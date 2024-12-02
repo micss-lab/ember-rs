@@ -1,0 +1,5 @@
+[formatting]
+reorder_keys = false
+array_auto_collapse = false
+indent_string = "    "
+inline_table_expand = false

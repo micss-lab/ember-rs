@@ -1,0 +1,5 @@
+# Nix-related artifacts.
+/.devenv
+
+# Rust build artifacts.
+/target

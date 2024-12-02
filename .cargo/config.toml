@@ -1,0 +1,9 @@
+[env]
+ESP_LOG = "trace"
+
+[target.riscv32imc-unknown-none-elf]
+rustflags = ["-C", "link-arg=-Tlinkall.x"]
+runner = "wokwi-server --chip esp32c3"
+
+[build]
+target = "riscv32imc-unknown-none-elf"
