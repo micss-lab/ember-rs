@@ -195,6 +195,7 @@
                 [
                   devRustToolchain
                   pkgs.espup
+                  pkgs.bacon
                 ]
                 ++ flakeChecksInputs;
 
