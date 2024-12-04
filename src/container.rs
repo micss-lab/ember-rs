@@ -2,6 +2,7 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 
 use crate::agent::Agent;
+use crate::behaviour::Context;
 
 #[derive(Default)]
 pub struct Container {
@@ -19,9 +20,19 @@ impl Container {
     }
 
     pub fn start(mut self) -> Result<(), Box<dyn core::error::Error>> {
-        loop {
+        'start: loop {
             for agent in self.agents.iter_mut() {
-                agent.update();
+                let mut context = Context::default();
+
+                agent.update(&mut context);
+
+                let Context {
+                    container: context, ..
+                } = context;
+
+                if context.should_stop {
+                    break 'start Ok(());
+                }
             }
         }
     }
