@@ -3,8 +3,7 @@ use alloc::string::{String, ToString};
 use crate::behaviour::{parallel, Behaviour, Context, ParallelBehaviour};
 
 pub struct Agent {
-    #[allow(unused)]
-    name: String,
+    pub(crate) name: String,
     behaviours: ParallelBehaviour<(), ()>,
 }
 

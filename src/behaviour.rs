@@ -1,6 +1,6 @@
 pub use self::complex::{parallel, ParallelBehaviour};
 pub use self::context::Context;
-pub use self::simple::OneShotBehaviour;
+pub use self::simple::{CyclicBehaviour, OneShotBehaviour, SimpleBehaviourState};
 pub use self::state::State;
 
 mod complex;

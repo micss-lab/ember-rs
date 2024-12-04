@@ -24,6 +24,7 @@ impl Container {
             for agent in self.agents.iter_mut() {
                 let mut context = Context::default();
 
+                log::trace!("Agent `{}` update:", agent.name);
                 agent.update(&mut context);
 
                 let Context {
