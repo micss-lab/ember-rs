@@ -615,7 +615,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d5439c4ad607c3c23abf66de8c8bf57ba8adcd1f129e699851a6e43935d339d"
 
 [[package]]
-name = "no-std-framework"
+name = "no-std-framework-core"
+version = "0.1.0"
+dependencies = [
+ "log",
+]
+
+[[package]]
+name = "no-std-framework-examples"
 version = "0.1.0"
 dependencies = [
  "esp-alloc",
@@ -623,6 +630,7 @@ dependencies = [
  "esp-hal",
  "esp-println",
  "log",
+ "no-std-framework-core",
 ]
 
 [[package]]

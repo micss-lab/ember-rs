@@ -6,4 +6,8 @@ rustflags = ["-C", "link-arg=-Tlinkall.x"]
 runner = "wokwi-server --chip esp32c3"
 
 [build]
-target = "riscv32imc-unknown-none-elf"
+target = ["riscv32imc-unknown-none-elf", "x86_64-unknown-linux-gnu"]
+
+[alias]
+run-local = "run --target=x86_64-unknown-linux-gnu"
+run-esp = "run --target=riscv32imc-unknown-none-elf"

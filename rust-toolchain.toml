@@ -1,5 +1,5 @@
 [toolchain]
 channel = "1.82.0"
 profile = "default"
-targets = ["riscv32imc-unknown-none-elf"]
+targets = ["riscv32imc-unknown-none-elf", "x86_64-unknown-linux-gnu"]
 components = ["rust-src"]

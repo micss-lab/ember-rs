@@ -1,20 +1,9 @@
-[package]
-name = "no-std-framework"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+resolver = "2"
+members = ["core", "examples"]
 
-[dependencies]
-esp-alloc = "0.5"
-log = "0.4"
-
-[dev-dependencies]
-esp-println = { version = "0.12.0", features = ["esp32c3", "log"] }
-esp-backtrace = { version = "0.14.2", default-features = false, features = [
-    "esp32c3",
-    "println",
-    "panic-handler",
-] }
-esp-hal = { version = "0.22.0", features = ["esp32c3"] }
+[workspace.dependencies]
+no-std-framework-core = { path = "./core" }
 
 [profile.dev]
 opt-level = 3
