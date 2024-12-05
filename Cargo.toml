@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["core", "examples"]
+members = ["core", "examples", "tests"]
 
 [workspace.dependencies]
 no-std-framework-core = { path = "./core" }

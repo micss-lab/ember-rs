@@ -6,6 +6,10 @@ pub struct State<R, P> {
 }
 
 impl<R, P> State<R, P> {
+    pub fn parent(&mut self) -> &mut P {
+        &mut self.parent
+    }
+
     pub(crate) fn cut_root(self) -> (R, P) {
         (self.root, self.parent)
     }
