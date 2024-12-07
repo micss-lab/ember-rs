@@ -768,6 +768,7 @@ dependencies = [
  "cbindgen",
  "critical-section",
  "esp-alloc",
+ "esp-riscv-rt",
  "no-std-framework-core",
 ]
 

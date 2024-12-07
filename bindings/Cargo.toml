@@ -12,6 +12,7 @@ no-std-framework-core = { workspace = true }
 
 [target.'cfg(target_os = "none")'.dependencies]
 esp-alloc = "0.5.0"
+esp-riscv-rt = "0.9.1"
 critical-section = "1.2.0"
 
 [build-dependencies]
