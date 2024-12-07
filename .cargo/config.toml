@@ -2,7 +2,7 @@
 ESP_LOG = "trace"
 
 [target.riscv32imc-unknown-none-elf]
-rustflags = ["-C", "link-arg=-Tlinkall.x"]
+rustflags = ["-C", "link-arg=-Tlinkall.x", "-C", "force-frame-pointers"]
 runner = "wokwi-server --chip esp32c3"
 
 [build]
