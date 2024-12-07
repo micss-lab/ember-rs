@@ -1,9 +1,12 @@
 [workspace]
 resolver = "2"
-members = ["core", "examples", "tests"]
+members = ["core", "examples", "tests", "bindings"]
 
 [workspace.dependencies]
 no-std-framework-core = { path = "./core" }
+
+[profile.release]
+panic = "abort"
 
 [profile.dev]
 opt-level = 3
@@ -12,7 +15,7 @@ strip = "none"
 debug-assertions = false
 overflow-checks = false
 lto = false
-panic = 'unwind'
+panic = 'abort'
 incremental = false
 codegen-units = 16
 rpath = false
