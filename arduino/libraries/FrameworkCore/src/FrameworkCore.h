@@ -21,6 +21,10 @@ int32_t container_start(Container *container);
 
 void container_free(Container *container);
 
+Agent *agent_new(const char *name);
+
+void agent_free(Agent *agent);
+
 /// Initialize the libraries global logger.
 ///
 /// Values less or equal to 0 disable logging. Values from 1 to 5 (and up) set respectively the levels;

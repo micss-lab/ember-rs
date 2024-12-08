@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 
 use crate::behaviour::{parallel, Behaviour, Context, ParallelBehaviour};
@@ -22,6 +23,13 @@ impl Agent {
 
     pub fn add_behaviour(&mut self, behaviour: impl Behaviour<ParentState = ()> + 'static) {
         self.behaviours.add_behaviour(behaviour);
+    }
+
+    pub fn add_boxed_behaviour(
+        &mut self,
+        behaviour: Box<dyn Behaviour<ParentState = ()> + 'static>,
+    ) {
+        self.behaviours.add_boxed_behaviour(behaviour);
     }
 
     pub(super) fn update(&mut self, context: &mut Context) {

@@ -35,6 +35,13 @@ impl<S, PS> ParallelBehaviour<S, PS> {
         self.add_behaviour(behaviour);
         self
     }
+
+    pub fn add_boxed_behaviour(
+        &mut self,
+        behaviour: Box<dyn Behaviour<ParentState = PS> + 'static>,
+    ) {
+        self.behaviours.push_back(behaviour);
+    }
 }
 
 impl<S, PS> ParallelBehaviour<S, PS> {
