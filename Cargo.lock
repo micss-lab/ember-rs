@@ -766,9 +766,12 @@ name = "no-std-framework-bindings"
 version = "0.1.0"
 dependencies = [
  "cbindgen",
+ "cfg-if",
  "critical-section",
  "esp-alloc",
+ "esp-println",
  "esp-riscv-rt",
+ "log",
  "no-std-framework-core",
 ]
 

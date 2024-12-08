@@ -196,6 +196,11 @@
                   devRustToolchain
                   pkgs.espup
                   pkgs.bacon
+
+                  pkgs.arduino-cli
+                  (pkgs.python3.withPackages (python-pkgs: [
+                    python-pkgs.pyserial
+                  ]))
                 ]
                 ++ flakeChecksInputs;
 

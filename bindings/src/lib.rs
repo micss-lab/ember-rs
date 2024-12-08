@@ -3,6 +3,7 @@
 extern crate alloc;
 
 mod ffi;
+mod log;
 
 #[cfg(target_os = "none")]
 mod esp;

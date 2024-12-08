@@ -1,10 +1,15 @@
 use core::panic::PanicInfo;
 
 use esp_alloc as _;
+use esp_println::logger::init_logger;
 
 #[panic_handler]
 fn panic(_: &PanicInfo) -> ! {
     loop {}
+}
+
+pub(crate) fn initialize_logging(level: log::LevelFilter) {
+    init_logger(level)
 }
 
 /// Esp32 single core critical section implementation.
