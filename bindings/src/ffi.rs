@@ -15,6 +15,7 @@ macro_rules! non_null {
     };
 }
 
+/// cbindgen:ignore
 mod util {
     use alloc::string::{String, ToString};
     use core::ffi::{c_char, CStr};
@@ -44,6 +45,14 @@ mod util {
     }
 }
 
+#[cfg(target_os = "none")]
+mod esp {
+    #[no_mangle]
+    pub extern "C" fn initialize_allocator() {
+        crate::esp::initialize_allocator();
+    }
+}
+
 mod container {
     use no_std_framework_core::{Agent, Container};
 
@@ -63,7 +72,12 @@ mod container {
         new(Container::default())
     }
 
-    // Wrapper to add an agent to the container
+    #[no_mangle]
+    pub extern "C" fn container_free(container: *mut Container) {
+        non_null_or_bail!(container, "attemted to free container null-pointer");
+        unsafe { drop_raw(container) }
+    }
+
     #[no_mangle]
     pub extern "C" fn container_add_agent(container: *mut Container, agent: *mut Agent) {
         non_null!(container, "got container nullpointer");
@@ -72,23 +86,14 @@ mod container {
         unsafe { (*container).add_agent(agent) };
     }
 
-    // Wrapper to start the container
     #[no_mangle]
     pub extern "C" fn container_start(container: *mut Container) -> i32 {
         non_null!(container, "got container null-pointer");
-
         let result = unsafe { from_raw(container) }.start();
         match result {
             Ok(()) => 0,
-            Err(_) => -1,
+            Err(_) => 1,
         }
-    }
-
-    // Wrapper to free the container
-    #[no_mangle]
-    pub extern "C" fn container_free(container: *mut Container) {
-        non_null_or_bail!(container, "attemted to free container null-pointer");
-        unsafe { drop_raw(container) }
     }
 }
 
@@ -96,7 +101,8 @@ mod agent {
     use alloc::boxed::Box;
     use core::ffi::c_char;
 
-    use no_std_framework_core::{behaviour::Behaviour, Agent};
+    use no_std_framework_core::behaviour::{Behaviour, OneShotBehaviour};
+    use no_std_framework_core::Agent;
 
     use super::util::{drop_raw, new, ref_from_raw, string_from_raw};
 
@@ -106,22 +112,52 @@ mod agent {
         new(Agent::new(name))
     }
 
-    // #[no_mangle]
-    // pub extern "C" fn agent_add_behaviour(
-    //     agent: *mut Agent,
-    //     behaviour: *mut dyn Behaviour<ParentState = ()>,
-    // ) {
-    //     non_null!(agent, "got agent null-pointer");
-    //     non_null!(agent, "got behaviour null-pointer");
-    //     let agent = unsafe { ref_from_raw(agent) };
-    //     let behaviour = unsafe { Box::from_raw(behaviour) };
-    //     agent.add_boxed_behaviour(behaviour);
-    // }
-
     #[no_mangle]
     pub extern "C" fn agent_free(agent: *mut Agent) {
         non_null_or_bail!(agent, "attemted to free agent null-pointer");
         unsafe { drop_raw(agent) }
+    }
+
+    // TODO: Add more behaviours here.
+    #[no_mangle]
+    pub extern "C" fn agent_add_behaviour_oneshot(
+        agent: *mut Agent,
+        oneshot: *mut OneShotBehaviour<()>,
+    ) {
+        non_null!(agent, "got agent null-pointer");
+        let agent = unsafe { ref_from_raw(agent) };
+        let behaviour = unsafe { Box::from_raw(oneshot) };
+        agent.add_boxed_behaviour(behaviour as Box<dyn Behaviour<ParentState = ()>>)
+    }
+}
+
+mod behaviour {
+    use core::ffi::c_void;
+    use core::ptr;
+
+    use no_std_framework_core::behaviour::{Context, OneShotBehaviour};
+
+    use super::util::{drop_raw, new};
+
+    #[repr(C)]
+    pub struct State {
+        root: *mut c_void,
+        parent: *mut State,
+    }
+
+    #[no_mangle]
+    pub extern "C" fn behaviour_oneshot_new(
+        action: extern "C" fn(*mut Context, State) -> State,
+    ) -> *mut OneShotBehaviour<State> {
+        new(OneShotBehaviour::new(move |ctx, state| {
+            (action)(ptr::from_mut(ctx), state)
+        }))
+    }
+
+    #[no_mangle]
+    pub extern "C" fn behaviour_oneshot_free(oneshot: *mut OneShotBehaviour<State>) {
+        non_null_or_bail!(oneshot, "attemted to free agent null-pointer");
+        unsafe { drop_raw(oneshot) };
     }
 }
 

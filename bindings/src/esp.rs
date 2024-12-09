@@ -3,6 +3,8 @@ use core::panic::PanicInfo;
 use esp_alloc as _;
 use esp_println::logger::init_logger;
 
+const HEAP_SIZE: usize = 160 * 1024;
+
 #[panic_handler]
 fn panic(_: &PanicInfo) -> ! {
     loop {}
@@ -10,6 +12,10 @@ fn panic(_: &PanicInfo) -> ! {
 
 pub(crate) fn initialize_logging(level: log::LevelFilter) {
     init_logger(level)
+}
+
+pub(crate) fn initialize_allocator() {
+    esp_alloc::heap_allocator!(HEAP_SIZE);
 }
 
 /// Esp32 single core critical section implementation.

@@ -20,11 +20,13 @@ impl Container {
     }
 
     pub fn start(mut self) -> Result<(), Box<dyn core::error::Error>> {
+        log::trace!("Starting the container.\r");
         'start: loop {
+            log::trace!("Polling all agents.\r");
             for agent in self.agents.iter_mut() {
                 let mut context = Context::default();
 
-                log::trace!("Agent `{}` update:", agent.name);
+                log::trace!("Agent `{}` update:\r", agent.name);
                 agent.update(&mut context);
 
                 let Context {

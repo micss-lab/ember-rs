@@ -19,6 +19,7 @@ fn main() {
             ..Default::default()
         },
         no_includes: true,
+        cpp_compat: true,
         ..Default::default()
     };
 

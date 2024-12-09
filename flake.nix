@@ -198,6 +198,7 @@
                   pkgs.bacon
 
                   pkgs.arduino-cli
+                  pkgs.arduino
                   (pkgs.python3.withPackages (python-pkgs: [
                     python-pkgs.pyserial
                   ]))

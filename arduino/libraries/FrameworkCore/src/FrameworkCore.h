@@ -5,7 +5,19 @@ struct Agent;
 
 struct Container;
 
+struct Context;
+
+template<typename S = void>
+struct OneShotBehaviour;
+
+struct State {
+  void *root;
+  State *parent;
+};
+
 extern "C" {
+
+void initialize_allocator();
 
 /// Creates a new container instance.
 ///
@@ -15,15 +27,21 @@ extern "C" {
 /// with the accompanying [`container_free`].
 Container *container_new();
 
+void container_free(Container *container);
+
 void container_add_agent(Container *container, Agent *agent);
 
 int32_t container_start(Container *container);
 
-void container_free(Container *container);
-
 Agent *agent_new(const char *name);
 
 void agent_free(Agent *agent);
+
+void agent_add_behaviour_oneshot(Agent *agent, OneShotBehaviour<void> *oneshot);
+
+OneShotBehaviour<State> *behaviour_oneshot_new(State (*action)(Context*, State));
+
+void behaviour_oneshot_free(OneShotBehaviour<State> *oneshot);
 
 /// Initialize the libraries global logger.
 ///
