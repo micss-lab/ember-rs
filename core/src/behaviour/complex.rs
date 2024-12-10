@@ -1,10 +1,12 @@
 use alloc::boxed::Box;
 
 pub use self::parallel::ParallelBehaviour;
+pub use self::sequential::SequentialBehaviour;
 
 use super::{Behaviour, State};
 
 pub mod parallel;
+mod sequential;
 
 trait ComplexBehaviour {
     /// The state that is passed down to the child-behaviours.
