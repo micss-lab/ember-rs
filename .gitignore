@@ -3,3 +3,6 @@
 
 # Rust build artifacts.
 /target
+
+# Editor artifacts.
+.idea

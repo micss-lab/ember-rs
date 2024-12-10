@@ -4,5 +4,5 @@
 set -e
 
 cargo build --release --target riscv32imc-unknown-none-elf --package no-std-framework-bindings
-cp ./target/riscv32imc-unknown-none-elf/release/libframework_core.a ./arduino/libraries/FrameworkCore/src/esp32c3/FrameworkCore.a
-cp ./target/bindings.hpp ./arduino/libraries/FrameworkCore/src/FrameworkCore.h
+cp ./target/riscv32imc-unknown-none-elf/release/libframework_core.a ./arduino/libraries/Framework/src/esp32c3/FrameworkCore.a
+cp ./target/bindings.hpp ./arduino/libraries/Framework/src/FrameworkCore.h

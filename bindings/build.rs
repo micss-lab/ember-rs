@@ -12,14 +12,14 @@ fn main() {
         .to_string();
 
     let config = Config {
-        namespace: Some(String::from("ffi")),
+        namespace: Some(String::from("framework::__ffi")),
         parse: ParseConfig {
             parse_deps: true,
             include: Some(Vec::from(["no-std-framework-core".into()])),
             ..Default::default()
         },
         no_includes: true,
-        cpp_compat: true,
+        include_guard: Some("FRAMEWORK_CORE_H".into()),
         ..Default::default()
     };
 

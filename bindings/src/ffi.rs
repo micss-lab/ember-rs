@@ -155,7 +155,22 @@ mod behaviour {
     }
 
     #[no_mangle]
+    pub extern "C" fn behaviour_oneshot_new_void(
+        action: extern "C" fn(*mut Context),
+    ) -> *mut OneShotBehaviour<()> {
+        new(OneShotBehaviour::new(move |ctx, _| {
+            (action)(ptr::from_mut(ctx))
+        }))
+    }
+
+    #[no_mangle]
     pub extern "C" fn behaviour_oneshot_free(oneshot: *mut OneShotBehaviour<State>) {
+        non_null_or_bail!(oneshot, "attemted to free agent null-pointer");
+        unsafe { drop_raw(oneshot) };
+    }
+
+    #[no_mangle]
+    pub extern "C" fn behaviour_oneshot_free_void(oneshot: *mut OneShotBehaviour<()>) {
         non_null_or_bail!(oneshot, "attemted to free agent null-pointer");
         unsafe { drop_raw(oneshot) };
     }

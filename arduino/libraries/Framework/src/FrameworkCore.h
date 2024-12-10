@@ -1,0 +1,62 @@
+#ifndef FRAMEWORK_CORE_H
+#define FRAMEWORK_CORE_H
+
+namespace framework::__ffi {
+
+struct Agent;
+
+struct Container;
+
+struct Context;
+
+template<typename S = void>
+struct OneShotBehaviour;
+
+struct State {
+  void *root;
+  State *parent;
+};
+
+extern "C" {
+
+void initialize_allocator();
+
+/// Creates a new container instance.
+///
+/// # Safety
+///
+/// The ownership of the instance is transferred to the caller. Make sure to free the memory
+/// with the accompanying [`container_free`].
+Container *container_new();
+
+void container_free(Container *container);
+
+void container_add_agent(Container *container, Agent *agent);
+
+int32_t container_start(Container *container);
+
+Agent *agent_new(const char *name);
+
+void agent_free(Agent *agent);
+
+void agent_add_behaviour_oneshot(Agent *agent, OneShotBehaviour<void> *oneshot);
+
+OneShotBehaviour<State> *behaviour_oneshot_new(State (*action)(Context*, State));
+
+OneShotBehaviour<void> *behaviour_oneshot_new_void(void (*action)(Context*));
+
+void behaviour_oneshot_free(OneShotBehaviour<State> *oneshot);
+
+void behaviour_oneshot_free_void(OneShotBehaviour<void> *oneshot);
+
+/// Initialize the libraries global logger.
+///
+/// Values less or equal to 0 disable logging. Values from 1 to 5 (and up) set respectively the levels;
+/// error, warn, info, debug, trace.
+void initialize_logging(char level);
+
+}  // extern "C"
+
+}  // namespace framework::__ffi
+
+#endif  // FRAMEWORK_CORE_H
