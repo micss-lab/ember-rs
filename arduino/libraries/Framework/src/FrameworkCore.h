@@ -9,8 +9,16 @@ struct Container;
 
 struct Context;
 
+template<typename S = void, typename P = void>
+struct CyclicBehaviour;
+
 template<typename S = void>
 struct OneShotBehaviour;
+
+struct SimpleState {
+  void *value;
+  bool finished;
+};
 
 struct State {
   void *root;
@@ -41,6 +49,8 @@ void agent_free(Agent *agent);
 
 void agent_add_behaviour_oneshot(Agent *agent, OneShotBehaviour<void> *oneshot);
 
+void agent_add_behaviour_cyclic(Agent *agent, CyclicBehaviour<SimpleState, void> *cyclic);
+
 OneShotBehaviour<State> *behaviour_oneshot_new(State (*action)(Context*, State));
 
 OneShotBehaviour<void> *behaviour_oneshot_new_void(void (*action)(Context*));
@@ -48,6 +58,18 @@ OneShotBehaviour<void> *behaviour_oneshot_new_void(void (*action)(Context*));
 void behaviour_oneshot_free(OneShotBehaviour<State> *oneshot);
 
 void behaviour_oneshot_free_void(OneShotBehaviour<void> *oneshot);
+
+CyclicBehaviour<SimpleState, State> *behaviour_cyclic_new(SimpleState state,
+                                                          State (*action)(Context*,
+                                                                          SimpleState*,
+                                                                          State));
+
+CyclicBehaviour<SimpleState, void> *behaviour_cyclic_new_void(SimpleState state,
+                                                              void (*action)(Context*, SimpleState*));
+
+void behaviour_cyclic_free(CyclicBehaviour<SimpleState, State> *oneshot);
+
+void behaviour_cyclic_free_void(CyclicBehaviour<SimpleState, void> *oneshot);
 
 /// Initialize the libraries global logger.
 ///

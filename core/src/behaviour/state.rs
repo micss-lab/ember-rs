@@ -10,8 +10,14 @@ impl<R, P> State<R, P> {
         &mut self.parent
     }
 
-    pub(crate) fn cut_root(self) -> (R, P) {
+    #[doc(hidden)]
+    pub fn cut_root(self) -> (R, P) {
         (self.root, self.parent)
+    }
+
+    #[doc(hidden)]
+    pub fn new(root: R, parent: P) -> State<R, P> {
+        Self { root, parent }
     }
 }
 

@@ -9,6 +9,22 @@ public:
   }
 };
 
+class Messenger {
+public:
+  struct State {
+    int counter{0};
+  };
+
+  static void action(framework::behaviour::Context& context, framework::behaviour::SimpleState& state_) {
+    Serial.println("This is a message");
+    State* state = static_cast<State*>(state_.value);
+    if (state->counter == 10) {
+      state_.finished = true;
+    }
+    ++state->counter;
+  }
+};
+
 void setup() {
   Serial.begin(115200);
   Serial.println("Hello, ESP32-C3!");
@@ -24,6 +40,7 @@ void setup() {
 
   framework::Agent hello_world_agent = framework::Agent("hello-world-agent");
   hello_world_agent.add_behaviour(std::make_unique<framework::behaviour::OneShotBehaviour<HelloWorld, void>>());
+  hello_world_agent.add_behaviour(std::make_unique<framework::behaviour::CyclicBehaviour<Messenger, Messenger::State, void>>(std::make_unique<Messenger::State>()));
 
   container.add_agent(std::move(hello_world_agent));
 

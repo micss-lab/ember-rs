@@ -101,9 +101,10 @@ mod agent {
     use alloc::boxed::Box;
     use core::ffi::c_char;
 
-    use no_std_framework_core::behaviour::{Behaviour, OneShotBehaviour};
+    use no_std_framework_core::behaviour::{Behaviour, CyclicBehaviour, OneShotBehaviour};
     use no_std_framework_core::Agent;
 
+    use super::behaviour::simple::SimpleState;
     use super::util::{drop_raw, new, ref_from_raw, string_from_raw};
 
     #[no_mangle]
@@ -129,15 +130,21 @@ mod agent {
         let behaviour = unsafe { Box::from_raw(oneshot) };
         agent.add_boxed_behaviour(behaviour as Box<dyn Behaviour<ParentState = ()>>)
     }
+
+    #[no_mangle]
+    pub extern "C" fn agent_add_behaviour_cyclic(
+        agent: *mut Agent,
+        cyclic: *mut CyclicBehaviour<SimpleState, ()>,
+    ) {
+        non_null!(agent, "got agent null-pointer");
+        let agent = unsafe { ref_from_raw(agent) };
+        let behaviour = unsafe { Box::from_raw(cyclic) };
+        agent.add_boxed_behaviour(behaviour as Box<dyn Behaviour<ParentState = ()>>)
+    }
 }
 
 mod behaviour {
     use core::ffi::c_void;
-    use core::ptr;
-
-    use no_std_framework_core::behaviour::{Context, OneShotBehaviour};
-
-    use super::util::{drop_raw, new};
 
     #[repr(C)]
     pub struct State {
@@ -145,34 +152,111 @@ mod behaviour {
         parent: *mut State,
     }
 
-    #[no_mangle]
-    pub extern "C" fn behaviour_oneshot_new(
-        action: extern "C" fn(*mut Context, State) -> State,
-    ) -> *mut OneShotBehaviour<State> {
-        new(OneShotBehaviour::new(move |ctx, state| {
-            (action)(ptr::from_mut(ctx), state)
-        }))
-    }
+    pub(super) mod simple {
+        use core::ffi::c_void;
 
-    #[no_mangle]
-    pub extern "C" fn behaviour_oneshot_new_void(
-        action: extern "C" fn(*mut Context),
-    ) -> *mut OneShotBehaviour<()> {
-        new(OneShotBehaviour::new(move |ctx, _| {
-            (action)(ptr::from_mut(ctx))
-        }))
-    }
+        use no_std_framework_core::behaviour::SimpleBehaviourState;
 
-    #[no_mangle]
-    pub extern "C" fn behaviour_oneshot_free(oneshot: *mut OneShotBehaviour<State>) {
-        non_null_or_bail!(oneshot, "attemted to free agent null-pointer");
-        unsafe { drop_raw(oneshot) };
-    }
+        use super::State;
+        use crate::ffi::util::{drop_raw, new};
 
-    #[no_mangle]
-    pub extern "C" fn behaviour_oneshot_free_void(oneshot: *mut OneShotBehaviour<()>) {
-        non_null_or_bail!(oneshot, "attemted to free agent null-pointer");
-        unsafe { drop_raw(oneshot) };
+        #[repr(C)]
+        pub struct SimpleState {
+            value: *mut c_void,
+            finished: bool,
+        }
+
+        impl SimpleBehaviourState for SimpleState {
+            fn finished(&self) -> bool {
+                self.finished
+            }
+        }
+
+        mod oneshot {
+            use core::ptr;
+
+            use no_std_framework_core::behaviour::{Context, OneShotBehaviour};
+
+            use super::{drop_raw, new, State};
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_oneshot_new(
+                action: extern "C" fn(*mut Context, State) -> State,
+            ) -> *mut OneShotBehaviour<State> {
+                new(OneShotBehaviour::new(move |ctx, state| {
+                    (action)(ptr::from_mut(ctx), state)
+                }))
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_oneshot_new_void(
+                action: extern "C" fn(*mut Context),
+            ) -> *mut OneShotBehaviour<()> {
+                new(OneShotBehaviour::new(move |ctx, _| {
+                    (action)(ptr::from_mut(ctx))
+                }))
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_oneshot_free(oneshot: *mut OneShotBehaviour<State>) {
+                non_null_or_bail!(oneshot, "attemted to free agent null-pointer");
+                unsafe { drop_raw(oneshot) };
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_oneshot_free_void(oneshot: *mut OneShotBehaviour<()>) {
+                non_null_or_bail!(oneshot, "attemted to free agent null-pointer");
+                unsafe { drop_raw(oneshot) };
+            }
+        }
+
+        mod cyclic {
+            use core::ptr;
+
+            use no_std_framework_core::behaviour::{Context, CyclicBehaviour};
+
+            use super::{drop_raw, new, SimpleState, State};
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_cyclic_new(
+                state: SimpleState,
+                action: extern "C" fn(*mut Context, *mut SimpleState, State) -> State,
+            ) -> *mut CyclicBehaviour<SimpleState, State> {
+                new(CyclicBehaviour::new(state, move |ctx, state| {
+                    let (mut state, parent) = state.cut_root();
+                    let parent = (action)(ptr::from_mut(ctx), ptr::from_mut(&mut state), parent);
+                    no_std_framework_core::behaviour::State::new(state, parent)
+                }))
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_cyclic_new_void(
+                state: SimpleState,
+                action: extern "C" fn(*mut Context, *mut SimpleState),
+            ) -> *mut CyclicBehaviour<SimpleState, ()> {
+                new(CyclicBehaviour::new(state, move |ctx, state| {
+                    let (mut state, _) = state.cut_root();
+                    (action)(ptr::from_mut(ctx), ptr::from_mut(&mut state));
+                    no_std_framework_core::behaviour::State::new(state, ())
+                }))
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_cyclic_free(
+                oneshot: *mut CyclicBehaviour<SimpleState, State>,
+            ) {
+                non_null_or_bail!(oneshot, "attemted to free agent null-pointer");
+                unsafe { drop_raw(oneshot) };
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_cyclic_free_void(
+                oneshot: *mut CyclicBehaviour<SimpleState, ()>,
+            ) {
+                non_null_or_bail!(oneshot, "attemted to free agent null-pointer");
+                unsafe { drop_raw(oneshot) };
+            }
+        }
     }
 }
 
