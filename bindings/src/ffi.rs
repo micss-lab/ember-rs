@@ -199,13 +199,13 @@ mod behaviour {
 
             #[no_mangle]
             pub extern "C" fn behaviour_oneshot_free(oneshot: *mut OneShotBehaviour<State>) {
-                non_null_or_bail!(oneshot, "attemted to free agent null-pointer");
+                non_null_or_bail!(oneshot, "attemted to free oneshot behaviour null-pointer");
                 unsafe { drop_raw(oneshot) };
             }
 
             #[no_mangle]
             pub extern "C" fn behaviour_oneshot_free_void(oneshot: *mut OneShotBehaviour<()>) {
-                non_null_or_bail!(oneshot, "attemted to free agent null-pointer");
+                non_null_or_bail!(oneshot, "attemted to free oneshot behaviour null-pointer");
                 unsafe { drop_raw(oneshot) };
             }
         }
@@ -243,18 +243,68 @@ mod behaviour {
 
             #[no_mangle]
             pub extern "C" fn behaviour_cyclic_free(
-                oneshot: *mut CyclicBehaviour<SimpleState, State>,
+                cyclic: *mut CyclicBehaviour<SimpleState, State>,
             ) {
-                non_null_or_bail!(oneshot, "attemted to free agent null-pointer");
-                unsafe { drop_raw(oneshot) };
+                non_null_or_bail!(cyclic, "attemted to free cyclic behaviour null-pointer");
+                unsafe { drop_raw(cyclic) };
             }
 
             #[no_mangle]
             pub extern "C" fn behaviour_cyclic_free_void(
-                oneshot: *mut CyclicBehaviour<SimpleState, ()>,
+                cyclic: *mut CyclicBehaviour<SimpleState, ()>,
             ) {
-                non_null_or_bail!(oneshot, "attemted to free agent null-pointer");
-                unsafe { drop_raw(oneshot) };
+                non_null_or_bail!(cyclic, "attemted to free cyclic behaviour null-pointer");
+                unsafe { drop_raw(cyclic) };
+            }
+        }
+    }
+
+    mod complex {
+        use super::super::util;
+        use super::State;
+
+        mod sequential {
+            use core::ffi::c_void;
+
+            use no_std_framework_core::behaviour::SequentialBehaviour;
+
+            use super::util::{drop_raw, new};
+            use super::State;
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_sequential_new(
+                state: *mut c_void,
+            ) -> *mut SequentialBehaviour<*mut c_void, State> {
+                new(SequentialBehaviour::new(state))
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_sequential_new_void(
+                state: *mut c_void,
+            ) -> *mut SequentialBehaviour<*mut c_void, ()> {
+                new(SequentialBehaviour::new(state))
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_sequential_free(
+                sequential: *mut SequentialBehaviour<*mut c_void, State>,
+            ) {
+                non_null_or_bail!(
+                    sequential,
+                    "attempted to free sequential behaviour null-pointer"
+                );
+                unsafe { drop_raw(sequential) };
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_sequential_free_void(
+                sequential: *mut SequentialBehaviour<*mut c_void, ()>,
+            ) {
+                non_null_or_bail!(
+                    sequential,
+                    "attempted to free sequential behaviour null-pointer"
+                );
+                unsafe { drop_raw(sequential) };
             }
         }
     }

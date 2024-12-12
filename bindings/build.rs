@@ -19,6 +19,7 @@ fn main() {
             ..Default::default()
         },
         no_includes: true,
+        includes: Vec::from(["inttypes.h".into()]),
         include_guard: Some("FRAMEWORK_CORE_H".into()),
         ..Default::default()
     };

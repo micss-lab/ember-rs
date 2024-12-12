@@ -14,6 +14,7 @@ mod setup_example {
             mod esp_imports {
                 pub(super) use esp_backtrace as _;
                 pub(super) use esp_hal::prelude::*;
+                pub(super) use esp_hal_embassy as _;
 
                 pub(super) use no_std_framework_examples::esp;
             }

@@ -1,11 +1,7 @@
 #ifndef FRAMEWORK_CORE_H
 #define FRAMEWORK_CORE_H
 
-#include <cstdarg>
-#include <cstdint>
-#include <cstdlib>
-#include <ostream>
-#include <new>
+#include "inttypes.h"
 
 namespace framework::__ffi {
 

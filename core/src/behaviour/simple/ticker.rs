@@ -1,11 +1,9 @@
 use super::{Behaviour, Context, CyclicBehaviour, SimpleBehaviourState, State};
 
-use core::time::Duration;
-
 #[cfg(target_os = "none")]
-use esp_hal::time::Instant;
+use embassy_time::{Duration, Instant};
 #[cfg(not(target_os = "none"))]
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 pub struct TickerBehaviour<S: SimpleBehaviourState, P> {
     cyclic: CyclicBehaviour<S, P>,
@@ -14,14 +12,15 @@ pub struct TickerBehaviour<S: SimpleBehaviourState, P> {
 }
 
 impl<S: SimpleBehaviourState, P> TickerBehaviour<S, P> {
+    /// Note: Duration in nano seconds must fit in a 64 bit unsigned integer.
     pub fn new(
-        interval: Duration,
+        interval: core::time::Duration,
         state: S,
         action: impl FnMut(&mut Context, State<S, P>) -> State<S, P> + Send + 'static,
     ) -> Self {
         Self {
             cyclic: CyclicBehaviour::new(state, action),
-            interval,
+            interval: from_std_duration(interval),
             last_tick: None,
         }
     }
@@ -33,34 +32,23 @@ impl<S: SimpleBehaviourState, P> Behaviour for TickerBehaviour<S, P> {
     fn action(&mut self, ctx: &mut Context, parent_state: P) -> (bool, P) {
         if self
             .last_tick
-            .map(|l| current_time_diff_nanos(l) < self.interval.as_nanos() as u64)
+            .map(|l| Instant::now() - l < self.interval)
             .unwrap_or(false)
         {
             return (false, parent_state);
         }
 
-        self.last_tick = Some(current_time());
+        self.last_tick = Some(Instant::now());
         self.cyclic.action(ctx, parent_state)
     }
 }
 
-fn current_time_diff_nanos(last: Instant) -> u64 {
-    let current_time = current_time();
+fn from_std_duration(duration: core::time::Duration) -> Duration {
     cfg_if::cfg_if! {
         if #[cfg(target_os = "none")] {
-            (current_time - last).to_nanos()
+            Duration::from_nanos(duration.as_nanos() as u64)
         } else {
-            (current_time - last).as_nanos() as u64
-        }
-    }
-}
-
-fn current_time() -> Instant {
-    cfg_if::cfg_if! {
-        if #[cfg(target_os = "none")] {
-            esp_hal::time::now()
-        } else {
-            std::time::Instant::now()
+            duration
         }
     }
 }
