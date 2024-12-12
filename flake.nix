@@ -202,6 +202,8 @@
                   (pkgs.python3.withPackages (python-pkgs: [
                     python-pkgs.pyserial
                   ]))
+
+                  pkgs.just
                 ]
                 ++ flakeChecksInputs;
 
