@@ -1,9 +1,11 @@
 #ifndef FRAMEWORK_CONTAINER_H
 #define FRAMEWORK_CONTAINER_H
 
-#include "Agent.h"
 #include "FrameworkCore.h"
+
 #include "Object.h"
+
+#include "Agent.h"
 
 namespace framework {
 

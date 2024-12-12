@@ -3,9 +3,11 @@
 
 #include <memory>
 
-#include "Behaviour.h"
-#include "Object.h"
 #include "FrameworkCore.h"
+
+#include "Object.h"
+
+#include "behaviour/Behaviour.h"
 
 namespace framework {
 

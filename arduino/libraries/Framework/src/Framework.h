@@ -2,13 +2,14 @@
 #define FRAMEWORK_H
 
 #include <inttypes.h>
-#include <functional>
 
 #include "FrameworkCore.h"
 
 #include "Agent.h"
 #include "Container.h"
-#include "Behaviour.h"
+
+#include "behaviour/OneShotBehaviour.h"
+#include "behaviour/CyclicBehaviour.h"
 
 namespace framework {
 

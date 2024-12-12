@@ -1,6 +1,12 @@
 #ifndef FRAMEWORK_CORE_H
 #define FRAMEWORK_CORE_H
 
+#include <cstdarg>
+#include <cstdint>
+#include <cstdlib>
+#include <ostream>
+#include <new>
+
 namespace framework::__ffi {
 
 struct Agent;
@@ -14,6 +20,9 @@ struct CyclicBehaviour;
 
 template<typename S = void>
 struct OneShotBehaviour;
+
+template<typename S = void, typename PS = void>
+struct SequentialBehaviour;
 
 struct SimpleState {
   void *value;
@@ -67,9 +76,17 @@ CyclicBehaviour<SimpleState, State> *behaviour_cyclic_new(SimpleState state,
 CyclicBehaviour<SimpleState, void> *behaviour_cyclic_new_void(SimpleState state,
                                                               void (*action)(Context*, SimpleState*));
 
-void behaviour_cyclic_free(CyclicBehaviour<SimpleState, State> *oneshot);
+void behaviour_cyclic_free(CyclicBehaviour<SimpleState, State> *cyclic);
 
-void behaviour_cyclic_free_void(CyclicBehaviour<SimpleState, void> *oneshot);
+void behaviour_cyclic_free_void(CyclicBehaviour<SimpleState, void> *cyclic);
+
+SequentialBehaviour<void*, State> *behaviour_sequential_new(void *state);
+
+SequentialBehaviour<void*, void> *behaviour_sequential_new_void(void *state);
+
+void behaviour_sequential_free(SequentialBehaviour<void*, State> *sequential);
+
+void behaviour_sequential_free_void(SequentialBehaviour<void*, void> *sequential);
 
 /// Initialize the libraries global logger.
 ///
