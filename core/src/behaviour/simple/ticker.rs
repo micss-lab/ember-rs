@@ -1,45 +1,67 @@
-use super::{Behaviour, Context, CyclicBehaviour, SimpleBehaviourState, State};
+use core::ops::DerefMut;
+
+use super::{Context, CyclicBehaviour};
 
 #[cfg(target_os = "none")]
 use embassy_time::{Duration, Instant};
 #[cfg(not(target_os = "none"))]
 use std::time::{Duration, Instant};
 
-pub struct TickerBehaviour<S: SimpleBehaviourState, P> {
-    cyclic: CyclicBehaviour<S, P>,
+pub trait TickerBehaviour {
+    fn interval() -> core::time::Duration;
+
+    fn action(&mut self, ctx: &mut Context);
+
+    fn is_finished(&self) -> bool;
+}
+
+pub(crate) struct TickerBehaviourWrapper<C> {
+    cyclic: C,
     interval: Duration,
     last_tick: Option<Instant>,
 }
 
-impl<S: SimpleBehaviourState, P> TickerBehaviour<S, P> {
+impl<C> TickerBehaviourWrapper<C> {
     /// Note: Duration in nano seconds must fit in a 64 bit unsigned integer.
-    pub fn new(
-        interval: core::time::Duration,
-        state: S,
-        action: impl FnMut(&mut Context, State<S, P>) -> State<S, P> + Send + 'static,
-    ) -> Self {
+    pub fn new(interval: core::time::Duration, cyclic: C) -> Self {
         Self {
-            cyclic: CyclicBehaviour::new(state, action),
+            cyclic,
             interval: from_std_duration(interval),
             last_tick: None,
         }
     }
 }
 
-impl<S: SimpleBehaviourState, P> Behaviour for TickerBehaviour<S, P> {
-    type ParentState = P;
-
-    fn action(&mut self, ctx: &mut Context, parent_state: P) -> (bool, P) {
+impl<B, C> TickerBehaviourWrapper<B>
+where
+    B: DerefMut<Target = C>,
+    C: CyclicBehaviour + ?Sized,
+{
+    pub(crate) fn action(&mut self, ctx: &mut Context) -> bool {
         if self
             .last_tick
             .map(|l| Instant::now() - l < self.interval)
             .unwrap_or(false)
         {
-            return (false, parent_state);
+            return self.cyclic.is_finished();
         }
 
         self.last_tick = Some(Instant::now());
-        self.cyclic.action(ctx, parent_state)
+        self.cyclic.deref_mut().action(ctx);
+        self.cyclic.deref().is_finished()
+    }
+}
+
+impl<T> CyclicBehaviour for T
+where
+    T: TickerBehaviour,
+{
+    fn action(&mut self, ctx: &mut Context) {
+        self.action(ctx)
+    }
+
+    fn is_finished(&self) -> bool {
+        self.is_finished()
     }
 }
 
