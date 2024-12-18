@@ -1,24 +1,34 @@
-use alloc::collections::vec_deque::VecDeque;
+use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 
-use super::{Behaviour, BehaviourQueue};
+use crate::behaviour::Behaviour;
 
-#[derive(Default)]
-pub struct SequentialBehaviour {
-    queue: VecDeque<Behaviour>,
+use super::BehaviourQueue;
+
+pub trait SequentialBehaviour<M>: Behaviour {
+    fn queue(&mut self) -> &mut SequentialBehaviourQueue<M>;
 }
 
-impl SequentialBehaviour {
+pub struct SequentialBehaviourQueue<M> {
+    queue: VecDeque<Box<dyn Behaviour<Message = M>>>,
+}
+
+impl<M> SequentialBehaviourQueue<M> {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            queue: VecDeque::new(),
+        }
     }
 }
 
-impl BehaviourQueue for SequentialBehaviour {
-    fn next(&mut self) -> Option<Behaviour> {
+struct Seq;
+impl<M: 'static> BehaviourQueue<M> for SequentialBehaviourQueue<M> {
+    type Ord = Seq;
+
+    fn next(&mut self) -> Option<Box<dyn Behaviour<Message = M>>> {
         self.queue.pop_front()
     }
 
-    fn schedule(&mut self, behaviour: Behaviour) {
+    fn schedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>) {
         self.queue.push_back(behaviour)
     }
 

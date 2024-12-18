@@ -1,5 +1,7 @@
 use super::Context;
 
 pub trait OneShotBehaviour {
-    fn action(&self, ctx: &mut Context);
+    type Message;
+
+    fn action(&self, ctx: &mut Context<Self::Message>);
 }

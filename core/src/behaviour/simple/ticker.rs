@@ -8,9 +8,11 @@ use embassy_time::{Duration, Instant};
 use std::time::{Duration, Instant};
 
 pub trait TickerBehaviour {
+    type Message;
+
     fn interval() -> core::time::Duration;
 
-    fn action(&mut self, ctx: &mut Context);
+    fn action(&mut self, ctx: &mut Context<Self::Message>);
 
     fn is_finished(&self) -> bool;
 }
@@ -32,12 +34,12 @@ impl<C> TickerBehaviourWrapper<C> {
     }
 }
 
-impl<B, C> TickerBehaviourWrapper<B>
+impl<B, C, M> TickerBehaviourWrapper<B>
 where
     B: DerefMut<Target = C>,
-    C: CyclicBehaviour + ?Sized,
+    C: CyclicBehaviour<Message = M> + ?Sized,
 {
-    pub(crate) fn action(&mut self, ctx: &mut Context) -> bool {
+    pub(crate) fn action(&mut self, ctx: &mut Context<M>) -> bool {
         if self
             .last_tick
             .map(|l| Instant::now() - l < self.interval)
@@ -52,11 +54,13 @@ where
     }
 }
 
-impl<T> CyclicBehaviour for T
+impl<T, M> CyclicBehaviour for T
 where
-    T: TickerBehaviour,
+    T: TickerBehaviour<Message = M>,
 {
-    fn action(&mut self, ctx: &mut Context) {
+    type Message = M;
+
+    fn action(&mut self, ctx: &mut Context<Self::Message>) {
         self.action(ctx)
     }
 

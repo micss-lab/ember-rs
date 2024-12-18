@@ -1,9 +1,13 @@
-use alloc::collections::vec_deque::VecDeque;
+use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 
-use super::{Behaviour, BehaviourQueue};
+use super::{super::Behaviour, BehaviourQueue, ComplexBehaviour};
 
-pub struct ParallelBehaviour {
-    queue: VecDeque<Behaviour>,
+pub trait ParallelBehaviour<M>: Behaviour {
+    fn queue(&mut self) -> &mut ParallelBehaviourQueue<M>;
+}
+
+pub struct ParallelBehaviourQueue<M> {
+    queue: VecDeque<Box<dyn Behaviour<Message = M>>>,
     finished: usize,
     strategy: Strategy,
 }
@@ -15,7 +19,7 @@ pub enum Strategy {
     Never,
 }
 
-impl ParallelBehaviour {
+impl<M> ParallelBehaviourQueue<M> {
     pub fn new(strategy: Strategy) -> Self {
         Self {
             queue: VecDeque::new(),
@@ -25,12 +29,15 @@ impl ParallelBehaviour {
     }
 }
 
-impl BehaviourQueue for ParallelBehaviour {
-    fn next(&mut self) -> Option<Behaviour> {
+struct Par;
+impl<M: 'static> BehaviourQueue<M> for ParallelBehaviourQueue<M> {
+    type Ord = Par;
+
+    fn next(&mut self) -> Option<Box<dyn Behaviour<Message = M>>> {
         self.queue.pop_front()
     }
 
-    fn schedule(&mut self, behaviour: Behaviour) {
+    fn schedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>) {
         self.queue.push_back(behaviour);
     }
 

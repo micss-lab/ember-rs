@@ -3,20 +3,21 @@ use alloc::vec::Vec;
 
 use crate::agent::Agent;
 use crate::behaviour::Context;
+use crate::Actor;
 
 #[derive(Default)]
 pub struct Container {
-    agents: Vec<Agent>,
+    agents: Vec<Box<dyn Actor>>,
 }
 
 impl Container {
-    pub fn with_agent(mut self, agent: Agent) -> Self {
+    pub fn with_agent(mut self, agent: impl Actor) -> Self {
         self.add_agent(agent);
         self
     }
 
-    pub fn add_agent(&mut self, agent: Agent) {
-        self.agents.push(agent);
+    pub fn add_agent(&mut self, agent: impl Actor) {
+        self.agents.push(Box::new(agent));
     }
 
     pub fn start(mut self) -> Result<(), Box<dyn core::error::Error>> {
@@ -24,9 +25,9 @@ impl Container {
         'start: loop {
             log::trace!("Polling all agents.\r");
             for agent in self.agents.iter_mut() {
-                let mut context = Context::default();
+                let mut context = Context::new();
 
-                log::trace!("Agent `{}` update:\r", agent.name);
+                log::trace!("Agent `{}` update:\r", agent.get_name());
                 agent.update(&mut context);
 
                 let Context {
