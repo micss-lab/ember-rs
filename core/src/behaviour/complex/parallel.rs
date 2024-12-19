@@ -1,13 +1,18 @@
 use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 
 use super::{Behaviour, BehaviourQueue, ComplexBehaviour, ComplexBehaviourKind, IntoBehaviour};
+use crate::behaviour::Context;
 
 pub trait ParallelBehaviour {
     type Message;
 
     type ChildMessage;
 
-    fn queue(&mut self) -> &mut ParallelBehaviourQueue<Self::ChildMessage>;
+    fn initial_behaviours(&self) -> ParallelBehaviourQueue<Self::ChildMessage>;
+
+    fn after_child_action(&mut self, context: &mut Context<Self::Message>) {
+        let _ = context;
+    }
 }
 
 pub struct ParallelBehaviourQueue<M> {
@@ -33,6 +38,17 @@ impl<M> ParallelBehaviourQueue<M> {
     }
 }
 
+impl<M: 'static> ParallelBehaviourQueue<M> {
+    pub fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Message = M>) {
+        self.schedule(behaviour.into_behaviour())
+    }
+
+    pub fn with_behaviour<K>(mut self, behaviour: impl IntoBehaviour<K, Message = M>) -> Self {
+        self.add_behaviour(behaviour);
+        self
+    }
+}
+
 impl<M: 'static> BehaviourQueue<M> for ParallelBehaviourQueue<M> {
     fn next(&mut self) -> Option<Box<dyn Behaviour<Message = M>>> {
         self.queue.pop_front()
@@ -55,15 +71,6 @@ impl<M: 'static> BehaviourQueue<M> for ParallelBehaviourQueue<M> {
 #[doc(hidden)]
 pub struct Parallel;
 
-impl<T, M: 'static> ComplexBehaviour<M, Parallel> for T
-where
-    T: ParallelBehaviour<ChildMessage = M>,
-{
-    fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Message = M>) {
-        self.queue().schedule(behaviour.into_behaviour());
-    }
-}
-
 impl<T, M: 'static> IntoBehaviour<Parallel> for T
 where
     T: ParallelBehaviour<Message = M> + 'static,
@@ -71,6 +78,10 @@ where
     type Message = M;
 
     fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>> {
-        Box::new(ComplexBehaviourKind::Parallel(Box::new(self)))
+        let queue = self.initial_behaviours();
+        Box::new(ComplexBehaviour {
+            kind: ComplexBehaviourKind::Parallel(Box::new(self)),
+            queue,
+        })
     }
 }

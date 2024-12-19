@@ -1,13 +1,20 @@
-use alloc::{boxed::Box, collections::vec_deque::VecDeque};
+use alloc::boxed::Box;
+use alloc::collections::vec_deque::VecDeque;
 
-use super::{Behaviour, BehaviourQueue, ComplexBehaviour, ComplexBehaviourKind, IntoBehaviour};
+use super::{
+    Behaviour, BehaviourQueue, ComplexBehaviour, ComplexBehaviourKind, Context, IntoBehaviour,
+};
 
 pub trait SequentialBehaviour {
     type Message;
 
     type ChildMessage;
 
-    fn queue(&mut self) -> &mut SequentialBehaviourQueue<Self::ChildMessage>;
+    fn initial_behaviours(&self) -> SequentialBehaviourQueue<Self::ChildMessage>;
+
+    fn after_child_action(&mut self, context: &mut Context<Self::Message>) {
+        let _ = context;
+    }
 }
 
 pub struct SequentialBehaviourQueue<M> {
@@ -28,6 +35,17 @@ impl<M> SequentialBehaviourQueue<M> {
     }
 }
 
+impl<M: 'static> SequentialBehaviourQueue<M> {
+    pub fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Message = M>) {
+        self.schedule(behaviour.into_behaviour())
+    }
+
+    pub fn with_behaviour<K>(mut self, behaviour: impl IntoBehaviour<K, Message = M>) -> Self {
+        self.add_behaviour(behaviour);
+        self
+    }
+}
+
 impl<M: 'static> BehaviourQueue<M> for SequentialBehaviourQueue<M> {
     fn next(&mut self) -> Option<Box<dyn Behaviour<Message = M>>> {
         self.queue.pop_front()
@@ -45,15 +63,6 @@ impl<M: 'static> BehaviourQueue<M> for SequentialBehaviourQueue<M> {
 #[doc(hidden)]
 pub struct Sequential;
 
-impl<T, M: 'static> ComplexBehaviour<M, Sequential> for T
-where
-    T: SequentialBehaviour<ChildMessage = M>,
-{
-    fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Message = M>) {
-        self.queue().schedule(behaviour.into_behaviour())
-    }
-}
-
 impl<T, M: 'static> IntoBehaviour<Sequential> for T
 where
     T: SequentialBehaviour<Message = M> + 'static,
@@ -61,6 +70,10 @@ where
     type Message = M;
 
     fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>> {
-        Box::new(ComplexBehaviourKind::Sequential(Box::new(self)))
+        let queue = self.initial_behaviours();
+        Box::new(ComplexBehaviour {
+            kind: ComplexBehaviourKind::Sequential(Box::new(self)),
+            queue,
+        })
     }
 }

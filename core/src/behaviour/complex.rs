@@ -8,16 +8,9 @@ use self::sequential::SequentialBehaviour;
 pub mod parallel;
 pub mod sequential;
 
-pub trait ComplexBehaviour<M, Ord>
-where
-    Self: Sized,
-{
-    fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Message = M>);
-
-    fn with_behaviour<K>(mut self, behaviour: impl IntoBehaviour<K, Message = M>) -> Self {
-        self.add_behaviour(behaviour);
-        self
-    }
+struct ComplexBehaviour<Q, M, MC> {
+    kind: ComplexBehaviourKind<M, MC>,
+    queue: Q,
 }
 
 enum ComplexBehaviourKind<M, CM> {
@@ -25,20 +18,20 @@ enum ComplexBehaviourKind<M, CM> {
     Parallel(Box<dyn ParallelBehaviour<ChildMessage = CM, Message = M>>),
 }
 
-impl<M: 'static, CM: 'static> Behaviour for ComplexBehaviourKind<M, CM> {
+impl<Q, M: 'static, CM: 'static> Behaviour for ComplexBehaviour<Q, M, CM>
+where
+    Q: BehaviourQueue<CM> + 'static,
+{
     type Message = M;
 
-    fn action(&mut self, _: &mut Context<Self::Message>) -> bool {
+    fn action(&mut self, ctx: &mut Context<Self::Message>) -> bool {
         let mut context = Context::new();
-        let mut queue_action = |queue: &mut dyn BehaviourQueue<CM>| {
-            queue.action(&mut context);
-            queue.is_finished()
-        };
-
-        match self {
-            ComplexBehaviourKind::Sequential(sequential) => queue_action(sequential.queue()),
-            ComplexBehaviourKind::Parallel(parallel) => queue_action(parallel.queue()),
+        self.queue.action(&mut context);
+        match &mut self.kind {
+            ComplexBehaviourKind::Sequential(sequential) => sequential.after_child_action(ctx),
+            ComplexBehaviourKind::Parallel(parallel) => parallel.after_child_action(ctx),
         }
+        self.queue.is_finished()
     }
 }
 
