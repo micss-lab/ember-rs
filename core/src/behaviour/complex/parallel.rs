@@ -29,10 +29,7 @@ impl<M> ParallelBehaviourQueue<M> {
     }
 }
 
-struct Par;
 impl<M: 'static> BehaviourQueue<M> for ParallelBehaviourQueue<M> {
-    type Ord = Par;
-
     fn next(&mut self) -> Option<Box<dyn Behaviour<Message = M>>> {
         self.queue.pop_front()
     }

@@ -20,10 +20,7 @@ impl<M> SequentialBehaviourQueue<M> {
     }
 }
 
-struct Seq;
 impl<M: 'static> BehaviourQueue<M> for SequentialBehaviourQueue<M> {
-    type Ord = Seq;
-
     fn next(&mut self) -> Option<Box<dyn Behaviour<Message = M>>> {
         self.queue.pop_front()
     }

@@ -18,8 +18,6 @@ where
 }
 
 pub(crate) trait BehaviourQueue<M: 'static> {
-    type Ord;
-
     fn next(&mut self) -> Option<Box<dyn Behaviour<Message = M>>>;
 
     fn schedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>);
