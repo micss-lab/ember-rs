@@ -34,17 +34,19 @@ where
     )))
 }
 
-pub fn sequential<M: 'static, CM: 'static>(
-    sequential: impl sequential::SequentialBehaviour<CM, Message = M> + 'static,
-) -> Box<dyn Behaviour<Message = M>> {
+pub fn sequential<S, M: 'static, CM: 'static>(sequential: S) -> Box<dyn Behaviour<Message = M>>
+where
+    S: SequentialBehaviour<ChildMessage = CM, Message = M> + 'static,
+{
     Box::new(ComplexBehaviourKind::<_, CM>::Sequential(Box::new(
         sequential,
     )))
 }
 
-pub fn parallel<M: 'static, CM: 'static>(
-    parallel: impl parallel::ParallelBehaviour<CM, Message = M> + 'static,
-) -> Box<dyn Behaviour<Message = M>> {
+pub fn parallel<P, M: 'static, CM: 'static>(parallel: P) -> Box<dyn Behaviour<Message = M>>
+where
+    P: ParallelBehaviour<ChildMessage = CM, Message = M> + 'static,
+{
     Box::new(ComplexBehaviourKind::Parallel(Box::new(parallel)))
 }
 
@@ -62,8 +64,8 @@ enum SimpleBehaviourKind<M> {
 }
 
 enum ComplexBehaviourKind<M, CM> {
-    Sequential(Box<dyn SequentialBehaviour<CM, Message = M>>),
-    Parallel(Box<dyn ParallelBehaviour<CM, Message = M>>),
+    Sequential(Box<dyn SequentialBehaviour<ChildMessage = CM, Message = M>>),
+    Parallel(Box<dyn ParallelBehaviour<ChildMessage = CM, Message = M>>),
 }
 
 impl<M: 'static> Behaviour for SimpleBehaviourKind<M> {

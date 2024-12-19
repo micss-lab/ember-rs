@@ -4,10 +4,12 @@ use crate::behaviour::Behaviour;
 
 use super::{BehaviourQueue, ComplexBehaviour};
 
-pub trait SequentialBehaviour<M> {
+pub trait SequentialBehaviour {
     type Message;
 
-    fn queue(&mut self) -> &mut SequentialBehaviourQueue<M>;
+    type ChildMessage;
+
+    fn queue(&mut self) -> &mut SequentialBehaviourQueue<Self::ChildMessage>;
 }
 
 pub struct SequentialBehaviourQueue<M> {
@@ -45,7 +47,7 @@ impl<M: 'static> BehaviourQueue<M> for SequentialBehaviourQueue<M> {
 pub struct Seq;
 impl<T, M: 'static> ComplexBehaviour<M, Seq> for T
 where
-    T: SequentialBehaviour<M>,
+    T: SequentialBehaviour<ChildMessage = M>,
 {
     fn add_behaviour(&mut self, behaviour: impl Behaviour<Message = M>) {
         self.queue().schedule(Box::new(behaviour))
