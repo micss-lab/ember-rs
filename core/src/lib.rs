@@ -2,8 +2,6 @@
 
 extern crate alloc;
 
-use behaviour::Context;
-
 pub use self::agent::Agent;
 pub use self::container::Container;
 

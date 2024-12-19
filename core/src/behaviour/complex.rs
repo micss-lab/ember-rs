@@ -5,7 +5,7 @@ use super::{Behaviour, Context};
 pub mod parallel;
 pub mod sequential;
 
-pub trait ComplexBehaviour<M>
+pub trait ComplexBehaviour<M, Ord>
 where
     Self: Sized,
 {
@@ -33,15 +33,5 @@ pub(crate) trait BehaviourQueue<M: 'static> {
             self.schedule(behaviour);
         }
         self.is_finished()
-    }
-}
-
-impl<T, M> ComplexBehaviour<M> for T
-where
-    M: 'static,
-    T: BehaviourQueue<M>,
-{
-    fn add_behaviour(&mut self, behaviour: impl Behaviour<Message = M> + 'static) {
-        self.schedule(Box::new(behaviour))
     }
 }

@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 
 use crate::behaviour::complex::BehaviourQueue;
@@ -26,8 +27,7 @@ impl<M: 'static> Agent<M> {
     }
 
     pub fn add_behaviour(&mut self, behaviour: impl Behaviour<Message = M>) {
-        use crate::behaviour::ComplexBehaviour;
-        self.behaviours.add_behaviour(behaviour);
+        self.behaviours.schedule(Box::new(behaviour));
     }
 }
 

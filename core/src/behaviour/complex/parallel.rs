@@ -2,7 +2,9 @@ use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 
 use super::{super::Behaviour, BehaviourQueue, ComplexBehaviour};
 
-pub trait ParallelBehaviour<M>: Behaviour {
+pub trait ParallelBehaviour<M> {
+    type Message;
+
     fn queue(&mut self) -> &mut ParallelBehaviourQueue<M>;
 }
 
@@ -45,5 +47,15 @@ impl<M: 'static> BehaviourQueue<M> for ParallelBehaviourQueue<M> {
             Strategy::N(n) => self.finished >= n,
             Strategy::Never => false,
         }
+    }
+}
+
+pub struct Par;
+impl<T, M: 'static> ComplexBehaviour<M, Par> for T
+where
+    T: ParallelBehaviour<M>,
+{
+    fn add_behaviour(&mut self, behaviour: impl Behaviour<Message = M>) {
+        self.queue().schedule(Box::new(behaviour));
     }
 }
