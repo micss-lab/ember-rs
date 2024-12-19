@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use alloc::string::{String, ToString};
 
 use crate::behaviour::complex::BehaviourQueue;
@@ -38,7 +39,7 @@ impl<M: 'static> ContainerAgent for Agent<M> {
         // TODO: Do something with the context here.
     }
 
-    fn get_name(&self) -> String {
-        self.name.clone()
+    fn get_name(&self) -> Cow<str> {
+        Cow::from(&self.name)
     }
 }

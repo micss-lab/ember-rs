@@ -1,5 +1,5 @@
+use alloc::borrow::Cow;
 use alloc::boxed::Box;
-use alloc::string::String;
 use alloc::vec::Vec;
 
 use crate::behaviour::Context;
@@ -13,7 +13,7 @@ pub struct Container {
 pub trait ContainerAgent: 'static {
     fn update(&mut self, context: &mut Context<()>);
 
-    fn get_name(&self) -> String;
+    fn get_name(&self) -> Cow<str>;
 }
 
 impl Container {
