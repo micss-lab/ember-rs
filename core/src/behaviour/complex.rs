@@ -1,41 +1,23 @@
 use alloc::boxed::Box;
 
-use super::{Behaviour, Context};
+use super::{Behaviour, Context, IntoBehaviour};
 
-pub use self::parallel::{
-    FinishStrategy as ParallelFinishStrategy, ParallelBehaviour, ParallelBehaviourQueue,
-};
-pub use self::sequential::{SequentialBehaviour, SequentialBehaviourQueue};
+use self::parallel::ParallelBehaviour;
+use self::sequential::SequentialBehaviour;
 
-pub(crate) mod parallel;
-mod sequential;
+pub mod parallel;
+pub mod sequential;
 
 pub trait ComplexBehaviour<M, Ord>
 where
     Self: Sized,
 {
-    fn add_behaviour(&mut self, behaviour: impl Behaviour<Message = M>);
+    fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Message = M>);
 
-    fn with_behaviour(mut self, behaviour: impl Behaviour<Message = M>) -> Self {
+    fn with_behaviour<K>(mut self, behaviour: impl IntoBehaviour<K, Message = M>) -> Self {
         self.add_behaviour(behaviour);
         self
     }
-}
-
-pub fn sequential<S, M: 'static, CM: 'static>(sequential: S) -> Box<dyn Behaviour<Message = M>>
-where
-    S: SequentialBehaviour<ChildMessage = CM, Message = M> + 'static,
-{
-    Box::new(ComplexBehaviourKind::<_, CM>::Sequential(Box::new(
-        sequential,
-    )))
-}
-
-pub fn parallel<P, M: 'static, CM: 'static>(parallel: P) -> Box<dyn Behaviour<Message = M>>
-where
-    P: ParallelBehaviour<ChildMessage = CM, Message = M> + 'static,
-{
-    Box::new(ComplexBehaviourKind::Parallel(Box::new(parallel)))
 }
 
 enum ComplexBehaviourKind<M, CM> {

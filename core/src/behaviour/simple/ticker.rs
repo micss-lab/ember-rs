@@ -1,26 +1,33 @@
-use super::{Context, CyclicBehaviour};
+use alloc::boxed::Box;
+
+use super::{Behaviour, Context, IntoBehaviour, SimpleBehaviourKind};
+use crate::util::from_std_duration;
 
 pub trait TickerBehaviour {
     type Message;
 
-    fn interval() -> core::time::Duration;
+    fn interval(&self) -> core::time::Duration;
 
     fn action(&mut self, ctx: &mut Context<Self::Message>);
 
     fn is_finished(&self) -> bool;
 }
 
-impl<T, M> CyclicBehaviour for T
+#[doc(hidden)]
+pub struct Ticker;
+
+impl<T, M: 'static> IntoBehaviour<Ticker> for T
 where
-    T: TickerBehaviour<Message = M>,
+    T: TickerBehaviour<Message = M> + 'static,
 {
     type Message = M;
 
-    fn action(&mut self, ctx: &mut Context<Self::Message>) {
-        self.action(ctx)
-    }
-
-    fn is_finished(&self) -> bool {
-        self.is_finished()
+    fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>> {
+        let interval = self.interval();
+        Box::new(SimpleBehaviourKind::Ticker {
+            ticker: Box::new(self),
+            interval: from_std_duration(interval),
+            last_tick: None,
+        })
     }
 }

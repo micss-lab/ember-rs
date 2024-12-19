@@ -1,8 +1,6 @@
 use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 
-use crate::behaviour::Behaviour;
-
-use super::{BehaviourQueue, ComplexBehaviour};
+use super::{Behaviour, BehaviourQueue, ComplexBehaviour, ComplexBehaviourKind, IntoBehaviour};
 
 pub trait SequentialBehaviour {
     type Message;
@@ -44,12 +42,25 @@ impl<M: 'static> BehaviourQueue<M> for SequentialBehaviourQueue<M> {
     }
 }
 
-pub struct Seq;
-impl<T, M: 'static> ComplexBehaviour<M, Seq> for T
+#[doc(hidden)]
+pub struct Sequential;
+
+impl<T, M: 'static> ComplexBehaviour<M, Sequential> for T
 where
     T: SequentialBehaviour<ChildMessage = M>,
 {
-    fn add_behaviour(&mut self, behaviour: impl Behaviour<Message = M>) {
-        self.queue().schedule(Box::new(behaviour))
+    fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Message = M>) {
+        self.queue().schedule(behaviour.into_behaviour())
+    }
+}
+
+impl<T, M: 'static> IntoBehaviour<Sequential> for T
+where
+    T: SequentialBehaviour<Message = M> + 'static,
+{
+    type Message = M;
+
+    fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>> {
+        Box::new(ComplexBehaviourKind::Sequential(Box::new(self)))
     }
 }

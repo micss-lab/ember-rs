@@ -1,9 +1,8 @@
-use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 
 use crate::behaviour::complex::BehaviourQueue;
-use crate::behaviour::{Behaviour, Context};
-use crate::behaviour::{ParallelBehaviourQueue, ParallelFinishStrategy};
+use crate::behaviour::parallel::{FinishStrategy, ParallelBehaviourQueue};
+use crate::behaviour::{Context, IntoBehaviour};
 use crate::container::ContainerAgent;
 
 pub struct Agent<M> {
@@ -15,19 +14,19 @@ impl<M> Agent<M> {
     pub fn new(name: impl ToString) -> Self {
         Self {
             name: name.to_string(),
-            behaviours: ParallelBehaviourQueue::new(ParallelFinishStrategy::Never),
+            behaviours: ParallelBehaviourQueue::new(FinishStrategy::Never),
         }
     }
 }
 
 impl<M: 'static> Agent<M> {
-    pub fn with_behaviour(mut self, behaviour: impl Behaviour<Message = M>) -> Self {
+    pub fn with_behaviour<K>(mut self, behaviour: impl IntoBehaviour<K, Message = M>) -> Self {
         self.add_behaviour(behaviour);
         self
     }
 
-    pub fn add_behaviour(&mut self, behaviour: impl Behaviour<Message = M>) {
-        self.behaviours.schedule(Box::new(behaviour));
+    pub fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Message = M>) {
+        self.behaviours.schedule(behaviour.into_behaviour());
     }
 }
 

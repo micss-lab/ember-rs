@@ -1,6 +1,6 @@
 use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 
-use super::{super::Behaviour, BehaviourQueue, ComplexBehaviour};
+use super::{Behaviour, BehaviourQueue, ComplexBehaviour, ComplexBehaviourKind, IntoBehaviour};
 
 pub trait ParallelBehaviour {
     type Message;
@@ -52,12 +52,25 @@ impl<M: 'static> BehaviourQueue<M> for ParallelBehaviourQueue<M> {
     }
 }
 
-pub struct Par;
-impl<T, M: 'static> ComplexBehaviour<M, Par> for T
+#[doc(hidden)]
+pub struct Parallel;
+
+impl<T, M: 'static> ComplexBehaviour<M, Parallel> for T
 where
     T: ParallelBehaviour<ChildMessage = M>,
 {
-    fn add_behaviour(&mut self, behaviour: impl Behaviour<Message = M>) {
-        self.queue().schedule(Box::new(behaviour));
+    fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Message = M>) {
+        self.queue().schedule(behaviour.into_behaviour());
+    }
+}
+
+impl<T, M: 'static> IntoBehaviour<Parallel> for T
+where
+    T: ParallelBehaviour<Message = M> + 'static,
+{
+    type Message = M;
+
+    fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>> {
+        Box::new(ComplexBehaviourKind::Parallel(Box::new(self)))
     }
 }
