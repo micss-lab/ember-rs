@@ -2,8 +2,8 @@ use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 
 use crate::behaviour::complex::BehaviourQueue;
-use crate::behaviour::parallel::{self, ParallelBehaviourQueue};
 use crate::behaviour::{Behaviour, Context};
+use crate::behaviour::{ParallelBehaviourQueue, ParallelFinishStrategy};
 use crate::container::ContainerAgent;
 
 pub struct Agent<M> {
@@ -15,7 +15,7 @@ impl<M> Agent<M> {
     pub fn new(name: impl ToString) -> Self {
         Self {
             name: name.to_string(),
-            behaviours: ParallelBehaviourQueue::new(parallel::Strategy::Never),
+            behaviours: ParallelBehaviourQueue::new(ParallelFinishStrategy::Never),
         }
     }
 }

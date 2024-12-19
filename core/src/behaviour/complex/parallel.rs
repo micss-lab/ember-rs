@@ -13,10 +13,10 @@ pub trait ParallelBehaviour {
 pub struct ParallelBehaviourQueue<M> {
     queue: VecDeque<Box<dyn Behaviour<Message = M>>>,
     finished: usize,
-    strategy: Strategy,
+    strategy: FinishStrategy,
 }
 
-pub enum Strategy {
+pub enum FinishStrategy {
     All,
     One,
     N(usize),
@@ -24,7 +24,7 @@ pub enum Strategy {
 }
 
 impl<M> ParallelBehaviourQueue<M> {
-    pub fn new(strategy: Strategy) -> Self {
+    pub fn new(strategy: FinishStrategy) -> Self {
         Self {
             queue: VecDeque::new(),
             finished: 0,
@@ -44,10 +44,10 @@ impl<M: 'static> BehaviourQueue<M> for ParallelBehaviourQueue<M> {
 
     fn is_finished(&self) -> bool {
         match self.strategy {
-            Strategy::All => self.queue.is_empty(),
-            Strategy::One => self.finished >= 1,
-            Strategy::N(n) => self.finished >= n,
-            Strategy::Never => false,
+            FinishStrategy::All => self.queue.is_empty(),
+            FinishStrategy::One => self.finished >= 1,
+            FinishStrategy::N(n) => self.finished >= n,
+            FinishStrategy::Never => false,
         }
     }
 }
