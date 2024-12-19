@@ -49,8 +49,12 @@ where
         }
 
         self.last_tick = Some(Instant::now());
-        self.cyclic.deref_mut().action(ctx);
-        self.cyclic.deref().is_finished()
+        self.cyclic.action(ctx);
+        self.cyclic.is_finished()
+    }
+
+    pub(crate) fn is_finished(&self) -> bool {
+        self.cyclic.is_finished()
     }
 }
 

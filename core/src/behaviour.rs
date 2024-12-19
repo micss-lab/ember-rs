@@ -41,8 +41,14 @@ impl<M: 'static> Behaviour for SimpleBehaviourKind<M> {
                     .action(ctx);
                 true
             }
-            SimpleBehaviourKind::Cyclic(_) => todo!(),
-            SimpleBehaviourKind::Ticker(_) => todo!(),
+            SimpleBehaviourKind::Cyclic(cyclic) => {
+                cyclic.action(ctx);
+                cyclic.is_finished()
+            }
+            SimpleBehaviourKind::Ticker(ticker) => {
+                ticker.action(ctx);
+                ticker.is_finished()
+            }
         }
     }
 }

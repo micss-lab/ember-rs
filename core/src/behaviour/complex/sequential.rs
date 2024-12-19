@@ -12,11 +12,17 @@ pub struct SequentialBehaviourQueue<M> {
     queue: VecDeque<Box<dyn Behaviour<Message = M>>>,
 }
 
-impl<M> SequentialBehaviourQueue<M> {
-    pub fn new() -> Self {
+impl<M> Default for SequentialBehaviourQueue<M> {
+    fn default() -> Self {
         Self {
             queue: VecDeque::new(),
         }
+    }
+}
+
+impl<M> SequentialBehaviourQueue<M> {
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 

@@ -15,13 +15,19 @@ pub(crate) struct ContainerContext {
 #[derive(Default)]
 pub(crate) struct AgentContext {}
 
-impl<M> Context<M> {
-    pub fn new() -> Self {
+impl<M> Default for Context<M> {
+    fn default() -> Self {
         Self {
             container: ContainerContext::default(),
             agent: AgentContext::default(),
             messages: Vec::new(),
         }
+    }
+}
+
+impl<M> Context<M> {
+    pub fn new() -> Self {
+        Self::default()
     }
 
     pub fn stop(&mut self) {
