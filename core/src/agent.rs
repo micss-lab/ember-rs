@@ -3,6 +3,7 @@ use alloc::string::{String, ToString};
 use crate::behaviour::complex::BehaviourQueue;
 use crate::behaviour::parallel::{self, ParallelBehaviourQueue};
 use crate::behaviour::{Behaviour, Context};
+use crate::container::ContainerAgent;
 
 pub struct Agent<M> {
     pub(crate) name: String,
@@ -30,7 +31,7 @@ impl<M: 'static> Agent<M> {
     }
 }
 
-impl<M: 'static> super::Actor for Agent<M> {
+impl<M: 'static> ContainerAgent for Agent<M> {
     fn update(&mut self, _: &mut Context<()>) {
         let mut context = Context::new();
         self.behaviours.action(&mut context);

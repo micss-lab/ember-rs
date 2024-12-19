@@ -1,22 +1,28 @@
 use alloc::boxed::Box;
+use alloc::string::String;
 use alloc::vec::Vec;
 
-use crate::agent::Agent;
 use crate::behaviour::Context;
-use crate::Actor;
+use crate::Agent;
 
 #[derive(Default)]
 pub struct Container {
-    agents: Vec<Box<dyn Actor>>,
+    agents: Vec<Box<dyn ContainerAgent>>,
+}
+
+pub trait ContainerAgent: 'static {
+    fn update(&mut self, context: &mut Context<()>);
+
+    fn get_name(&self) -> String;
 }
 
 impl Container {
-    pub fn with_agent(mut self, agent: impl Actor) -> Self {
+    pub fn with_agent<M: 'static>(mut self, agent: Agent<M>) -> Self {
         self.add_agent(agent);
         self
     }
 
-    pub fn add_agent(&mut self, agent: impl Actor) {
+    pub fn add_agent<M: 'static>(&mut self, agent: Agent<M>) {
         self.agents.push(Box::new(agent));
     }
 
