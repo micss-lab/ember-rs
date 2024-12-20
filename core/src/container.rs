@@ -2,7 +2,7 @@ use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use crate::behaviour::Context;
+use crate::context::ContainerContext;
 use crate::Agent;
 
 #[derive(Default)]
@@ -11,7 +11,7 @@ pub struct Container {
 }
 
 pub trait ContainerAgent: 'static {
-    fn update(&mut self, context: &mut Context<()>);
+    fn update(&mut self, context: &mut ContainerContext);
 
     fn get_name(&self) -> Cow<str>;
 }
@@ -31,14 +31,10 @@ impl Container {
         'start: loop {
             log::trace!("Polling all agents.\r");
             for agent in self.agents.iter_mut() {
-                let mut context = Context::new();
+                let mut context = ContainerContext::new();
 
                 log::trace!("Agent `{}` update:\r", agent.get_name());
                 agent.update(&mut context);
-
-                let Context {
-                    container: context, ..
-                } = context;
 
                 if context.should_stop {
                     break 'start Ok(());

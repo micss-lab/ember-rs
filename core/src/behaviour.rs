@@ -1,11 +1,9 @@
 use alloc::boxed::Box;
 
-pub use self::context::Context;
-
 pub use self::complex::{parallel, sequential};
 pub use self::simple::{CyclicBehaviour, OneShotBehaviour, TickerBehaviour};
 
-mod context;
+pub use crate::context::Context;
 
 pub(crate) mod complex;
 mod simple;

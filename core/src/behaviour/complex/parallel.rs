@@ -10,8 +10,8 @@ pub trait ParallelBehaviour {
 
     fn initial_behaviours(&self) -> ParallelBehaviourQueue<Self::ChildMessage>;
 
-    fn after_child_action(&mut self, context: &mut Context<Self::Message>) {
-        let _ = context;
+    fn after_child_action(&mut self, ctx: &mut Context<Self::Message>) {
+        let _ = ctx;
     }
 }
 

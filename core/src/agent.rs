@@ -3,8 +3,9 @@ use alloc::string::{String, ToString};
 
 use crate::behaviour::complex::BehaviourQueue;
 use crate::behaviour::parallel::{FinishStrategy, ParallelBehaviourQueue};
-use crate::behaviour::{Context, IntoBehaviour};
+use crate::behaviour::IntoBehaviour;
 use crate::container::ContainerAgent;
+use crate::context::{ContainerContext, Context};
 
 pub struct Agent<M> {
     pub(crate) name: String,
@@ -32,11 +33,13 @@ impl<M: 'static> Agent<M> {
 }
 
 impl<M: 'static> ContainerAgent for Agent<M> {
-    fn update(&mut self, _: &mut Context<()>) {
+    fn update(&mut self, ctx: &mut ContainerContext) {
         let mut context = Context::new();
         self.behaviours.action(&mut context);
 
-        // TODO: Do something with the context here.
+        if let Some(container_ctx) = context.container.take() {
+            ctx.merge(container_ctx);
+        }
     }
 
     fn get_name(&self) -> Cow<str> {
