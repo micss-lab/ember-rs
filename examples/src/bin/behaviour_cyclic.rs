@@ -5,37 +5,54 @@ use no_std_framework_examples::setup_example;
 
 setup_example!();
 
-use no_std_framework_core::behaviour::{CyclicBehaviour, OneShotBehaviour, SimpleBehaviourState};
+use no_std_framework_core::behaviour::{Context, CyclicBehaviour, OneShotBehaviour};
 use no_std_framework_core::{Agent, Container};
 
 const MESSAGE_AMOUNT: usize = 10;
 
-fn example() {
-    struct CyclicState(usize);
+struct InformationPrinter;
 
-    impl SimpleBehaviourState for CyclicState {
-        fn finished(&self) -> bool {
-            self.0 == 0
+impl OneShotBehaviour for InformationPrinter {
+    type Message = ();
+
+    fn action(&self, _: &mut Context<Self::Message>) {
+        log::info!("This is the cyclic agent.");
+        log::info!("I will print a message {MESSAGE_AMOUNT} times");
+    }
+}
+
+struct MessagePrinter {
+    count: usize,
+}
+
+impl MessagePrinter {
+    fn new(count: usize) -> Self {
+        Self { count }
+    }
+}
+
+impl CyclicBehaviour for MessagePrinter {
+    type Message = ();
+
+    fn action(&mut self, ctx: &mut Context<Self::Message>) {
+        self.count -= 1;
+        log::info!("Hello there!");
+        if self.is_finished() {
+            // Stop the container instead of only finishing this behaviour.
+            ctx.stop_container()
         }
     }
 
+    fn is_finished(&self) -> bool {
+        self.count == 0
+    }
+}
+
+fn example() {
     let container = Container::default().with_agent(
         Agent::new("messaging-agent")
-            .with_behaviour(OneShotBehaviour::new(|_, _| {
-                log::info!("This is the cyclic agent.");
-                log::info!("I will print a message {MESSAGE_AMOUNT} times");
-            }))
-            .with_behaviour(CyclicBehaviour::new(
-                CyclicState(MESSAGE_AMOUNT),
-                |ctx, mut state| {
-                    state.0 -= 1;
-                    log::info!("Hello there!");
-                    if state.finished() {
-                        ctx.stop()
-                    }
-                    state
-                },
-            )),
+            .with_behaviour(InformationPrinter)
+            .with_behaviour(MessagePrinter::new(MESSAGE_AMOUNT)),
     );
     container.start().unwrap();
 }
