@@ -1,6 +1,6 @@
 use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 
-use super::{Behaviour, BehaviourQueue, ComplexBehaviour, ComplexBehaviourKind, IntoBehaviour};
+use super::{Behaviour, BehaviourQueue, ComplexBehaviour, IntoBehaviour, ParallelBehaviourImpl};
 use crate::behaviour::Context;
 
 pub trait ParallelBehaviour {
@@ -80,7 +80,7 @@ where
     fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>> {
         let queue = self.initial_behaviours();
         Box::new(ComplexBehaviour {
-            kind: ComplexBehaviourKind::Parallel(Box::new(self)),
+            kind: ParallelBehaviourImpl(self),
             queue,
         })
     }

@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use alloc::collections::vec_deque::VecDeque;
 
 use super::{
-    Behaviour, BehaviourQueue, ComplexBehaviour, ComplexBehaviourKind, Context, IntoBehaviour,
+    Behaviour, BehaviourQueue, ComplexBehaviour, Context, IntoBehaviour, SequentialBehaviourImpl,
 };
 
 pub trait SequentialBehaviour {
@@ -72,7 +72,7 @@ where
     fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>> {
         let queue = self.initial_behaviours();
         Box::new(ComplexBehaviour {
-            kind: ComplexBehaviourKind::Sequential(Box::new(self)),
+            kind: SequentialBehaviourImpl(self),
             queue,
         })
     }

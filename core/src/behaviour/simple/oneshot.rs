@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use super::{Behaviour, Context, IntoBehaviour, SimpleBehaviourKind};
+use super::{Behaviour, Context, IntoBehaviour, OneShotBehaviourImpl};
 
 pub trait OneShotBehaviour {
     type Message;
@@ -18,6 +18,6 @@ where
     type Message = M;
 
     fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>> {
-        Box::new(SimpleBehaviourKind::OneShot(Some(Box::new(self))))
+        Box::new(OneShotBehaviourImpl(Some(self)))
     }
 }

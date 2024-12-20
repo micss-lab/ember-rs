@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use super::{Behaviour, Context, IntoBehaviour, SimpleBehaviourKind};
+use super::{Behaviour, Context, CyclicBehaviourImpl, IntoBehaviour};
 
 pub trait CyclicBehaviour {
     type Message;
@@ -20,6 +20,6 @@ where
     type Message = M;
 
     fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>> {
-        Box::new(SimpleBehaviourKind::Cyclic(Box::new(self)))
+        Box::new(CyclicBehaviourImpl(self))
     }
 }

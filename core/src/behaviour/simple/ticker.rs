@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use super::{Behaviour, Context, IntoBehaviour, SimpleBehaviourKind};
+use super::{Behaviour, Context, IntoBehaviour, TickerBehaviourImpl};
 use crate::util::from_std_duration;
 
 pub trait TickerBehaviour {
@@ -24,8 +24,8 @@ where
 
     fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>> {
         let interval = self.interval();
-        Box::new(SimpleBehaviourKind::Ticker {
-            ticker: Box::new(self),
+        Box::new(TickerBehaviourImpl {
+            ticker: self,
             interval: from_std_duration(interval),
             last_tick: None,
         })

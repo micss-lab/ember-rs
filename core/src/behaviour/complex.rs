@@ -2,37 +2,49 @@ use alloc::boxed::Box;
 
 use super::{Behaviour, Context, IntoBehaviour};
 
-use self::parallel::ParallelBehaviour;
-use self::sequential::SequentialBehaviour;
+use self::parallel::{ParallelBehaviour, ParallelBehaviourQueue};
+use self::sequential::{SequentialBehaviour, SequentialBehaviourQueue};
 
 pub mod parallel;
 pub mod sequential;
 
-struct ComplexBehaviour<Q, M, MC> {
-    kind: ComplexBehaviourKind<M, MC>,
+macro_rules! complex_action {
+    () => {
+        fn action(&mut self, ctx: &mut Context<Self::Message>) -> bool {
+            let mut context = Context::new();
+            self.queue.action(&mut context);
+            self.kind.0.after_child_action(ctx);
+            self.queue.is_finished()
+        }
+    };
+}
+
+struct ComplexBehaviour<K, Q> {
+    kind: K,
     queue: Q,
 }
 
-enum ComplexBehaviourKind<M, CM> {
-    Sequential(Box<dyn SequentialBehaviour<ChildMessage = CM, Message = M>>),
-    Parallel(Box<dyn ParallelBehaviour<ChildMessage = CM, Message = M>>),
-}
+struct SequentialBehaviourImpl<S: SequentialBehaviour>(S);
+struct ParallelBehaviourImpl<P: ParallelBehaviour>(P);
 
-impl<Q, M: 'static, CM: 'static> Behaviour for ComplexBehaviour<Q, M, CM>
+impl<S, M: 'static, CM: 'static> Behaviour
+    for ComplexBehaviour<SequentialBehaviourImpl<S>, SequentialBehaviourQueue<CM>>
 where
-    Q: BehaviourQueue<CM> + 'static,
+    S: SequentialBehaviour<Message = M, ChildMessage = CM> + 'static,
 {
     type Message = M;
 
-    fn action(&mut self, ctx: &mut Context<Self::Message>) -> bool {
-        let mut context = Context::new();
-        self.queue.action(&mut context);
-        match &mut self.kind {
-            ComplexBehaviourKind::Sequential(sequential) => sequential.after_child_action(ctx),
-            ComplexBehaviourKind::Parallel(parallel) => parallel.after_child_action(ctx),
-        }
-        self.queue.is_finished()
-    }
+    complex_action!();
+}
+
+impl<P, M: 'static, CM: 'static> Behaviour
+    for ComplexBehaviour<ParallelBehaviourImpl<P>, ParallelBehaviourQueue<CM>>
+where
+    P: ParallelBehaviour<Message = M, ChildMessage = CM> + 'static,
+{
+    type Message = M;
+
+    complex_action!();
 }
 
 pub(crate) trait BehaviourQueue<M: 'static> {
