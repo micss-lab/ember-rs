@@ -12,7 +12,6 @@ mod ticker;
 struct OneShotBehaviourImpl<O: OneShotBehaviour>(Option<O>);
 struct CyclicBehaviourImpl<C: CyclicBehaviour>(C);
 struct TickerBehaviourImpl<T: TickerBehaviour> {
-    // Cannot be stored as a [`TickerBehaviour`] because it is not object safe.
     ticker: T,
     interval: Duration,
     last_tick: Option<Instant>,
