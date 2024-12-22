@@ -2,27 +2,12 @@
 
 #include <utility>
 
-class HelloWorld {
-public:
-  static void action(framework::behaviour::Context& context) {
-    Serial.println("Hello, world!");
-  }
-};
-
-class Messenger {
-public:
-  struct State {
-    int counter{0};
-  };
-
-  static void action(framework::behaviour::Context& context, framework::behaviour::SimpleState& state_) {
-    Serial.println("This is a message");
-    State* state = static_cast<State*>(state_.value);
-    if (state->counter == 10) {
-      state_.finished = true;
+class HelloWorld: 
+  public framework::behaviour::OneShotBehaviour {
+  public:
+    virtual void action(framework::behaviour::Context& context) {
+      Serial.println("Hello, World!");
     }
-    ++state->counter;
-  }
 };
 
 void setup() {
@@ -39,8 +24,7 @@ void setup() {
   /* framework::__ffi::Container* container = framework::__ffi::container_new(); */
 
   framework::Agent hello_world_agent = framework::Agent("hello-world-agent");
-  hello_world_agent.add_behaviour(std::make_unique<framework::behaviour::OneShotBehaviour<HelloWorld, void>>());
-  hello_world_agent.add_behaviour(std::make_unique<framework::behaviour::CyclicBehaviour<Messenger, Messenger::State, void>>(std::make_unique<Messenger::State>()));
+  hello_world_agent.add_behaviour(std::make_unique<HelloWorld>());
 
   container.add_agent(std::move(hello_world_agent));
 

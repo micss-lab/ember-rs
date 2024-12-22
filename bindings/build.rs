@@ -1,4 +1,4 @@
-use cbindgen::{Config, ParseConfig};
+use cbindgen::{Config, DocumentationStyle, ParseConfig};
 use std::env;
 use std::path::PathBuf;
 
@@ -21,6 +21,7 @@ fn main() {
         no_includes: true,
         includes: Vec::from(["inttypes.h".into()]),
         include_guard: Some("FRAMEWORK_CORE_H".into()),
+        documentation_style: DocumentationStyle::Doxy,
         ..Default::default()
     };
 

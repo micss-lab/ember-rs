@@ -11,6 +11,6 @@ void Agent::add_behaviour(std::unique_ptr<behaviour::Behaviour> behaviour) {
     behaviour->__ffi_add_behaviour_to_agent(this->value);
 }
 
-void Agent::free_object(__ffi::Agent* agent) {
+void Agent::free_object(__ffi::Agent<__ffi::Message>* agent) {
     __ffi::agent_free(agent);
 }
