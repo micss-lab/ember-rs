@@ -7,6 +7,7 @@ const HEAP_SIZE: usize = 160 * 1024;
 
 #[panic_handler]
 fn panic(_: &PanicInfo) -> ! {
+    log::error!("Got panic!\r");
     loop {}
 }
 
