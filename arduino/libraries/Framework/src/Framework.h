@@ -9,7 +9,7 @@
 #include "Container.h"
 
 #include "behaviour/OneShotBehaviour.h"
-// #include "behaviour/CyclicBehaviour.h"
+#include "behaviour/CyclicBehaviour.h"
 
 namespace framework {
 

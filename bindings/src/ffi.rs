@@ -111,7 +111,7 @@ mod agent {
 
     use no_std_framework_core::Agent;
 
-    use super::behaviour::simple::OneShotBehaviour;
+    use super::behaviour::simple::{CyclicBehaviour, OneShotBehaviour};
     use super::message::Message;
     use super::util::{drop_raw, from_raw, new, ref_from_raw, string_from_raw};
 
@@ -138,23 +138,24 @@ mod agent {
         let behaviour = unsafe { from_raw(oneshot) };
         agent.add_behaviour(behaviour)
     }
-    //
-    // #[no_mangle]
-    // pub extern "C" fn agent_add_behaviour_cyclic(
-    //     agent: *mut Agent,
-    //     cyclic: *mut CyclicBehaviour<SimpleState, ()>,
-    // ) {
-    //     non_null!(agent, "got agent null-pointer");
-    //     let agent = unsafe { ref_from_raw(agent) };
-    //     let behaviour = unsafe { Box::from_raw(cyclic) };
-    //     agent.add_boxed_behaviour(behaviour as Box<dyn Behaviour<ParentState = ()>>)
-    // }
+
+    #[no_mangle]
+    pub extern "C" fn agent_add_behaviour_cyclic(
+        agent: *mut Agent<Message>,
+        cyclic: *mut CyclicBehaviour,
+    ) {
+        non_null!(agent, "got agent null-pointer");
+        let agent = unsafe { ref_from_raw(agent) };
+        let behaviour = unsafe { from_raw(cyclic) };
+        agent.add_behaviour(behaviour)
+    }
 }
 
 mod behaviour {
     use super::message::Message;
 
     pub(super) mod simple {
+        pub(in crate::ffi) use cyclic::CyclicBehaviour;
         pub(in crate::ffi) use oneshot::OneShotBehaviour;
 
         use super::Message;
@@ -171,10 +172,9 @@ mod behaviour {
             use super::{drop_raw, new, Message};
 
             pub struct OneShotBehaviour {
+                /// Type value defined by the user implementing the trait.
                 inner: *mut c_void,
                 /// Action to be performed.
-                ///
-                /// First argument is the `inner` void pointer.
                 action: extern "C" fn(*mut c_void, *mut Context<Message>),
             }
 
@@ -201,55 +201,57 @@ mod behaviour {
             }
         }
 
-        //     mod cyclic {
-        //         use core::ptr;
-        //
-        //         use no_std_framework_core::behaviour::{Context, CyclicBehaviour};
-        //
-        //         use super::{drop_raw, new, SimpleState, State};
-        //
-        //         #[no_mangle]
-        //         pub extern "C" fn behaviour_cyclic_new(
-        //             state: SimpleState,
-        //             action: extern "C" fn(*mut Context, *mut SimpleState, State) -> State,
-        //         ) -> *mut CyclicBehaviour<SimpleState, State> {
-        //             new(CyclicBehaviour::new(state, move |ctx, state| {
-        //                 let (mut state, parent) = state.cut_root();
-        //                 let parent = (action)(ptr::from_mut(ctx), ptr::from_mut(&mut state), parent);
-        //                 no_std_framework_core::behaviour::State::new(state, parent)
-        //             }))
-        //         }
-        //
-        //         #[no_mangle]
-        //         pub extern "C" fn behaviour_cyclic_new_void(
-        //             state: SimpleState,
-        //             action: extern "C" fn(*mut Context, *mut SimpleState),
-        //         ) -> *mut CyclicBehaviour<SimpleState, ()> {
-        //             new(CyclicBehaviour::new(state, move |ctx, state| {
-        //                 let (mut state, _) = state.cut_root();
-        //                 (action)(ptr::from_mut(ctx), ptr::from_mut(&mut state));
-        //                 no_std_framework_core::behaviour::State::new(state, ())
-        //             }))
-        //         }
-        //
-        //         #[no_mangle]
-        //         pub extern "C" fn behaviour_cyclic_free(
-        //             cyclic: *mut CyclicBehaviour<SimpleState, State>,
-        //         ) {
-        //             non_null_or_bail!(cyclic, "attemted to free cyclic behaviour null-pointer");
-        //             unsafe { drop_raw(cyclic) };
-        //         }
-        //
-        //         #[no_mangle]
-        //         pub extern "C" fn behaviour_cyclic_free_void(
-        //             cyclic: *mut CyclicBehaviour<SimpleState, ()>,
-        //         ) {
-        //             non_null_or_bail!(cyclic, "attemted to free cyclic behaviour null-pointer");
-        //             unsafe { drop_raw(cyclic) };
-        //         }
-        //     }
-        // }
-        //
+        mod cyclic {
+            use core::ffi::c_void;
+            use core::ptr;
+
+            use no_std_framework_core::behaviour::{
+                Context, CyclicBehaviour as CyclicBehaviourTrait,
+            };
+
+            use super::{drop_raw, new, Message};
+
+            pub struct CyclicBehaviour {
+                /// Type value defined by the user implementing the trait.
+                inner: *mut c_void,
+                /// Action to be performed.
+                action: extern "C" fn(*mut c_void, *mut Context<Message>),
+                /// Whether the behaviour has finished.
+                is_finished: extern "C" fn(*mut c_void) -> bool,
+            }
+
+            impl CyclicBehaviourTrait for CyclicBehaviour {
+                type Message = Message;
+
+                fn action(&mut self, ctx: &mut Context<Self::Message>) {
+                    (self.action)(self.inner, ptr::from_mut(ctx));
+                }
+
+                fn is_finished(&self) -> bool {
+                    (self.is_finished)(self.inner)
+                }
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_cyclic_new(
+                inner: *mut c_void,
+                action: extern "C" fn(*mut c_void, *mut Context<Message>),
+                is_finished: extern "C" fn(*mut c_void) -> bool,
+            ) -> *mut CyclicBehaviour {
+                new(CyclicBehaviour {
+                    inner,
+                    action,
+                    is_finished,
+                })
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_cyclic_free(cyclic: *mut CyclicBehaviour) {
+                non_null_or_bail!(cyclic, "attemted to free cyclic behaviour null-pointer");
+                unsafe { drop_raw(cyclic) };
+            }
+        }
+
         // mod complex {
         //     use super::super::util;
         //     use super::State;

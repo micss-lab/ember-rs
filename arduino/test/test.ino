@@ -3,11 +3,34 @@
 #include <utility>
 
 class HelloWorld: 
-  public framework::behaviour::OneShotBehaviour {
+    public framework::behaviour::OneShotBehaviour {
   public:
-    virtual void action(framework::behaviour::Context& context) {
+    virtual void action(framework::behaviour::Context& context) const override {
       Serial.println("Hello, World!");
+      Serial.println("My friend will print 10 messages.");
     }
+};
+
+class MessagePrinter:
+    public framework::behaviour::CyclicBehaviour {
+  public:
+    virtual void action(framework::behaviour::Context& context) override {
+        Serial.println(
+          (this->count == 10)
+            ? "Printing the first message!"
+            : (
+              (this->count == 1)
+                ? "Printing the last message!"
+                : "Printing another message."
+            )
+        );
+        --this->count;
+    }
+    virtual bool is_finished() const override {
+      return this->count == 0;
+    }
+  private:
+    unsigned int count{10};
 };
 
 void setup() {
@@ -25,6 +48,7 @@ void setup() {
 
   framework::Agent hello_world_agent = framework::Agent("hello-world-agent");
   hello_world_agent.add_behaviour(std::make_unique<HelloWorld>());
+  hello_world_agent.add_behaviour(std::make_unique<MessagePrinter>());
 
   container.add_agent(std::move(hello_world_agent));
 

@@ -18,9 +18,6 @@ class Agent:
     virtual ~Agent();
     
     void add_behaviour(std::unique_ptr<behaviour::Behaviour> behaviour);
-
-  protected:
-    virtual void free_object(__ffi::Agent<__ffi::Message>* agent);
 };
 
 } // namespace framework

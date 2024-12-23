@@ -9,47 +9,17 @@ namespace framework {
 
 namespace behaviour {
 
-template<class T, class S, class P>
 class CyclicBehaviour:
     public Behaviour,
-    public Object<__ffi::CyclicBehaviour<__ffi::SimpleState, P>> {
-};
-
-template<class T, class S>
-class CyclicBehaviour<T, S, __ffi::State>:
-    public Behaviour,
-    public Object<__ffi::CyclicBehaviour<__ffi::SimpleState, __ffi::State>> {
+    public Object<__ffi::CyclicBehaviour> {
   public:
-    CyclicBehaviour(std::unique_ptr<S> state):
-        Object(__ffi::behaviour_cyclic_new(
-            SimpleState { .value = static_cast<void*>(state.release()), .finished = false },
-            [](__ffi::Context* context_, __ffi::State state) -> __ffi::State {
-                Context context(context_);
-                return T::action(context, state);
-            }
-        ), __ffi::behaviour_cyclic_free) {}
-};
+    CyclicBehaviour();
+    virtual ~CyclicBehaviour();
 
-template<class T, class S>
-class CyclicBehaviour<T, S, void>:
-    public Behaviour,
-    public Object<__ffi::CyclicBehaviour<__ffi::SimpleState, void>> {
-  public:
-    CyclicBehaviour(std::unique_ptr<S> state):
-        Object(__ffi::behaviour_cyclic_new_void(
-            SimpleState { .value = static_cast<void*>(state.release()), .finished = false },
-            [](__ffi::Context* context_, __ffi::SimpleState* state) -> void {
-                Context context(context_);
-                T::action(context, *state);
-            }
-        ), __ffi::behaviour_cyclic_free_void) {}
+    virtual void action(Context& context) = 0;
+    virtual bool is_finished() const = 0;
 
-    virtual void __ffi_add_behaviour_to_agent(__ffi::Agent* agent) {
-        __ffi::agent_add_behaviour_cyclic(
-            agent,
-            this->move_object()
-        );
-    }
+    virtual void __ffi_add_behaviour_to_agent(__ffi::Agent<__ffi::Message>* agent) override;
 };
 
 } // namespace behaviour

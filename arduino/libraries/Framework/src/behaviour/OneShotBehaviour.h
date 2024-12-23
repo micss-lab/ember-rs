@@ -16,7 +16,7 @@ class OneShotBehaviour:
     OneShotBehaviour();
     virtual ~OneShotBehaviour();
 
-    virtual void action(Context& context) = 0;
+    virtual void action(Context& context) const = 0;
 
     virtual void __ffi_add_behaviour_to_agent(__ffi::Agent<__ffi::Message>* agent) override;
 };

@@ -13,6 +13,8 @@ struct Container;
 template<typename M = void>
 struct Context;
 
+struct CyclicBehaviour;
+
 struct Message;
 
 struct OneShotBehaviour;
@@ -43,9 +45,17 @@ void agent_free(Agent<Message> *agent);
 
 void agent_add_behaviour_oneshot(Agent<Message> *agent, OneShotBehaviour *oneshot);
 
+void agent_add_behaviour_cyclic(Agent<Message> *agent, CyclicBehaviour *cyclic);
+
 OneShotBehaviour *behaviour_oneshot_new(void *inner, void (*action)(void*, Context<Message>*));
 
 void behaviour_oneshot_free(OneShotBehaviour *oneshot);
+
+CyclicBehaviour *behaviour_cyclic_new(void *inner,
+                                      void (*action)(void*, Context<Message>*),
+                                      bool (*is_finished)(void*));
+
+void behaviour_cyclic_free(CyclicBehaviour *cyclic);
 
 /**
  * Initialize the libraries global logger.
