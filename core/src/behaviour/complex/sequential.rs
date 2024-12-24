@@ -55,6 +55,10 @@ impl<M: 'static> BehaviourQueue<M> for SequentialBehaviourQueue<M> {
         self.queue.push_back(behaviour)
     }
 
+    fn reschedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>) {
+        self.queue.push_front(behaviour);
+    }
+
     fn is_finished(&self) -> bool {
         self.queue.is_empty()
     }

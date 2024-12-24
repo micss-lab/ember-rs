@@ -52,6 +52,8 @@ pub(crate) trait BehaviourQueue<M: 'static> {
 
     fn schedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>);
 
+    fn reschedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>);
+
     fn is_finished(&self) -> bool;
 
     fn action(&mut self, ctx: &mut Context<M>) -> bool {
@@ -60,7 +62,7 @@ pub(crate) trait BehaviourQueue<M: 'static> {
         };
         let finished = behaviour.action(ctx);
         if !finished {
-            self.schedule(behaviour);
+            self.reschedule(behaviour);
         }
         self.is_finished()
     }
