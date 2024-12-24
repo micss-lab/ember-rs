@@ -7,6 +7,7 @@ Agent::Agent(const char* const name):
 
 Agent::~Agent() {};
 
-void Agent::add_behaviour(std::unique_ptr<behaviour::Behaviour> behaviour) {
-    behaviour->__ffi_add_behaviour_to_agent(this->value);
+void Agent::add_behaviour(std::unique_ptr<behaviour::Behaviour>&& behaviour_) {
+    behaviour::Behaviour* behaviour = behaviour_.release();
+    behaviour->__ffi_add_behaviour_to_agent(this->object);
 }

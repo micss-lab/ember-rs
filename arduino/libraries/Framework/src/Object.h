@@ -17,15 +17,22 @@ class Object {
     Object(T* object, std::function<void(T*)> free);
     ~Object();
 
+    // Do not allow to copy an object.
+    Object(const Object<T>&) = delete;
+    Object<T>& operator=(const Object<T>&) = delete;
+
+    Object(Object<T>&&);
+    Object<T>& operator=(Object<T>&&);
+
   protected:
     bool moved{false};
-    T* value;
+    T* object;
     std::function<void(T*)> free;
 };
 
 template<class T>
-Object<T>::Object(T* value, std::function<void(T*)>):
-    value(value), free(free) {}
+Object<T>::Object(T* object, std::function<void(T*)> free):
+    object(object), free(free) {}
 
 template<class T>
 T* Object<T>::move_object() {
@@ -34,7 +41,25 @@ T* Object<T>::move_object() {
     }
 
     this->moved = true;
-    return this->value;
+    return this->object;
+}
+
+template<class T>
+Object<T>::Object(Object<T>&& o) {
+    if (!o.moved) {
+        this->object = o.move_object();
+        this->free = o.free;
+    }
+}
+
+template<class T>
+Object<T>& Object<T>::operator=(Object<T>&& o) {
+    if (this != &o && !o.moved) {
+        this->object = o.move_object();
+        this->free = o.free;
+        this->moved = false;
+    }
+    return *this;
 }
 
 template<class T>
@@ -42,7 +67,7 @@ Object<T>::~Object() {
     if (this->moved) {
         return;
     }
-    this->free(this->value);
+    this->free(this->object);
 }
 
 } // namespace framework

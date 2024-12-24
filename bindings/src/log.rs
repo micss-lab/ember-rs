@@ -22,5 +22,7 @@ pub(crate) fn initialize_logging(level: LevelFilter) {
                 let _ = level;
             }
         }
+
+        unsafe { INIT = true };
     })
 }

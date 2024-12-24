@@ -89,8 +89,8 @@ mod container {
 
     #[no_mangle]
     pub extern "C" fn container_add_agent(container: *mut Container, agent: *mut Agent<Message>) {
-        non_null!(container, "got container nullpointer");
-        non_null!(agent, "got agent nullpointer");
+        non_null!(container, "got container null-pointer");
+        non_null!(agent, "got agent null-pointer");
         let agent = unsafe { from_raw(agent) };
         unsafe { (*container).add_agent(agent) };
     }
@@ -111,6 +111,7 @@ mod agent {
 
     use no_std_framework_core::Agent;
 
+    use super::behaviour::complex::SequentialBehaviour;
     use super::behaviour::simple::{CyclicBehaviour, OneShotBehaviour};
     use super::message::Message;
     use super::util::{drop_raw, from_raw, new, ref_from_raw, string_from_raw};
@@ -134,9 +135,10 @@ mod agent {
         oneshot: *mut OneShotBehaviour,
     ) {
         non_null!(agent, "got agent null-pointer");
+        non_null!(oneshot, "got oneshot behaviour null-pointer");
         let agent = unsafe { ref_from_raw(agent) };
         let behaviour = unsafe { from_raw(oneshot) };
-        agent.add_behaviour(behaviour)
+        agent.add_behaviour(behaviour);
     }
 
     #[no_mangle]
@@ -145,9 +147,22 @@ mod agent {
         cyclic: *mut CyclicBehaviour,
     ) {
         non_null!(agent, "got agent null-pointer");
+        non_null!(cyclic, "got cyclic behaviour null-pointer");
         let agent = unsafe { ref_from_raw(agent) };
         let behaviour = unsafe { from_raw(cyclic) };
-        agent.add_behaviour(behaviour)
+        agent.add_behaviour(behaviour);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn agent_add_behaviour_sequential(
+        agent: *mut Agent<Message>,
+        sequential: *mut SequentialBehaviour,
+    ) {
+        non_null!(agent, "got agent null-pointer");
+        non_null!(sequential, "got sequential behaviour null-pointer");
+        let agent = unsafe { ref_from_raw(agent) };
+        let behaviour = unsafe { from_raw(sequential) };
+        agent.add_behaviour(behaviour);
     }
 }
 
@@ -155,8 +170,8 @@ mod behaviour {
     use super::message::Message;
 
     pub(super) mod simple {
-        pub(in crate::ffi) use cyclic::CyclicBehaviour;
-        pub(in crate::ffi) use oneshot::OneShotBehaviour;
+        pub(in crate::ffi) use self::cyclic::CyclicBehaviour;
+        pub(in crate::ffi) use self::oneshot::OneShotBehaviour;
 
         use super::Message;
         use crate::ffi::util::{drop_raw, new};
@@ -251,55 +266,145 @@ mod behaviour {
                 unsafe { drop_raw(cyclic) };
             }
         }
+    }
 
-        // mod complex {
-        //     use super::super::util;
-        //     use super::State;
-        //
-        //     mod sequential {
-        //         use core::ffi::c_void;
-        //
-        //         use no_std_framework_core::behaviour::SequentialBehaviour;
-        //
-        //         use super::util::{drop_raw, new};
-        //         use super::State;
-        //
-        //         #[no_mangle]
-        //         pub extern "C" fn behaviour_sequential_new(
-        //             state: *mut c_void,
-        //         ) -> *mut SequentialBehaviour<*mut c_void, State> {
-        //             new(SequentialBehaviour::new(state))
-        //         }
-        //
-        //         #[no_mangle]
-        //         pub extern "C" fn behaviour_sequential_new_void(
-        //             state: *mut c_void,
-        //         ) -> *mut SequentialBehaviour<*mut c_void, ()> {
-        //             new(SequentialBehaviour::new(state))
-        //         }
-        //
-        //         #[no_mangle]
-        //         pub extern "C" fn behaviour_sequential_free(
-        //             sequential: *mut SequentialBehaviour<*mut c_void, State>,
-        //         ) {
-        //             non_null_or_bail!(
-        //                 sequential,
-        //                 "attempted to free sequential behaviour null-pointer"
-        //             );
-        //             unsafe { drop_raw(sequential) };
-        //         }
-        //
-        //         #[no_mangle]
-        //         pub extern "C" fn behaviour_sequential_free_void(
-        //             sequential: *mut SequentialBehaviour<*mut c_void, ()>,
-        //         ) {
-        //             non_null_or_bail!(
-        //                 sequential,
-        //                 "attempted to free sequential behaviour null-pointer"
-        //             );
-        //             unsafe { drop_raw(sequential) };
-        //         }
-        //     }
+    pub(super) mod complex {
+        pub(in crate::ffi) use self::sequential::SequentialBehaviour;
+
+        use super::Message;
+        use crate::ffi::util::{drop_raw, from_raw, new, ref_from_raw};
+
+        mod sequential {
+            use core::cell::Cell;
+            use core::ffi::c_void;
+            use core::ptr;
+
+            use no_std_framework_core::behaviour::{
+                sequential::{
+                    SequentialBehaviour as SequentialBehaviourTrait, SequentialBehaviourQueue,
+                },
+                Context,
+            };
+
+            use super::{drop_raw, from_raw, new, ref_from_raw, Message};
+
+            mod queue {
+                use super::{
+                    drop_raw, from_raw, new, ref_from_raw, Message, SequentialBehaviour,
+                    SequentialBehaviourQueue,
+                };
+                use crate::ffi::behaviour::simple::{CyclicBehaviour, OneShotBehaviour};
+
+                #[no_mangle]
+                pub extern "C" fn behaviour_sequential_queue_new(
+                ) -> *mut SequentialBehaviourQueue<Message> {
+                    new(SequentialBehaviourQueue::new())
+                }
+
+                #[no_mangle]
+                pub extern "C" fn behaviour_sequential_queue_add_behaviour_oneshot(
+                    queue: *mut SequentialBehaviourQueue<Message>,
+                    oneshot: *mut OneShotBehaviour,
+                ) {
+                    non_null!(queue, "got sequential queue null-pointer");
+                    non_null!(oneshot, "got oneshot behaviour null-pointer");
+                    let queue = unsafe { ref_from_raw(queue) };
+                    let behaviour = unsafe { from_raw(oneshot) };
+                    queue.add_behaviour(behaviour);
+                }
+
+                #[no_mangle]
+                pub extern "C" fn behaviour_sequential_queue_add_behaviour_cyclic(
+                    queue: *mut SequentialBehaviourQueue<Message>,
+                    cyclic: *mut CyclicBehaviour,
+                ) {
+                    non_null!(queue, "got sequential queue null-pointer");
+                    non_null!(cyclic, "got cyclic behaviour null-pointer");
+                    let queue = unsafe { ref_from_raw(queue) };
+                    let behaviour = unsafe { from_raw(cyclic) };
+                    queue.add_behaviour(behaviour);
+                }
+
+                #[no_mangle]
+                pub extern "C" fn behaviour_sequential_queue_add_behaviour_sequential(
+                    queue: *mut SequentialBehaviourQueue<Message>,
+                    sequential: *mut SequentialBehaviour,
+                ) {
+                    non_null!(queue, "got sequential queue null-pointer");
+                    non_null!(sequential, "got sequential behaviour null-pointer");
+                    let queue = unsafe { ref_from_raw(queue) };
+                    let behaviour = unsafe { from_raw(sequential) };
+                    queue.add_behaviour(behaviour);
+                }
+
+                #[no_mangle]
+                pub extern "C" fn behaviour_sequential_queue_free(
+                    queue: *mut SequentialBehaviourQueue<Message>,
+                ) {
+                    non_null_or_bail!(
+                        queue,
+                        "attemted to free sequential behaviour queue null-pointer"
+                    );
+                    unsafe { drop_raw(queue) };
+                }
+            }
+
+            pub struct SequentialBehaviour {
+                /// Type value defined by the user implementing the trait.
+                inner: *mut c_void,
+                /// List of initial behaviours to be scheduled.
+                initial_behaviours: Cell<*mut SequentialBehaviourQueue<Message>>,
+                /// Function to be executed after a child behaviour has performed its action.
+                after_child_action: extern "C" fn(*mut c_void, *mut Context<Message>),
+            }
+
+            impl SequentialBehaviourTrait for SequentialBehaviour {
+                type Message = Message;
+
+                type ChildMessage = Message;
+
+                fn initial_behaviours(&self) -> SequentialBehaviourQueue<Self::ChildMessage> {
+                    // Replace the initial behaviours pointer with a null-pointer.
+                    non_null!(
+                        self.initial_behaviours.get(),
+                        "initial behaviours can only be fetched once"
+                    );
+                    let result = self.initial_behaviours.replace(ptr::null_mut());
+                    unsafe { from_raw(result) }
+                }
+
+                fn after_child_action(
+                    &mut self,
+                    ctx: &mut no_std_framework_core::behaviour::Context<Self::Message>,
+                ) {
+                    (self.after_child_action)(self.inner, ptr::from_mut(ctx));
+                }
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_sequential_new(
+                inner: *mut c_void,
+                initial_behaviours: *mut SequentialBehaviourQueue<Message>,
+                after_child_action: extern "C" fn(*mut c_void, *mut Context<Message>),
+            ) -> *mut SequentialBehaviour {
+                non_null!(inner, "got inner null-pointer");
+                non_null!(initial_behaviours, "got initial behaviours null-pointer");
+                new(SequentialBehaviour {
+                    inner,
+                    initial_behaviours: initial_behaviours.into(),
+                    after_child_action,
+                })
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_sequential_free(sequential: *mut SequentialBehaviour) {
+                non_null_or_bail!(
+                    sequential,
+                    "attempted to free sequential behaviour null-pointer"
+                );
+                unsafe { drop_raw(sequential) };
+            }
+        }
     }
 }
 

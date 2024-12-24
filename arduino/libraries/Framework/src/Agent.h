@@ -17,7 +17,7 @@ class Agent:
     Agent(const char* const name);
     virtual ~Agent();
     
-    void add_behaviour(std::unique_ptr<behaviour::Behaviour> behaviour);
+    void add_behaviour(std::unique_ptr<behaviour::Behaviour>&& behaviour);
 };
 
 } // namespace framework

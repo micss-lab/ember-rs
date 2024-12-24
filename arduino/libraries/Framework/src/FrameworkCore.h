@@ -19,6 +19,11 @@ struct Message;
 
 struct OneShotBehaviour;
 
+struct SequentialBehaviour;
+
+template<typename M = void>
+struct SequentialBehaviourQueue;
+
 extern "C" {
 
 void initialize_allocator();
@@ -47,6 +52,8 @@ void agent_add_behaviour_oneshot(Agent<Message> *agent, OneShotBehaviour *onesho
 
 void agent_add_behaviour_cyclic(Agent<Message> *agent, CyclicBehaviour *cyclic);
 
+void agent_add_behaviour_sequential(Agent<Message> *agent, SequentialBehaviour *sequential);
+
 OneShotBehaviour *behaviour_oneshot_new(void *inner, void (*action)(void*, Context<Message>*));
 
 void behaviour_oneshot_free(OneShotBehaviour *oneshot);
@@ -56,6 +63,25 @@ CyclicBehaviour *behaviour_cyclic_new(void *inner,
                                       bool (*is_finished)(void*));
 
 void behaviour_cyclic_free(CyclicBehaviour *cyclic);
+
+SequentialBehaviour *behaviour_sequential_new(void *inner,
+                                              SequentialBehaviourQueue<Message> *initial_behaviours,
+                                              void (*after_child_action)(void*, Context<Message>*));
+
+void behaviour_sequential_free(SequentialBehaviour *sequential);
+
+SequentialBehaviourQueue<Message> *behaviour_sequential_queue_new();
+
+void behaviour_sequential_queue_add_behaviour_oneshot(SequentialBehaviourQueue<Message> *queue,
+                                                      OneShotBehaviour *oneshot);
+
+void behaviour_sequential_queue_add_behaviour_cyclic(SequentialBehaviourQueue<Message> *queue,
+                                                     CyclicBehaviour *cyclic);
+
+void behaviour_sequential_queue_add_behaviour_sequential(SequentialBehaviourQueue<Message> *queue,
+                                                         SequentialBehaviour *sequential);
+
+void behaviour_sequential_queue_free(SequentialBehaviourQueue<Message> *queue);
 
 /**
  * Initialize the libraries global logger.

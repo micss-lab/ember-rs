@@ -19,7 +19,12 @@ class CyclicBehaviour:
     virtual void action(Context& context) = 0;
     virtual bool is_finished() const = 0;
 
+  public:
     virtual void __ffi_add_behaviour_to_agent(__ffi::Agent<__ffi::Message>* agent) override;
+
+    virtual void __ffi_add_behaviour_to_sequential_behaviour_queue(
+        __ffi::SequentialBehaviourQueue<__ffi::Message>* queue
+    ) override;
 };
 
 } // namespace behaviour

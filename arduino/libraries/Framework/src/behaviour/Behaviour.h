@@ -23,6 +23,10 @@ class Context {
 class Behaviour {
   public:
     virtual void __ffi_add_behaviour_to_agent(__ffi::Agent<__ffi::Message>* agent) = 0;
+
+    virtual void __ffi_add_behaviour_to_sequential_behaviour_queue(
+        __ffi::SequentialBehaviourQueue<__ffi::Message>* queue
+    ) = 0;
 };
 
 } // namespace behaviour
