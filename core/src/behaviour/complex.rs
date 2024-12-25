@@ -13,6 +13,12 @@ macro_rules! complex_action {
         fn action(&mut self, ctx: &mut Context<Self::Message>) -> bool {
             let mut context = Context::new();
             self.queue.action(&mut context);
+            if let Some(mut messages) = context.messages.take() {
+                while let Some(message) = messages.pop() {
+                    self.kind.0.handle_child_message(message);
+                }
+            }
+            ctx.merge(context);
             self.kind.0.after_child_action(ctx);
             self.queue.is_finished()
         }

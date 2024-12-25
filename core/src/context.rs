@@ -29,10 +29,34 @@ impl<M> Context<M> {
         Self::default()
     }
 
+    pub fn message_parent(&mut self, message: M) {
+        self.messages.get_or_insert_with(Vec::new).push(message);
+    }
+
     pub fn stop_container(&mut self) {
         self.container
-            .get_or_insert(ContainerContext::default())
+            .get_or_insert_with(ContainerContext::new)
             .should_stop = true;
+    }
+
+    pub(crate) fn merge<M2>(
+        &mut self,
+        Context {
+            container,
+            agent,
+            messages: _,
+        }: Context<M2>,
+    ) {
+        if let Some(container) = container {
+            self.container
+                .get_or_insert_with(ContainerContext::new)
+                .merge(container);
+        }
+        if let Some(agent) = agent {
+            self.agent
+                .get_or_insert_with(AgentContext::new)
+                .merge(agent);
+        }
     }
 }
 
@@ -44,4 +68,12 @@ impl ContainerContext {
     pub(crate) fn merge(&mut self, Self { should_stop }: Self) {
         self.should_stop |= should_stop;
     }
+}
+
+impl AgentContext {
+    pub(crate) fn new() -> Self {
+        Self::default()
+    }
+
+    pub(crate) fn merge(&mut self, _other: Self) {}
 }
