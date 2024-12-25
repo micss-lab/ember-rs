@@ -1,58 +1,68 @@
 use std::{cell::RefCell, rc::Rc};
 
 use no_std_framework_core::behaviour::{
-    parallel, CyclicBehaviour, OneShotBehaviour, ParallelBehaviour, SimpleBehaviourState, State,
+    parallel::{FinishStrategy, ParallelBehaviour, ParallelBehaviourQueue},
+    Context, CyclicBehaviour, OneShotBehaviour,
 };
 use no_std_framework_core::{Agent, Container};
 
 #[test]
 fn strategy_all() {
-    #[derive(Debug)]
-    struct SequentialStateInner {
-        value: u32,
-    }
+    static mut RESULT: u32 = 0;
 
-    struct CyclicState(u32);
+    struct IncrementMessage;
 
-    impl SimpleBehaviourState for CyclicState {
-        fn finished(&self) -> bool {
-            self.0 == 0
+    struct FirstAndThird;
+
+    impl OneShotBehaviour for FirstAndThird {
+        type Message = IncrementMessage;
+
+        fn action(&self, ctx: &mut Context<Self::Message>) {
+            ctx.message_parent(IncrementMessage)
         }
     }
 
-    type SequentialState = Rc<RefCell<SequentialStateInner>>;
+    struct Second {
+        value: u32,
+    }
 
-    let state = Rc::new(RefCell::new(SequentialStateInner { value: 0 }));
-    let container = Container::default().with_agent(
-        Agent::new("parallel-agent")
-            .with_behaviour(OneShotBehaviour::new(|_, _| {
-                println!("Some value");
-            }))
-            .with_behaviour(
-                ParallelBehaviour::new(state.clone(), parallel::Strategy::All)
-                    .with_behaviour(OneShotBehaviour::new(|_, state: SequentialState| {
-                        println!("I hope this will work...");
-                        state.borrow_mut().value += 1;
-                        state
-                    }))
-                    .with_behaviour(CyclicBehaviour::new(
-                        CyclicState(10),
-                        |ctx, mut state: State<CyclicState, SequentialState>| {
-                            state.0 -= 1;
-                            state.parent().borrow_mut().value += 1;
-                            if state.finished() {
-                                ctx.stop();
-                            }
-                            state
-                        },
-                    ))
-                    .with_behaviour(OneShotBehaviour::new(|_, state: SequentialState| {
-                        println!("foo");
-                        state.borrow_mut().value += 1;
-                        state
-                    })),
-            ),
-    );
+    impl CyclicBehaviour for Second {
+        type Message = IncrementMessage;
+
+        fn action(&mut self, ctx: &mut Context<Self::Message>) {
+            self.value -= 1;
+            ctx.message_parent(IncrementMessage);
+            if self.is_finished() {
+                ctx.stop_container();
+            }
+        }
+
+        fn is_finished(&self) -> bool {
+            self.value == 0
+        }
+    }
+
+    struct Parallel;
+
+    impl ParallelBehaviour for Parallel {
+        type Message = ();
+
+        type ChildMessage = IncrementMessage;
+
+        fn initial_behaviours(&self) -> ParallelBehaviourQueue<Self::ChildMessage> {
+            ParallelBehaviourQueue::new(FinishStrategy::All)
+                .with_behaviour(FirstAndThird)
+                .with_behaviour(Second { value: 10 })
+                .with_behaviour(FirstAndThird)
+        }
+
+        fn handle_child_message(&mut self, message: Self::ChildMessage) {
+            unsafe { RESULT += 1 };
+        }
+    }
+
+    let container =
+        Container::default().with_agent(Agent::new("parallel-agent").with_behaviour(Parallel));
     container.start().unwrap();
-    assert!(state.borrow_mut().value == 12);
+    assert!(unsafe { RESULT } == 12);
 }
