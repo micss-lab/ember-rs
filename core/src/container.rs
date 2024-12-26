@@ -28,18 +28,26 @@ impl Container {
 
     pub fn start(mut self) -> Result<(), Box<dyn core::error::Error>> {
         log::trace!("Starting the container.\r");
-        'start: loop {
-            log::trace!("Polling all agents.\r");
-            for agent in self.agents.iter_mut() {
-                let mut context = ContainerContext::new();
-
-                log::trace!("Agent `{}` update:\r", agent.get_name());
-                agent.update(&mut context);
-
-                if context.should_stop {
-                    break 'start Ok(());
-                }
+        loop {
+            let should_stop = self.poll()?;
+            if should_stop {
+                break Ok(());
             }
         }
+    }
+
+    pub fn poll(&mut self) -> Result<bool, Box<dyn core::error::Error>> {
+        log::trace!("Polling all agents.\r");
+        for agent in self.agents.iter_mut() {
+            let mut context = ContainerContext::new();
+
+            log::trace!("Agent `{}` update:\r", agent.get_name());
+            agent.update(&mut context);
+
+            if context.should_stop {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 }
