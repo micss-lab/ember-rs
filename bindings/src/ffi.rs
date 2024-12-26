@@ -64,7 +64,7 @@ mod message {
 mod container {
     use no_std_framework_core::{Agent, Container};
 
-    use crate::ffi::util::drop_raw;
+    use crate::ffi::util::{drop_raw, ref_from_raw};
 
     use super::message::Message;
     use super::util::{from_raw, new};
@@ -102,6 +102,26 @@ mod container {
         match result {
             Ok(()) => 0,
             Err(_) => 1,
+        }
+    }
+
+    #[repr(C)]
+    pub struct ContainerPollResult {
+        status: i32,
+        should_stop: bool,
+    }
+
+    #[no_mangle]
+    pub extern "C" fn container_poll(container: *mut Container) -> ContainerPollResult {
+        non_null!(container, "got container null-pointer");
+        let container = unsafe { ref_from_raw(container) };
+        let (should_stop, status) = match container.poll() {
+            Ok(should_stop) => (should_stop, 0),
+            Err(_) => (true, 1),
+        };
+        ContainerPollResult {
+            status,
+            should_stop,
         }
     }
 }

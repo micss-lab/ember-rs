@@ -14,3 +14,7 @@ void Container::add_agent(Agent&& agent) {
 bool Container::start(Container&& container) {
     return static_cast<bool>(__ffi::container_start(container.move_object()));
 }
+
+Container::PollResult Container::poll() {
+    return __ffi::container_poll(this->object);
+}

@@ -24,6 +24,11 @@ struct SequentialBehaviour;
 template<typename M = void>
 struct SequentialBehaviourQueue;
 
+struct ContainerPollResult {
+  int32_t status;
+  bool should_stop;
+};
+
 extern "C" {
 
 void initialize_allocator();
@@ -43,6 +48,8 @@ void container_free(Container *container);
 void container_add_agent(Container *container, Agent<Message> *agent);
 
 int32_t container_start(Container *container);
+
+ContainerPollResult container_poll(Container *container);
 
 Agent<Message> *agent_new(const char *name);
 

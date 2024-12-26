@@ -1,6 +1,7 @@
 #include <Framework.h>
 
 #include <utility>
+#include <memory>
 
 class HelloWorld: 
     public framework::behaviour::OneShotBehaviour {
@@ -33,6 +34,8 @@ class MessagePrinter:
     unsigned int count{10};
 };
 
+std::unique_ptr<framework::Container> container;
+
 void setup() {
   Serial.begin(115200);
   Serial.println("Hello, ESP32-C3!");
@@ -43,25 +46,23 @@ void setup() {
   /* framework::__ffi::initialize_allocator(); */
 
   // Create the main container instance.
-  framework::Container container{};
+  container = std::make_unique<framework::Container>();
   /* framework::__ffi::Container* container = framework::__ffi::container_new(); */
 
   framework::Agent hello_world_agent = framework::Agent("hello-world-agent");
   hello_world_agent.add_behaviour(std::make_unique<HelloWorld>());
   hello_world_agent.add_behaviour(std::make_unique<MessagePrinter>());
 
-  container.add_agent(std::move(hello_world_agent));
-
-  // Start the container and check for errors.
-  bool failed = framework::Container::start(std::move(container));
-  /* int failed = (bool) framework::__ffi::container_start(container); */
-  if (failed) {
-    Serial.println("Container exited with an error!");
-  }
-
-  Serial.println("Finished executing.");
+  container->add_agent(std::move(hello_world_agent));
+  Serial.println("Finished setup");
 }
 
 void loop() {
-
+  framework::Container::PollResult result = container->poll();
+  if (result.should_stop) {
+    Serial.println(
+      (result.status == 0) ? "Finished executing." : "Container exited with an error!"
+    );
+    exit(result.status);
+  }
 }
