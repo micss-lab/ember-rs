@@ -1,56 +1,75 @@
 use alloc::boxed::Box;
 
-pub use self::parallel::ParallelBehaviour;
-pub use self::sequential::SequentialBehaviour;
+use super::{Behaviour, Context, IntoBehaviour};
 
-use super::{Behaviour, State};
+use self::parallel::{ParallelBehaviour, ParallelBehaviourQueue};
+use self::sequential::{SequentialBehaviour, SequentialBehaviourQueue};
 
 pub mod parallel;
-mod sequential;
+pub mod sequential;
 
-trait ComplexBehaviour {
-    /// The state that is passed down to the child-behaviours.
-    type State;
-
-    /// The state that is passed down to this behaviour from the parent.
-    type ParentState;
-
-    /// Returns the next behaviour to be scheduled for execution (if any remain).
-    fn next_behaviour(&mut self) -> Option<Box<dyn Behaviour<ParentState = Self::State>>>;
-
-    /// Reschedules the behaviour for execution at a later time.
-    fn schedule(&mut self, behaviour: Box<dyn Behaviour<ParentState = Self::State>>);
-
-    /// Returns whether this behaviour has reached the finished state.
-    fn is_finished(&self) -> bool;
-
-    /// Constructs the `Self::State` type, using the parent state if needed.
-    fn construct_state(&mut self, parent_state: Self::ParentState) -> Self::State;
-
-    /// Updates the state stored in the behaviour with the state returned from a child-behaviour.
-    fn update_state(&mut self, state: Self::State) -> Self::ParentState;
+macro_rules! complex_action {
+    () => {
+        fn action(&mut self, ctx: &mut Context<Self::Message>) -> bool {
+            let mut context = Context::new();
+            self.queue.action(&mut context);
+            if let Some(mut messages) = context.messages.take() {
+                while let Some(message) = messages.pop() {
+                    self.kind.0.handle_child_message(message);
+                }
+            }
+            ctx.merge(context);
+            self.kind.0.after_child_action(ctx);
+            self.queue.is_finished()
+        }
+    };
 }
 
-impl<T, P> Behaviour for T
-where
-    T: ComplexBehaviour<ParentState = P>,
-{
-    type ParentState = P;
+struct ComplexBehaviour<K, Q> {
+    kind: K,
+    queue: Q,
+}
 
-    fn action(
-        &mut self,
-        ctx: &mut super::Context,
-        parent_state: Self::ParentState,
-    ) -> (bool, Self::ParentState) {
-        let Some(mut behaviour) = self.next_behaviour() else {
-            return (self.is_finished(), parent_state);
+struct SequentialBehaviourImpl<S: SequentialBehaviour>(S);
+struct ParallelBehaviourImpl<P: ParallelBehaviour>(P);
+
+impl<S, M: 'static, CM: 'static> Behaviour
+    for ComplexBehaviour<SequentialBehaviourImpl<S>, SequentialBehaviourQueue<CM>>
+where
+    S: SequentialBehaviour<Message = M, ChildMessage = CM> + 'static,
+{
+    type Message = M;
+
+    complex_action!();
+}
+
+impl<P, M: 'static, CM: 'static> Behaviour
+    for ComplexBehaviour<ParallelBehaviourImpl<P>, ParallelBehaviourQueue<CM>>
+where
+    P: ParallelBehaviour<Message = M, ChildMessage = CM> + 'static,
+{
+    type Message = M;
+
+    complex_action!();
+}
+
+pub(crate) trait BehaviourQueue<M: 'static> {
+    fn next(&mut self) -> Option<Box<dyn Behaviour<Message = M>>>;
+
+    fn schedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>);
+
+    fn reschedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>);
+
+    fn is_finished(&self) -> bool;
+
+    fn action(&mut self, ctx: &mut Context<M>) -> bool {
+        let Some(mut behaviour) = self.next() else {
+            return self.is_finished();
         };
-        let state = self.construct_state(parent_state);
-        let (done, state) = behaviour.action(ctx, state);
-        let parent_state = self.update_state(state);
-        if !done {
-            self.schedule(behaviour);
+        let finished = behaviour.action(ctx);
+        if !finished {
+            self.reschedule(behaviour);
         }
-        (self.is_finished(), parent_state)
+        self.is_finished()
     }
 }

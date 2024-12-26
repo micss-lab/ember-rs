@@ -1,26 +1,24 @@
-pub use self::complex::{parallel, ParallelBehaviour, SequentialBehaviour};
-pub use self::context::Context;
-pub use self::simple::{CyclicBehaviour, OneShotBehaviour, SimpleBehaviourState, TickerBehaviour};
-pub use self::state::State;
+use alloc::boxed::Box;
 
-mod complex;
-mod context;
+pub use self::complex::{parallel, sequential};
+pub use self::simple::{CyclicBehaviour, OneShotBehaviour, TickerBehaviour};
+
+pub use crate::context::Context;
+
+pub(crate) mod complex;
 mod simple;
-mod state;
 
-/// Implemented for types that represent a behaviour.
-///
-/// # Shared State
-///
-/// Behaviours can share state by declaring state on their parent. The behaviour is passed the
-/// owned state and is required to return the (possible updated) state.
-pub trait Behaviour {
-    /// State passed down from the parent.
-    type ParentState;
+pub trait Behaviour: 'static {
+    type Message;
 
-    /// Executes the behaviours action once.
-    ///
-    /// When the behaviour is complex (e.g., it has child behaviours), the action call is
-    /// propagated to the currently scheduled child.
-    fn action(&mut self, ctx: &mut Context, state: Self::ParentState) -> (bool, Self::ParentState);
+    fn action(&mut self, ctx: &mut Context<Self::Message>) -> bool;
+}
+
+pub trait IntoBehaviour<Kind>
+where
+    Self: Sized,
+{
+    type Message;
+
+    fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>>;
 }

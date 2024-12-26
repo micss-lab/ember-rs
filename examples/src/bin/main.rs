@@ -9,7 +9,7 @@ use no_std_framework_core::{Agent, Container};
 
 fn example() {
     let container = Container::default()
-        .with_agent(Agent::new("agent-0"))
-        .with_agent(Agent::new("agent-1"));
+        .with_agent::<()>(Agent::new("agent-0"))
+        .with_agent::<()>(Agent::new("agent-1"));
     container.start().unwrap();
 }

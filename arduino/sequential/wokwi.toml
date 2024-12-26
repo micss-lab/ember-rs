@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+elf = "build/sequential.ino.elf"
+firmware = "build/sequential.ino.bin"

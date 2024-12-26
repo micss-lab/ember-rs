@@ -53,11 +53,20 @@ mod esp {
     }
 }
 
+mod message {
+    use core::ffi::c_void;
+
+    pub struct Message {
+        inner: *mut c_void,
+    }
+}
+
 mod container {
     use no_std_framework_core::{Agent, Container};
 
     use crate::ffi::util::drop_raw;
 
+    use super::message::Message;
     use super::util::{from_raw, new};
 
     /// Creates a new container instance.
@@ -79,9 +88,9 @@ mod container {
     }
 
     #[no_mangle]
-    pub extern "C" fn container_add_agent(container: *mut Container, agent: *mut Agent) {
-        non_null!(container, "got container nullpointer");
-        non_null!(agent, "got agent nullpointer");
+    pub extern "C" fn container_add_agent(container: *mut Container, agent: *mut Agent<Message>) {
+        non_null!(container, "got container null-pointer");
+        non_null!(agent, "got agent null-pointer");
         let agent = unsafe { from_raw(agent) };
         unsafe { (*container).add_agent(agent) };
     }
@@ -98,23 +107,23 @@ mod container {
 }
 
 mod agent {
-    use alloc::boxed::Box;
     use core::ffi::c_char;
 
-    use no_std_framework_core::behaviour::{Behaviour, CyclicBehaviour, OneShotBehaviour};
     use no_std_framework_core::Agent;
 
-    use super::behaviour::simple::SimpleState;
-    use super::util::{drop_raw, new, ref_from_raw, string_from_raw};
+    use super::behaviour::complex::SequentialBehaviour;
+    use super::behaviour::simple::{CyclicBehaviour, OneShotBehaviour};
+    use super::message::Message;
+    use super::util::{drop_raw, from_raw, new, ref_from_raw, string_from_raw};
 
     #[no_mangle]
-    pub extern "C" fn agent_new(name: *const c_char) -> *mut Agent {
+    pub extern "C" fn agent_new(name: *const c_char) -> *mut Agent<Message> {
         let name = unsafe { string_from_raw(name) };
         new(Agent::new(name))
     }
 
     #[no_mangle]
-    pub extern "C" fn agent_free(agent: *mut Agent) {
+    pub extern "C" fn agent_free(agent: *mut Agent<Message>) {
         non_null_or_bail!(agent, "attemted to free agent null-pointer");
         unsafe { drop_raw(agent) }
     }
@@ -122,184 +131,273 @@ mod agent {
     // TODO: Add more behaviours here.
     #[no_mangle]
     pub extern "C" fn agent_add_behaviour_oneshot(
-        agent: *mut Agent,
-        oneshot: *mut OneShotBehaviour<()>,
+        agent: *mut Agent<Message>,
+        oneshot: *mut OneShotBehaviour,
     ) {
         non_null!(agent, "got agent null-pointer");
+        non_null!(oneshot, "got oneshot behaviour null-pointer");
         let agent = unsafe { ref_from_raw(agent) };
-        let behaviour = unsafe { Box::from_raw(oneshot) };
-        agent.add_boxed_behaviour(behaviour as Box<dyn Behaviour<ParentState = ()>>)
+        let behaviour = unsafe { from_raw(oneshot) };
+        agent.add_behaviour(behaviour);
     }
 
     #[no_mangle]
     pub extern "C" fn agent_add_behaviour_cyclic(
-        agent: *mut Agent,
-        cyclic: *mut CyclicBehaviour<SimpleState, ()>,
+        agent: *mut Agent<Message>,
+        cyclic: *mut CyclicBehaviour,
     ) {
         non_null!(agent, "got agent null-pointer");
+        non_null!(cyclic, "got cyclic behaviour null-pointer");
         let agent = unsafe { ref_from_raw(agent) };
-        let behaviour = unsafe { Box::from_raw(cyclic) };
-        agent.add_boxed_behaviour(behaviour as Box<dyn Behaviour<ParentState = ()>>)
+        let behaviour = unsafe { from_raw(cyclic) };
+        agent.add_behaviour(behaviour);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn agent_add_behaviour_sequential(
+        agent: *mut Agent<Message>,
+        sequential: *mut SequentialBehaviour,
+    ) {
+        non_null!(agent, "got agent null-pointer");
+        non_null!(sequential, "got sequential behaviour null-pointer");
+        let agent = unsafe { ref_from_raw(agent) };
+        let behaviour = unsafe { from_raw(sequential) };
+        agent.add_behaviour(behaviour);
     }
 }
 
 mod behaviour {
-    use core::ffi::c_void;
-
-    #[repr(C)]
-    pub struct State {
-        root: *mut c_void,
-        parent: *mut State,
-    }
+    use super::message::Message;
 
     pub(super) mod simple {
-        use core::ffi::c_void;
+        pub(in crate::ffi) use self::cyclic::CyclicBehaviour;
+        pub(in crate::ffi) use self::oneshot::OneShotBehaviour;
 
-        use no_std_framework_core::behaviour::SimpleBehaviourState;
-
-        use super::State;
+        use super::Message;
         use crate::ffi::util::{drop_raw, new};
 
-        #[repr(C)]
-        pub struct SimpleState {
-            value: *mut c_void,
-            finished: bool,
-        }
-
-        impl SimpleBehaviourState for SimpleState {
-            fn finished(&self) -> bool {
-                self.finished
-            }
-        }
-
         mod oneshot {
+            use core::ffi::c_void;
             use core::ptr;
 
-            use no_std_framework_core::behaviour::{Context, OneShotBehaviour};
+            use no_std_framework_core::behaviour::{
+                Context, OneShotBehaviour as OneShotBehaviourTrait,
+            };
 
-            use super::{drop_raw, new, State};
+            use super::{drop_raw, new, Message};
+
+            pub struct OneShotBehaviour {
+                /// Type value defined by the user implementing the trait.
+                inner: *mut c_void,
+                /// Action to be performed.
+                action: extern "C" fn(*mut c_void, *mut Context<Message>),
+            }
+
+            impl OneShotBehaviourTrait for OneShotBehaviour {
+                type Message = Message;
+
+                fn action(&self, ctx: &mut Context<Self::Message>) {
+                    (self.action)(self.inner, ptr::from_mut(ctx))
+                }
+            }
 
             #[no_mangle]
             pub extern "C" fn behaviour_oneshot_new(
-                action: extern "C" fn(*mut Context, State) -> State,
-            ) -> *mut OneShotBehaviour<State> {
-                new(OneShotBehaviour::new(move |ctx, state| {
-                    (action)(ptr::from_mut(ctx), state)
-                }))
+                inner: *mut c_void,
+                action: extern "C" fn(*mut c_void, *mut Context<Message>),
+            ) -> *mut OneShotBehaviour {
+                new(OneShotBehaviour { inner, action })
             }
 
             #[no_mangle]
-            pub extern "C" fn behaviour_oneshot_new_void(
-                action: extern "C" fn(*mut Context),
-            ) -> *mut OneShotBehaviour<()> {
-                new(OneShotBehaviour::new(move |ctx, _| {
-                    (action)(ptr::from_mut(ctx))
-                }))
-            }
-
-            #[no_mangle]
-            pub extern "C" fn behaviour_oneshot_free(oneshot: *mut OneShotBehaviour<State>) {
-                non_null_or_bail!(oneshot, "attemted to free oneshot behaviour null-pointer");
-                unsafe { drop_raw(oneshot) };
-            }
-
-            #[no_mangle]
-            pub extern "C" fn behaviour_oneshot_free_void(oneshot: *mut OneShotBehaviour<()>) {
+            pub extern "C" fn behaviour_oneshot_free(oneshot: *mut OneShotBehaviour) {
                 non_null_or_bail!(oneshot, "attemted to free oneshot behaviour null-pointer");
                 unsafe { drop_raw(oneshot) };
             }
         }
 
         mod cyclic {
+            use core::ffi::c_void;
             use core::ptr;
 
-            use no_std_framework_core::behaviour::{Context, CyclicBehaviour};
+            use no_std_framework_core::behaviour::{
+                Context, CyclicBehaviour as CyclicBehaviourTrait,
+            };
 
-            use super::{drop_raw, new, SimpleState, State};
+            use super::{drop_raw, new, Message};
+
+            pub struct CyclicBehaviour {
+                /// Type value defined by the user implementing the trait.
+                inner: *mut c_void,
+                /// Action to be performed.
+                action: extern "C" fn(*mut c_void, *mut Context<Message>),
+                /// Whether the behaviour has finished.
+                is_finished: extern "C" fn(*mut c_void) -> bool,
+            }
+
+            impl CyclicBehaviourTrait for CyclicBehaviour {
+                type Message = Message;
+
+                fn action(&mut self, ctx: &mut Context<Self::Message>) {
+                    (self.action)(self.inner, ptr::from_mut(ctx));
+                }
+
+                fn is_finished(&self) -> bool {
+                    (self.is_finished)(self.inner)
+                }
+            }
 
             #[no_mangle]
             pub extern "C" fn behaviour_cyclic_new(
-                state: SimpleState,
-                action: extern "C" fn(*mut Context, *mut SimpleState, State) -> State,
-            ) -> *mut CyclicBehaviour<SimpleState, State> {
-                new(CyclicBehaviour::new(state, move |ctx, state| {
-                    let (mut state, parent) = state.cut_root();
-                    let parent = (action)(ptr::from_mut(ctx), ptr::from_mut(&mut state), parent);
-                    no_std_framework_core::behaviour::State::new(state, parent)
-                }))
+                inner: *mut c_void,
+                action: extern "C" fn(*mut c_void, *mut Context<Message>),
+                is_finished: extern "C" fn(*mut c_void) -> bool,
+            ) -> *mut CyclicBehaviour {
+                new(CyclicBehaviour {
+                    inner,
+                    action,
+                    is_finished,
+                })
             }
 
             #[no_mangle]
-            pub extern "C" fn behaviour_cyclic_new_void(
-                state: SimpleState,
-                action: extern "C" fn(*mut Context, *mut SimpleState),
-            ) -> *mut CyclicBehaviour<SimpleState, ()> {
-                new(CyclicBehaviour::new(state, move |ctx, state| {
-                    let (mut state, _) = state.cut_root();
-                    (action)(ptr::from_mut(ctx), ptr::from_mut(&mut state));
-                    no_std_framework_core::behaviour::State::new(state, ())
-                }))
-            }
-
-            #[no_mangle]
-            pub extern "C" fn behaviour_cyclic_free(
-                cyclic: *mut CyclicBehaviour<SimpleState, State>,
-            ) {
-                non_null_or_bail!(cyclic, "attemted to free cyclic behaviour null-pointer");
-                unsafe { drop_raw(cyclic) };
-            }
-
-            #[no_mangle]
-            pub extern "C" fn behaviour_cyclic_free_void(
-                cyclic: *mut CyclicBehaviour<SimpleState, ()>,
-            ) {
+            pub extern "C" fn behaviour_cyclic_free(cyclic: *mut CyclicBehaviour) {
                 non_null_or_bail!(cyclic, "attemted to free cyclic behaviour null-pointer");
                 unsafe { drop_raw(cyclic) };
             }
         }
     }
 
-    mod complex {
-        use super::super::util;
-        use super::State;
+    pub(super) mod complex {
+        pub(in crate::ffi) use self::sequential::SequentialBehaviour;
+
+        use super::Message;
+        use crate::ffi::util::{drop_raw, from_raw, new, ref_from_raw};
 
         mod sequential {
+            use core::cell::Cell;
             use core::ffi::c_void;
+            use core::ptr;
 
-            use no_std_framework_core::behaviour::SequentialBehaviour;
+            use no_std_framework_core::behaviour::{
+                sequential::{
+                    SequentialBehaviour as SequentialBehaviourTrait, SequentialBehaviourQueue,
+                },
+                Context,
+            };
 
-            use super::util::{drop_raw, new};
-            use super::State;
+            use super::{drop_raw, from_raw, new, ref_from_raw, Message};
+
+            mod queue {
+                use super::{
+                    drop_raw, from_raw, new, ref_from_raw, Message, SequentialBehaviour,
+                    SequentialBehaviourQueue,
+                };
+                use crate::ffi::behaviour::simple::{CyclicBehaviour, OneShotBehaviour};
+
+                #[no_mangle]
+                pub extern "C" fn behaviour_sequential_queue_new(
+                ) -> *mut SequentialBehaviourQueue<Message> {
+                    new(SequentialBehaviourQueue::new())
+                }
+
+                #[no_mangle]
+                pub extern "C" fn behaviour_sequential_queue_add_behaviour_oneshot(
+                    queue: *mut SequentialBehaviourQueue<Message>,
+                    oneshot: *mut OneShotBehaviour,
+                ) {
+                    non_null!(queue, "got sequential queue null-pointer");
+                    non_null!(oneshot, "got oneshot behaviour null-pointer");
+                    let queue = unsafe { ref_from_raw(queue) };
+                    let behaviour = unsafe { from_raw(oneshot) };
+                    queue.add_behaviour(behaviour);
+                }
+
+                #[no_mangle]
+                pub extern "C" fn behaviour_sequential_queue_add_behaviour_cyclic(
+                    queue: *mut SequentialBehaviourQueue<Message>,
+                    cyclic: *mut CyclicBehaviour,
+                ) {
+                    non_null!(queue, "got sequential queue null-pointer");
+                    non_null!(cyclic, "got cyclic behaviour null-pointer");
+                    let queue = unsafe { ref_from_raw(queue) };
+                    let behaviour = unsafe { from_raw(cyclic) };
+                    queue.add_behaviour(behaviour);
+                }
+
+                #[no_mangle]
+                pub extern "C" fn behaviour_sequential_queue_add_behaviour_sequential(
+                    queue: *mut SequentialBehaviourQueue<Message>,
+                    sequential: *mut SequentialBehaviour,
+                ) {
+                    non_null!(queue, "got sequential queue null-pointer");
+                    non_null!(sequential, "got sequential behaviour null-pointer");
+                    let queue = unsafe { ref_from_raw(queue) };
+                    let behaviour = unsafe { from_raw(sequential) };
+                    queue.add_behaviour(behaviour);
+                }
+
+                #[no_mangle]
+                pub extern "C" fn behaviour_sequential_queue_free(
+                    queue: *mut SequentialBehaviourQueue<Message>,
+                ) {
+                    non_null_or_bail!(
+                        queue,
+                        "attemted to free sequential behaviour queue null-pointer"
+                    );
+                    unsafe { drop_raw(queue) };
+                }
+            }
+
+            pub struct SequentialBehaviour {
+                /// Type value defined by the user implementing the trait.
+                inner: *mut c_void,
+                /// List of initial behaviours to be scheduled.
+                initial_behaviours: Cell<*mut SequentialBehaviourQueue<Message>>,
+                /// Function to be executed after a child behaviour has performed its action.
+                after_child_action: extern "C" fn(*mut c_void, *mut Context<Message>),
+            }
+
+            impl SequentialBehaviourTrait for SequentialBehaviour {
+                type Message = Message;
+
+                type ChildMessage = Message;
+
+                fn initial_behaviours(&self) -> SequentialBehaviourQueue<Self::ChildMessage> {
+                    // Replace the initial behaviours pointer with a null-pointer.
+                    non_null!(
+                        self.initial_behaviours.get(),
+                        "initial behaviours can only be fetched once"
+                    );
+                    let result = self.initial_behaviours.replace(ptr::null_mut());
+                    unsafe { from_raw(result) }
+                }
+
+                fn after_child_action(
+                    &mut self,
+                    ctx: &mut no_std_framework_core::behaviour::Context<Self::Message>,
+                ) {
+                    (self.after_child_action)(self.inner, ptr::from_mut(ctx));
+                }
+            }
 
             #[no_mangle]
             pub extern "C" fn behaviour_sequential_new(
-                state: *mut c_void,
-            ) -> *mut SequentialBehaviour<*mut c_void, State> {
-                new(SequentialBehaviour::new(state))
+                inner: *mut c_void,
+                initial_behaviours: *mut SequentialBehaviourQueue<Message>,
+                after_child_action: extern "C" fn(*mut c_void, *mut Context<Message>),
+            ) -> *mut SequentialBehaviour {
+                non_null!(inner, "got inner null-pointer");
+                non_null!(initial_behaviours, "got initial behaviours null-pointer");
+                new(SequentialBehaviour {
+                    inner,
+                    initial_behaviours: initial_behaviours.into(),
+                    after_child_action,
+                })
             }
 
             #[no_mangle]
-            pub extern "C" fn behaviour_sequential_new_void(
-                state: *mut c_void,
-            ) -> *mut SequentialBehaviour<*mut c_void, ()> {
-                new(SequentialBehaviour::new(state))
-            }
-
-            #[no_mangle]
-            pub extern "C" fn behaviour_sequential_free(
-                sequential: *mut SequentialBehaviour<*mut c_void, State>,
-            ) {
-                non_null_or_bail!(
-                    sequential,
-                    "attempted to free sequential behaviour null-pointer"
-                );
-                unsafe { drop_raw(sequential) };
-            }
-
-            #[no_mangle]
-            pub extern "C" fn behaviour_sequential_free_void(
-                sequential: *mut SequentialBehaviour<*mut c_void, ()>,
-            ) {
+            pub extern "C" fn behaviour_sequential_free(sequential: *mut SequentialBehaviour) {
                 non_null_or_bail!(
                     sequential,
                     "attempted to free sequential behaviour null-pointer"

@@ -12,15 +12,12 @@
 namespace framework {
 
 class Agent: 
-    public Object<__ffi::Agent> {
+    public Object<__ffi::Agent<__ffi::Message>> {
   public:
     Agent(const char* const name);
     virtual ~Agent();
     
-    void add_behaviour(std::unique_ptr<behaviour::Behaviour> behaviour);
-
-  protected:
-    virtual void free_object(__ffi::Agent* agent);
+    void add_behaviour(std::unique_ptr<behaviour::Behaviour>&& behaviour);
 };
 
 } // namespace framework

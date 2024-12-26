@@ -1,20 +1,23 @@
 use alloc::boxed::Box;
 
-use super::{Behaviour, Context};
+use super::{Behaviour, Context, IntoBehaviour, OneShotBehaviourImpl};
 
-#[allow(clippy::type_complexity)]
-pub struct OneShotBehaviour<S>(Box<dyn FnMut(&mut Context, S) -> S + Send>);
+pub trait OneShotBehaviour {
+    type Message;
 
-impl<S> OneShotBehaviour<S> {
-    pub fn new(action: impl FnMut(&mut Context, S) -> S + Send + 'static) -> Self {
-        Self(Box::new(action))
-    }
+    fn action(&self, ctx: &mut Context<Self::Message>);
 }
 
-impl<S> Behaviour for OneShotBehaviour<S> {
-    type ParentState = S;
+#[doc(hidden)]
+pub struct OneShot;
 
-    fn action(&mut self, ctx: &mut Context, state: Self::ParentState) -> (bool, Self::ParentState) {
-        (true, self.0(ctx, state))
+impl<T, M: 'static> IntoBehaviour<OneShot> for T
+where
+    T: OneShotBehaviour<Message = M> + 'static,
+{
+    type Message = M;
+
+    fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>> {
+        Box::new(OneShotBehaviourImpl(Some(self)))
     }
 }

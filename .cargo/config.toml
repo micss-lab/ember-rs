@@ -1,5 +1,5 @@
 [env]
-ESP_LOG = "info"
+ESP_LOG = "trace"
 
 [target.riscv32imc-unknown-none-elf]
 rustflags = ["-C", "link-arg=-Tlinkall.x", "-C", "force-frame-pointers"]

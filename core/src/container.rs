@@ -1,22 +1,29 @@
+use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use crate::agent::Agent;
-use crate::behaviour::Context;
+use crate::context::ContainerContext;
+use crate::Agent;
 
 #[derive(Default)]
 pub struct Container {
-    agents: Vec<Agent>,
+    agents: Vec<Box<dyn ContainerAgent>>,
+}
+
+pub trait ContainerAgent: 'static {
+    fn update(&mut self, context: &mut ContainerContext);
+
+    fn get_name(&self) -> Cow<str>;
 }
 
 impl Container {
-    pub fn with_agent(mut self, agent: Agent) -> Self {
+    pub fn with_agent<M: 'static>(mut self, agent: Agent<M>) -> Self {
         self.add_agent(agent);
         self
     }
 
-    pub fn add_agent(&mut self, agent: Agent) {
-        self.agents.push(agent);
+    pub fn add_agent<M: 'static>(&mut self, agent: Agent<M>) {
+        self.agents.push(Box::new(agent));
     }
 
     pub fn start(mut self) -> Result<(), Box<dyn core::error::Error>> {
@@ -24,14 +31,10 @@ impl Container {
         'start: loop {
             log::trace!("Polling all agents.\r");
             for agent in self.agents.iter_mut() {
-                let mut context = Context::default();
+                let mut context = ContainerContext::new();
 
-                log::trace!("Agent `{}` update:\r", agent.name);
+                log::trace!("Agent `{}` update:\r", agent.get_name());
                 agent.update(&mut context);
-
-                let Context {
-                    container: context, ..
-                } = context;
 
                 if context.should_stop {
                     break 'start Ok(());
