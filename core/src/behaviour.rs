@@ -1,4 +1,5 @@
 use alloc::boxed::Box;
+use alloc::vec::Vec;
 
 pub use self::complex::{parallel, sequential};
 pub use self::simple::{CyclicBehaviour, OneShotBehaviour, TickerBehaviour};
@@ -7,6 +8,8 @@ pub use crate::context::Context;
 
 pub(crate) mod complex;
 mod simple;
+
+pub(crate) type BehaviourVec<M> = Vec<Box<dyn Behaviour<Message = M>>>;
 
 pub trait Behaviour: 'static {
     type Message;

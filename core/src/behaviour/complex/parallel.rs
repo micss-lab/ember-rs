@@ -1,7 +1,10 @@
 use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 
-use super::{Behaviour, BehaviourQueue, ComplexBehaviour, IntoBehaviour, ParallelBehaviourImpl};
-use crate::behaviour::Context;
+use super::macros::complex_behaviour_methods;
+use super::{
+    Behaviour, BehaviourQueue, ComplexBehaviour, Context, IntoBehaviour, ParallelBehaviourImpl,
+    ScheduleStrategy,
+};
 
 pub trait ParallelBehaviour {
     type Message;
@@ -10,13 +13,7 @@ pub trait ParallelBehaviour {
 
     fn initial_behaviours(&self) -> ParallelBehaviourQueue<Self::ChildMessage>;
 
-    fn handle_child_message(&mut self, message: Self::ChildMessage) {
-        let _ = message;
-    }
-
-    fn after_child_action(&mut self, ctx: &mut Context<Self::Message>) {
-        let _ = ctx;
-    }
+    complex_behaviour_methods!();
 }
 
 pub struct ParallelBehaviourQueue<M> {
@@ -44,7 +41,7 @@ impl<M> ParallelBehaviourQueue<M> {
 
 impl<M: 'static> ParallelBehaviourQueue<M> {
     pub fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Message = M>) {
-        self.schedule(behaviour.into_behaviour())
+        self.schedule(behaviour.into_behaviour(), ScheduleStrategy::End)
     }
 
     pub fn with_behaviour<K>(mut self, behaviour: impl IntoBehaviour<K, Message = M>) -> Self {
@@ -58,12 +55,15 @@ impl<M: 'static> BehaviourQueue<M> for ParallelBehaviourQueue<M> {
         self.queue.pop_front()
     }
 
-    fn schedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>) {
-        self.queue.push_back(behaviour);
+    fn schedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>, strategy: ScheduleStrategy) {
+        match strategy {
+            ScheduleStrategy::Next => self.queue.push_front(behaviour),
+            ScheduleStrategy::End => self.queue.push_back(behaviour),
+        }
     }
 
     fn reschedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>) {
-        self.queue.push_back(behaviour);
+        self.schedule(behaviour, ScheduleStrategy::End);
     }
 
     fn is_finished(&self) -> bool {

@@ -1,7 +1,7 @@
 use alloc::borrow::Cow;
 use alloc::string::{String, ToString};
 
-use crate::behaviour::complex::BehaviourQueue;
+use crate::behaviour::complex::{BehaviourQueue, ScheduleStrategy};
 use crate::behaviour::parallel::{FinishStrategy, ParallelBehaviourQueue};
 use crate::behaviour::IntoBehaviour;
 use crate::container::ContainerAgent;
@@ -28,7 +28,8 @@ impl<M: 'static> Agent<M> {
     }
 
     pub fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Message = M>) {
-        self.behaviours.schedule(behaviour.into_behaviour());
+        self.behaviours
+            .schedule(behaviour.into_behaviour(), ScheduleStrategy::End);
     }
 }
 
