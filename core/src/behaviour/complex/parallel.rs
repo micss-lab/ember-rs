@@ -2,8 +2,8 @@ use alloc::boxed::Box;
 use alloc::collections::vec_deque::VecDeque;
 
 use super::macros::{complex_action_impl, complex_behaviour_methods};
-use super::{get_id, Behaviour, BehaviourId, Context, IntoBehaviour};
-use super::{BehaviourQueue, ComplexBehaviour, ScheduleStrategy};
+use super::queue::{BehaviourScheduler, ScheduleStrategy};
+use super::{get_id, Behaviour, BehaviourId, ComplexBehaviour, Context, IntoBehaviour};
 
 pub trait ParallelBehaviour {
     type Message;
@@ -55,7 +55,7 @@ impl<M: 'static> ParallelBehaviourQueue<M> {
     }
 }
 
-impl<M: 'static> BehaviourQueue<M> for ParallelBehaviourQueue<M> {
+impl<M: 'static> BehaviourScheduler<M> for ParallelBehaviourQueue<M> {
     fn next(&mut self) -> Option<Box<dyn Behaviour<Message = M>>> {
         self.queue.pop_front()
     }

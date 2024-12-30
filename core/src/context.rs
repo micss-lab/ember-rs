@@ -1,8 +1,8 @@
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
-use crate::behaviour::complex::ScheduleStrategy;
-use crate::behaviour::{BehaviourVec, IntoBehaviour};
+use crate::behaviour::complex::queue::ScheduleStrategy;
+use crate::behaviour::{/* BehaviourId, */ BehaviourVec, IntoBehaviour};
 
 pub struct Context<M> {
     pub(crate) container: Option<ContainerContext>,
@@ -38,7 +38,7 @@ impl<M> Context<M> {
         self.new_behaviours
             .get_or_insert_with(BTreeMap::default)
             .entry(ScheduleStrategy::Next)
-            .or_insert_with(Vec::default)
+            .or_default()
             .push(behaviour.into_behaviour());
     }
 
@@ -46,7 +46,7 @@ impl<M> Context<M> {
         self.new_behaviours
             .get_or_insert_with(BTreeMap::default)
             .entry(ScheduleStrategy::End)
-            .or_insert_with(Vec::default)
+            .or_default()
             .push(behaviour.into_behaviour());
     }
 }

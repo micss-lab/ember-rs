@@ -1,7 +1,7 @@
 use alloc::borrow::Cow;
 use alloc::string::{String, ToString};
 
-use crate::behaviour::complex::{BehaviourQueue, ScheduleStrategy};
+use crate::behaviour::complex::queue::{BehaviourScheduler, ScheduleStrategy};
 use crate::behaviour::parallel::{FinishStrategy, ParallelBehaviourQueue};
 use crate::behaviour::IntoBehaviour;
 use crate::container::ContainerAgent;
