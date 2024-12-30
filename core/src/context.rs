@@ -9,6 +9,7 @@ pub struct Context<M> {
     pub(crate) agent: Option<AgentContext>,
     pub(crate) messages: Option<Vec<M>>,
     pub(crate) new_behaviours: Option<BTreeMap<ScheduleStrategy, BehaviourVec<M>>>,
+    // pub(crate) deleted_behaviours: Option<Vec<BehaviourId>>,
 }
 
 #[derive(Default)]

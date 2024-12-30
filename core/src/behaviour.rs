@@ -13,7 +13,7 @@ mod simple;
 
 pub(crate) type BehaviourVec<M> = Vec<Box<dyn Behaviour<Message = M>>>;
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct BehaviourId(u32);
 

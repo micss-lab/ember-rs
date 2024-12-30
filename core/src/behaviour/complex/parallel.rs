@@ -1,8 +1,7 @@
 use alloc::boxed::Box;
-use alloc::collections::vec_deque::VecDeque;
 
 use super::macros::{complex_action_impl, complex_behaviour_methods};
-use super::queue::{BehaviourScheduler, ScheduleStrategy};
+use super::queue::{BehaviourQueue, BehaviourScheduler, ScheduleStrategy};
 use super::{get_id, Behaviour, BehaviourId, ComplexBehaviour, Context, IntoBehaviour};
 
 pub trait ParallelBehaviour {
@@ -16,7 +15,7 @@ pub trait ParallelBehaviour {
 }
 
 pub struct ParallelBehaviourQueue<M> {
-    queue: VecDeque<Box<dyn Behaviour<Message = M>>>,
+    queue: BehaviourQueue<M>,
     finished: usize,
     strategy: FinishStrategy,
 }
@@ -28,10 +27,10 @@ pub enum FinishStrategy {
     Never,
 }
 
-impl<M> ParallelBehaviourQueue<M> {
+impl<M: 'static> ParallelBehaviourQueue<M> {
     pub fn new(strategy: FinishStrategy) -> Self {
         Self {
-            queue: VecDeque::new(),
+            queue: BehaviourQueue::new(),
             finished: 0,
             strategy,
         }

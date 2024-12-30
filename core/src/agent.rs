@@ -12,7 +12,7 @@ pub struct Agent<M> {
     behaviours: ParallelBehaviourQueue<M>,
 }
 
-impl<M> Agent<M> {
+impl<M: 'static> Agent<M> {
     pub fn new(name: impl ToString) -> Self {
         Self {
             name: name.to_string(),

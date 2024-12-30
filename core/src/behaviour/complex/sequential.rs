@@ -1,8 +1,7 @@
 use alloc::boxed::Box;
-use alloc::collections::vec_deque::VecDeque;
 
 use super::macros::{complex_action_impl, complex_behaviour_methods};
-use super::queue::{BehaviourScheduler, ScheduleStrategy};
+use super::queue::{BehaviourQueue, BehaviourScheduler, ScheduleStrategy};
 use super::{get_id, Behaviour, BehaviourId, ComplexBehaviour, Context, IntoBehaviour};
 
 pub trait SequentialBehaviour {
@@ -16,18 +15,18 @@ pub trait SequentialBehaviour {
 }
 
 pub struct SequentialBehaviourQueue<M> {
-    queue: VecDeque<Box<dyn Behaviour<Message = M>>>,
+    queue: BehaviourQueue<M>,
 }
 
-impl<M> Default for SequentialBehaviourQueue<M> {
+impl<M: 'static> Default for SequentialBehaviourQueue<M> {
     fn default() -> Self {
         Self {
-            queue: VecDeque::new(),
+            queue: BehaviourQueue::new(),
         }
     }
 }
 
-impl<M> SequentialBehaviourQueue<M> {
+impl<M: 'static> SequentialBehaviourQueue<M> {
     pub fn new() -> Self {
         Self::default()
     }
