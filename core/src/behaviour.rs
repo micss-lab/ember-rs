@@ -6,13 +6,21 @@ pub use self::simple::{CyclicBehaviour, OneShotBehaviour, TickerBehaviour};
 
 pub use crate::context::Context;
 
+use crate::util::sync::AtomicU32;
+
 pub(crate) mod complex;
 mod simple;
 
 pub(crate) type BehaviourVec<M> = Vec<Box<dyn Behaviour<Message = M>>>;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct BehaviourId(u32);
+
 pub trait Behaviour: 'static {
     type Message;
+
+    fn id(&self) -> BehaviourId;
 
     fn action(&mut self, ctx: &mut Context<Self::Message>) -> bool;
 }
@@ -24,4 +32,9 @@ where
     type Message;
 
     fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>>;
+}
+
+fn get_id() -> BehaviourId {
+    static mut ID_COUNTER: AtomicU32 = AtomicU32::new(0);
+    BehaviourId(unsafe { ID_COUNTER.get_increment() })
 }

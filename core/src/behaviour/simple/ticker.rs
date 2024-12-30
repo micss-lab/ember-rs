@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 
-use super::{Behaviour, Context, IntoBehaviour};
-use crate::util::{from_std_duration, Duration, Instant};
+use super::{get_id, Behaviour, BehaviourId, Context, IntoBehaviour};
+use crate::util::time::{from_std_duration, Duration, Instant};
 
 pub trait TickerBehaviour {
     type Message;
@@ -14,6 +14,7 @@ pub trait TickerBehaviour {
 }
 
 struct TickerBehaviourImpl<T: TickerBehaviour> {
+    id: BehaviourId,
     ticker: T,
     interval: Duration,
     last_tick: Option<Instant>,
@@ -24,6 +25,10 @@ where
     T: TickerBehaviour<Message = M> + 'static,
 {
     type Message = M;
+
+    fn id(&self) -> BehaviourId {
+        self.id
+    }
 
     fn action(&mut self, ctx: &mut Context<Self::Message>) -> bool {
         if self
@@ -52,6 +57,7 @@ where
     fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>> {
         let interval = self.interval();
         Box::new(TickerBehaviourImpl {
+            id: get_id(),
             ticker: self,
             interval: from_std_duration(interval),
             last_tick: None,

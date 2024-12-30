@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use super::{Behaviour, Context, IntoBehaviour};
+use super::{get_id, Behaviour, BehaviourId, Context, IntoBehaviour};
 
 pub trait OneShotBehaviour {
     type Message;
@@ -8,7 +8,10 @@ pub trait OneShotBehaviour {
     fn action(&self, ctx: &mut Context<Self::Message>);
 }
 
-struct OneShotBehaviourImpl<O: OneShotBehaviour>(Option<O>);
+struct OneShotBehaviourImpl<O: OneShotBehaviour> {
+    id: BehaviourId,
+    oneshot: Option<O>,
+}
 
 impl<M: 'static, O> Behaviour for OneShotBehaviourImpl<O>
 where
@@ -16,8 +19,12 @@ where
 {
     type Message = M;
 
+    fn id(&self) -> BehaviourId {
+        self.id
+    }
+
     fn action(&mut self, ctx: &mut Context<Self::Message>) -> bool {
-        self.0
+        self.oneshot
             .take()
             .expect("oneshot behaviour should only be called once")
             .action(ctx);
@@ -35,6 +42,9 @@ where
     type Message = M;
 
     fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>> {
-        Box::new(OneShotBehaviourImpl(Some(self)))
+        Box::new(OneShotBehaviourImpl {
+            id: get_id(),
+            oneshot: Some(self),
+        })
     }
 }

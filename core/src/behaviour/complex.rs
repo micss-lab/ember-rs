@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use super::{Behaviour, Context, IntoBehaviour};
+use super::{get_id, Behaviour, BehaviourId, Context, IntoBehaviour};
 
 pub mod parallel;
 pub mod sequential;
@@ -8,6 +8,7 @@ pub mod sequential;
 mod macros;
 
 struct ComplexBehaviour<K, Q> {
+    id: BehaviourId,
     kind: K,
     queue: Q,
 }

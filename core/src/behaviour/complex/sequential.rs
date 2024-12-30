@@ -2,9 +2,8 @@ use alloc::boxed::Box;
 use alloc::collections::vec_deque::VecDeque;
 
 use super::macros::{complex_action_impl, complex_behaviour_methods};
-use super::{
-    Behaviour, BehaviourQueue, ComplexBehaviour, Context, IntoBehaviour, ScheduleStrategy,
-};
+use super::{get_id, Behaviour, BehaviourId, Context, IntoBehaviour};
+use super::{BehaviourQueue, ComplexBehaviour, ScheduleStrategy};
 
 pub trait SequentialBehaviour {
     type Message;
@@ -35,8 +34,14 @@ impl<M> SequentialBehaviourQueue<M> {
 }
 
 impl<M: 'static> SequentialBehaviourQueue<M> {
-    pub fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Message = M>) {
-        self.schedule(behaviour.into_behaviour(), ScheduleStrategy::Next)
+    pub fn add_behaviour<K>(
+        &mut self,
+        behaviour: impl IntoBehaviour<K, Message = M>,
+    ) -> BehaviourId {
+        let behaviour = behaviour.into_behaviour();
+        let id = behaviour.id();
+        self.schedule(behaviour, ScheduleStrategy::Next);
+        id
     }
 
     pub fn with_behaviour<K>(mut self, behaviour: impl IntoBehaviour<K, Message = M>) -> Self {
@@ -75,6 +80,10 @@ where
 {
     type Message = M;
 
+    fn id(&self) -> BehaviourId {
+        self.id
+    }
+
     complex_action_impl!();
 }
 
@@ -90,6 +99,7 @@ where
     fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>> {
         let queue = self.initial_behaviours();
         Box::new(ComplexBehaviour {
+            id: get_id(),
             kind: SequentialBehaviourImpl(self),
             queue,
         })

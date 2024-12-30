@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use super::{Behaviour, Context, IntoBehaviour};
+use super::{get_id, Behaviour, BehaviourId, Context, IntoBehaviour};
 
 pub trait CyclicBehaviour {
     type Message;
@@ -10,7 +10,10 @@ pub trait CyclicBehaviour {
     fn is_finished(&self) -> bool;
 }
 
-struct CyclicBehaviourImpl<C: CyclicBehaviour>(C);
+struct CyclicBehaviourImpl<C: CyclicBehaviour> {
+    id: BehaviourId,
+    cyclic: C,
+}
 
 impl<M: 'static, C> Behaviour for CyclicBehaviourImpl<C>
 where
@@ -18,9 +21,13 @@ where
 {
     type Message = M;
 
+    fn id(&self) -> BehaviourId {
+        self.id
+    }
+
     fn action(&mut self, ctx: &mut Context<Self::Message>) -> bool {
-        self.0.action(ctx);
-        self.0.is_finished()
+        self.cyclic.action(ctx);
+        self.cyclic.is_finished()
     }
 }
 
@@ -34,6 +41,9 @@ where
     type Message = M;
 
     fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>> {
-        Box::new(CyclicBehaviourImpl(self))
+        Box::new(CyclicBehaviourImpl {
+            id: get_id(),
+            cyclic: self,
+        })
     }
 }

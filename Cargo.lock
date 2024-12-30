@@ -821,6 +821,7 @@ name = "no-std-framework-core"
 version = "0.1.0"
 dependencies = [
  "cfg-if",
+ "critical-section",
  "embassy-time",
  "log",
 ]
