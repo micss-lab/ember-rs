@@ -2,64 +2,14 @@ use alloc::boxed::Box;
 
 use super::{Behaviour, Context, IntoBehaviour};
 
-use self::parallel::{ParallelBehaviour, ParallelBehaviourQueue};
-use self::sequential::{SequentialBehaviour, SequentialBehaviourQueue};
-
 pub mod parallel;
 pub mod sequential;
 
 mod macros;
 
-macro_rules! complex_action_impl {
-    () => {
-        fn action(&mut self, ctx: &mut Context<Self::Message>) -> bool {
-            let mut context = Context::new();
-
-            // 1. Execute next scheduled behaviour.
-            self.queue.action(&mut context);
-
-            // 2. Handle messages the behaviour produced.
-            if let Some(mut messages) = context.messages.take() {
-                while let Some(message) = messages.pop() {
-                    self.kind.0.handle_child_message(message);
-                }
-            }
-
-            // 4. Run user defined actions for this complex behaviour.
-            ctx.merge(context);
-            self.kind.0.after_child_action(ctx);
-
-            self.queue.is_finished()
-        }
-    };
-}
-
 struct ComplexBehaviour<K, Q> {
     kind: K,
     queue: Q,
-}
-
-struct SequentialBehaviourImpl<S: SequentialBehaviour>(S);
-struct ParallelBehaviourImpl<P: ParallelBehaviour>(P);
-
-impl<S, M: 'static, CM: 'static> Behaviour
-    for ComplexBehaviour<SequentialBehaviourImpl<S>, SequentialBehaviourQueue<CM>>
-where
-    S: SequentialBehaviour<Message = M, ChildMessage = CM> + 'static,
-{
-    type Message = M;
-
-    complex_action_impl!();
-}
-
-impl<P, M: 'static, CM: 'static> Behaviour
-    for ComplexBehaviour<ParallelBehaviourImpl<P>, ParallelBehaviourQueue<CM>>
-where
-    P: ParallelBehaviour<Message = M, ChildMessage = CM> + 'static,
-{
-    type Message = M;
-
-    complex_action_impl!();
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

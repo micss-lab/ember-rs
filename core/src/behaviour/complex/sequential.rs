@@ -1,10 +1,9 @@
 use alloc::boxed::Box;
 use alloc::collections::vec_deque::VecDeque;
 
-use super::macros::complex_behaviour_methods;
+use super::macros::{complex_action_impl, complex_behaviour_methods};
 use super::{
     Behaviour, BehaviourQueue, ComplexBehaviour, Context, IntoBehaviour, ScheduleStrategy,
-    SequentialBehaviourImpl,
 };
 
 pub trait SequentialBehaviour {
@@ -65,6 +64,18 @@ impl<M: 'static> BehaviourQueue<M> for SequentialBehaviourQueue<M> {
     fn is_finished(&self) -> bool {
         self.queue.is_empty()
     }
+}
+
+struct SequentialBehaviourImpl<S: SequentialBehaviour>(S);
+
+impl<S, M: 'static, CM: 'static> Behaviour
+    for ComplexBehaviour<SequentialBehaviourImpl<S>, SequentialBehaviourQueue<CM>>
+where
+    S: SequentialBehaviour<Message = M, ChildMessage = CM> + 'static,
+{
+    type Message = M;
+
+    complex_action_impl!();
 }
 
 #[doc(hidden)]

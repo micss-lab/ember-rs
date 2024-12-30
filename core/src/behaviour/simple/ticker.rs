@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 
-use super::{Behaviour, Context, IntoBehaviour, TickerBehaviourImpl};
-use crate::util::from_std_duration;
+use super::{Behaviour, Context, IntoBehaviour};
+use crate::util::{from_std_duration, Duration, Instant};
 
 pub trait TickerBehaviour {
     type Message;
@@ -11,6 +11,33 @@ pub trait TickerBehaviour {
     fn action(&mut self, ctx: &mut Context<Self::Message>);
 
     fn is_finished(&self) -> bool;
+}
+
+struct TickerBehaviourImpl<T: TickerBehaviour> {
+    ticker: T,
+    interval: Duration,
+    last_tick: Option<Instant>,
+}
+
+impl<M: 'static, T> Behaviour for TickerBehaviourImpl<T>
+where
+    T: TickerBehaviour<Message = M> + 'static,
+{
+    type Message = M;
+
+    fn action(&mut self, ctx: &mut Context<Self::Message>) -> bool {
+        if self
+            .last_tick
+            .map(|l| Instant::now() - l < self.interval)
+            .unwrap_or(false)
+        {
+            return self.ticker.is_finished();
+        }
+        self.last_tick = Some(Instant::now());
+        self.ticker.action(ctx);
+        self.interval = from_std_duration(self.ticker.interval());
+        self.ticker.is_finished()
+    }
 }
 
 #[doc(hidden)]

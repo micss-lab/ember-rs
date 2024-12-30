@@ -1,9 +1,8 @@
 use alloc::{boxed::Box, collections::vec_deque::VecDeque};
 
-use super::macros::complex_behaviour_methods;
+use super::macros::{complex_action_impl, complex_behaviour_methods};
 use super::{
-    Behaviour, BehaviourQueue, ComplexBehaviour, Context, IntoBehaviour, ParallelBehaviourImpl,
-    ScheduleStrategy,
+    Behaviour, BehaviourQueue, ComplexBehaviour, Context, IntoBehaviour, ScheduleStrategy,
 };
 
 pub trait ParallelBehaviour {
@@ -74,6 +73,18 @@ impl<M: 'static> BehaviourQueue<M> for ParallelBehaviourQueue<M> {
             FinishStrategy::Never => false,
         }
     }
+}
+
+struct ParallelBehaviourImpl<P: ParallelBehaviour>(P);
+
+impl<P, M: 'static, CM: 'static> Behaviour
+    for ComplexBehaviour<ParallelBehaviourImpl<P>, ParallelBehaviourQueue<CM>>
+where
+    P: ParallelBehaviour<Message = M, ChildMessage = CM> + 'static,
+{
+    type Message = M;
+
+    complex_action_impl!();
 }
 
 #[doc(hidden)]
