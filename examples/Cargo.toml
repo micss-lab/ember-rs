@@ -3,9 +3,20 @@ name = "no-std-framework-examples"
 version = "0.1.0"
 edition = "2021"
 
+[profile.dev]
+opt-level = 3
+debug = false
+strip = "none"
+debug-assertions = false
+overflow-checks = false
+lto = false
+incremental = false
+codegen-units = 16
+rpath = false
+
 [dependencies]
 log = "0.4.22"
-no-std-framework-core = { workspace = true }
+no-std-framework-core = { path = "../core" }
 
 [target.'cfg(target_os = "none")'.dependencies]
 log = { version = "0.4.22", features = [] }

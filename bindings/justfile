@@ -1,0 +1,10 @@
+default:
+    @ echo -n "\"Bindings\" module defines following "
+    @ just --list
+
+build:
+    cargo build --release --target riscv32imc-unknown-none-elf --package no-std-framework-bindings
+
+update-arduino-lib: build
+    cp ${CARGO_TARGET_DIR}/riscv32imc-unknown-none-elf/release/libframework_core.a ./arduino/libraries/Framework/src/esp32c3/FrameworkCore.a
+    cp ${CARGO_TARGET_DIR}/bindings.hpp ./arduino/libraries/Framework/src/FrameworkCore.h

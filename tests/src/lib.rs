@@ -1,4 +1,4 @@
-#![cfg_attr(target_os = "none", no_std)]
+#[cfg_attr(target_os = "none", no_std)]
 
 macro_rules! tests {
     ($($test:ident),*) => {

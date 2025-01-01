@@ -1,5 +1,3 @@
-use std::{cell::RefCell, rc::Rc};
-
 use no_std_framework_core::behaviour::{
     parallel::{FinishStrategy, ParallelBehaviour, ParallelBehaviourQueue},
     Context, CyclicBehaviour, OneShotBehaviour,
@@ -56,7 +54,7 @@ fn strategy_all() {
                 .with_behaviour(FirstAndThird)
         }
 
-        fn handle_child_message(&mut self, message: Self::ChildMessage) {
+        fn handle_child_message(&mut self, _message: Self::ChildMessage) {
             unsafe { RESULT += 1 };
         }
     }
