@@ -3,7 +3,7 @@ use alloc::string::{String, ToString};
 
 use crate::behaviour::complex::queue::{BehaviourScheduler, ScheduleStrategy};
 use crate::behaviour::parallel::{FinishStrategy, ParallelBehaviourQueue};
-use crate::behaviour::IntoBehaviour;
+use crate::behaviour::{BehaviourId, IntoBehaviour};
 use crate::container::ContainerAgent;
 use crate::context::{ContainerContext, Context};
 
@@ -27,9 +27,14 @@ impl<M: 'static> Agent<M> {
         self
     }
 
-    pub fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Message = M>) {
-        self.behaviours
-            .schedule(behaviour.into_behaviour(), ScheduleStrategy::End);
+    pub fn add_behaviour<K>(
+        &mut self,
+        behaviour: impl IntoBehaviour<K, Message = M>,
+    ) -> BehaviourId {
+        let behaviour = behaviour.into_behaviour();
+        let id = behaviour.id();
+        self.behaviours.schedule(behaviour, ScheduleStrategy::End);
+        id
     }
 }
 

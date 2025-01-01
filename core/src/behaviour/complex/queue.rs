@@ -79,8 +79,8 @@ pub(crate) trait BehaviourScheduler<M: 'static> {
         };
         let finished = behaviour.action(&mut *ctx);
 
-        // Immediatly schedule newly created behaviours.
-        if let Some(new_behaviours) = ctx.new_behaviours.take() {
+        // Schedule newly created behaviours.
+        if let Some(new_behaviours) = ctx.local.new_behaviours.take() {
             new_behaviours
                 .into_iter()
                 .flat_map(|(strategy, behaviours)| {
@@ -88,6 +88,11 @@ pub(crate) trait BehaviourScheduler<M: 'static> {
                 })
                 .for_each(|(behaviour, strategy)| self.schedule(behaviour, strategy));
         }
+
+        // Remove requested behaviours.
+        ctx.local.removed_behaviours.drain(0..).for_each(|id| {
+            self.remove(id);
+        });
 
         if !finished {
             self.reschedule(behaviour);

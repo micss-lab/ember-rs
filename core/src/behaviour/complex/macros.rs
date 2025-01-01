@@ -19,10 +19,8 @@ macro_rules! complex_action_impl {
             self.queue.action(&mut context);
 
             // 2. Handle messages the behaviour produced.
-            if let Some(mut messages) = context.messages.take() {
-                while let Some(message) = messages.pop() {
-                    self.kind.0.handle_child_message(message);
-                }
+            while let Some(message) = context.local.messages.pop() {
+                self.kind.0.handle_child_message(message);
             }
 
             // 4. Run user defined actions for this complex behaviour.

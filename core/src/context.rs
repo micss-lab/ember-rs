@@ -2,14 +2,12 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use crate::behaviour::complex::queue::ScheduleStrategy;
-use crate::behaviour::{/* BehaviourId, */ BehaviourVec, IntoBehaviour};
+use crate::behaviour::{BehaviourId, BehaviourVec, IntoBehaviour};
 
 pub struct Context<M> {
     pub(crate) container: Option<ContainerContext>,
     pub(crate) agent: Option<AgentContext>,
-    pub(crate) messages: Option<Vec<M>>,
-    pub(crate) new_behaviours: Option<BTreeMap<ScheduleStrategy, BehaviourVec<M>>>,
-    // pub(crate) deleted_behaviours: Option<Vec<BehaviourId>>,
+    pub(crate) local: LocalContext<M>,
 }
 
 #[derive(Default)]
@@ -20,13 +18,29 @@ pub(crate) struct ContainerContext {
 #[derive(Default)]
 pub(crate) struct AgentContext {}
 
+pub(crate) struct LocalContext<M> {
+    pub(crate) messages: Vec<M>,
+    pub(crate) new_behaviours: Option<BTreeMap<ScheduleStrategy, BehaviourVec<M>>>,
+    pub(crate) removed_behaviours: Vec<BehaviourId>,
+}
+
+impl<M> Default for LocalContext<M> {
+    fn default() -> Self {
+        Self {
+            messages: Vec::with_capacity(0),
+            new_behaviours: None,
+            removed_behaviours: Vec::with_capacity(0),
+        }
+    }
+}
+
 impl<M> Context<M> {
     pub fn new() -> Self {
         Self::default()
     }
 
     pub fn message_parent(&mut self, message: M) {
-        self.messages.get_or_insert_with(Vec::new).push(message);
+        self.local.messages.push(message);
     }
 
     pub fn stop_container(&mut self) {
@@ -36,7 +50,8 @@ impl<M> Context<M> {
     }
 
     pub fn insert_next_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Message = M>) {
-        self.new_behaviours
+        self.local
+            .new_behaviours
             .get_or_insert_with(BTreeMap::default)
             .entry(ScheduleStrategy::Next)
             .or_default()
@@ -44,11 +59,16 @@ impl<M> Context<M> {
     }
 
     pub fn append_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Message = M>) {
-        self.new_behaviours
+        self.local
+            .new_behaviours
             .get_or_insert_with(BTreeMap::default)
             .entry(ScheduleStrategy::End)
             .or_default()
             .push(behaviour.into_behaviour());
+    }
+
+    pub fn remove_behaviour(&mut self, id: BehaviourId) {
+        self.local.removed_behaviours.push(id);
     }
 }
 
@@ -58,8 +78,7 @@ impl<M> Context<M> {
         Context {
             container,
             agent,
-            new_behaviours: _,
-            messages: _,
+            local: _,
         }: Context<M2>,
     ) {
         if let Some(container) = container {
@@ -96,10 +115,9 @@ impl AgentContext {
 impl<M> Default for Context<M> {
     fn default() -> Self {
         Self {
-            messages: None,
             container: None,
             agent: None,
-            new_behaviours: None,
+            local: LocalContext::default(),
         }
     }
 }
