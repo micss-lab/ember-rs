@@ -35,6 +35,6 @@ where
 }
 
 fn get_id() -> BehaviourId {
-    static mut ID_COUNTER: AtomicU32 = AtomicU32::new(0);
-    BehaviourId(unsafe { ID_COUNTER.get_increment() })
+    static ID_COUNTER: AtomicU32 = AtomicU32::new(0);
+    BehaviourId(ID_COUNTER.get_increment())
 }

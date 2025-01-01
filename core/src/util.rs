@@ -16,18 +16,24 @@ pub(crate) mod time {
 }
 
 pub(crate) mod sync {
-    pub(crate) struct AtomicU32(u32);
+    use core::cell::Cell;
+
+    #[repr(transparent)]
+    pub(crate) struct AtomicU32(Cell<u32>);
+
+    // SAFETY: Internal methods are protected using the [`critical-section`] crate.
+    unsafe impl Sync for AtomicU32 {}
 
     impl AtomicU32 {
         pub(crate) const fn new(value: u32) -> Self {
-            Self(value)
+            Self(Cell::new(value))
         }
 
-        pub(crate) fn get_increment(&mut self) -> u32 {
+        pub(crate) fn get_increment(&self) -> u32 {
             critical_section::with(|_| {
-                let result = self.0;
-                self.0.checked_add(1).expect("atomic u32 overflow");
-                result
+                let value = self.0.get();
+                self.0
+                    .replace(value.checked_add(1).expect("atomic u32 overflow"))
             })
         }
     }
