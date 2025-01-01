@@ -5,3 +5,6 @@ edition = "2021"
 
 [dependencies]
 no-std-framework-core = { workspace = true }
+
+[target.'cfg(not(target_os = "none"))'.dependencies]
+critical-section = { version = "1.2.0", features = ["std"] }

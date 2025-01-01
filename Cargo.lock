@@ -843,6 +843,7 @@ dependencies = [
 name = "no-std-framework-tests"
 version = "0.1.0"
 dependencies = [
+ "critical-section",
  "no-std-framework-core",
 ]
 
