@@ -1,4 +1,5 @@
 mod bindings
+mod examples
 import 'core/justfile'
 import 'tests/justfile'
 
@@ -9,4 +10,5 @@ check:
     cd core && cargo check
     cd bindings && cargo check-esp
     cd tests && cargo check-local --tests
-    cd examples && cargo check
+    cd examples && cargo check-local
+    cd examples && cargo check-esp

@@ -34,7 +34,7 @@ impl<M> Default for LocalContext<M> {
     }
 }
 
-impl<M> Context<M> {
+impl<M: 'static> Context<M> {
     pub fn new() -> Self {
         Self::default()
     }
@@ -49,22 +49,34 @@ impl<M> Context<M> {
             .should_stop = true;
     }
 
-    pub fn insert_next_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Message = M>) {
+    fn insert_behaviour<K>(
+        &mut self,
+        behaviour: impl IntoBehaviour<K, Message = M>,
+        strategy: ScheduleStrategy,
+    ) -> BehaviourId {
+        let behaviour = behaviour.into_behaviour();
+        let id = behaviour.id();
         self.local
             .new_behaviours
             .get_or_insert_with(BTreeMap::default)
-            .entry(ScheduleStrategy::Next)
+            .entry(strategy)
             .or_default()
-            .push(behaviour.into_behaviour());
+            .push(behaviour);
+        id
     }
 
-    pub fn append_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Message = M>) {
-        self.local
-            .new_behaviours
-            .get_or_insert_with(BTreeMap::default)
-            .entry(ScheduleStrategy::End)
-            .or_default()
-            .push(behaviour.into_behaviour());
+    pub fn insert_next_behaviour<K>(
+        &mut self,
+        behaviour: impl IntoBehaviour<K, Message = M>,
+    ) -> BehaviourId {
+        self.insert_behaviour(behaviour, ScheduleStrategy::Next)
+    }
+
+    pub fn append_behaviour<K>(
+        &mut self,
+        behaviour: impl IntoBehaviour<K, Message = M>,
+    ) -> BehaviourId {
+        self.insert_behaviour(behaviour, ScheduleStrategy::End)
     }
 
     pub fn remove_behaviour(&mut self, id: BehaviourId) {

@@ -670,6 +670,7 @@ dependencies = [
 name = "no-std-framework-examples"
 version = "0.1.0"
 dependencies = [
+ "critical-section",
  "esp-alloc",
  "esp-backtrace",
  "esp-hal",
