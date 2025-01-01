@@ -51,18 +51,19 @@ impl<M: 'static> SequentialBehaviourQueue<M> {
 
 impl<M: 'static> BehaviourScheduler<M> for SequentialBehaviourQueue<M> {
     fn next(&mut self) -> Option<Box<dyn Behaviour<Message = M>>> {
-        self.queue.pop_front()
+        self.queue.pop()
     }
 
     fn schedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>, strategy: ScheduleStrategy) {
-        match strategy {
-            ScheduleStrategy::Next => self.queue.push_front(behaviour),
-            ScheduleStrategy::End => self.queue.push_back(behaviour),
-        }
+        self.queue.push(behaviour, strategy);
     }
 
     fn reschedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>) {
         self.schedule(behaviour, ScheduleStrategy::Next);
+    }
+
+    fn remove(&mut self, id: BehaviourId) -> bool {
+        self.queue.remove(id)
     }
 
     fn is_finished(&self) -> bool {

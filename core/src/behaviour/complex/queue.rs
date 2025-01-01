@@ -17,48 +17,49 @@ impl<M> Default for BehaviourQueue<M> {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum ScheduleStrategy {
+    Next,
+    End,
+}
+
 impl<M: 'static> BehaviourQueue<M> {
     pub(super) fn new() -> Self {
         Self::default()
     }
 
-    pub(super) fn push_front(&mut self, behaviour: Box<dyn Behaviour<Message = M>>) {
+    pub(super) fn push(
+        &mut self,
+        behaviour: Box<dyn Behaviour<Message = M>>,
+        strategy: ScheduleStrategy,
+    ) {
         let present = self.ids.insert(behaviour.id());
         if !present {
             return;
         }
-        self.behaviours.push_front(behaviour);
-    }
-
-    pub(super) fn push_back(&mut self, behaviour: Box<dyn Behaviour<Message = M>>) {
-        let present = self.ids.insert(behaviour.id());
-        if !present {
-            return;
+        match strategy {
+            ScheduleStrategy::Next => self.behaviours.push_front(behaviour),
+            ScheduleStrategy::End => self.behaviours.push_back(behaviour),
         }
-        self.behaviours.push_back(behaviour);
     }
 
-    pub(super) fn pop_front(&mut self) -> Option<Box<dyn Behaviour<Message = M>>> {
-        let behaviour = self.behaviours.pop_front()?;
-        self.ids.remove(&behaviour.id());
-        Some(behaviour)
-    }
-
-    pub(super) fn pop_back(&mut self) -> Option<Box<dyn Behaviour<Message = M>>> {
-        let behaviour = self.behaviours.pop_back()?;
-        self.ids.remove(&behaviour.id());
-        Some(behaviour)
+    pub(super) fn pop(&mut self) -> Option<Box<dyn Behaviour<Message = M>>> {
+        Some(loop {
+            let behaviour = self.behaviours.pop_front()?;
+            // Check if the behaviour has not been removed yet.
+            if self.ids.remove(&behaviour.id()) {
+                break behaviour;
+            }
+        })
     }
 
     pub(super) fn is_empty(&self) -> bool {
         self.behaviours.is_empty()
     }
-}
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) enum ScheduleStrategy {
-    Next,
-    End,
+    pub(super) fn remove(&mut self, id: BehaviourId) -> bool {
+        self.ids.remove(&id)
+    }
 }
 
 pub(crate) trait BehaviourScheduler<M: 'static> {
@@ -67,6 +68,8 @@ pub(crate) trait BehaviourScheduler<M: 'static> {
     fn schedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>, strategy: ScheduleStrategy);
 
     fn reschedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>);
+
+    fn remove(&mut self, id: BehaviourId) -> bool;
 
     fn is_finished(&self) -> bool;
 
