@@ -23,8 +23,10 @@ macro_rules! complex_action_impl {
                 self.kind.0.handle_child_message(message);
             }
 
-            // 4. Run user defined actions for this complex behaviour.
+            // 3. Update the parent context.
             ctx.merge(context);
+
+            // 4. Run user defined actions for this complex behaviour.
             self.kind.0.after_child_action(ctx);
 
             self.queue.is_finished()

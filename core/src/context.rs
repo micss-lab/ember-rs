@@ -90,11 +90,6 @@ impl<M: 'static> Context<M> {
     pub fn remove_behaviour(&mut self, id: BehaviourId) {
         self.local.removed_behaviours.push(id);
     }
-
-    fn should_propagate(&self) -> bool {
-        self.agent.as_ref().is_some_and(|a| a.should_remove)
-            || self.container.as_ref().is_some_and(|c| c.should_stop)
-    }
 }
 
 impl<M> Context<M> {
