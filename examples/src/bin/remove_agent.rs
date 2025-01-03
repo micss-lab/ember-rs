@@ -5,7 +5,7 @@ use no_std_framework_examples::setup_example;
 
 setup_example!();
 
-use no_std_framework_core::behaviour::{BehaviourId, Context, CyclicBehaviour, OneShotBehaviour};
+use no_std_framework_core::behaviour::{Context, CyclicBehaviour, OneShotBehaviour};
 use no_std_framework_core::{Agent, Container};
 
 const MESSAGE_AMOUNT: usize = 10;

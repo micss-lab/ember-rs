@@ -13,6 +13,7 @@ pub struct Container {
 pub trait ContainerAgent: 'static {
     fn update(&mut self, context: &mut ContainerContext) -> bool;
 
+    #[allow(unused)]
     fn get_name(&self) -> Cow<str>;
 }
 
