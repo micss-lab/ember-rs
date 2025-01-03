@@ -24,6 +24,7 @@ pub(crate) struct LocalContext<M> {
     pub(crate) messages: Vec<M>,
     pub(crate) new_behaviours: Option<BTreeMap<ScheduleStrategy, BehaviourVec<M>>>,
     pub(crate) removed_behaviours: Vec<BehaviourId>,
+    pub(crate) should_block: bool,
 }
 
 impl<M> Default for LocalContext<M> {
@@ -32,6 +33,7 @@ impl<M> Default for LocalContext<M> {
             messages: Vec::with_capacity(0),
             new_behaviours: None,
             removed_behaviours: Vec::with_capacity(0),
+            should_block: false,
         }
     }
 }
@@ -55,6 +57,10 @@ impl<M: 'static> Context<M> {
         self.agent
             .get_or_insert_with(AgentContext::default)
             .should_remove = true;
+    }
+
+    pub fn block_behaviour(&mut self) {
+        self.local.should_block = true;
     }
 
     fn insert_behaviour<K>(

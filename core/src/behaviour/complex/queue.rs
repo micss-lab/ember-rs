@@ -6,6 +6,7 @@ use super::{Behaviour, BehaviourId, Context};
 pub(super) struct BehaviourQueue<M> {
     behaviours: VecDeque<Box<dyn Behaviour<Message = M>>>,
     ids: BTreeSet<BehaviourId>,
+    blocked_ids: BTreeSet<BehaviourId>,
 }
 
 impl<M> Default for BehaviourQueue<M> {
@@ -13,6 +14,7 @@ impl<M> Default for BehaviourQueue<M> {
         Self {
             behaviours: VecDeque::default(),
             ids: BTreeSet::default(),
+            blocked_ids: BTreeSet::default(),
         }
     }
 }
@@ -46,8 +48,16 @@ impl<M: 'static> BehaviourQueue<M> {
     pub(super) fn pop(&mut self) -> Option<Box<dyn Behaviour<Message = M>>> {
         Some(loop {
             let behaviour = self.behaviours.pop_front()?;
+            let id = behaviour.id();
+
+            // Next behaviour if it has been blocked.
+            if self.blocked_ids.contains(&id) {
+                self.behaviours.push_back(behaviour);
+                continue;
+            }
+
             // Check if the behaviour has not been removed yet.
-            if self.ids.remove(&behaviour.id()) {
+            if self.ids.remove(&id) {
                 break behaviour;
             }
         })
@@ -60,6 +70,13 @@ impl<M: 'static> BehaviourQueue<M> {
     pub(super) fn remove(&mut self, id: BehaviourId) -> bool {
         self.ids.remove(&id)
     }
+
+    pub(super) fn block(&mut self, id: BehaviourId) -> bool {
+        if !self.ids.contains(&id) {
+            return false;
+        }
+        self.blocked_ids.insert(id)
+    }
 }
 
 pub(crate) trait BehaviourScheduler<M: 'static> {
@@ -71,12 +88,16 @@ pub(crate) trait BehaviourScheduler<M: 'static> {
 
     fn remove(&mut self, id: BehaviourId) -> bool;
 
+    fn block(&mut self, id: BehaviourId) -> bool;
+
     fn is_finished(&self) -> bool;
 
     fn action(&mut self, ctx: &mut Context<M>) -> bool {
         let Some(mut behaviour) = self.next() else {
             return self.is_finished();
         };
+        let id = behaviour.id();
+
         let finished = behaviour.action(&mut *ctx);
 
         // Schedule newly created behaviours.
@@ -97,6 +118,12 @@ pub(crate) trait BehaviourScheduler<M: 'static> {
         if !finished {
             self.reschedule(behaviour);
         }
+
+        // Block the current behaviour if requested.
+        if ctx.local.should_block {
+            self.block(id);
+        }
+
         self.is_finished()
     }
 }

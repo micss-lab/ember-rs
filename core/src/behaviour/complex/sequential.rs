@@ -66,6 +66,10 @@ impl<M: 'static> BehaviourScheduler<M> for SequentialBehaviourQueue<M> {
         self.queue.remove(id)
     }
 
+    fn block(&mut self, id: BehaviourId) -> bool {
+        self.queue.block(id)
+    }
+
     fn is_finished(&self) -> bool {
         self.queue.is_empty()
     }

@@ -71,6 +71,10 @@ impl<M: 'static> BehaviourScheduler<M> for ParallelBehaviourQueue<M> {
         self.queue.remove(id)
     }
 
+    fn block(&mut self, id: BehaviourId) -> bool {
+        self.queue.block(id)
+    }
+
     fn is_finished(&self) -> bool {
         match self.strategy {
             FinishStrategy::All => self.queue.is_empty(),
