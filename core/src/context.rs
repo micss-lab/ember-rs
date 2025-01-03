@@ -16,7 +16,9 @@ pub(crate) struct ContainerContext {
 }
 
 #[derive(Default)]
-pub(crate) struct AgentContext {}
+pub(crate) struct AgentContext {
+    pub(crate) should_remove: bool,
+}
 
 pub(crate) struct LocalContext<M> {
     pub(crate) messages: Vec<M>,
@@ -47,6 +49,12 @@ impl<M: 'static> Context<M> {
         self.container
             .get_or_insert_with(ContainerContext::new)
             .should_stop = true;
+    }
+
+    pub fn remove_agent(&mut self) {
+        self.agent
+            .get_or_insert_with(AgentContext::default)
+            .should_remove = true;
     }
 
     fn insert_behaviour<K>(
@@ -81,6 +89,11 @@ impl<M: 'static> Context<M> {
 
     pub fn remove_behaviour(&mut self, id: BehaviourId) {
         self.local.removed_behaviours.push(id);
+    }
+
+    fn should_propagate(&self) -> bool {
+        self.agent.as_ref().is_some_and(|a| a.should_remove)
+            || self.container.as_ref().is_some_and(|c| c.should_stop)
     }
 }
 

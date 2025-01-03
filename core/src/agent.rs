@@ -39,13 +39,15 @@ impl<M: 'static> Agent<M> {
 }
 
 impl<M: 'static> ContainerAgent for Agent<M> {
-    fn update(&mut self, ctx: &mut ContainerContext) {
+    fn update(&mut self, ctx: &mut ContainerContext) -> bool {
         let mut context = Context::new();
         self.behaviours.action(&mut context);
 
         if let Some(container_ctx) = context.container.take() {
             ctx.merge(container_ctx);
         }
+
+        context.agent.is_some_and(|a| a.should_remove)
     }
 
     fn get_name(&self) -> Cow<str> {

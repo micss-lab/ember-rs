@@ -1,17 +1,17 @@
 use alloc::borrow::Cow;
 use alloc::boxed::Box;
-use alloc::vec::Vec;
+use alloc::collections::VecDeque;
 
 use crate::context::ContainerContext;
 use crate::Agent;
 
 #[derive(Default)]
 pub struct Container {
-    agents: Vec<Box<dyn ContainerAgent>>,
+    agents: VecDeque<Box<dyn ContainerAgent>>,
 }
 
 pub trait ContainerAgent: 'static {
-    fn update(&mut self, context: &mut ContainerContext);
+    fn update(&mut self, context: &mut ContainerContext) -> bool;
 
     fn get_name(&self) -> Cow<str>;
 }
@@ -23,11 +23,10 @@ impl Container {
     }
 
     pub fn add_agent<M: 'static>(&mut self, agent: Agent<M>) {
-        self.agents.push(Box::new(agent));
+        self.agents.push_back(Box::new(agent));
     }
 
     pub fn start(mut self) -> Result<(), Box<dyn core::error::Error>> {
-        log::trace!("Starting the container.\r");
         loop {
             let should_stop = self.poll()?;
             if should_stop {
@@ -37,15 +36,25 @@ impl Container {
     }
 
     pub fn poll(&mut self) -> Result<bool, Box<dyn core::error::Error>> {
-        log::trace!("Polling all agents.\r");
-        for agent in self.agents.iter_mut() {
+        // Iterate over all agents once, only rescheduling agents that are not removed.
+        let mut amount = self.agents.len();
+
+        while let Some(mut agent) = self.agents.pop_front() {
             let mut context = ContainerContext::new();
 
-            log::trace!("Agent `{}` update:\r", agent.get_name());
-            agent.update(&mut context);
+            let removed = agent.update(&mut context);
 
             if context.should_stop {
                 return Ok(true);
+            }
+
+            if !removed {
+                self.agents.push_back(agent);
+            }
+
+            amount -= 1;
+            if amount == 0 {
+                break;
             }
         }
         Ok(false)
