@@ -1,6 +1,9 @@
-#![cfg_attr(target_os = "none", no_std)]
+#![no_std]
 
 extern crate alloc;
+
+#[cfg(not(target_os = "none"))]
+extern crate std;
 
 pub use self::agent::Agent;
 pub use self::container::Container;
