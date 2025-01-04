@@ -17,7 +17,8 @@ class Container:
   public:
     Container();
 
-    void add_agent(Agent&& agent);
+    template<class Message>
+    void add_agent(Agent<Message>&& agent);
 
   public:
     PollResult poll();
@@ -25,6 +26,13 @@ class Container:
   public:
     static bool start(Container&& container);
 };
+
+// ======================= Impl =======================
+
+template<class Message>
+void Container::add_agent(Agent<Message>&& agent) {
+    __ffi::container_add_agent(this->object, agent.move_object());
+}
 
 }
 

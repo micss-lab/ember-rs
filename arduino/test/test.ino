@@ -4,18 +4,18 @@
 #include <memory>
 
 class HelloWorld: 
-    public framework::behaviour::OneShotBehaviour {
+    public framework::behaviour::OneShotBehaviour<> {
   public:
-    virtual void action(framework::behaviour::Context& context) const override {
+    virtual void action(framework::behaviour::Context<>& context) const override {
       Serial.println("Hello, World!");
       Serial.println("My friend will print 10 messages.");
     }
 };
 
 class MessagePrinter:
-    public framework::behaviour::CyclicBehaviour {
+    public framework::behaviour::CyclicBehaviour<> {
   public:
-    virtual void action(framework::behaviour::Context& context) override {
+    virtual void action(framework::behaviour::Context<>& context) override {
         Serial.println(
           (this->count == 10)
             ? "Printing the first message!"

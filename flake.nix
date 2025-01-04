@@ -207,6 +207,7 @@
                   ]))
 
                   pkgs.just
+                  pkgs.jq
                 ]
                 ++ flakeChecksInputs;
 

@@ -10,6 +10,7 @@ namespace framework {
 
 namespace behaviour {
 
+template<class Message=void>
 class Context {
   public:
     inline Context(__ffi::Context<__ffi::Message>* context):
@@ -20,6 +21,7 @@ class Context {
     __ffi::Context<__ffi::Message>* context;
 };
 
+template<class Message=void> // used to store only behaviours who pass around the same message.
 class Behaviour {
   public:
     virtual void __ffi_add_behaviour_to_agent(__ffi::Agent<__ffi::Message>* agent) = 0;
