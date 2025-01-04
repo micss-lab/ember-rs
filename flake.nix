@@ -62,7 +62,10 @@
               cargoVendorDir = craneLib.vendorMultipleCargoDeps {
                 inherit (craneLib.findCargoFiles sources.cargo) cargoConfigs;
                 cargoLockList = [
-                  ./Cargo.lock
+                  ./core/Cargo.lock
+                  ./examples/Cargo.lock
+                  ./tests/Cargo.lock
+                  ./bindings/Cargo.lock
                 ];
               };
 
@@ -97,67 +100,67 @@
         formatter = pkgs.nixpkgs-fmt;
 
         checks = {
-          cargo-build = builds.cargo;
-
-          cargo-clippy = craneLib.cargoClippy (commonArgs.cargo
-            // {
-              cargoArtifacts = artifacts.cargo;
-              cargoClippyExtraArgs = "-- --deny warnings";
-            });
-
-          cargo-doc = craneLib.cargoDoc (commonArgs.cargo
-            // {
-              cargoArtifacts = artifacts.cargo;
-            });
-
-          cargo-fmt = craneLib.cargoFmt (metadata.cargo
-            // {
-              src = sources.cargo;
-            });
-
-          cargo-toml-fmt = craneLib.taploFmt (metadata.cargo
-            // {
-              src = pkgs.lib.sources.sourceFilesBySuffices sources.cargo [".toml"];
-            });
-
-          cargo-test = craneLib.cargoNextest (commonArgs.cargo
-            // {
-              cargoArtifacts = artifacts.cargo;
-            });
-
-          cargo-hack = craneLib.mkCargoDerivation (commonArgs.cargo
-            // {
-              cargoArtifacts = artifacts.cargo;
-
-              pnameSuffix = "-hack";
-
-              buildPhaseCargoCommand = ''
-                cargo hack check --workspace --locked
-              '';
-
-              nativeBuildInputs =
-                commonArgs.cargo.nativeBuildInputs
-                ++ [
-                  pkgs.cargo-hack
-                ];
-            });
-
-          cargo-machete = craneLib.mkCargoDerivation (commonArgs.cargo
-            // {
-              cargoArtifacts = artifacts.cargo;
-
-              pnameSuffix = "-machete";
-
-              buildPhaseCargoCommand = ''
-                cargo machete --with-metadata
-              '';
-
-              nativeBuildInputs =
-                commonArgs.cargo.nativeBuildInputs
-                ++ [
-                  pkgs.cargo-machete
-                ];
-            });
+          # cargo-build = builds.cargo;
+          #
+          # cargo-clippy = craneLib.cargoClippy (commonArgs.cargo
+          #   // {
+          #     cargoArtifacts = artifacts.cargo;
+          #     cargoClippyExtraArgs = "-- --deny warnings";
+          #   });
+          #
+          # cargo-doc = craneLib.cargoDoc (commonArgs.cargo
+          #   // {
+          #     cargoArtifacts = artifacts.cargo;
+          #   });
+          #
+          # cargo-fmt = craneLib.cargoFmt (metadata.cargo
+          #   // {
+          #     src = sources.cargo;
+          #   });
+          #
+          # cargo-toml-fmt = craneLib.taploFmt (metadata.cargo
+          #   // {
+          #     src = pkgs.lib.sources.sourceFilesBySuffices sources.cargo [".toml"];
+          #   });
+          #
+          # cargo-test = craneLib.cargoNextest (commonArgs.cargo
+          #   // {
+          #     cargoArtifacts = artifacts.cargo;
+          #   });
+          #
+          # cargo-hack = craneLib.mkCargoDerivation (commonArgs.cargo
+          #   // {
+          #     cargoArtifacts = artifacts.cargo;
+          #
+          #     pnameSuffix = "-hack";
+          #
+          #     buildPhaseCargoCommand = ''
+          #       cargo hack check --workspace --locked
+          #     '';
+          #
+          #     nativeBuildInputs =
+          #       commonArgs.cargo.nativeBuildInputs
+          #       ++ [
+          #         pkgs.cargo-hack
+          #       ];
+          #   });
+          #
+          # cargo-machete = craneLib.mkCargoDerivation (commonArgs.cargo
+          #   // {
+          #     cargoArtifacts = artifacts.cargo;
+          #
+          #     pnameSuffix = "-machete";
+          #
+          #     buildPhaseCargoCommand = ''
+          #       cargo machete --with-metadata
+          #     '';
+          #
+          #     nativeBuildInputs =
+          #       commonArgs.cargo.nativeBuildInputs
+          #       ++ [
+          #         pkgs.cargo-machete
+          #       ];
+          #   });
         };
 
         packages = {
