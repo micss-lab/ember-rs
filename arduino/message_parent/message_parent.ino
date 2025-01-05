@@ -4,28 +4,22 @@
 #include <iostream>
 #include <memory>
 
+using namespace framework::behaviour;
+
 class HelloWorld: 
-    public framework::behaviour::OneShotBehaviour<> {
+    public OneShotBehaviour<> {
   public:
-    virtual void action(framework::behaviour::Context<>& context) const override {
+    virtual void action(Context<>& context) const override {
       Serial.println("Hello, World!");
       Serial.println("My friends will print 10 messages followed by 20 of something else.");
     }
 };
 
-class MessagePrinter:
-    public framework::behaviour::CyclicBehaviour<> {
+class Incrementor:
+    public CyclicBehaviour<char> {
   public:
-    virtual void action(framework::behaviour::Context<>& context) override {
-        Serial.println(
-          (this->count == 10)
-            ? "Printing the first message!"
-            : (
-              (this->count == 1)
-                ? "Printing the last message!"
-                : "Printing another message."
-            )
-        );
+    virtual void action(Context<char>& context) override {
+        context.message_parent(Message(std::make_unique<char>(this->count)));
         --this->count;
     }
     virtual bool is_finished() const override {
@@ -35,42 +29,44 @@ class MessagePrinter:
     unsigned int count{10};
 };
 
-class SomethingElse:
-    public framework::behaviour::CyclicBehaviour<> {
-  public:
-    virtual void action(framework::behaviour::Context<>& context) override {
-        Serial.println("Something else...");
-        --this->count;
-    }
-    virtual bool is_finished() const override {
-      return this->count == 0;
-    }
-  private:
-    unsigned int count{20};
-};
-
 class SomethingSequential:
-    public framework::behaviour::SequentialBehaviour<> {
+    public SequentialBehaviour<void, char> {
   public:
     SomethingSequential():
-     framework::behaviour::SequentialBehaviour<>(
+     SequentialBehaviour<void, char>(
        SomethingSequential::initial_behaviours()
      ) {}
 
-    static framework::behaviour::SequentialBehaviourQueue<> initial_behaviours() {
-      framework::behaviour::SequentialBehaviourQueue<> queue;
-      queue.add_behaviour(std::make_unique<HelloWorld>());
-      queue.add_behaviour(std::make_unique<MessagePrinter>());
-      queue.add_behaviour(std::make_unique<SomethingElse>());
+    static SequentialBehaviourQueue<char> initial_behaviours() {
+      SequentialBehaviourQueue<char> queue;
+      // queue.add_behaviour(std::make_unique<HelloWorld>());
+      queue.add_behaviour(std::make_unique<Incrementor>());
+      queue.add_behaviour(std::make_unique<Incrementor>());
       return queue;
     }
+
+    void handle_child_message(Message<char>&& message) {
+      char value = *(message.value());
+
+      Serial.print("Receiving child message: ");
+      Serial.println((unsigned int) value);
+
+      this->count += value;
+
+      Serial.print("Calculated a value of `");
+      Serial.print(this->count);
+      Serial.println("` so far...");
+    }
+
+  private:
+    unsigned int count{0};
 };
 
 std::unique_ptr<framework::Container> container;
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("Running example `sequential`");
+  Serial.println("Running example `message_parent`");
 
   // Initialize the frameworks required resources.
   framework::initialize(framework::logging::LogLevel::Debug);
