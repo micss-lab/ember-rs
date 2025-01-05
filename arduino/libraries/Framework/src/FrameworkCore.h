@@ -22,6 +22,8 @@ struct SequentialBehaviour;
 template<typename M = void>
 struct SequentialBehaviourQueue;
 
+struct TickerBehaviour;
+
 struct Message {
   void *inner;
 };
@@ -65,6 +67,8 @@ void agent_add_behaviour_oneshot(Agent<Message> *agent, OneShotBehaviour *onesho
 
 void agent_add_behaviour_cyclic(Agent<Message> *agent, CyclicBehaviour *cyclic);
 
+void agent_add_behaviour_ticker(Agent<Message> *agent, TickerBehaviour *ticker);
+
 void agent_add_behaviour_sequential(Agent<Message> *agent, SequentialBehaviour *sequential);
 
 void context_message_parent(Context<Message> *context, Message *message);
@@ -78,6 +82,13 @@ CyclicBehaviour *behaviour_cyclic_new(void *inner,
                                       bool (*is_finished)(void*));
 
 void behaviour_cyclic_free(CyclicBehaviour *cyclic);
+
+TickerBehaviour *behaviour_ticker_new(void *inner,
+                                      uint64_t (*interval)(void*),
+                                      void (*action)(void*, Context<Message>*),
+                                      bool (*is_finished)(void*));
+
+void behaviour_ticker_free(TickerBehaviour *ticker);
 
 SequentialBehaviour *behaviour_sequential_new(void *inner,
                                               SequentialBehaviourQueue<Message> *initial_behaviours,
@@ -93,6 +104,9 @@ void behaviour_sequential_queue_add_behaviour_oneshot(SequentialBehaviourQueue<M
 
 void behaviour_sequential_queue_add_behaviour_cyclic(SequentialBehaviourQueue<Message> *queue,
                                                      CyclicBehaviour *cyclic);
+
+void behaviour_sequential_queue_add_behaviour_ticker(SequentialBehaviourQueue<Message> *queue,
+                                                     TickerBehaviour *ticker);
 
 void behaviour_sequential_queue_add_behaviour_sequential(SequentialBehaviourQueue<Message> *queue,
                                                          SequentialBehaviour *sequential);

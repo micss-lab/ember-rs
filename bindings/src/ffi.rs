@@ -146,7 +146,7 @@ mod agent {
     use no_std_framework_core::Agent;
 
     use super::behaviour::complex::SequentialBehaviour;
-    use super::behaviour::simple::{CyclicBehaviour, OneShotBehaviour};
+    use super::behaviour::simple::{CyclicBehaviour, OneShotBehaviour, TickerBehaviour};
     use super::message::Message;
     use super::util::{drop_raw, from_raw, new, ref_from_raw, string_from_raw};
 
@@ -184,6 +184,18 @@ mod agent {
         non_null!(cyclic, "got cyclic behaviour null-pointer");
         let agent = unsafe { ref_from_raw(agent) };
         let behaviour = unsafe { from_raw(cyclic) };
+        agent.add_behaviour(behaviour);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn agent_add_behaviour_ticker(
+        agent: *mut Agent<Message>,
+        ticker: *mut TickerBehaviour,
+    ) {
+        non_null!(agent, "got agent null-pointer");
+        non_null!(ticker, "got ticker behaviour null-pointer");
+        let agent = unsafe { ref_from_raw(agent) };
+        let behaviour = unsafe { from_raw(ticker) };
         agent.add_behaviour(behaviour);
     }
 
@@ -227,6 +239,7 @@ mod behaviour {
     pub(super) mod simple {
         pub(in crate::ffi) use self::cyclic::CyclicBehaviour;
         pub(in crate::ffi) use self::oneshot::OneShotBehaviour;
+        pub(in crate::ffi) use self::ticker::TickerBehaviour;
 
         use super::Message;
         use crate::ffi::util::{drop_raw, new};
@@ -321,6 +334,66 @@ mod behaviour {
                 unsafe { drop_raw(cyclic) };
             }
         }
+
+        mod ticker {
+            use core::ffi::c_void;
+            use core::ptr;
+            use core::time::Duration;
+
+            use no_std_framework_core::behaviour::{
+                Context, TickerBehaviour as TickerBehaviourTrait,
+            };
+
+            use super::{drop_raw, new, Message};
+
+            pub struct TickerBehaviour {
+                /// Type value defined by the user implementing the trait.
+                inner: *mut c_void,
+                /// Action to be performed.
+                action: extern "C" fn(*mut c_void, *mut Context<Message>),
+                /// Whether the behaviour has finished.
+                is_finished: extern "C" fn(*mut c_void) -> bool,
+                /// Interval in miliseconds until the next scheduled action.
+                interval: extern "C" fn(*mut c_void) -> u64,
+            }
+
+            impl TickerBehaviourTrait for TickerBehaviour {
+                type Message = Message;
+
+                fn interval(&self) -> Duration {
+                    Duration::from_millis((self.interval)(self.inner))
+                }
+
+                fn action(&mut self, ctx: &mut Context<Self::Message>) {
+                    (self.action)(self.inner, ptr::from_mut(ctx));
+                }
+
+                fn is_finished(&self) -> bool {
+                    (self.is_finished)(self.inner)
+                }
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_ticker_new(
+                inner: *mut c_void,
+                interval: extern "C" fn(*mut c_void) -> u64,
+                action: extern "C" fn(*mut c_void, *mut Context<Message>),
+                is_finished: extern "C" fn(*mut c_void) -> bool,
+            ) -> *mut TickerBehaviour {
+                new(TickerBehaviour {
+                    inner,
+                    interval,
+                    action,
+                    is_finished,
+                })
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_ticker_free(ticker: *mut TickerBehaviour) {
+                non_null_or_bail!(ticker, "attemted to free ticker behaviour null-pointer");
+                unsafe { drop_raw(ticker) };
+            }
+        }
     }
 
     pub(super) mod complex {
@@ -348,7 +421,9 @@ mod behaviour {
                     drop_raw, from_raw, new, ref_from_raw, Message, SequentialBehaviour,
                     SequentialBehaviourQueue,
                 };
-                use crate::ffi::behaviour::simple::{CyclicBehaviour, OneShotBehaviour};
+                use crate::ffi::behaviour::simple::{
+                    CyclicBehaviour, OneShotBehaviour, TickerBehaviour,
+                };
 
                 #[no_mangle]
                 pub extern "C" fn behaviour_sequential_queue_new(
@@ -377,6 +452,18 @@ mod behaviour {
                     non_null!(cyclic, "got cyclic behaviour null-pointer");
                     let queue = unsafe { ref_from_raw(queue) };
                     let behaviour = unsafe { from_raw(cyclic) };
+                    queue.add_behaviour(behaviour);
+                }
+
+                #[no_mangle]
+                pub extern "C" fn behaviour_sequential_queue_add_behaviour_ticker(
+                    queue: *mut SequentialBehaviourQueue<Message>,
+                    ticker: *mut TickerBehaviour,
+                ) {
+                    non_null!(queue, "got sequential queue null-pointer");
+                    non_null!(ticker, "got ticker behaviour null-pointer");
+                    let queue = unsafe { ref_from_raw(queue) };
+                    let behaviour = unsafe { from_raw(ticker) };
                     queue.add_behaviour(behaviour);
                 }
 

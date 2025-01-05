@@ -129,3 +129,142 @@ mod critical_section {
         }
     }
 }
+
+/// Embassy-time implementation.
+///
+/// Stolen from the [esp-hal] crate.
+///
+/// [esp-hal]: https://github.com/esp-rs/esp-hal/blob/713cd491b6a6645bc8fe107d1e4d284135ca4459/esp-hal/src/time.rs
+pub mod time {
+    /// Represents an instant in time.
+    ///
+    /// The resolution is 1 microsecond, represented as a 64-bit unsigned integer.
+    pub type Instant = fugit::Instant<u64, 1, 1_000_000>;
+
+    mod clock {
+        use fugit::HertzU32;
+
+        pub fn xtal_freq() -> HertzU32 {
+            // Heavily reduced...
+
+            HertzU32::MHz(40)
+        }
+    }
+
+    mod systimer {
+        use esp32c3::SYSTIMER;
+
+        /// System Timer driver.
+        pub struct SystemTimer;
+
+        impl SystemTimer {
+            /// Returns the tick frequency of the underlying timer unit.
+            pub fn ticks_per_second() -> u64 {
+                // The counters and comparators are driven using `XTAL_CLK`.
+                // The average clock frequency is fXTAL_CLK/2.5, which is 16 MHz.
+                // The timer counting is incremented by 1/16 μs on each `CNT_CLK` cycle.
+                const MULTIPLIER: u64 = 10_000_000 / 25;
+
+                let xtal_freq_mhz = super::clock::xtal_freq().to_MHz();
+                xtal_freq_mhz as u64 * MULTIPLIER
+            }
+
+            /// Get the current count of the given unit in the System Timer.
+            pub fn unit_value(unit: Unit) -> u64 {
+                // This should be safe to access from multiple contexts
+                // worst case scenario the second accessor ends up reading
+                // an older time stamp
+
+                unit.read_count()
+            }
+        }
+
+        /// A 52-bit counter.
+        #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+        pub enum Unit {
+            /// Unit 0
+            Unit0 = 0,
+        }
+
+        impl Unit {
+            #[inline]
+            fn channel(&self) -> u8 {
+                *self as _
+            }
+
+            pub fn read_count(&self) -> u64 {
+                // This can be a shared reference as long as this type isn't Sync.
+
+                let channel = self.channel() as usize;
+                let systimer = unsafe { SYSTIMER::steal() };
+
+                systimer.unit_op(channel).write(|w| w.update().set_bit());
+                while !systimer.unit_op(channel).read().value_valid().bit_is_set() {}
+
+                // Read LO, HI, then LO again, check that LO returns the same value.
+                // This accounts for the case when an interrupt may happen between reading
+                // HI and LO values (or the other core updates the counter mid-read), and this
+                // function may get called from the ISR. In this case, the repeated read
+                // will return consistent values.
+                let unit_value = systimer.unit_value(channel);
+                let mut lo_prev = unit_value.lo().read().bits();
+                loop {
+                    let lo = lo_prev;
+                    let hi = unit_value.hi().read().bits();
+                    lo_prev = unit_value.lo().read().bits();
+
+                    if lo == lo_prev {
+                        return ((hi as u64) << 32) | lo as u64;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Provides time since system start in microseconds precision.
+    ///
+    /// The counter won’t measure time in sleep-mode.
+    ///
+    /// The timer will wrap after 36_558 years.
+    pub fn now() -> Instant {
+        let (ticks, div) = {
+            use self::systimer::{SystemTimer, Unit};
+            // otherwise use SYSTIMER
+            let ticks = SystemTimer::unit_value(Unit::Unit0);
+            (ticks, (SystemTimer::ticks_per_second() / 1_000_000))
+        };
+
+        Instant::from_ticks(ticks / div)
+    }
+}
+
+mod embassy_time_driver_impl {
+    use embassy_time_driver::Driver;
+
+    struct EmbassyDriver;
+
+    impl Driver for EmbassyDriver {
+        fn now(&self) -> u64 {
+            super::time::now().ticks()
+        }
+
+        unsafe fn allocate_alarm(&self) -> Option<embassy_time_driver::AlarmHandle> {
+            unimplemented!()
+        }
+
+        fn set_alarm_callback(
+            &self,
+            _: embassy_time_driver::AlarmHandle,
+            _: fn(*mut ()),
+            _: *mut (),
+        ) {
+            unimplemented!()
+        }
+
+        fn set_alarm(&self, _: embassy_time_driver::AlarmHandle, _: u64) -> bool {
+            unimplemented!()
+        }
+    }
+
+    embassy_time_driver::time_driver_impl!(static DRIVER: EmbassyDriver = EmbassyDriver{});
+}

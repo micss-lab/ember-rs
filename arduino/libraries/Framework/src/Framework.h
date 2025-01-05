@@ -12,6 +12,7 @@
 #include "behaviour/Context.h"
 #include "behaviour/OneShotBehaviour.h"
 #include "behaviour/CyclicBehaviour.h"
+#include "behaviour/TickerBehaviour.h"
 #include "behaviour/SequentialBehaviour.h"
 
 namespace framework {
