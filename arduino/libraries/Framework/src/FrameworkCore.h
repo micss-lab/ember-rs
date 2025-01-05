@@ -15,14 +15,16 @@ struct Context;
 
 struct CyclicBehaviour;
 
-struct Message;
-
 struct OneShotBehaviour;
 
 struct SequentialBehaviour;
 
 template<typename M = void>
 struct SequentialBehaviourQueue;
+
+struct Message {
+  void *inner;
+};
 
 struct ContainerPollResult {
   int32_t status;
@@ -32,6 +34,10 @@ struct ContainerPollResult {
 extern "C" {
 
 void initialize_allocator();
+
+Message *message_new(void *message);
+
+void message_free(Message *message);
 
 /**
  * Creates a new container instance.
@@ -61,6 +67,8 @@ void agent_add_behaviour_cyclic(Agent<Message> *agent, CyclicBehaviour *cyclic);
 
 void agent_add_behaviour_sequential(Agent<Message> *agent, SequentialBehaviour *sequential);
 
+void context_message_parent(Context<Message> *context, Message *message);
+
 OneShotBehaviour *behaviour_oneshot_new(void *inner, void (*action)(void*, Context<Message>*));
 
 void behaviour_oneshot_free(OneShotBehaviour *oneshot);
@@ -73,6 +81,7 @@ void behaviour_cyclic_free(CyclicBehaviour *cyclic);
 
 SequentialBehaviour *behaviour_sequential_new(void *inner,
                                               SequentialBehaviourQueue<Message> *initial_behaviours,
+                                              void (*handle_child_message)(void*, Message*),
                                               void (*after_child_action)(void*, Context<Message>*));
 
 void behaviour_sequential_free(SequentialBehaviour *sequential);

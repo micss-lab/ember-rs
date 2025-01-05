@@ -36,7 +36,7 @@ OneShotBehaviour<Message>::OneShotBehaviour():
             this,
             [](void* self_, __ffi::Context<__ffi::Message>* context_) {
                 OneShotBehaviour<Message>* self = static_cast<OneShotBehaviour<Message>*>(self_);
-                Context context(context_);
+                Context<Message> context(context_);
                 return self->action(context);
             }
         ),

@@ -8,6 +8,8 @@
 #include "Agent.h"
 #include "Container.h"
 
+#include "behaviour/Message.h"
+#include "behaviour/Context.h"
 #include "behaviour/OneShotBehaviour.h"
 #include "behaviour/CyclicBehaviour.h"
 #include "behaviour/SequentialBehaviour.h"

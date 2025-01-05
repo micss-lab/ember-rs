@@ -56,8 +56,22 @@ mod esp {
 mod message {
     use core::ffi::c_void;
 
+    use super::util::{drop_raw, new};
+
+    #[repr(C)]
     pub struct Message {
         inner: *mut c_void,
+    }
+
+    #[no_mangle]
+    extern "C" fn message_new(message: *mut c_void) -> *mut Message {
+        new(Message { inner: message })
+    }
+
+    #[no_mangle]
+    extern "C" fn message_free(message: *mut Message) {
+        non_null_or_bail!(message, "attemted to free message null-pointer");
+        unsafe { drop_raw(message) }
     }
 }
 
@@ -183,6 +197,27 @@ mod agent {
         let agent = unsafe { ref_from_raw(agent) };
         let behaviour = unsafe { from_raw(sequential) };
         agent.add_behaviour(behaviour);
+    }
+}
+
+mod context {
+    use no_std_framework_core::behaviour::Context;
+
+    use super::message::Message;
+    use super::util::{from_raw, ref_from_raw};
+
+    // No `new` or `free` needed as this is a mutable borrow from rust.
+
+    #[no_mangle]
+    pub extern "C" fn context_message_parent(
+        context: *mut Context<Message>,
+        message: *mut Message,
+    ) {
+        non_null!(context, "got a context null-pointer");
+        non_null!(message, "got a message null-pointer");
+        let context = unsafe { ref_from_raw(context) };
+        let message = unsafe { from_raw(message) };
+        context.message_parent(message);
     }
 }
 
@@ -374,6 +409,8 @@ mod behaviour {
                 inner: *mut c_void,
                 /// List of initial behaviours to be scheduled.
                 initial_behaviours: Cell<*mut SequentialBehaviourQueue<Message>>,
+                /// Function to be executed for every message a child has sent to the parent.
+                handle_child_message: extern "C" fn(*mut c_void, *mut Message),
                 /// Function to be executed after a child behaviour has performed its action.
                 after_child_action: extern "C" fn(*mut c_void, *mut Context<Message>),
             }
@@ -393,6 +430,10 @@ mod behaviour {
                     unsafe { from_raw(result) }
                 }
 
+                fn handle_child_message(&mut self, message: Self::ChildMessage) {
+                    (self.handle_child_message)(self.inner, new(message))
+                }
+
                 fn after_child_action(
                     &mut self,
                     ctx: &mut no_std_framework_core::behaviour::Context<Self::Message>,
@@ -405,6 +446,7 @@ mod behaviour {
             pub extern "C" fn behaviour_sequential_new(
                 inner: *mut c_void,
                 initial_behaviours: *mut SequentialBehaviourQueue<Message>,
+                handle_child_message: extern "C" fn(*mut c_void, *mut Message),
                 after_child_action: extern "C" fn(*mut c_void, *mut Context<Message>),
             ) -> *mut SequentialBehaviour {
                 non_null!(inner, "got inner null-pointer");
@@ -412,6 +454,7 @@ mod behaviour {
                 new(SequentialBehaviour {
                     inner,
                     initial_behaviours: initial_behaviours.into(),
+                    handle_child_message,
                     after_child_action,
                 })
             }

@@ -11,11 +11,37 @@ namespace framework {
 
 namespace behaviour {
 
+template<class M>
 class Message:
     public Object<__ffi::Message> {
-  private:
-    static std::unique_ptr<Message> __ffi_from_void(void* self);
+  public:
+    Message(std::unique_ptr<M>&& message);
+
+    M* value();
+
+  public:
+    Message(__ffi::Message* message);
 };
+
+template<class M>
+Message<M>::Message(std::unique_ptr<M>&& message):
+    Object(
+        __ffi::message_new(message.release()),
+        __ffi::message_free
+    ) {}
+
+template<class M>
+M* Message<M>::value() {
+    M* message = static_cast<M*>(this->object->inner);
+    return message;
+}
+
+template<class M>
+Message<M>::Message(__ffi::Message* message):
+    Object(
+        message,
+        __ffi::message_free
+    ) {}
 
 } // namespace behaviour
 

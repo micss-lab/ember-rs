@@ -3,7 +3,7 @@
 - [ ] Support missing behaviours.
     - [ ] `TickerBehaviour`
     - [ ] `ParallelBehaviour`
-- [ ] Support message passing to the parent.
+- [x] Support message passing to the parent.
 - [ ] Support missing actions on the context.
     - [ ] Adding behaviours.
     - [ ] Removing behaviours.

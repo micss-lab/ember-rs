@@ -37,7 +37,7 @@ CyclicBehaviour<Message>::CyclicBehaviour():
             this,
             [](void* self_, __ffi::Context<__ffi::Message>* context_) {
                 CyclicBehaviour<Message>* self = static_cast<CyclicBehaviour<Message>*>(self_);
-                Context context(context_);
+                Context<Message> context(context_);
                 return self->action(context);
             },
             [](void* self_) -> bool {
