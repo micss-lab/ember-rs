@@ -1,6 +1,7 @@
 #![no_std]
 
 #[cfg(not(target_os = "none"))]
+#[macro_use]
 extern crate std;
 
 macro_rules! tests {
@@ -12,4 +13,4 @@ macro_rules! tests {
     };
 }
 
-tests![parallel];
+tests![parallel, sequential];

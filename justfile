@@ -2,8 +2,8 @@ CARGO_EXTRA_ARGS := "--locked"
 
 mod bindings
 mod examples
+mod tests
 import 'core/justfile'
-import 'tests/justfile'
 
 default:
     @just --unstable --list

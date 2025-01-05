@@ -39,7 +39,7 @@ impl<M: 'static> SequentialBehaviourQueue<M> {
     ) -> BehaviourId {
         let behaviour = behaviour.into_behaviour();
         let id = behaviour.id();
-        self.schedule(behaviour, ScheduleStrategy::Next);
+        self.schedule(behaviour, ScheduleStrategy::End);
         id
     }
 
