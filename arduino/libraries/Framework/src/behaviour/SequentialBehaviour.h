@@ -12,12 +12,12 @@ namespace framework {
 
 namespace behaviour {
 
+template<class Message=void>
 class SequentialBehaviourQueue:
     public Object<__ffi::SequentialBehaviourQueue<__ffi::Message>> {
   public:
     SequentialBehaviourQueue();
 
-    template<class Message>
     void add_behaviour(std::unique_ptr<Behaviour<Message>>&& behaviour);
 };
 
@@ -26,7 +26,7 @@ class SequentialBehaviour:
     public Behaviour<Message>,
     public Object<__ffi::SequentialBehaviour> {
   public:
-    SequentialBehaviour(SequentialBehaviourQueue&& initial_behaviours);
+    SequentialBehaviour(SequentialBehaviourQueue<Message>&& initial_behaviours);
     virtual ~SequentialBehaviour();
 
     virtual void after_child_action(Context<Message>& context);
@@ -42,13 +42,17 @@ class SequentialBehaviour:
 // ======================= Impl =======================
 
 template<class Message>
-void SequentialBehaviourQueue::add_behaviour(std::unique_ptr<Behaviour<Message>>&& behaviour_) {
+SequentialBehaviourQueue<Message>::SequentialBehaviourQueue():
+    Object(__ffi::behaviour_sequential_queue_new(), __ffi::behaviour_sequential_queue_free) {}
+
+template<class Message>
+void SequentialBehaviourQueue<Message>::add_behaviour(std::unique_ptr<Behaviour<Message>>&& behaviour_) {
     Behaviour<Message>* behaviour = behaviour_.release();
     behaviour->__ffi_add_behaviour_to_sequential_behaviour_queue(this->object);
 }
 
 template<class Message>
-SequentialBehaviour<Message>::SequentialBehaviour(SequentialBehaviourQueue&& initial_behaviours):
+SequentialBehaviour<Message>::SequentialBehaviour(SequentialBehaviourQueue<Message>&& initial_behaviours):
     Object (
         __ffi::behaviour_sequential_new(
             this,
