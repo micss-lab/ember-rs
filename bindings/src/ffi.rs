@@ -231,6 +231,27 @@ mod context {
         let message = unsafe { from_raw(message) };
         context.message_parent(message);
     }
+
+    #[no_mangle]
+    pub extern "C" fn context_stop_container(context: *mut Context<Message>) {
+        non_null!(context, "got a context null-pointer");
+        let context = unsafe { ref_from_raw(context) };
+        context.stop_container();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn context_remove_agent(context: *mut Context<Message>) {
+        non_null!(context, "got a context null-pointer");
+        let context = unsafe { ref_from_raw(context) };
+        context.remove_agent();
+    }
+
+    #[no_mangle]
+    pub extern "C" fn context_block_behaviour(context: *mut Context<Message>) {
+        non_null!(context, "got a context null-pointer");
+        let context = unsafe { ref_from_raw(context) };
+        context.block_behaviour();
+    }
 }
 
 mod behaviour {

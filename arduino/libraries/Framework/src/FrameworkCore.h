@@ -73,6 +73,12 @@ void agent_add_behaviour_sequential(Agent<Message> *agent, SequentialBehaviour *
 
 void context_message_parent(Context<Message> *context, Message *message);
 
+void context_stop_container(Context<Message> *context);
+
+void context_remove_agent(Context<Message> *context);
+
+void context_block_behaviour(Context<Message> *context);
+
 OneShotBehaviour *behaviour_oneshot_new(void *inner, void (*action)(void*, Context<Message>*));
 
 void behaviour_oneshot_free(OneShotBehaviour *oneshot);
