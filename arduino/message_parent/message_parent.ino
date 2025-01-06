@@ -11,7 +11,7 @@ class HelloWorld:
   public:
     virtual void action(Context<>& context) const override {
       Serial.println("Hello, World!");
-      Serial.println("My friends will print 10 messages followed by 20 of something else.");
+      Serial.println("My friends will send messages to their parent to calculate a value.");
     }
 };
 
@@ -78,6 +78,7 @@ void setup() {
   /* framework::__ffi::Container* container = framework::__ffi::container_new(); */
 
   framework::Agent hello_world_agent = framework::Agent("hello-world-agent");
+  hello_world_agent.add_behaviour(std::make_unique<HelloWorld>());
   hello_world_agent.add_behaviour(std::make_unique<SomethingSequential>());
 
   container->add_agent(std::move(hello_world_agent));
