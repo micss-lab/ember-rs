@@ -3,6 +3,7 @@ CARGO_EXTRA_ARGS := "--locked"
 mod bindings
 mod examples
 mod tests
+mod arduino
 import 'core/justfile'
 
 default:
