@@ -22,7 +22,10 @@ class CyclicBehaviour:
 
   public:
     virtual void __ffi_add_behaviour_to_agent(__ffi::Agent<__ffi::Message>* agent) override;
-
+    virtual void __ffi_add_behaviour_to_context(
+        __ffi::Context<__ffi::Message>* context,
+        __ffi::ScheduleStrategy strategy
+    ) override;
     virtual void __ffi_add_behaviour_to_sequential_behaviour_queue(
         __ffi::SequentialBehaviourQueue<__ffi::Message>* queue
     ) override;
@@ -56,6 +59,18 @@ void CyclicBehaviour<Message>::__ffi_add_behaviour_to_agent(__ffi::Agent<__ffi::
     __ffi::agent_add_behaviour_cyclic(
         agent,
         this->move_object()
+    );
+}
+
+template<class Message>
+void CyclicBehaviour<Message>::__ffi_add_behaviour_to_context(
+    __ffi::Context<__ffi::Message>* context,
+    __ffi::ScheduleStrategy strategy
+) {
+    __ffi::context_insert_behaviour_cyclic(
+        context,
+        this->move_object(),
+        strategy
     );
 }
 

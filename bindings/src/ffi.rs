@@ -213,8 +213,10 @@ mod agent {
 }
 
 mod context {
-    use no_std_framework_core::behaviour::Context;
+    use no_std_framework_core::behaviour::{Context, IntoBehaviour};
 
+    use super::behaviour::complex::SequentialBehaviour;
+    use super::behaviour::simple::{CyclicBehaviour, OneShotBehaviour, TickerBehaviour};
     use super::message::Message;
     use super::util::{from_raw, ref_from_raw};
 
@@ -251,6 +253,76 @@ mod context {
         non_null!(context, "got a context null-pointer");
         let context = unsafe { ref_from_raw(context) };
         context.block_behaviour();
+    }
+
+    #[allow(unused)] // Rust thinks the variants are unused.
+    #[repr(C)]
+    pub enum ScheduleStrategy {
+        Next,
+        End,
+    }
+
+    fn context_insert_behaviour<K>(
+        context: &mut Context<Message>,
+        behaviour: impl IntoBehaviour<K, Message = Message>,
+        strategy: ScheduleStrategy,
+    ) {
+        match strategy {
+            ScheduleStrategy::Next => context.insert_next_behaviour(behaviour),
+            ScheduleStrategy::End => context.append_behaviour(behaviour),
+        };
+    }
+
+    #[no_mangle]
+    pub extern "C" fn context_insert_behaviour_oneshot(
+        context: *mut Context<Message>,
+        oneshot: *mut OneShotBehaviour,
+        strategy: ScheduleStrategy,
+    ) {
+        non_null!(context, "got context null-pointer");
+        non_null!(oneshot, "got oneshot behaviour null-pointer");
+        let context = unsafe { ref_from_raw(context) };
+        let behaviour = unsafe { from_raw(oneshot) };
+        context_insert_behaviour(context, behaviour, strategy);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn context_insert_behaviour_cyclic(
+        context: *mut Context<Message>,
+        cyclic: *mut CyclicBehaviour,
+        strategy: ScheduleStrategy,
+    ) {
+        non_null!(context, "got context null-pointer");
+        non_null!(cyclic, "got cyclic behaviour null-pointer");
+        let context = unsafe { ref_from_raw(context) };
+        let behaviour = unsafe { from_raw(cyclic) };
+        context_insert_behaviour(context, behaviour, strategy);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn context_insert_behaviour_ticker(
+        context: *mut Context<Message>,
+        ticker: *mut TickerBehaviour,
+        strategy: ScheduleStrategy,
+    ) {
+        non_null!(context, "got context null-pointer");
+        non_null!(ticker, "got ticker behaviour null-pointer");
+        let context = unsafe { ref_from_raw(context) };
+        let behaviour = unsafe { from_raw(ticker) };
+        context_insert_behaviour(context, behaviour, strategy);
+    }
+
+    #[no_mangle]
+    pub extern "C" fn context_insert_behaviour_sequential(
+        context: *mut Context<Message>,
+        sequential: *mut SequentialBehaviour,
+        strategy: ScheduleStrategy,
+    ) {
+        non_null!(context, "got context null-pointer");
+        non_null!(sequential, "got sequential behaviour null-pointer");
+        let context = unsafe { ref_from_raw(context) };
+        let behaviour = unsafe { from_raw(sequential) };
+        context_insert_behaviour(context, behaviour, strategy);
     }
 }
 

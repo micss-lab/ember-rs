@@ -2,4 +2,4 @@ default:
     just --list
 
 build-all:
-    for file in ./*/example.just; do just -f $file build; done
+    for file in ./*/example.just; do just -f $file build || break; done

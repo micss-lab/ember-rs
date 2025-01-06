@@ -5,7 +5,7 @@
     - [ ] `ParallelBehaviour`
 - [x] Support message passing to the parent.
 - [ ] Support missing actions on the context.
-    - [ ] Adding behaviours.
+    - [x] Adding behaviours.
     - [ ] Removing behaviours.
     - [x] Deleting the agent.
     - [x] Stopping the container.

@@ -5,6 +5,11 @@
 
 namespace framework::__ffi {
 
+enum class ScheduleStrategy {
+  Next,
+  End,
+};
+
 template<typename M = void>
 struct Agent;
 
@@ -78,6 +83,22 @@ void context_stop_container(Context<Message> *context);
 void context_remove_agent(Context<Message> *context);
 
 void context_block_behaviour(Context<Message> *context);
+
+void context_insert_behaviour_oneshot(Context<Message> *context,
+                                      OneShotBehaviour *oneshot,
+                                      ScheduleStrategy strategy);
+
+void context_insert_behaviour_cyclic(Context<Message> *context,
+                                     CyclicBehaviour *cyclic,
+                                     ScheduleStrategy strategy);
+
+void context_insert_behaviour_ticker(Context<Message> *context,
+                                     TickerBehaviour *ticker,
+                                     ScheduleStrategy strategy);
+
+void context_insert_behaviour_sequential(Context<Message> *context,
+                                         SequentialBehaviour *sequential,
+                                         ScheduleStrategy strategy);
 
 OneShotBehaviour *behaviour_oneshot_new(void *inner, void (*action)(void*, Context<Message>*));
 
