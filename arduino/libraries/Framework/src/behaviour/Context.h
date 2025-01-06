@@ -39,17 +39,17 @@ void Context<M>::message_parent(Message<M>&& message) {
 
 template<class M>
 void Context<M>::stop_container() {
-    __ffi::context_stop_container(this->object);
+    __ffi::context_stop_container(this->context);
 }
 
 template<class M>
 void Context<M>::remove_agent() {
-    __ffi::context_remove_agent(this->object);
+    __ffi::context_remove_agent(this->context);
 }
 
 template<class M>
 void Context<M>::block_behaviour() {
-    __ffi::context_block_behaviour(this->object);
+    __ffi::context_block_behaviour(this->context);
 }
 
 } // namespace behaviour
