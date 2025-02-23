@@ -6,3 +6,4 @@
 
 # Editor artifacts.
 .idea
+.ccls-cache
