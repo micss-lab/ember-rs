@@ -156,8 +156,8 @@ mod parser {
         impl core::fmt::Display for LineCol {
             fn fmt(
                 &self,
-                fmt: &mut ::std::fmt::Formatter,
-            ) -> ::std::result::Result<(), ::std::fmt::Error> {
+                fmt: &mut ::core::fmt::Formatter,
+            ) -> ::core::result::Result<(), ::core::fmt::Error> {
                 write!(
                     fmt,
                     "({}:{})[byte: {}]",
@@ -345,7 +345,7 @@ mod parser {
 
             /// A floating point value represented by a mantissa and an optional exponent.
             rule float() -> f32
-                = s:neg_sign() f:float_mantissa() e:float_exponent()? { f * if let Some(e) = e { 10f32.powf(e as f32) } else { 1.0 } * i32::from(s) as f32 }
+                = s:neg_sign() f:float_mantissa() e:float_exponent()? { f * if let Some(e) = e { libm::powf(10f32, e as f32) } else { 1.0 } * i32::from(s) as f32 }
 
             /// A floating point value's mantissa.
             rule float_mantissa() -> f32
