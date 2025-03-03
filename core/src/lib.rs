@@ -8,6 +8,7 @@ extern crate std;
 pub use self::agent::Agent;
 pub use self::container::Container;
 
+mod acl;
 mod agent;
 pub mod behaviour;
 mod container;
