@@ -2,9 +2,8 @@ CARGO_EXTRA_ARGS := "--locked"
 
 mod bindings
 mod examples
-mod tests
 mod arduino
-import 'core/justfile'
+mod tests
 
 default:
     @just --unstable --list
@@ -15,3 +14,7 @@ check:
     cd tests && cargo check-local --tests {{CARGO_EXTRA_ARGS}}
     cd examples && cargo check-local {{CARGO_EXTRA_ARGS}}
     cd examples && cargo check-esp {{CARGO_EXTRA_ARGS}}
+
+test:
+    cd core && cargo test-local {{CARGO_EXTRA_ARGS}}
+    @just --unstable tests run
