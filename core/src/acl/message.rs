@@ -1,5 +1,6 @@
-use alloc::collections::btree_set::BTreeSet;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
+use alloc::vec::Vec;
 
 type Aid = String;
 
@@ -26,6 +27,16 @@ struct Message {
     // reply_with: Option<String>,
     // in_reply_to: Option<String>,
     // reply_by: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct MessageEnvelope {
+    to: Vec<Aid>,
+    from: Option<Aid>,
+    date: chrono::DateTime<chrono::FixedOffset>,
+    acl_representation: AclRepresentation,
+    parameters: BTreeMap<String, bstr::BString>,
+    message: bstr::BString,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,4 +78,9 @@ enum Language {
     Ccl,
     Kif,
     Rdf,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AclRepresentation {
+    BitEfficient,
 }

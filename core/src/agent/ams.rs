@@ -7,7 +7,7 @@ use crate::context::{ContainerContext, Context};
 use super::Agent;
 
 pub(crate) struct AmsAgent {
-    /// Inner agent on which all behaviours will be stored.
+    /// Inner agent on which ams behaviours will be stored.
     inner: Agent<()>,
 }
 
@@ -33,7 +33,7 @@ struct StartupMessage;
 impl OneShotBehaviour for StartupMessage {
     type Message = ();
 
-    fn action(&self, ctx: &mut Context<Self::Message>) {
-        log::info!("Ams agent has registered.");
+    fn action(&self, _: &mut Context<Self::Message>) {
+        log::debug!("Ams agent has registered.");
     }
 }
