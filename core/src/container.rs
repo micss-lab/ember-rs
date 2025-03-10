@@ -2,15 +2,27 @@ use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 
+use crate::agent::{Agent, AmsAgent};
 use crate::context::ContainerContext;
-use crate::Agent;
+use crate::util::sync::AtomicBool;
 
-#[derive(Default)]
-pub struct Container {
-    agents: VecDeque<Box<dyn ContainerAgent>>,
+static MAIN_CONTAINER_CREATED: AtomicBool = AtomicBool::new(false);
+
+pub struct Container<K = Main> {
+    /// Ams agent required for for a main container.
+    ams: AmsAgent,
+    /// Agents managed by this container.
+    agents: VecDeque<Box<dyn AgentLike>>,
+    /// Sub-containers managed by this container.
+    _containers: K,
 }
+/// The container is a main container and can contain sub-containers.
+#[derive(Default)]
+pub struct Main(VecDeque<Container<Sub>>);
+/// The container is a sub-container, thus cannot contain more sub-containers.
+pub struct Sub;
 
-pub trait ContainerAgent: 'static {
+pub trait AgentLike: 'static {
     fn update(&mut self, context: &mut ContainerContext) -> bool;
 
     #[allow(unused)]
@@ -59,5 +71,22 @@ impl Container {
             }
         }
         Ok(false)
+    }
+}
+
+impl Default for Container {
+    fn default() -> Self {
+        check_and_set_created();
+        Self {
+            ams: AmsAgent::new(),
+            agents: VecDeque::default(),
+            _containers: Main::default(),
+        }
+    }
+}
+
+fn check_and_set_created() {
+    if MAIN_CONTAINER_CREATED.compare_and_swap(false, true) {
+        panic!("Can only create a single instance of the main container.");
     }
 }

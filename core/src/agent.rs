@@ -1,11 +1,14 @@
+pub(crate) use self::ams::AmsAgent;
 use alloc::borrow::Cow;
 use alloc::string::{String, ToString};
 
 use crate::behaviour::complex::queue::{BehaviourScheduler, ScheduleStrategy};
 use crate::behaviour::parallel::{FinishStrategy, ParallelBehaviourQueue};
 use crate::behaviour::{BehaviourId, IntoBehaviour};
-use crate::container::ContainerAgent;
+use crate::container::AgentLike;
 use crate::context::{ContainerContext, Context};
+
+mod ams;
 
 pub struct Agent<M> {
     pub(crate) name: String,
@@ -38,7 +41,7 @@ impl<M: 'static> Agent<M> {
     }
 }
 
-impl<M: 'static> ContainerAgent for Agent<M> {
+impl<M: 'static> AgentLike for Agent<M> {
     fn update(&mut self, ctx: &mut ContainerContext) -> bool {
         let mut context = Context::new();
         self.behaviours.action(&mut context);
