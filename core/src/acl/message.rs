@@ -13,7 +13,7 @@ type Content = String;
 type Protocol = String;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct Message {
+pub(crate) struct Message {
     performative: Performative,
     sender: Option<Aid>,
     receiver: Receiver,
@@ -30,7 +30,7 @@ struct Message {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct MessageEnvelope {
+pub(crate) struct MessageEnvelope {
     to: Vec<Aid>,
     from: Option<Aid>,
     date: chrono::DateTime<chrono::FixedOffset>,

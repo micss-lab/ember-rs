@@ -1,17 +1,22 @@
-pub(crate) use self::ams::AmsAgent;
 use alloc::borrow::Cow;
 use alloc::string::{String, ToString};
 
+use uchan::{Receiver, Sender};
+
+use crate::acl::message::MessageEnvelope;
 use crate::behaviour::complex::queue::{BehaviourScheduler, ScheduleStrategy};
 use crate::behaviour::parallel::{FinishStrategy, ParallelBehaviourQueue};
 use crate::behaviour::{BehaviourId, IntoBehaviour};
 use crate::container::AgentLike;
 use crate::context::{ContainerContext, Context};
 
+pub(crate) use self::ams::AmsAgent;
+
 mod ams;
 
 pub struct Agent<M> {
     pub(crate) name: String,
+    inbox: (Sender<MessageEnvelope>, Receiver<MessageEnvelope>),
     behaviours: ParallelBehaviourQueue<M>,
 }
 
@@ -19,6 +24,7 @@ impl<M: 'static> Agent<M> {
     pub fn new(name: impl ToString) -> Self {
         Self {
             name: name.to_string(),
+            inbox: uchan::channel(),
             behaviours: ParallelBehaviourQueue::new(FinishStrategy::Never),
         }
     }

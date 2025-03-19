@@ -1,2 +1,2 @@
-mod message;
+pub(crate) mod message;
 mod sl;
