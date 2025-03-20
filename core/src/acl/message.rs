@@ -2,24 +2,23 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
 
+use super::sl;
+
 type Aid = String;
 
 type Encoding = String;
 
 type Ontology = String;
 
-type Content = String;
-
 type Protocol = String;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Message {
     performative: Performative,
     sender: Option<Aid>,
     receiver: Receiver,
     reply_to: Option<Aid>,
     content: Content,
-    language: Option<Language>,
     // TODO: Implement these.
     // ontology: Option<Ontology>,
     // protocol: Option<Protocol>,
@@ -72,9 +71,17 @@ enum Performative {
     Unknown,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+enum Content {
+    Sl(sl::Content),
+    Other {
+        kind: Option<OtherLanguage>,
+        content: String,
+    },
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Language {
-    Sl,
+enum OtherLanguage {
     Ccl,
     Kif,
     Rdf,

@@ -13,4 +13,5 @@ mod agent;
 pub mod behaviour;
 mod container;
 mod context;
+mod fipa;
 mod util;

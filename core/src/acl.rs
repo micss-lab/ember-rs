@@ -1,2 +1,3 @@
+pub mod codec;
 pub(crate) mod message;
-mod sl;
+pub(crate) mod sl;

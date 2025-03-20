@@ -3,12 +3,13 @@ use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
 use core::marker::PhantomData;
+use core::ops::Deref;
 
 use chrono::{DateTime, FixedOffset};
 
 /// List of expressions to form the content of an ACL message.
 #[derive(Debug, Clone, PartialEq)]
-pub(super) struct Content(Vec<ContentElement>);
+pub struct Content(pub Vec<ContentElement>);
 
 impl Content {
     pub fn parse(input: impl AsRef<bstr::BStr>) -> Result<Self, String> {
@@ -17,25 +18,25 @@ impl Content {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(super) enum ContentElement {
+pub enum ContentElement {
     AgentAction(AgentAction),
     Predicate(Predicate),
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(super) struct Concept {
-    symbol: bstr::BString,
-    parameters: ConceptParameters,
+pub struct Concept {
+    pub symbol: bstr::BString,
+    pub parameters: ConceptParameters,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(super) struct AgentAction {
-    agent: Term,
-    action: Term,
+pub struct AgentAction {
+    pub agent: Term,
+    pub action: Term,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub(super) enum Predicate {
+pub enum Predicate {
     Regular {
         symbol: bstr::BString,
         terms: Vec<Term>,
@@ -52,24 +53,24 @@ pub(super) enum Predicate {
 
 /// Recursive structure defining the concept of a term.
 #[derive(Debug, Clone, PartialEq)]
-pub(super) enum Term {
+pub enum Term {
     Constant(Constant),
-    Set(Collection<SetLike>),
-    Sequence(Collection<SeqLike>),
+    Set(Set),
+    Sequence(Seq),
     Concept(Concept),
     Action(Box<AgentAction>),
 }
 
 /// Parameters part of a functional term.
 #[derive(Debug, Clone, PartialEq)]
-pub(super) enum ConceptParameters {
+pub enum ConceptParameters {
     Positional(Vec<Term>),
     ByName(Vec<(bstr::BString, Term)>),
 }
 
 /// Numerical, string, and time-related constants.
 #[derive(Debug, Clone, PartialEq)]
-pub(super) enum Constant {
+pub enum Constant {
     Number(Number),
     String(bstr::BString),
     Datatime(DateTime<FixedOffset>),
@@ -77,13 +78,13 @@ pub(super) enum Constant {
 
 /// Numerical constant.
 #[derive(Debug, Clone, PartialEq)]
-pub(super) enum Number {
+pub enum Number {
     Int(i32),
     Float(f32),
 }
 
-pub(super) type Set = Collection<SetLike>;
-pub(super) type Seq = Collection<SeqLike>;
+pub type Set = Collection<collection::SetLike>;
+pub type Seq = Collection<collection::SeqLike>;
 
 /// General collection type.
 ///
@@ -94,16 +95,26 @@ pub(super) type Seq = Collection<SeqLike>;
 /// [`BTreeSet`]: alloc::collections::btree_set::BTreeSet
 /// [`Ord`]: core::cmp::Ord
 #[derive(Debug, Clone, PartialEq)]
-pub(super) struct Collection<C> {
+pub struct Collection<C> {
     /// Items in the collection.
-    items: Vec<()>,
+    items: Vec<Term>,
     /// Semantics behind the collection.
     _marker: PhantomData<C>,
 }
-#[derive(Debug, Clone, PartialEq)]
-pub(super) struct SetLike;
-#[derive(Debug, Clone, PartialEq)]
-pub(super) struct SeqLike;
+mod collection {
+    #[derive(Debug, Clone, PartialEq)]
+    pub struct SetLike;
+    #[derive(Debug, Clone, PartialEq)]
+    pub struct SeqLike;
+}
+
+impl<C> Deref for Collection<C> {
+    type Target = [Term];
+
+    fn deref(&self) -> &Self::Target {
+        &self.items
+    }
+}
 
 mod parser {
     pub(super) use self::input::BStr;
@@ -293,10 +304,10 @@ mod parser {
             // TODO: Collect the items.
 
             rule sequence() -> Collection<SeqLike>
-                = lbrace() _ "sequence" (term() _)* _ rbrace() { Collection { items: Vec::new(), _marker: PhantomData } }
+                = lbrace() _ "sequence" t:(t:term() _ { t })* _ rbrace() { Collection { items: t, _marker: PhantomData } }
 
             rule set() -> Collection<SetLike>
-                = lbrace() _ "set" (term() _)* _ rbrace() { Collection { items: Vec::new(), _marker: PhantomData } }
+                = lbrace() _ "set" t:(t:term() _ { t })* _ rbrace() { Collection { items: t, _marker: PhantomData } }
 
             // ====================
             //      Numerical
