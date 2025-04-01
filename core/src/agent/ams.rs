@@ -46,9 +46,9 @@ struct AgentReference {
 struct StartupMessage;
 
 impl OneShotBehaviour for StartupMessage {
-    type Message = ();
+    type Event = ();
 
-    fn action(&self, _: &mut Context<Self::Message>) {
+    fn action(&self, _: &mut Context<Self::Event>) {
         log::debug!("Ams agent has registered.");
     }
 }

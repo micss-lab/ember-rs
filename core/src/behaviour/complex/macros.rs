@@ -1,10 +1,10 @@
 macro_rules! complex_behaviour_methods {
     () => {
-        fn handle_child_message(&mut self, message: Self::ChildMessage) {
+        fn handle_child_event(&mut self, message: Self::ChildEvent) {
             let _ = message;
         }
 
-        fn after_child_action(&mut self, ctx: &mut Context<Self::Message>) {
+        fn after_child_action(&mut self, ctx: &mut Context<Self::Event>) {
             let _ = ctx;
         }
     };
@@ -12,15 +12,15 @@ macro_rules! complex_behaviour_methods {
 
 macro_rules! complex_action_impl {
     () => {
-        fn action(&mut self, ctx: &mut Context<Self::Message>) -> bool {
+        fn action(&mut self, ctx: &mut Context<Self::Event>) -> bool {
             let mut context = Context::new();
 
             // 1. Execute next scheduled behaviour.
             self.queue.action(&mut context);
 
-            // 2. Handle messages the behaviour produced.
-            while let Some(message) = context.local.messages.pop() {
-                self.kind.0.handle_child_message(message);
+            // 2. Handle events the behaviour produced.
+            while let Some(event) = context.local.events.pop() {
+                self.kind.0.handle_child_event(event);
             }
 
             // 3. Update the parent context.
