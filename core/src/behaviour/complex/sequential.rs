@@ -5,20 +5,20 @@ use super::queue::{BehaviourQueue, BehaviourScheduler, ScheduleStrategy};
 use super::{get_id, Behaviour, BehaviourId, ComplexBehaviour, Context, IntoBehaviour};
 
 pub trait SequentialBehaviour {
-    type Message;
+    type Event;
 
-    type ChildMessage;
+    type ChildEvent;
 
-    fn initial_behaviours(&self) -> SequentialBehaviourQueue<Self::ChildMessage>;
+    fn initial_behaviours(&self) -> SequentialBehaviourQueue<Self::ChildEvent>;
 
     complex_behaviour_methods!();
 }
 
-pub struct SequentialBehaviourQueue<M> {
-    queue: BehaviourQueue<M>,
+pub struct SequentialBehaviourQueue<E> {
+    queue: BehaviourQueue<E>,
 }
 
-impl<M: 'static> Default for SequentialBehaviourQueue<M> {
+impl<E: 'static> Default for SequentialBehaviourQueue<E> {
     fn default() -> Self {
         Self {
             queue: BehaviourQueue::new(),
@@ -26,39 +26,36 @@ impl<M: 'static> Default for SequentialBehaviourQueue<M> {
     }
 }
 
-impl<M: 'static> SequentialBehaviourQueue<M> {
+impl<E: 'static> SequentialBehaviourQueue<E> {
     pub fn new() -> Self {
         Self::default()
     }
 }
 
-impl<M: 'static> SequentialBehaviourQueue<M> {
-    pub fn add_behaviour<K>(
-        &mut self,
-        behaviour: impl IntoBehaviour<K, Message = M>,
-    ) -> BehaviourId {
+impl<E: 'static> SequentialBehaviourQueue<E> {
+    pub fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Event = E>) -> BehaviourId {
         let behaviour = behaviour.into_behaviour();
         let id = behaviour.id();
         self.schedule(behaviour, ScheduleStrategy::End);
         id
     }
 
-    pub fn with_behaviour<K>(mut self, behaviour: impl IntoBehaviour<K, Message = M>) -> Self {
+    pub fn with_behaviour<K>(mut self, behaviour: impl IntoBehaviour<K, Event = E>) -> Self {
         self.add_behaviour(behaviour);
         self
     }
 }
 
-impl<M: 'static> BehaviourScheduler<M> for SequentialBehaviourQueue<M> {
-    fn next(&mut self) -> Option<Box<dyn Behaviour<Message = M>>> {
+impl<E: 'static> BehaviourScheduler<E> for SequentialBehaviourQueue<E> {
+    fn next(&mut self) -> Option<Box<dyn Behaviour<Event = E>>> {
         self.queue.pop()
     }
 
-    fn schedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>, strategy: ScheduleStrategy) {
+    fn schedule(&mut self, behaviour: Box<dyn Behaviour<Event = E>>, strategy: ScheduleStrategy) {
         self.queue.push(behaviour, strategy);
     }
 
-    fn reschedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>) {
+    fn reschedule(&mut self, behaviour: Box<dyn Behaviour<Event = E>>) {
         self.schedule(behaviour, ScheduleStrategy::Next);
     }
 
@@ -77,12 +74,12 @@ impl<M: 'static> BehaviourScheduler<M> for SequentialBehaviourQueue<M> {
 
 struct SequentialBehaviourImpl<S: SequentialBehaviour>(S);
 
-impl<S, M: 'static, CM: 'static> Behaviour
-    for ComplexBehaviour<SequentialBehaviourImpl<S>, SequentialBehaviourQueue<CM>>
+impl<S, E: 'static, CE: 'static> Behaviour
+    for ComplexBehaviour<SequentialBehaviourImpl<S>, SequentialBehaviourQueue<CE>>
 where
-    S: SequentialBehaviour<Message = M, ChildMessage = CM> + 'static,
+    S: SequentialBehaviour<Event = E, ChildEvent = CE> + 'static,
 {
-    type Message = M;
+    type Event = E;
 
     fn id(&self) -> BehaviourId {
         self.id
@@ -94,13 +91,13 @@ where
 #[doc(hidden)]
 pub struct Sequential;
 
-impl<T, M: 'static> IntoBehaviour<Sequential> for T
+impl<T, E: 'static> IntoBehaviour<Sequential> for T
 where
-    T: SequentialBehaviour<Message = M> + 'static,
+    T: SequentialBehaviour<Event = E> + 'static,
 {
-    type Message = M;
+    type Event = E;
 
-    fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>> {
+    fn into_behaviour(self) -> Box<dyn Behaviour<Event = Self::Event>> {
         let queue = self.initial_behaviours();
         Box::new(ComplexBehaviour {
             id: get_id(),

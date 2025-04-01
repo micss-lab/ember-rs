@@ -4,10 +4,10 @@ use alloc::vec::Vec;
 use crate::behaviour::complex::queue::ScheduleStrategy;
 use crate::behaviour::{BehaviourId, BehaviourVec, IntoBehaviour};
 
-pub struct Context<M> {
+pub struct Context<E> {
     pub(crate) container: Option<ContainerContext>,
     pub(crate) agent: Option<AgentContext>,
-    pub(crate) local: LocalContext<M>,
+    pub(crate) local: LocalContext<E>,
 }
 
 #[derive(Default)]
@@ -20,17 +20,17 @@ pub(crate) struct AgentContext {
     pub(crate) should_remove: bool,
 }
 
-pub(crate) struct LocalContext<M> {
-    pub(crate) messages: Vec<M>,
-    pub(crate) new_behaviours: Option<BTreeMap<ScheduleStrategy, BehaviourVec<M>>>,
+pub(crate) struct LocalContext<E> {
+    pub(crate) events: Vec<E>,
+    pub(crate) new_behaviours: Option<BTreeMap<ScheduleStrategy, BehaviourVec<E>>>,
     pub(crate) removed_behaviours: Vec<BehaviourId>,
     pub(crate) should_block: bool,
 }
 
-impl<M> Default for LocalContext<M> {
+impl<E> Default for LocalContext<E> {
     fn default() -> Self {
         Self {
-            messages: Vec::with_capacity(0),
+            events: Vec::with_capacity(0),
             new_behaviours: None,
             removed_behaviours: Vec::with_capacity(0),
             should_block: false,
@@ -38,13 +38,13 @@ impl<M> Default for LocalContext<M> {
     }
 }
 
-impl<M: 'static> Context<M> {
+impl<E: 'static> Context<E> {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn message_parent(&mut self, message: M) {
-        self.local.messages.push(message);
+    pub fn emit_event(&mut self, event: E) {
+        self.local.events.push(event);
     }
 
     pub fn stop_container(&mut self) {
@@ -65,7 +65,7 @@ impl<M: 'static> Context<M> {
 
     fn insert_behaviour<K>(
         &mut self,
-        behaviour: impl IntoBehaviour<K, Message = M>,
+        behaviour: impl IntoBehaviour<K, Event = E>,
         strategy: ScheduleStrategy,
     ) -> BehaviourId {
         let behaviour = behaviour.into_behaviour();
@@ -81,14 +81,14 @@ impl<M: 'static> Context<M> {
 
     pub fn insert_next_behaviour<K>(
         &mut self,
-        behaviour: impl IntoBehaviour<K, Message = M>,
+        behaviour: impl IntoBehaviour<K, Event = E>,
     ) -> BehaviourId {
         self.insert_behaviour(behaviour, ScheduleStrategy::Next)
     }
 
     pub fn append_behaviour<K>(
         &mut self,
-        behaviour: impl IntoBehaviour<K, Message = M>,
+        behaviour: impl IntoBehaviour<K, Event = E>,
     ) -> BehaviourId {
         self.insert_behaviour(behaviour, ScheduleStrategy::End)
     }
@@ -98,14 +98,14 @@ impl<M: 'static> Context<M> {
     }
 }
 
-impl<M> Context<M> {
-    pub(crate) fn merge<M2>(
+impl<E> Context<E> {
+    pub(crate) fn merge<E2>(
         &mut self,
         Context {
             container,
             agent,
             local: _,
-        }: Context<M2>,
+        }: Context<E2>,
     ) {
         if let Some(container) = container {
             self.container
@@ -138,7 +138,7 @@ impl AgentContext {
     pub(crate) fn merge(&mut self, _other: Self) {}
 }
 
-impl<M> Default for Context<M> {
+impl<E> Default for Context<E> {
     fn default() -> Self {
         Self {
             container: None,

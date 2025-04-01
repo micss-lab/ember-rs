@@ -4,11 +4,11 @@ use super::{get_id, Behaviour, BehaviourId, Context, IntoBehaviour};
 use crate::util::time::{from_std_duration, Duration, Instant};
 
 pub trait TickerBehaviour {
-    type Message;
+    type Event;
 
     fn interval(&self) -> core::time::Duration;
 
-    fn action(&mut self, ctx: &mut Context<Self::Message>);
+    fn action(&mut self, ctx: &mut Context<Self::Event>);
 
     fn is_finished(&self) -> bool;
 }
@@ -20,17 +20,17 @@ struct TickerBehaviourImpl<T: TickerBehaviour> {
     last_tick: Option<Instant>,
 }
 
-impl<M: 'static, T> Behaviour for TickerBehaviourImpl<T>
+impl<E: 'static, T> Behaviour for TickerBehaviourImpl<T>
 where
-    T: TickerBehaviour<Message = M> + 'static,
+    T: TickerBehaviour<Event = E> + 'static,
 {
-    type Message = M;
+    type Event = E;
 
     fn id(&self) -> BehaviourId {
         self.id
     }
 
-    fn action(&mut self, ctx: &mut Context<Self::Message>) -> bool {
+    fn action(&mut self, ctx: &mut Context<Self::Event>) -> bool {
         if self
             .last_tick
             .map(|l| Instant::now() - l < self.interval)
@@ -48,13 +48,13 @@ where
 #[doc(hidden)]
 pub struct Ticker;
 
-impl<T, M: 'static> IntoBehaviour<Ticker> for T
+impl<T, E: 'static> IntoBehaviour<Ticker> for T
 where
-    T: TickerBehaviour<Message = M> + 'static,
+    T: TickerBehaviour<Event = E> + 'static,
 {
-    type Message = M;
+    type Event = E;
 
-    fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>> {
+    fn into_behaviour(self) -> Box<dyn Behaviour<Event = Self::Event>> {
         let interval = self.interval();
         Box::new(TickerBehaviourImpl {
             id: get_id(),

@@ -7,12 +7,12 @@ use crate::behaviour::{BehaviourId, IntoBehaviour};
 use crate::container::ContainerAgent;
 use crate::context::{ContainerContext, Context};
 
-pub struct Agent<M> {
+pub struct Agent<E> {
     pub(crate) name: String,
-    behaviours: ParallelBehaviourQueue<M>,
+    behaviours: ParallelBehaviourQueue<E>,
 }
 
-impl<M: 'static> Agent<M> {
+impl<E: 'static> Agent<E> {
     pub fn new(name: impl ToString) -> Self {
         Self {
             name: name.to_string(),
@@ -21,16 +21,13 @@ impl<M: 'static> Agent<M> {
     }
 }
 
-impl<M: 'static> Agent<M> {
-    pub fn with_behaviour<K>(mut self, behaviour: impl IntoBehaviour<K, Message = M>) -> Self {
+impl<E: 'static> Agent<E> {
+    pub fn with_behaviour<K>(mut self, behaviour: impl IntoBehaviour<K, Event = E>) -> Self {
         self.add_behaviour(behaviour);
         self
     }
 
-    pub fn add_behaviour<K>(
-        &mut self,
-        behaviour: impl IntoBehaviour<K, Message = M>,
-    ) -> BehaviourId {
+    pub fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Event = E>) -> BehaviourId {
         let behaviour = behaviour.into_behaviour();
         let id = behaviour.id();
         self.behaviours.schedule(behaviour, ScheduleStrategy::End);
@@ -38,7 +35,7 @@ impl<M: 'static> Agent<M> {
     }
 }
 
-impl<M: 'static> ContainerAgent for Agent<M> {
+impl<E: 'static> ContainerAgent for Agent<E> {
     fn update(&mut self, ctx: &mut ContainerContext) -> bool {
         let mut context = Context::new();
         self.behaviours.action(&mut context);
