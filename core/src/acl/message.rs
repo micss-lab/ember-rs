@@ -17,14 +17,14 @@ type Ontology = String;
 type Protocol = String;
 
 #[derive(Debug, Clone, PartialEq)]
-pub(crate) struct Message {
-    performative: Performative,
-    sender: Option<Aid>,
-    receiver: Receiver,
-    reply_to: Option<Aid>,
-    content: Content,
+pub struct Message {
+    pub performative: Performative,
+    pub sender: Option<Aid>,
+    pub receiver: Receiver,
+    pub reply_to: Option<Aid>,
+    pub ontology: Option<Ontology>,
+    pub content: Content,
     // TODO: Implement these.
-    // ontology: Option<Ontology>,
     // protocol: Option<Protocol>,
     // conversation_id: Option<String>,
     // reply_with: Option<String>,
@@ -34,12 +34,12 @@ pub(crate) struct Message {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct MessageEnvelope {
-    to: Vec<Aid>,
-    from: Option<Aid>,
-    date: chrono::DateTime<chrono::FixedOffset>,
-    acl_representation: AclRepresentation,
-    parameters: BTreeMap<String, bstr::BString>,
-    message: bstr::BString,
+    pub(crate) to: Vec<Aid>,
+    pub(crate) from: Option<Aid>,
+    pub(crate) date: chrono::DateTime<chrono::FixedOffset>,
+    pub(crate) acl_representation: AclRepresentation,
+    pub(crate) parameters: BTreeMap<String, bstr::BString>,
+    pub(crate) message: bstr::BString,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,7 +49,7 @@ enum Receiver {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Performative {
+pub enum Performative {
     AcceptProposal,
     Agree,
     Cancel,
@@ -76,7 +76,7 @@ enum Performative {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-enum Content {
+pub enum Content {
     Sl(sl::Content),
     Other {
         kind: Option<OtherLanguage>,
@@ -85,13 +85,13 @@ enum Content {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum OtherLanguage {
+pub enum OtherLanguage {
     Ccl,
     Kif,
     Rdf,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum AclRepresentation {
+pub enum AclRepresentation {
     BitEfficient,
 }
