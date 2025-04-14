@@ -2,6 +2,7 @@ use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 
+use crate::adt::Adt;
 use crate::agent::{Agent, AmsAgent};
 use crate::context::ContainerContext;
 use crate::util::sync::AtomicBool;
@@ -20,6 +21,7 @@ mod kind {
     use alloc::boxed::Box;
     use alloc::collections::VecDeque;
 
+    use crate::adt::Adt;
     use crate::agent::AmsAgent;
     use crate::context::ContainerContext;
 
@@ -27,10 +29,12 @@ mod kind {
 
     /// The container is a main container and can contain sub-containers.
     pub struct Main {
-        /// Ams agent required for for a main container.
+        /// Ams agent managing this and all sub-cotainers.
         pub(super) ams: AmsAgent,
         /// Sub-containers managed by this main container.
         pub(super) containers: VecDeque<Container<Sub>>,
+        /// Register of agents running on this platform.
+        pub(super) ladt: Adt,
     }
     /// The container is a sub-container, thus cannot contain more sub-containers.
     pub(super) struct Sub;
@@ -49,6 +53,7 @@ mod kind {
         fn poll_associated_agents(&mut self) -> Result<(), Box<dyn core::error::Error>> {
             let mut context = ContainerContext::new();
             self.ams.update(&mut context);
+            self.ams.perform_platform_actions(&mut self.ladt);
             Ok(())
         }
 
@@ -108,14 +113,14 @@ where
                 self.agents.push_back(agent);
             }
 
+            // Give associated agents a priority, for example, for agent name
+            // resolution, creation, deletion, etc.
+            self.kind.poll_associated_agents()?;
+
             amount -= 1;
             if amount == 0 {
                 break;
             }
-
-            // Give associated agents a priority, for example, for agent name
-            // resolution, creation, deletion, etc.
-            self.kind.poll_associated_agents()?;
         }
         self.kind.poll_sub_containers()?;
 
@@ -131,6 +136,7 @@ impl Default for Container {
             kind: Main {
                 ams: AmsAgent::new(),
                 containers: VecDeque::default(),
+                ladt: Adt::default(),
             },
         }
     }

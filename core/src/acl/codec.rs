@@ -1,4 +1,6 @@
-use alloc::string::String;
+use alloc::boxed::Box;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
 use super::sl::{AgentAction, Concept, Constant, Content, ContentElement, Number, Predicate, Term};
 
@@ -86,6 +88,18 @@ pub trait DecodeCollection: Sized {
     }
 }
 
+impl DecodeAgentAction for AgentAction {
+    fn from_agent_action(action: AgentAction) -> Result<Self, DecodeError> {
+        Ok(action)
+    }
+}
+
+impl DecodeConcept for Concept {
+    fn from_concept(concept: Concept) -> Result<Self, DecodeError> {
+        Ok(concept)
+    }
+}
+
 impl DecodeConstant for bstr::BString {
     fn from_constant(constant: Constant) -> Result<Self, DecodeError> {
         match constant {
@@ -99,7 +113,9 @@ impl DecodeConstant for String {
     fn from_constant(constant: Constant) -> Result<Self, DecodeError> {
         use bstr::ByteVec;
         let s = bstr::BString::from_constant(constant)?;
-        s.into_string().map_err(|e| DecodeError::Other(e.into()))
+        Vec::from(s)
+            .into_string()
+            .map_err(|e| DecodeError::Other(e.to_string().into()))
     }
 }
 
