@@ -1,8 +1,12 @@
+pub use filter::MessageFilter;
+
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
 
 use super::sl;
+
+mod filter;
 
 type Aid = String;
 
