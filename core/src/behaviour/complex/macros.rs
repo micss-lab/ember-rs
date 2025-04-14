@@ -13,7 +13,7 @@ macro_rules! complex_behaviour_methods {
 macro_rules! complex_action_impl {
     () => {
         fn action(&mut self, ctx: &mut Context<Self::Event>) -> bool {
-            let mut context = Context::new();
+            let mut context = Context::from_upper(&mut *ctx);
 
             // 1. Execute next scheduled behaviour.
             self.queue.action(&mut context);

@@ -9,6 +9,7 @@ pub use self::agent::Agent;
 pub use self::container::Container;
 
 mod acl;
+mod adt;
 mod agent;
 pub mod behaviour;
 mod container;
