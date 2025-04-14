@@ -1,8 +1,11 @@
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
+use alloc::vec;
 use alloc::vec::Vec;
 
-use super::sl::{AgentAction, Concept, Constant, Content, ContentElement, Number, Predicate, Term};
+use super::sl::{
+    AgentAction, Concept, Constant, Content, ContentElement, Number, Predicate, Seq, Set, Term,
+};
 
 #[derive(Debug)]
 pub enum DecodeError {
@@ -14,7 +17,9 @@ pub enum DecodeError {
     Other(Box<dyn core::error::Error>),
 }
 
-pub trait DecodeAgentAction: Sized {
+pub trait AgentActionCodec: Sized {
+    // From
+
     fn from_agent_action(action: AgentAction) -> Result<Self, DecodeError>;
 
     fn from_term(term: Term) -> Result<Self, DecodeError> {
@@ -34,9 +39,23 @@ pub trait DecodeAgentAction: Sized {
             Predicate(_) => Err(DecodeError::InvalidType),
         }
     }
+
+    // Into
+
+    fn into_agent_action(self) -> AgentAction;
+
+    fn into_content_element(self) -> ContentElement {
+        ContentElement::AgentAction(self.into_agent_action())
+    }
+
+    fn into_content(self) -> Content {
+        Content(vec![self.into_content_element()])
+    }
 }
 
-pub trait DecodePredicate: Sized {
+pub trait PredicateCodec: Sized {
+    // From
+
     fn from_predicate(predicate: Predicate) -> Result<Self, DecodeError>;
 
     fn from_content(content: Content) -> Result<Self, DecodeError> {
@@ -48,9 +67,23 @@ pub trait DecodePredicate: Sized {
             ContentElement::AgentAction(_) => Err(DecodeError::InvalidType),
         }
     }
+
+    // Into
+
+    fn into_predicate(self) -> Predicate;
+
+    fn into_content_element(self) -> ContentElement {
+        ContentElement::Predicate(self.into_predicate())
+    }
+
+    fn into_content(self) -> Content {
+        Content(vec![self.into_content_element()])
+    }
 }
 
-pub trait DecodeConcept: Sized {
+pub trait ConceptCodec: Sized {
+    // From
+
     fn from_concept(concept: Concept) -> Result<Self, DecodeError>;
 
     fn from_term(term: Term) -> Result<Self, DecodeError> {
@@ -59,9 +92,19 @@ pub trait DecodeConcept: Sized {
             _ => Err(DecodeError::InvalidType),
         }
     }
+
+    // Into
+
+    fn into_concept(self) -> Concept;
+
+    fn into_term(self) -> Term {
+        Term::Concept(self.into_concept())
+    }
 }
 
-pub trait DecodeConstant: Sized {
+pub trait ConstantCodec: Sized {
+    // From
+
     fn from_constant(constant: Constant) -> Result<Self, DecodeError>;
 
     fn from_term(term: Term) -> Result<Self, DecodeError> {
@@ -70,46 +113,80 @@ pub trait DecodeConstant: Sized {
             _ => Err(DecodeError::InvalidType),
         }
     }
+
+    // Into
+
+    fn into_constant(self) -> Constant;
+
+    fn into_term(self) -> Term {
+        Term::Constant(self.into_constant())
+    }
 }
 
-enum CollectionKind {
+pub enum CollectionKind {
     Set,
     Seq,
 }
-pub trait DecodeCollection: Sized {
+pub trait CollectionCodec: Sized {
+    // From
+
     fn from_collection(items: &[Term], kind: CollectionKind) -> Result<Self, DecodeError>;
 
     fn from_term(term: Term) -> Result<Self, DecodeError> {
         match term {
-            Term::Set(s) => Self::from_collection(&*s, CollectionKind::Set),
-            Term::Sequence(s) => Self::from_collection(&*s, CollectionKind::Seq),
+            Term::Set(s) => Self::from_collection(&s, CollectionKind::Set),
+            Term::Sequence(s) => Self::from_collection(&s, CollectionKind::Seq),
             _ => Err(DecodeError::InvalidType),
+        }
+    }
+
+    // Into
+
+    fn into_collection(self) -> (CollectionKind, impl IntoIterator<Item = Term>);
+
+    fn into_term(self) -> Term {
+        let (kind, iter) = self.into_collection();
+        match kind {
+            CollectionKind::Set => Term::Set(Set::from_iter(iter)),
+            CollectionKind::Seq => Term::Sequence(Seq::from_iter(iter)),
         }
     }
 }
 
-impl DecodeAgentAction for AgentAction {
+impl AgentActionCodec for AgentAction {
     fn from_agent_action(action: AgentAction) -> Result<Self, DecodeError> {
         Ok(action)
     }
-}
 
-impl DecodeConcept for Concept {
-    fn from_concept(concept: Concept) -> Result<Self, DecodeError> {
-        Ok(concept)
+    fn into_agent_action(self) -> AgentAction {
+        self
     }
 }
 
-impl DecodeConstant for bstr::BString {
+impl ConceptCodec for Concept {
+    fn from_concept(concept: Concept) -> Result<Self, DecodeError> {
+        Ok(concept)
+    }
+
+    fn into_concept(self) -> Concept {
+        self
+    }
+}
+
+impl ConstantCodec for bstr::BString {
     fn from_constant(constant: Constant) -> Result<Self, DecodeError> {
         match constant {
             Constant::String(s) => Ok(s),
             _ => Err(DecodeError::InvalidType),
         }
     }
+
+    fn into_constant(self) -> Constant {
+        Constant::String(self)
+    }
 }
 
-impl DecodeConstant for String {
+impl ConstantCodec for String {
     fn from_constant(constant: Constant) -> Result<Self, DecodeError> {
         use bstr::ByteVec;
         let s = bstr::BString::from_constant(constant)?;
@@ -117,22 +194,34 @@ impl DecodeConstant for String {
             .into_string()
             .map_err(|e| DecodeError::Other(e.to_string().into()))
     }
+
+    fn into_constant(self) -> Constant {
+        Constant::String(self.into())
+    }
 }
 
-impl DecodeConstant for i32 {
+impl ConstantCodec for i32 {
     fn from_constant(constant: Constant) -> Result<Self, DecodeError> {
         match constant {
             Constant::Number(Number::Int(i)) => Ok(i),
             _ => Err(DecodeError::InvalidType),
         }
     }
+
+    fn into_constant(self) -> Constant {
+        Constant::Number(Number::Int(self))
+    }
 }
 
-impl DecodeConstant for f32 {
+impl ConstantCodec for f32 {
     fn from_constant(constant: Constant) -> Result<Self, DecodeError> {
         match constant {
             Constant::Number(Number::Float(f)) => Ok(f),
             _ => Err(DecodeError::InvalidType),
         }
+    }
+
+    fn into_constant(self) -> Constant {
+        Constant::Number(Number::Float(self))
     }
 }
