@@ -75,9 +75,7 @@ impl<E: 'static> AgentLike for Agent<E> {
         let mut context = Context::new(Vec::<Message>::with_capacity(0));
         self.behaviours.action(&mut context);
 
-        if let Some(container_ctx) = context.container.take() {
-            ctx.merge(container_ctx);
-        }
+        ctx.merge(context.container);
 
         context.agent.should_remove
     }

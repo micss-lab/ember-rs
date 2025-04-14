@@ -7,7 +7,7 @@ use crate::adt::Adt;
 use crate::behaviour::complex::queue::BehaviourScheduler;
 use crate::behaviour::parallel::{FinishStrategy, ParallelBehaviourQueue};
 use crate::behaviour::{CyclicBehaviour, OneShotBehaviour};
-use crate::container::{AgentLike, RegisterAgentError};
+use crate::container::AgentLike;
 use crate::context::{ContainerContext, Context};
 use crate::fipa::{ActionKind, AmsAgentDescription, ManagementOntology};
 

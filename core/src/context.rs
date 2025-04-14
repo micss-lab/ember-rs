@@ -9,7 +9,7 @@ use crate::behaviour::{BehaviourId, BehaviourVec, IntoBehaviour};
 mod messsage_store;
 
 pub struct Context<E> {
-    pub(crate) container: Option<ContainerContext>,
+    pub(crate) container: ContainerContext,
     pub(crate) agent: AgentContext,
     pub(crate) local: LocalContext<E>,
 }
@@ -17,13 +17,13 @@ pub struct Context<E> {
 #[derive(Default)]
 pub(crate) struct ContainerContext {
     pub(crate) should_stop: bool,
+    pub(crate) message_outbox: Vec<MessageEnvelope>,
 }
 
 #[derive(Default)]
 pub(crate) struct AgentContext {
     pub(crate) should_remove: bool,
     pub(crate) message_inbox: MessageStore,
-    pub(crate) message_to_send: Vec<MessageEnvelope>,
 }
 
 pub(crate) struct LocalContext<E> {
@@ -61,9 +61,7 @@ impl<E: 'static> Context<E> {
     }
 
     pub fn stop_container(&mut self) {
-        self.container
-            .get_or_insert_with(ContainerContext::new)
-            .should_stop = true;
+        self.container.should_stop = true;
     }
 
     pub fn remove_agent(&mut self) {
@@ -111,6 +109,10 @@ impl<E: 'static> Context<E> {
     pub fn receive_message(&mut self, filter: Option<&MessageFilter>) -> Option<Message> {
         self.agent.message_inbox.find_and_take(filter)
     }
+
+    pub fn send_message(&mut self, message: MessageEnvelope) {
+        self.container.message_outbox.push(message)
+    }
 }
 
 impl<E> Context<E> {
@@ -122,11 +124,7 @@ impl<E> Context<E> {
             local: _,
         }: Context<E2>,
     ) {
-        if let Some(container) = container {
-            self.container
-                .get_or_insert_with(ContainerContext::new)
-                .merge(container);
-        }
+        self.container.merge(container);
         self.agent.merge(agent);
     }
 }
@@ -136,8 +134,19 @@ impl ContainerContext {
         Self::default()
     }
 
-    pub(crate) fn merge(&mut self, Self { should_stop }: Self) {
+    pub(crate) fn merge(
+        &mut self,
+        Self {
+            should_stop,
+            message_outbox,
+        }: Self,
+    ) {
         self.should_stop |= should_stop;
+        debug_assert!(
+            self.message_outbox.is_empty(),
+            "container level context should not have any messages in the outbox"
+        );
+        self.message_outbox = message_outbox;
     }
 }
 
@@ -147,7 +156,6 @@ impl AgentContext {
         Self {
             should_remove: false,
             message_inbox: messages,
-            message_to_send: Vec::new(),
         }
     }
 
@@ -158,14 +166,13 @@ impl AgentContext {
             "message inboxe should be passed down fully"
         );
         self.message_inbox = other.message_inbox;
-        self.message_to_send.extend(other.message_to_send);
     }
 }
 
 impl<E> Default for Context<E> {
     fn default() -> Self {
         Self {
-            container: None,
+            container: ContainerContext::default(),
             agent: AgentContext::default(),
             local: LocalContext::default(),
         }

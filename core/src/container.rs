@@ -105,6 +105,11 @@ where
 
             let finished = agent.update(&mut context);
 
+            // Handle all messages the agent wants to send.
+            for _message in context.message_outbox.into_iter() {
+                todo!()
+            }
+
             if context.should_stop {
                 return Ok(true);
             }

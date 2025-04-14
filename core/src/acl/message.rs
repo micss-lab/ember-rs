@@ -1,20 +1,22 @@
+use chrono::{DateTime, Utc};
 pub use filter::MessageFilter;
 
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
+use alloc::vec;
 use alloc::vec::Vec;
+
+use crate::agent::Aid;
 
 use super::sl;
 
 mod filter;
 
-type Aid = String;
-
-type Encoding = String;
+// type Encoding = String;
 
 type Ontology = String;
 
-type Protocol = String;
+// type Protocol = String;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Message {
@@ -32,18 +34,31 @@ pub struct Message {
     // reply_by: Option<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct MessageEnvelope {
-    pub(crate) to: Vec<Aid>,
-    pub(crate) from: Option<Aid>,
-    pub(crate) date: chrono::DateTime<chrono::FixedOffset>,
-    pub(crate) acl_representation: AclRepresentation,
-    pub(crate) parameters: BTreeMap<String, bstr::BString>,
-    pub(crate) message: bstr::BString,
+#[derive(Debug, Clone, PartialEq)]
+pub struct MessageEnvelope {
+    pub to: Vec<Aid>,
+    pub from: Option<Aid>,
+    pub date: chrono::DateTime<chrono::FixedOffset>,
+    pub acl_representation: AclRepresentation,
+    pub parameters: BTreeMap<String, bstr::BString>,
+    pub message: MessageKind,
+}
+
+impl MessageEnvelope {
+    pub fn new(to: Aid, message: Message) -> Self {
+        Self {
+            to: vec![to],
+            from: None,
+            date: DateTime::<Utc>::MIN_UTC.into(),
+            acl_representation: AclRepresentation::BitEfficient,
+            parameters: BTreeMap::new(),
+            message: MessageKind::Structured(message),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum Receiver {
+pub enum Receiver {
     Single(Aid),
     Multiple(BTreeSet<Aid>),
 }
@@ -82,6 +97,13 @@ pub enum Content {
         kind: Option<OtherLanguage>,
         content: String,
     },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum MessageKind {
+    Structured(Message),
+    // TODO: Support this.
+    // Bytes(bstr::BString),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

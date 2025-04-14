@@ -120,6 +120,15 @@ impl<C> Deref for Collection<C> {
     }
 }
 
+impl<C> FromIterator<Term> for Collection<C> {
+    fn from_iter<T: IntoIterator<Item = Term>>(iter: T) -> Self {
+        Self {
+            items: iter.into_iter().collect(),
+            _marker: PhantomData,
+        }
+    }
+}
+
 mod parser {
     pub(super) use self::input::BStr;
 
