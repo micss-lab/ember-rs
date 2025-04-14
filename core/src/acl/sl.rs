@@ -25,13 +25,17 @@ pub enum ContentElement {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Concept {
+    /// Type defining the concept.
     pub symbol: bstr::BString,
+    /// Parameters belonging to the concept.
     pub parameters: ConceptParameters,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct AgentAction {
+    /// Agent performing the action.
     pub agent: Term,
+    /// The action to be performed.
     pub action: Term,
 }
 
@@ -303,10 +307,10 @@ mod parser {
 
             // TODO: Collect the items.
 
-            rule sequence() -> Collection<SeqLike>
+            rule sequence() -> Seq
                 = lbrace() _ "sequence" t:(t:term() _ { t })* _ rbrace() { Collection { items: t, _marker: PhantomData } }
 
-            rule set() -> Collection<SetLike>
+            rule set() -> Set
                 = lbrace() _ "set" t:(t:term() _ { t })* _ rbrace() { Collection { items: t, _marker: PhantomData } }
 
             // ====================
