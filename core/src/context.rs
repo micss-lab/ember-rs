@@ -18,12 +18,12 @@ pub struct Context<E> {
 pub(crate) struct ContainerContext {
     pub(crate) should_stop: bool,
     pub(crate) message_outbox: Vec<MessageEnvelope>,
+    pub(crate) message_inbox: MessageStore,
 }
 
 #[derive(Default)]
 pub(crate) struct AgentContext {
     pub(crate) should_remove: bool,
-    pub(crate) message_inbox: MessageStore,
 }
 
 pub(crate) struct LocalContext<E> {
@@ -45,15 +45,15 @@ impl<E> Default for LocalContext<E> {
 }
 
 impl<E: 'static> Context<E> {
-    pub(crate) fn new(messages: impl Into<MessageStore>) -> Self {
+    pub(crate) fn new_using_container(container_ctx: &mut ContainerContext) -> Self {
         Self {
-            agent: AgentContext::new(messages),
+            container: ContainerContext::new(container_ctx.message_inbox.take()),
             ..Default::default()
         }
     }
 
-    pub(crate) fn from_upper<M2>(upper: &mut Context<M2>) -> Self {
-        Self::new(upper.agent.message_inbox.drain_into_new())
+    pub(crate) fn from_upper<E2>(upper: &mut Context<E2>) -> Self {
+        Self::new_using_container(&mut upper.container)
     }
 
     pub fn emit_event(&mut self, event: E) {
@@ -107,11 +107,11 @@ impl<E: 'static> Context<E> {
     }
 
     pub fn receive_message(&mut self, filter: Option<&MessageFilter>) -> Option<Message> {
-        self.agent.message_inbox.find_and_take(filter)
+        self.container.message_inbox.find_and_take(filter)
     }
 
     pub fn send_message(&mut self, message: MessageEnvelope) {
-        self.container.message_outbox.push(message)
+        self.container.send_message(message);
     }
 }
 
@@ -130,8 +130,12 @@ impl<E> Context<E> {
 }
 
 impl ContainerContext {
-    pub(crate) fn new() -> Self {
-        Self::default()
+    pub(crate) fn new(messages: impl Into<MessageStore>) -> Self {
+        let messages = messages.into();
+        Self {
+            message_inbox: messages,
+            ..Default::default()
+        }
     }
 
     pub(crate) fn merge(
@@ -139,6 +143,7 @@ impl ContainerContext {
         Self {
             should_stop,
             message_outbox,
+            message_inbox,
         }: Self,
     ) {
         self.should_stop |= should_stop;
@@ -146,26 +151,22 @@ impl ContainerContext {
             self.message_outbox.is_empty(),
             "container level context should not have any messages in the outbox"
         );
+        debug_assert!(
+            self.message_inbox.is_empty(),
+            "message inbox should have been passed down fully"
+        );
         self.message_outbox = message_outbox;
+        self.message_inbox = message_inbox;
+    }
+
+    pub(crate) fn send_message(&mut self, message: MessageEnvelope) {
+        self.message_outbox.push(message)
     }
 }
 
 impl AgentContext {
-    pub(crate) fn new(messages: impl Into<MessageStore>) -> Self {
-        let messages = messages.into();
-        Self {
-            should_remove: false,
-            message_inbox: messages,
-        }
-    }
-
-    pub(crate) fn merge(&mut self, other: Self) {
-        // NOTE: Messages inboxes should always be passed down completely
-        assert!(
-            self.message_inbox.is_empty(),
-            "message inboxe should be passed down fully"
-        );
-        self.message_inbox = other.message_inbox;
+    fn merge(&mut self, other: Self) {
+        self.should_remove |= other.should_remove;
     }
 }
 

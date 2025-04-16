@@ -63,6 +63,12 @@ pub enum Receiver {
     Multiple(BTreeSet<Aid>),
 }
 
+impl From<Aid> for Receiver {
+    fn from(aid: Aid) -> Self {
+        Self::Single(aid)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Performative {
     AcceptProposal,
@@ -97,6 +103,12 @@ pub enum Content {
         kind: Option<OtherLanguage>,
         content: String,
     },
+}
+
+impl From<sl::Content> for Content {
+    fn from(content: sl::Content) -> Self {
+        Self::Sl(content)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

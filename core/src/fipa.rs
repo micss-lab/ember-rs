@@ -1,4 +1,6 @@
 use alloc::string::String;
+use alloc::vec;
+use alloc::vec::Vec;
 
 use crate::acl::codec::{AgentActionCodec, ConceptCodec, ConstantCodec, DecodeError};
 use crate::acl::message::{Content, Message};
@@ -16,6 +18,7 @@ pub enum ActionKind {
     Register(RegisterAction),
 }
 
+#[derive(Debug)]
 pub enum DecodeAsOntologyError {
     UnexpectedOntology,
     UnexpectedLanguage,
@@ -56,47 +59,50 @@ pub(crate) struct RegisterAction {
     pub(crate) agent: AmsAgentDescription,
 }
 
+struct Register {
+    agent: AmsAgentDescription,
+}
+
+impl ConceptCodec for Register {
+    fn from_concept(concept: Concept) -> Result<Self, DecodeError> {
+        use ConceptParameters::*;
+        if concept.symbol != "register" {
+            return Err(DecodeError::UnknownConcept(concept.symbol));
+        }
+        let agent = match concept.parameters {
+            Positional(mut items) => {
+                if items.len() != 1 {
+                    return Err(DecodeError::InvalidLength(items.len()));
+                }
+                ConceptCodec::from_term(items.remove(0))?
+            }
+            ByName(params) => {
+                let mut result = None;
+                for (key, value) in params {
+                    match key.as_slice() {
+                        b"agent" => result = Some(value),
+                        _ => return Err(DecodeError::UnknownField(key)),
+                    }
+                }
+                match result {
+                    Some(agent) => ConceptCodec::from_term(agent)?,
+                    None => return Err(DecodeError::MissingField("agent")),
+                }
+            }
+        };
+        Ok(Register { agent })
+    }
+
+    fn into_concept(self) -> Concept {
+        Concept {
+            symbol: "register".into(),
+            parameters: ConceptParameters::ByName(vec![("agent".into(), self.agent.into_term())]),
+        }
+    }
+}
+
 impl AgentActionCodec for RegisterAction {
     fn from_agent_action(action: AgentAction) -> Result<Self, DecodeError> {
-        struct Register {
-            agent: AmsAgentDescription,
-        }
-
-        impl ConceptCodec for Register {
-            fn from_concept(concept: Concept) -> Result<Self, DecodeError> {
-                use ConceptParameters::*;
-                if concept.symbol != "register" {
-                    return Err(DecodeError::UnknownConcept(concept.symbol));
-                }
-                let agent = match concept.parameters {
-                    Positional(mut items) => {
-                        if items.len() != 1 {
-                            return Err(DecodeError::InvalidLength(items.len()));
-                        }
-                        ConceptCodec::from_term(items.remove(0))?
-                    }
-                    ByName(params) => {
-                        let mut result = None;
-                        for (key, value) in params {
-                            match key.as_slice() {
-                                b"agent" => result = Some(value),
-                                _ => return Err(DecodeError::UnknownField(key)),
-                            }
-                        }
-                        match result {
-                            Some(agent) => ConceptCodec::from_term(agent)?,
-                            None => return Err(DecodeError::MissingField("agent")),
-                        }
-                    }
-                };
-                Ok(Register { agent })
-            }
-
-            fn into_concept(self) -> Concept {
-                unimplemented!("type only used for decoding")
-            }
-        }
-
         let ams = ConceptCodec::from_term(action.agent)?;
         let agent = {
             let register: Register = ConceptCodec::from_term(action.action)?;
@@ -106,7 +112,10 @@ impl AgentActionCodec for RegisterAction {
     }
 
     fn into_agent_action(self) -> AgentAction {
-        todo!()
+        AgentAction {
+            agent: self.ams.into_term(),
+            action: Register { agent: self.agent }.into_term(),
+        }
     }
 }
 
@@ -139,16 +148,20 @@ impl ConceptCodec for AmsAgentDescription {
                         _ => return Err(DecodeError::UnknownField(key)),
                     }
                 }
-                match result {
-                    Some(name) => Some(ConstantCodec::from_term(name)?),
-                    None => return Err(DecodeError::MissingField("name")),
-                }
+                result.map(ConstantCodec::from_term).transpose()?
             }
         };
         Ok(AmsAgentDescription { name })
     }
 
     fn into_concept(self) -> Concept {
-        todo!()
+        let mut parameters = Vec::new();
+        if let Some(name) = self.name {
+            parameters.push(("name".into(), name.into_term()))
+        }
+        Concept {
+            symbol: "ams-agent-description".into(),
+            parameters: ConceptParameters::ByName(parameters),
+        }
     }
 }

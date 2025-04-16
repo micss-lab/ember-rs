@@ -1,15 +1,14 @@
 use alloc::borrow::Cow;
+use alloc::format;
 use alloc::string::{String, ToString};
-use alloc::vec::Vec;
 
-use uchan::{Receiver, Sender};
-
-use crate::acl::message::{Message, MessageEnvelope};
+use crate::acl::message::{Message, MessageEnvelope, Performative};
 use crate::behaviour::complex::queue::{BehaviourScheduler, ScheduleStrategy};
 use crate::behaviour::parallel::{FinishStrategy, ParallelBehaviourQueue};
 use crate::behaviour::{BehaviourId, IntoBehaviour};
 use crate::container::AgentLike;
 use crate::context::{ContainerContext, Context};
+use crate::fipa::{self, AmsAgentDescription, RegisterAction};
 
 pub(crate) use self::ams::AmsAgent;
 
@@ -28,7 +27,6 @@ enum AgentState {
 
 pub struct Agent<E> {
     pub(crate) name: String,
-    inbox: (Sender<MessageEnvelope>, Receiver<MessageEnvelope>),
     behaviours: ParallelBehaviourQueue<E>,
     state: AgentState,
 }
@@ -37,7 +35,6 @@ impl<E: 'static> Agent<E> {
     pub fn new(name: impl ToString) -> Self {
         Self {
             name: name.to_string(),
-            inbox: uchan::channel(),
             behaviours: ParallelBehaviourQueue::new(FinishStrategy::Never),
             state: AgentState::Initiated,
         }
@@ -60,11 +57,35 @@ impl<E: 'static> Agent<E> {
 
 impl<E: 'static> AgentLike for Agent<E> {
     fn update(&mut self, ctx: &mut ContainerContext) -> bool {
+        use crate::acl::codec::AgentActionCodec;
         use AgentState::*;
+
+        log::trace!("Ticking agent `{}`", self.name);
 
         match self.state {
             Initiated => {
                 // First register the agent with the ams.
+                let ams_aid = Cow::Borrowed("ams@local");
+
+                ctx.send_message(MessageEnvelope::new(
+                    ams_aid.clone(),
+                    Message {
+                        performative: Performative::Request,
+                        sender: None,
+                        receiver: ams_aid.into(),
+                        reply_to: None,
+                        ontology: Some(fipa::ManagementOntology::name().to_string()),
+                        content: RegisterAction {
+                            ams: AmsAgentDescription { name: None },
+                            agent: AmsAgentDescription {
+                                name: Some(format!("{}@local", self.get_name().to_string())),
+                            },
+                        }
+                        .into_content()
+                        .into(),
+                    },
+                ));
+                log::debug!("Sending ams register request.");
                 self.state = Active;
                 return false;
             }
@@ -72,7 +93,7 @@ impl<E: 'static> AgentLike for Agent<E> {
             Suspended => return false,
         }
 
-        let mut context = Context::new(Vec::<Message>::with_capacity(0));
+        let mut context = Context::new_using_container(&mut *ctx);
         self.behaviours.action(&mut context);
 
         ctx.merge(context.container);

@@ -5,11 +5,25 @@ use no_std_framework_examples::setup_example;
 
 setup_example!();
 
-use no_std_framework_core::{Agent, Container};
+use no_std_framework_core::{
+    behaviour::{Context, OneShotBehaviour},
+    Agent, Container,
+};
+
+struct Stopper;
+
+impl OneShotBehaviour for Stopper {
+    type Event = ();
+
+    fn action(&self, ctx: &mut Context<Self::Event>) {
+        log::info!("Stopping agent");
+        ctx.remove_agent();
+    }
+}
 
 fn example() {
     let container = Container::default()
-        .with_agent::<()>(Agent::new("agent-0"))
-        .with_agent::<()>(Agent::new("agent-1"));
+        .with_agent(Agent::<()>::new("agent-0").with_behaviour(Stopper))
+        .with_agent(Agent::<()>::new("agent-1").with_behaviour(Stopper));
     container.start().unwrap();
 }

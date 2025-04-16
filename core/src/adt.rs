@@ -1,18 +1,18 @@
 use alloc::collections::btree_map::BTreeMap;
+use alloc::format;
+use alloc::vec::Vec;
 use core::ops::{Deref, DerefMut};
 
-use uchan::Sender;
-
 use crate::acl::message::MessageEnvelope;
-use crate::agent::Aid;
+use crate::agent::{Aid, AmsAgent};
+use crate::container::AgentLike;
 
 #[derive(Debug, Clone)]
 pub(crate) struct AgentReference {
-    pub(crate) outbox: Sender<MessageEnvelope>,
-    pub(crate) registered: bool,
+    pub(crate) inbox: Vec<MessageEnvelope>,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub(crate) struct Adt(BTreeMap<Aid, AgentReference>);
 
 impl Deref for Adt {
@@ -20,6 +20,15 @@ impl Deref for Adt {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl Adt {
+    pub(super) fn new(ams: &AmsAgent) -> Self {
+        Self(BTreeMap::from([(
+            format!("{}@local", ams.get_name()).into(),
+            AgentReference { inbox: Vec::new() },
+        )]))
     }
 }
 

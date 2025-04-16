@@ -46,6 +46,7 @@ impl<E: 'static> BehaviourQueue<E> {
     }
 
     pub(super) fn pop(&mut self) -> Option<Box<dyn Behaviour<Event = E>>> {
+        let mut amount = self.behaviours.len();
         Some(loop {
             let behaviour = self.behaviours.pop_front()?;
             let id = behaviour.id();
@@ -59,6 +60,12 @@ impl<E: 'static> BehaviourQueue<E> {
             // Check if the behaviour has not been removed yet.
             if self.ids.remove(&id) {
                 break behaviour;
+            }
+
+            amount -= 1;
+            if amount == 0 {
+                // No behaviour is found that can be scheduled.
+                return None;
             }
         })
     }

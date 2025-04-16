@@ -9,14 +9,18 @@ pub(crate) struct MessageStore {
 
 impl MessageStore {
     /// Create a new store from an existing one by moving all the messages.
-    pub(super) fn drain_into_new(&mut self) -> Self {
+    pub(super) fn take(&mut self) -> Self {
         Self {
-            messages: self.messages.drain(..).collect(),
+            messages: core::mem::take(&mut self.messages),
         }
     }
 
     /// Find the first message that matches the filter and remove it from the store.
     pub(super) fn find_and_take(&mut self, filter: Option<&MessageFilter>) -> Option<Message> {
+        log::trace!(
+            "Trying to find a message matching the filter among {} messages",
+            self.messages.len()
+        );
         let filter = filter.map_or_else(|| Cow::Owned(MessageFilter::all()), Cow::Borrowed);
         self.messages
             .iter()

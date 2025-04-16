@@ -2,8 +2,8 @@ use alloc::borrow::Cow;
 use alloc::collections::vec_deque::VecDeque;
 use alloc::vec::Vec;
 
-use crate::acl::message::{Message, MessageFilter, Performative};
-use crate::adt::Adt;
+use crate::acl::message::{Message, MessageEnvelope, MessageFilter, Performative};
+use crate::adt::{Adt, AgentReference};
 use crate::behaviour::complex::queue::BehaviourScheduler;
 use crate::behaviour::parallel::{FinishStrategy, ParallelBehaviourQueue};
 use crate::behaviour::{CyclicBehaviour, OneShotBehaviour};
@@ -21,8 +21,9 @@ pub(crate) struct AmsAgent {
 }
 
 impl AgentLike for AmsAgent {
-    fn update(&mut self, _context: &mut ContainerContext) -> bool {
-        let mut context = Context::new(Vec::<Message>::with_capacity(0));
+    fn update(&mut self, ctx: &mut ContainerContext) -> bool {
+        log::trace!("Ticking ams agent");
+        let mut context = Context::new_using_container(&mut *ctx);
         self.behaviours.action(&mut context);
 
         // Do nothing with the container context for now.
@@ -33,6 +34,9 @@ impl AgentLike for AmsAgent {
         while let Some(event) = context.local.events.pop() {
             self.actions.push_back(event);
         }
+
+        // Store unhandled messages for the next request.
+        ctx.merge(context.container);
 
         false
     }
@@ -76,20 +80,21 @@ impl AmsAgent {
         let aid: Aid = match agent.name {
             Some(name) => Cow::Owned(name),
             None => {
-                log::error!("Cannot register an agent without the name.");
+                log::error!("Cannot register an agent without a name.");
                 return;
             }
         };
-        match adt.entry(aid) {
-            Entry::Vacant(_) => {
-                log::error!("Cannot register an agent that is not local to this platform.");
+        log::trace!("Trying to registering agent `{}`.", aid);
+        match adt.entry(aid.clone()) {
+            Entry::Vacant(entry) => {
+                entry.insert(AgentReference { inbox: Vec::new() });
+                log::info!("Agent `{}` successfully registered.", aid);
             }
-            Entry::Occupied(mut entry) => {
-                let agent = entry.get_mut();
-                if agent.registered {
-                    log::error!("Cannot register agent that has already been registered.");
-                }
-                agent.registered = true;
+            Entry::Occupied(_) => {
+                log::error!(
+                    "Cannot register agent `{}` as it is already registered.",
+                    aid
+                );
             }
         }
     }
@@ -125,12 +130,16 @@ impl CyclicBehaviour for FipaAgentManagementBehaviour {
 
     fn action(&mut self, ctx: &mut Context<Self::Event>) {
         let Some(message) = ctx.receive_message(Some(&self.filter)) else {
+            log::trace!("Blocking agent management behaviour");
             ctx.block_behaviour();
             return;
         };
         let action_kind = match ManagementOntology::decode_message(message) {
             Ok(k) => k,
-            Err(e) => todo!(),
+            Err(e) => {
+                log::error!("Could not decode message: {:?}", e);
+                todo!()
+            }
         };
         ctx.emit_event(action_kind);
     }
