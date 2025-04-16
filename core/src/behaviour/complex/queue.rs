@@ -118,9 +118,11 @@ pub(crate) trait BehaviourScheduler<E: 'static> {
         }
 
         // Remove requested behaviours.
-        ctx.local.removed_behaviours.drain(0..).for_each(|id| {
-            self.remove(id);
-        });
+        core::mem::take(&mut ctx.local.removed_behaviours)
+            .into_iter()
+            .for_each(|id| {
+                self.remove(id);
+            });
 
         if !finished {
             self.reschedule(behaviour);
