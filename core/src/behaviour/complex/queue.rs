@@ -3,13 +3,13 @@ use alloc::collections::{BTreeSet, VecDeque};
 
 use super::{Behaviour, BehaviourId, Context};
 
-pub(super) struct BehaviourQueue<M> {
-    behaviours: VecDeque<Box<dyn Behaviour<Message = M>>>,
+pub(super) struct BehaviourQueue<E> {
+    behaviours: VecDeque<Box<dyn Behaviour<Event = E>>>,
     ids: BTreeSet<BehaviourId>,
     blocked_ids: BTreeSet<BehaviourId>,
 }
 
-impl<M> Default for BehaviourQueue<M> {
+impl<E> Default for BehaviourQueue<E> {
     fn default() -> Self {
         Self {
             behaviours: VecDeque::default(),
@@ -25,14 +25,14 @@ pub(crate) enum ScheduleStrategy {
     End,
 }
 
-impl<M: 'static> BehaviourQueue<M> {
+impl<E: 'static> BehaviourQueue<E> {
     pub(super) fn new() -> Self {
         Self::default()
     }
 
     pub(super) fn push(
         &mut self,
-        behaviour: Box<dyn Behaviour<Message = M>>,
+        behaviour: Box<dyn Behaviour<Event = E>>,
         strategy: ScheduleStrategy,
     ) {
         let present = self.ids.insert(behaviour.id());
@@ -45,7 +45,8 @@ impl<M: 'static> BehaviourQueue<M> {
         }
     }
 
-    pub(super) fn pop(&mut self) -> Option<Box<dyn Behaviour<Message = M>>> {
+    pub(super) fn pop(&mut self) -> Option<Box<dyn Behaviour<Event = E>>> {
+        let mut amount = self.behaviours.len();
         Some(loop {
             let behaviour = self.behaviours.pop_front()?;
             let id = behaviour.id();
@@ -59,6 +60,12 @@ impl<M: 'static> BehaviourQueue<M> {
             // Check if the behaviour has not been removed yet.
             if self.ids.remove(&id) {
                 break behaviour;
+            }
+
+            amount -= 1;
+            if amount == 0 {
+                // No behaviour is found that can be scheduled.
+                return None;
             }
         })
     }
@@ -79,12 +86,12 @@ impl<M: 'static> BehaviourQueue<M> {
     }
 }
 
-pub(crate) trait BehaviourScheduler<M: 'static> {
-    fn next(&mut self) -> Option<Box<dyn Behaviour<Message = M>>>;
+pub(crate) trait BehaviourScheduler<E: 'static> {
+    fn next(&mut self) -> Option<Box<dyn Behaviour<Event = E>>>;
 
-    fn schedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>, strategy: ScheduleStrategy);
+    fn schedule(&mut self, behaviour: Box<dyn Behaviour<Event = E>>, strategy: ScheduleStrategy);
 
-    fn reschedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>);
+    fn reschedule(&mut self, behaviour: Box<dyn Behaviour<Event = E>>);
 
     fn remove(&mut self, id: BehaviourId) -> bool;
 
@@ -92,7 +99,7 @@ pub(crate) trait BehaviourScheduler<M: 'static> {
 
     fn is_finished(&self) -> bool;
 
-    fn action(&mut self, ctx: &mut Context<M>) -> bool {
+    fn action(&mut self, ctx: &mut Context<E>) -> bool {
         let Some(mut behaviour) = self.next() else {
             return self.is_finished();
         };

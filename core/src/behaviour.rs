@@ -11,27 +11,27 @@ use crate::util::sync::AtomicU32;
 pub(crate) mod complex;
 mod simple;
 
-pub(crate) type BehaviourVec<M> = Vec<Box<dyn Behaviour<Message = M>>>;
+pub(crate) type BehaviourVec<E> = Vec<Box<dyn Behaviour<Event = E>>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct BehaviourId(u32);
 
 pub trait Behaviour: 'static {
-    type Message;
+    type Event;
 
     fn id(&self) -> BehaviourId;
 
-    fn action(&mut self, ctx: &mut Context<Self::Message>) -> bool;
+    fn action(&mut self, ctx: &mut Context<Self::Event>) -> bool;
 }
 
 pub trait IntoBehaviour<Kind>
 where
     Self: Sized,
 {
-    type Message;
+    type Event;
 
-    fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>>;
+    fn into_behaviour(self) -> Box<dyn Behaviour<Event = Self::Event>>;
 }
 
 fn get_id() -> BehaviourId {

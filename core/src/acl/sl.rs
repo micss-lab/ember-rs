@@ -1,129 +1,136 @@
-mod parser {
-    use alloc::boxed::Box;
-    use alloc::string::{String, ToString};
-    use alloc::vec;
-    use alloc::vec::Vec;
-    use core::marker::PhantomData;
+use alloc::boxed::Box;
+use alloc::string::{String, ToString};
+use alloc::vec;
+use alloc::vec::Vec;
+use core::marker::PhantomData;
+use core::ops::Deref;
 
-    use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, FixedOffset};
 
-    #[cfg(test)]
-    extern crate std;
+/// List of expressions to form the content of an ACL message.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Content(pub Vec<ContentElement>);
 
-    /// List of expressions to form the content of an ACL message.
+impl Content {
+    pub fn parse(input: impl AsRef<bstr::BStr>) -> Result<Self, String> {
+        parser::sl0_content::content(&parser::BStr::from(input.as_ref())).map_err(|e| e.to_string())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ContentElement {
+    AgentAction(AgentAction),
+    Predicate(Predicate),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Concept {
+    /// Type defining the concept.
+    pub symbol: bstr::BString,
+    /// Parameters belonging to the concept.
+    pub parameters: ConceptParameters,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AgentAction {
+    /// Agent performing the action.
+    pub agent: Term,
+    /// The action to be performed.
+    pub action: Term,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Predicate {
+    Regular {
+        symbol: bstr::BString,
+        terms: Vec<Term>,
+    },
+    Result {
+        lhs: Term,
+        rhs: Term,
+    },
+    Done {
+        action: AgentAction,
+    },
+    Bool(bool),
+}
+
+/// Recursive structure defining the concept of a term.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Term {
+    Constant(Constant),
+    Set(Set),
+    Sequence(Seq),
+    Concept(Concept),
+    Action(Box<AgentAction>),
+}
+
+/// Parameters part of a functional term.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConceptParameters {
+    Positional(Vec<Term>),
+    ByName(Vec<(bstr::BString, Term)>),
+}
+
+/// Numerical, string, and time-related constants.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Constant {
+    Number(Number),
+    String(bstr::BString),
+    Datatime(DateTime<FixedOffset>),
+}
+
+/// Numerical constant.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Number {
+    Int(i32),
+    Float(f32),
+}
+
+pub type Set = Collection<collection::SetLike>;
+pub type Seq = Collection<collection::SeqLike>;
+
+/// General collection type.
+///
+/// Note: A set cannot be stored in a [`BTreeSet`] as it requires the
+/// items to be [`Ord`]. They cannot be as this would require evaluating
+/// the terms before storing them.
+///
+/// [`BTreeSet`]: alloc::collections::btree_set::BTreeSet
+/// [`Ord`]: core::cmp::Ord
+#[derive(Debug, Clone, PartialEq)]
+pub struct Collection<C> {
+    /// Items in the collection.
+    items: Vec<Term>,
+    /// Semantics behind the collection.
+    _marker: PhantomData<C>,
+}
+mod collection {
     #[derive(Debug, Clone, PartialEq)]
-    struct Content(Vec<ContentExpression>);
+    pub struct SetLike;
+    #[derive(Debug, Clone, PartialEq)]
+    pub struct SeqLike;
+}
 
-    impl Content {
-        pub fn parse(input: impl AsRef<bstr::BStr>) -> Result<Self, String> {
-            sl0_content::content(&input::BStr::from(input.as_ref())).map_err(|e| e.to_string())
+impl<C> Deref for Collection<C> {
+    type Target = [Term];
+
+    fn deref(&self) -> &Self::Target {
+        &self.items
+    }
+}
+
+impl<C> FromIterator<Term> for Collection<C> {
+    fn from_iter<T: IntoIterator<Item = Term>>(iter: T) -> Self {
+        Self {
+            items: iter.into_iter().collect(),
+            _marker: PhantomData,
         }
     }
+}
 
-    #[derive(Debug, Clone, PartialEq)]
-    enum ContentExpression {
-        Action(ActionExpression),
-        Proposition(Proposition),
-    }
-
-    #[derive(Debug, Clone, PartialEq)]
-    struct Proposition(Wff);
-
-    /// Well-formed formula.
-    #[derive(Debug, Clone, PartialEq)]
-    enum Wff {
-        Atomic(AtomicFormula),
-        Done { action: ActionExpression },
-    }
-
-    /// General collection type.
-    ///
-    /// Note: A set cannot be stored in a [`BTreeSet`] as it requires the
-    /// items to be [`Ord`]. They cannot be as this would require evaluating
-    /// the terms before storing them.
-    ///
-    /// [`BTreeSet`]: alloc::collections::btree_set::BTreeSet
-    /// [`Ord`]: core::cmp::Ord
-    #[derive(Debug, Clone, PartialEq)]
-    struct Collection<C> {
-        /// Items in the collection.
-        items: Vec<()>,
-        /// Semantics behind the collection.
-        _marker: PhantomData<C>,
-    }
-    #[derive(Debug, Clone, PartialEq)]
-    struct Set;
-    #[derive(Debug, Clone, PartialEq)]
-    struct Sequence;
-
-    /// Numerical constant.
-    #[derive(Debug, Clone, PartialEq)]
-    enum Number {
-        Int(i32),
-        Float(f32),
-    }
-
-    /// Recursive structure defining the concept of a term.
-    #[derive(Debug, Clone, PartialEq)]
-    enum Term {
-        Constant(Constant),
-        Set(Collection<Set>),
-        Sequence(Collection<Sequence>),
-        Functional(FunctionalTerm),
-        Action(Box<ActionExpression>),
-    }
-
-    /// Action (to be) performed by an agent.
-    #[derive(Debug, Clone, PartialEq)]
-    struct ActionExpression {
-        /// Agent performing the action.
-        agent: Term,
-        /// Action being/to be performed.
-        action: Term,
-    }
-
-    /// Indirect reference to an object via a functional relation with other objects.
-    #[derive(Debug, Clone, PartialEq)]
-    struct FunctionalTerm {
-        symbol: bstr::BString,
-        parameters: FunctionalParameters,
-    }
-
-    /// Parameters part of a functional term.
-    #[derive(Debug, Clone, PartialEq)]
-    enum FunctionalParameters {
-        Positional(Vec<Term>),
-        ByName(Vec<(bstr::BString, Term)>),
-    }
-
-    /// Atomic structures forming the building blocks of well-formed formula's.
-    #[derive(Debug, Clone, PartialEq)]
-    enum AtomicFormula {
-        Proposition {
-            symbol: bstr::BString,
-        },
-        /// The result of performing the action or evaluating the term denoted
-        /// by the lhs is equal to the rhs.
-        Result {
-            lhs: Term,
-            rhs: Term,
-        },
-        Predicate {
-            /// Symbol identifying the predicate.
-            symbol: bstr::BString,
-            /// Terms passed to the predicate.
-            terms: Vec<Term>,
-        },
-        Bool(bool),
-    }
-
-    /// Numerical, string, and time-related constants.
-    #[derive(Debug, Clone, PartialEq)]
-    enum Constant {
-        Number(Number),
-        String(bstr::BString),
-        Datatime(DateTime<FixedOffset>),
-    }
+mod parser {
+    pub(super) use self::input::BStr;
 
     mod input {
         pub(crate) struct BStr<'a>(&'a bstr::BStr);
@@ -227,49 +234,51 @@ mod parser {
     }
 
     peg::parser! {
-        grammar sl0_content<'a>() for input::BStr<'a> {
+        pub(super) grammar sl0_content<'a>() for input::BStr<'a> {
             use bstr::ByteSlice;
             use chrono::{DateTime, FixedOffset, Utc};
+
+            use super::super::*;
 
             rule _ = [c if c.is_ascii_whitespace()]?
 
             pub rule content() -> Content
                 = lbrace() _ c:(c:content_expression() _ { c })+ _ rbrace() { Content(c) }
 
-            rule content_expression() -> ContentExpression
-                = a:action_expression() { ContentExpression::Action(a) }
-                / p:proposition() { ContentExpression::Proposition(p) }
+            rule content_expression() -> ContentElement
+                = a:action_expression() { ContentElement::AgentAction(a) }
+                / p:proposition() { ContentElement::Predicate(p) }
 
-            rule proposition() -> Proposition
-                = w:wff() { Proposition(w) }
+            rule proposition() -> Predicate
+                = wff()
 
-            rule action_expression() -> ActionExpression
-                = lbrace() _ "action" _ a:agent() _ t:term() _ rbrace() { ActionExpression { agent: a, action: t } }
+            rule action_expression() -> AgentAction
+                = lbrace() _ "action" _ a:agent() _ t:term() _ rbrace() { AgentAction { agent: a, action: t } }
 
-            rule wff() -> Wff
-                 = a:atomic_formula() { Wff::Atomic(a) }
-                / lbrace() _ "done" _ a:action_expression() _ rbrace() { Wff::Done { action: a } }
+            rule wff() -> Predicate
+                 = atomic_formula()
+                / lbrace() _ "done" _ a:action_expression() _ rbrace() { Predicate::Done { action: a } }
 
-            rule atomic_formula() -> AtomicFormula
-                = s:propostion_symbol() { AtomicFormula::Proposition { symbol: s } }
-                / lbrace() _ "result" _ lhs:term() _ rhs:term() _ rbrace() { AtomicFormula::Result { lhs, rhs } }
-                / lbrace() _ s:predicate_symbol() _ t:(t:term() _ { t })+ _ rbrace() { AtomicFormula::Predicate { symbol: s, terms: t } }
-                / "true" { AtomicFormula::Bool(true) }
-                / "false" { AtomicFormula::Bool(false) }
+            rule atomic_formula() -> Predicate
+                = s:propostion_symbol() { Predicate::Regular { symbol: s, terms: Vec::with_capacity(0) }}
+                / lbrace() _ "result" _ lhs:term() _ rhs:term() _ rbrace() { Predicate::Result { lhs, rhs } }
+                / lbrace() _ s:predicate_symbol() _ t:(t:term() _ { t })+ _ rbrace() { Predicate::  Regular { symbol: s, terms: t } }
+                / "true" { Predicate::Bool(true) }
+                / "false" { Predicate::Bool(false) }
 
             rule term() -> Term
                 = c:constant() { Term::Constant(c) }
                 / s:set() { Term::Set(s) }
                 / s:sequence() { Term::Sequence(s) }
-                / ft:functional_term() { Term::Functional(ft) }
+                / ft:functional_term() { Term::Concept(ft) }
                 / ae:action_expression() { Term::Action(Box::new(ae)) }
 
 
-            rule functional_term() -> FunctionalTerm
+            rule functional_term() -> Concept
                 = lbrace() _ s:function_symbol() _ p:(
-                    t:(t:term() _ { t })* { FunctionalParameters::Positional(t) }
-                    / p:(p:parameter() _ { p })* { FunctionalParameters::ByName(p) }
-                  ) _ rbrace() { FunctionalTerm {symbol: s, parameters: p} }
+                    t:(t:term() _ { t })* { ConceptParameters::Positional(t) }
+                    / p:(p:parameter() _ { p })* { ConceptParameters::ByName(p) }
+                  ) _ rbrace() { Concept {symbol: s, parameters: p} }
 
             rule parameter() -> (bstr::BString, Term)
                 = n:parameter_name() _ v:parameter_value() { (n, v) }
@@ -307,11 +316,11 @@ mod parser {
 
             // TODO: Collect the items.
 
-            rule sequence() -> Collection<Sequence>
-                = lbrace() _ "sequence" (term() _)* _ rbrace() { Collection { items: Vec::new(), _marker: PhantomData } }
+            rule sequence() -> Seq
+                = lbrace() _ "sequence" t:(t:term() _ { t })* _ rbrace() { Collection { items: t, _marker: PhantomData } }
 
-            rule set() -> Collection<Set>
-                = lbrace() _ "set" (term() _)* _ rbrace() { Collection { items: Vec::new(), _marker: PhantomData } }
+            rule set() -> Set
+                = lbrace() _ "set" t:(t:term() _ { t })* _ rbrace() { Collection { items: t, _marker: PhantomData } }
 
             // ====================
             //      Numerical
@@ -372,11 +381,6 @@ mod parser {
             /// Single word that is a valid variable name.
             rule word() -> bstr::BString
                 = s:$([^(0x00..=0x20 | b'(' | b')' | b'#' | b'0'..=b'9' | b':' | b'-' | b'?')][^(0x00..=0x20 | b'(' | b')')]*) {
-                #[cfg(test)]
-                {
-                    use std::dbg;
-                    dbg!("word: {}", s);
-                }
                 s.into()
             }
 
@@ -466,130 +470,140 @@ mod parser {
 
     #[cfg(test)]
     mod tests {
-        use alloc::string::String;
+        extern crate std;
 
-        fn parse(input: &str) -> Result<(), String> {
+        use super::super::Content;
+
+        mod parse_success {
+            use alloc::string::String;
+
             use super::Content;
-            Content::parse(input).map(|_| ())
-        }
 
-        #[test]
-        fn empty_content() {
-            parse("()").unwrap_err();
-        }
+            fn parse(input: &str) -> Result<(), String> {
+                Content::parse(input).map(|_| ())
+            }
 
-        #[test]
-        fn simple_proposition() {
-            parse("(some_proposition)").unwrap();
-        }
+            #[test]
+            fn empty_content() {
+                parse("()").unwrap_err();
+            }
 
-        #[test]
-        fn complex_content_expression() {
-            parse("((action agent1 term1) (predicate term1 term2) (done (action agent2 term2)))")
+            #[test]
+            fn simple_proposition() {
+                parse("(some_proposition)").unwrap();
+            }
+
+            #[test]
+            fn complex_content_expression() {
+                parse(
+                    "((action agent1 term1) (predicate term1 term2) (done (action agent2 term2)))",
+                )
                 .unwrap();
-        }
+            }
 
-        #[test]
-        fn atomic_formulas() {
-            parse("(true)").unwrap();
-            parse("(false)").unwrap();
-            parse("((result term1 term2))").unwrap();
-            parse("((predicate term1 term2 term3))").unwrap();
-        }
+            #[test]
+            fn atomic_formulas() {
+                parse("(true)").unwrap();
+                parse("(false)").unwrap();
+                parse("((result term1 term2))").unwrap();
+                parse("((predicate term1 term2 term3))").unwrap();
+            }
 
-        #[test]
-        fn action_expressions() {
-            parse("((action agent1 term1))").unwrap();
-            parse("((action (function param1 value1) term2))").unwrap();
-        }
+            #[test]
+            fn action_expressions() {
+                parse("((action agent1 term1))").unwrap();
+                parse("((action (function param1 value1) term2))").unwrap();
+            }
 
-        #[test]
-        fn nested_action_expressions() {
-            parse("((action agent1 (action agent2 term2)))").unwrap();
-        }
+            #[test]
+            fn nested_action_expressions() {
+                parse("((action agent1 (action agent2 term2)))").unwrap();
+            }
 
-        #[test]
-        fn done_operator() {
-            parse("((done (action agent1 term1)))").unwrap();
-        }
+            #[test]
+            fn done_operator() {
+                parse("((done (action agent1 term1)))").unwrap();
+            }
 
-        #[test]
-        fn functional_terms() {
-            parse("((function term1 term2))").unwrap();
-            parse("((function param1 value1 param2 value2))").unwrap();
-        }
+            #[test]
+            fn functional_terms() {
+                parse("((function term1 term2))").unwrap();
+                parse("((function param1 value1 param2 value2))").unwrap();
+            }
 
-        #[test]
-        fn mixed_functional_terms() {
-            parse("((function term1 param1 value1 term2))").unwrap();
-        }
+            #[test]
+            fn mixed_functional_terms() {
+                parse("((function term1 param1 value1 term2))").unwrap();
+            }
 
-        #[test]
-        fn complex_nested_structure() {
-            parse(
+            #[test]
+            fn complex_nested_structure() {
+                parse(
                 "((action agent1 (set (sequence 1 2 3) (function param1 (action agent2 term2)))))",
             )
             .unwrap();
-        }
+            }
 
-        #[test]
-        fn multiple_content_expressions() {
-            parse("(proposition1 proposition2 (action agent1 term1) (done (action agent2 term2)))")
+            #[test]
+            fn multiple_content_expressions() {
+                parse("(proposition1 proposition2 (action agent1 term1) (done (action agent2 term2)))")
                 .unwrap();
-        }
+            }
 
-        #[test]
-        fn complex_predicate() {
-            parse(
+            #[test]
+            fn complex_predicate() {
+                parse(
                 "((complex_predicate (function param1 value1) (set 1 2 3) (sequence term1 term2)))",
             )
             .unwrap();
-        }
+            }
 
-        #[test]
-        fn nested_functional_terms() {
-            parse("((outer_function (inner_function1 term1) (inner_function2 param1 value1)))")
-                .unwrap();
-        }
+            #[test]
+            fn nested_functional_terms() {
+                parse("((outer_function (inner_function1 term1) (inner_function2 param1 value1)))")
+                    .unwrap();
+            }
 
-        #[test]
-        fn mixed_term_types() {
-            parse("((action agent1 (set 1 \"string\" 3.14 (sequence term1 term2))))").unwrap();
-        }
+            #[test]
+            fn mixed_term_types() {
+                parse("((action agent1 (set 1 \"string\" 3.14 (sequence term1 term2))))").unwrap();
+            }
 
-        #[test]
-        fn complex_result() {
-            parse("((result (function param1 value1) (set 1 2 3)))").unwrap();
-        }
+            #[test]
+            fn complex_result() {
+                parse("((result (function param1 value1) (set 1 2 3)))").unwrap();
+            }
 
-        #[test]
-        fn nested_done_operators() {
-            parse("((done (done (action agent1 term1))))").unwrap();
-        }
+            #[test]
+            fn nested_done_operators() {
+                parse("((done (done (action agent1 term1))))").unwrap();
+            }
 
-        #[test]
-        fn empty_set_and_sequence() {
-            parse("((action agent1 (set) (sequence)))").unwrap();
-        }
+            #[test]
+            fn empty_set_and_sequence() {
+                parse("((action agent1 (set) (sequence)))").unwrap();
+            }
 
-        #[test]
-        fn complex_parameter_values() {
-            parse("((function param1 (set 1 2 3) param2 (sequence term1 term2)))").unwrap();
-        }
+            #[test]
+            fn complex_parameter_values() {
+                parse("((function param1 (set 1 2 3) param2 (sequence term1 term2)))").unwrap();
+            }
 
-        #[test]
-        fn deeply_nested_structure() {
-            parse("((action agent1 (function param1 (set (sequence 1 2 3) (action agent2 (done (action agent3 term3)))))))").unwrap();
-        }
+            #[test]
+            fn deeply_nested_structure() {
+                parse("((action agent1 (function param1 (set (sequence 1 2 3) (action agent2 (done (action agent3 term3)))))))").unwrap();
+            }
 
-        #[test]
-        fn multiple_nested_predicates() {
-            parse("((pred1 (pred2 term1 term2) (pred3 term3 term4)) (pred4 term5 term6))").unwrap();
-        }
+            #[test]
+            fn multiple_nested_predicates() {
+                parse("((pred1 (pred2 term1 term2) (pred3 term3 term4)) (pred4 term5 term6))")
+                    .unwrap();
+            }
 
-        #[test]
-        fn complex_datetime() {
-            parse("((action agent1 2023-05-17T10:30:00.123+02:00))").unwrap();
+            #[test]
+            fn complex_datetime() {
+                parse("((action agent1 2023-05-17T10:30:00.123+02:00))").unwrap();
+            }
         }
     }
 }

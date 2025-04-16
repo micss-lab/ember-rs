@@ -5,17 +5,17 @@ use super::queue::{BehaviourQueue, BehaviourScheduler, ScheduleStrategy};
 use super::{get_id, Behaviour, BehaviourId, ComplexBehaviour, Context, IntoBehaviour};
 
 pub trait ParallelBehaviour {
-    type Message;
+    type Event;
 
-    type ChildMessage;
+    type ChildEvent;
 
-    fn initial_behaviours(&self) -> ParallelBehaviourQueue<Self::ChildMessage>;
+    fn initial_behaviours(&self) -> ParallelBehaviourQueue<Self::ChildEvent>;
 
     complex_behaviour_methods!();
 }
 
-pub struct ParallelBehaviourQueue<M> {
-    queue: BehaviourQueue<M>,
+pub struct ParallelBehaviourQueue<E> {
+    queue: BehaviourQueue<E>,
     finished: usize,
     strategy: FinishStrategy,
 }
@@ -27,7 +27,7 @@ pub enum FinishStrategy {
     Never,
 }
 
-impl<M: 'static> ParallelBehaviourQueue<M> {
+impl<E: 'static> ParallelBehaviourQueue<E> {
     pub fn new(strategy: FinishStrategy) -> Self {
         Self {
             queue: BehaviourQueue::new(),
@@ -37,33 +37,30 @@ impl<M: 'static> ParallelBehaviourQueue<M> {
     }
 }
 
-impl<M: 'static> ParallelBehaviourQueue<M> {
-    pub fn add_behaviour<K>(
-        &mut self,
-        behaviour: impl IntoBehaviour<K, Message = M>,
-    ) -> BehaviourId {
+impl<E: 'static> ParallelBehaviourQueue<E> {
+    pub fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Event = E>) -> BehaviourId {
         let behaviour = behaviour.into_behaviour();
         let id = behaviour.id();
         self.schedule(behaviour, ScheduleStrategy::End);
         id
     }
 
-    pub fn with_behaviour<K>(mut self, behaviour: impl IntoBehaviour<K, Message = M>) -> Self {
+    pub fn with_behaviour<K>(mut self, behaviour: impl IntoBehaviour<K, Event = E>) -> Self {
         self.add_behaviour(behaviour);
         self
     }
 }
 
-impl<M: 'static> BehaviourScheduler<M> for ParallelBehaviourQueue<M> {
-    fn next(&mut self) -> Option<Box<dyn Behaviour<Message = M>>> {
+impl<E: 'static> BehaviourScheduler<E> for ParallelBehaviourQueue<E> {
+    fn next(&mut self) -> Option<Box<dyn Behaviour<Event = E>>> {
         self.queue.pop()
     }
 
-    fn schedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>, strategy: ScheduleStrategy) {
+    fn schedule(&mut self, behaviour: Box<dyn Behaviour<Event = E>>, strategy: ScheduleStrategy) {
         self.queue.push(behaviour, strategy)
     }
 
-    fn reschedule(&mut self, behaviour: Box<dyn Behaviour<Message = M>>) {
+    fn reschedule(&mut self, behaviour: Box<dyn Behaviour<Event = E>>) {
         self.schedule(behaviour, ScheduleStrategy::End);
     }
 
@@ -87,12 +84,12 @@ impl<M: 'static> BehaviourScheduler<M> for ParallelBehaviourQueue<M> {
 
 struct ParallelBehaviourImpl<P: ParallelBehaviour>(P);
 
-impl<P, M: 'static, CM: 'static> Behaviour
-    for ComplexBehaviour<ParallelBehaviourImpl<P>, ParallelBehaviourQueue<CM>>
+impl<P, E: 'static, CE: 'static> Behaviour
+    for ComplexBehaviour<ParallelBehaviourImpl<P>, ParallelBehaviourQueue<CE>>
 where
-    P: ParallelBehaviour<Message = M, ChildMessage = CM> + 'static,
+    P: ParallelBehaviour<Event = E, ChildEvent = CE> + 'static,
 {
-    type Message = M;
+    type Event = E;
 
     fn id(&self) -> BehaviourId {
         self.id
@@ -104,13 +101,13 @@ where
 #[doc(hidden)]
 pub struct Parallel;
 
-impl<T, M: 'static> IntoBehaviour<Parallel> for T
+impl<T, E: 'static> IntoBehaviour<Parallel> for T
 where
-    T: ParallelBehaviour<Message = M> + 'static,
+    T: ParallelBehaviour<Event = E> + 'static,
 {
-    type Message = M;
+    type Event = E;
 
-    fn into_behaviour(self) -> Box<dyn Behaviour<Message = Self::Message>> {
+    fn into_behaviour(self) -> Box<dyn Behaviour<Event = Self::Event>> {
         let queue = self.initial_behaviours();
         Box::new(ComplexBehaviour {
             id: get_id(),

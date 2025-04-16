@@ -37,4 +37,28 @@ pub(crate) mod sync {
             })
         }
     }
+
+    #[repr(transparent)]
+    pub(crate) struct AtomicBool(Cell<bool>);
+
+    // SAFETY: Internal methods are protected using the [`critical-section`] crate.
+    unsafe impl Sync for AtomicBool {}
+
+    impl AtomicBool {
+        pub(crate) const fn new(value: bool) -> Self {
+            Self(Cell::new(value))
+        }
+
+        /// Checks if the inner value is equal to `current` and replaces the value with the
+        /// given if they were the same.
+        pub(crate) fn compare_and_swap(&self, current: bool, value: bool) -> bool {
+            critical_section::with(|_| {
+                if self.0.get() == current {
+                    self.0.replace(value)
+                } else {
+                    self.0.get()
+                }
+            })
+        }
+    }
 }
