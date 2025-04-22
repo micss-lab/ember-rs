@@ -1,8 +1,8 @@
 # No Std Framework Arduino - TODO
 
-- [ ] Support missing behaviours.
+- [x] Support missing behaviours.
     - [x] `TickerBehaviour`
-    - [ ] `ParallelBehaviour`
+    - [x] `ParallelBehaviour`
 - [x] Support message passing to the parent.
 - [ ] Support missing actions on the context.
     - [x] Adding behaviours.
