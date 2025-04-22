@@ -13,9 +13,9 @@ const MESSAGE_AMOUNT: usize = 10;
 struct InformationPrinter;
 
 impl OneShotBehaviour for InformationPrinter {
-    type Message = ();
+    type Event = ();
 
-    fn action(&self, _: &mut Context<Self::Message>) {
+    fn action(&self, _: &mut Context<Self::Event>) {
         log::info!("This agent has two behaviours.");
         log::info!("One will print infinitely, the other will stop the first after {MESSAGE_AMOUNT} iterations.")
     }
@@ -24,9 +24,9 @@ impl OneShotBehaviour for InformationPrinter {
 struct MessagePrinter;
 
 impl CyclicBehaviour for MessagePrinter {
-    type Message = ();
+    type Event = ();
 
-    fn action(&mut self, _: &mut Context<Self::Message>) {
+    fn action(&mut self, _: &mut Context<Self::Event>) {
         log::info!("Hello there!");
     }
 
@@ -47,9 +47,9 @@ impl MessagePrinterStopper {
 }
 
 impl CyclicBehaviour for MessagePrinterStopper {
-    type Message = ();
+    type Event = ();
 
-    fn action(&mut self, ctx: &mut Context<Self::Message>) {
+    fn action(&mut self, ctx: &mut Context<Self::Event>) {
         self.count -= 1;
         if self.is_finished() {
             ctx.remove_behaviour(self.behaviour);

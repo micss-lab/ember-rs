@@ -13,9 +13,9 @@ const MESSAGE_AMOUNT: usize = 10;
 struct InformationPrinter;
 
 impl OneShotBehaviour for InformationPrinter {
-    type Message = ();
+    type Event = ();
 
-    fn action(&self, _: &mut Context<Self::Message>) {
+    fn action(&self, _: &mut Context<Self::Event>) {
         log::info!("This agent has one behaviour.");
         log::info!("It will seemingly print for an infinite amount of time, though it removes the agent after {MESSAGE_AMOUNT} of messages");
     }
@@ -32,9 +32,9 @@ impl MessagePrinter {
 }
 
 impl CyclicBehaviour for MessagePrinter {
-    type Message = ();
+    type Event = ();
 
-    fn action(&mut self, ctx: &mut Context<Self::Message>) {
+    fn action(&mut self, ctx: &mut Context<Self::Event>) {
         log::info!("Hello there!");
         self.count -= 1;
         if self.count == 0 {

@@ -15,6 +15,7 @@ mod setup_example {
                 pub(super) use esp_backtrace as _;
                 pub(super) use esp_hal::prelude::*;
                 pub(super) use esp_hal_embassy as _;
+                pub(super) use esp_println::print;
 
                 pub(super) use no_std_framework_examples::esp;
             }
@@ -25,6 +26,8 @@ mod setup_example {
             #[cfg(target_os = "none")]
             #[entry]
             fn main() -> ! {
+                // Set newline mode to linux line endings.
+                print!("\x1b[20h");
                 esp_println::logger::init_logger_from_env();
                 esp::init_heap();
 

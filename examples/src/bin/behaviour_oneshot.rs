@@ -11,9 +11,9 @@ use no_std_framework_core::{Agent, Container};
 struct HelloWorld;
 
 impl OneShotBehaviour for HelloWorld {
-    type Message = ();
+    type Event = ();
 
-    fn action(&self, _: &mut Context<Self::Message>) {
+    fn action(&self, _: &mut Context<Self::Event>) {
         log::info!("Hello, World!");
     }
 }
@@ -21,9 +21,9 @@ impl OneShotBehaviour for HelloWorld {
 struct Responder;
 
 impl OneShotBehaviour for Responder {
-    type Message = ();
+    type Event = ();
 
-    fn action(&self, ctx: &mut Context<Self::Message>) {
+    fn action(&self, ctx: &mut Context<Self::Event>) {
         log::info!("I am good!");
         ctx.stop_container()
     }

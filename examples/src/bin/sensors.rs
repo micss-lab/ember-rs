@@ -14,9 +14,9 @@ use no_std_framework_core::{Agent, Container};
 struct SensorInit;
 
 impl OneShotBehaviour for SensorInit {
-    type Message = ();
+    type Event = ();
 
-    fn action(&self, _: &mut Context<Self::Message>) {
+    fn action(&self, _: &mut Context<Self::Event>) {
         log::info!("Sensors and actuators have been configured");
         log::info!("Oneshot event ended");
     }
@@ -25,13 +25,13 @@ impl OneShotBehaviour for SensorInit {
 struct AgentAliveBroadCast;
 
 impl TickerBehaviour for AgentAliveBroadCast {
-    type Message = ();
+    type Event = ();
 
     fn interval(&self) -> Duration {
         Duration::from_secs(1)
     }
 
-    fn action(&mut self, _: &mut Context<Self::Message>) {
+    fn action(&mut self, _: &mut Context<Self::Event>) {
         log::info!("Broadcasting that this agent is alive.");
     }
 
@@ -43,13 +43,13 @@ impl TickerBehaviour for AgentAliveBroadCast {
 struct SensorValueReader;
 
 impl TickerBehaviour for SensorValueReader {
-    type Message = ();
+    type Event = ();
 
     fn interval(&self) -> Duration {
         Duration::from_millis(200)
     }
 
-    fn action(&mut self, _: &mut Context<Self::Message>) {
+    fn action(&mut self, _: &mut Context<Self::Event>) {
         log::info!("Reading sensor values...");
     }
 
@@ -61,17 +61,17 @@ impl TickerBehaviour for SensorValueReader {
 struct MotorMovements;
 
 impl SequentialBehaviour for MotorMovements {
-    type Message = ();
+    type Event = ();
 
-    type ChildMessage = ();
+    type ChildEvent = ();
 
-    fn initial_behaviours(&self) -> SequentialBehaviourQueue<Self::ChildMessage> {
+    fn initial_behaviours(&self) -> SequentialBehaviourQueue<Self::ChildEvent> {
         struct MotorStartUp;
 
         impl OneShotBehaviour for MotorStartUp {
-            type Message = ();
+            type Event = ();
 
-            fn action(&self, _: &mut Context<Self::Message>) {
+            fn action(&self, _: &mut Context<Self::Event>) {
                 log::info!("1 - Motors are turned on");
             }
         }
@@ -79,9 +79,9 @@ impl SequentialBehaviour for MotorMovements {
         struct MotorTurn;
 
         impl OneShotBehaviour for MotorTurn {
-            type Message = ();
+            type Event = ();
 
-            fn action(&self, _: &mut Context<Self::Message>) {
+            fn action(&self, _: &mut Context<Self::Event>) {
                 log::info!("2 - Motors are turned 90 degrees ");
             }
         }
@@ -89,9 +89,9 @@ impl SequentialBehaviour for MotorMovements {
         struct MotorShutDown;
 
         impl OneShotBehaviour for MotorShutDown {
-            type Message = ();
+            type Event = ();
 
-            fn action(&self, _: &mut Context<Self::Message>) {
+            fn action(&self, _: &mut Context<Self::Event>) {
                 log::info!("3 - Motors are turned off 3")
             }
         }
