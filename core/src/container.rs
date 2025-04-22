@@ -4,7 +4,7 @@ use alloc::collections::VecDeque;
 use alloc::format;
 
 use crate::adt::Adt;
-use crate::agent::{Agent, AmsAgent};
+use crate::agent::{Agent, Aid, AmsAgent};
 use crate::context::ContainerContext;
 use crate::util::sync::AtomicBool;
 
@@ -57,10 +57,8 @@ mod kind {
 
     impl ContainerKind for Main {
         fn poll_associated_agents(&mut self) -> Result<(), Box<dyn core::error::Error>> {
-            let mut context = ContainerContext::new(
-                self.messages_for_agent(&Cow::Owned(format!("{}@local", self.ams.get_name())))
-                    .unwrap_or_default(),
-            );
+            let mut context =
+                ContainerContext::new(self.messages_for_agent(&Aid::ams()).unwrap_or_default());
             self.ams.update(&mut context);
             self.ams.perform_platform_actions(&mut self.ladt);
             Ok(())
@@ -91,8 +89,9 @@ mod kind {
 pub trait AgentLike: 'static {
     fn update(&mut self, context: &mut ContainerContext) -> bool;
 
-    #[allow(unused)]
     fn get_name(&self) -> Cow<str>;
+
+    fn get_aid(&self) -> Aid;
 }
 
 impl Container<Main> {
@@ -125,7 +124,7 @@ impl Container<Main> {
 
             let mut context = ContainerContext::new(
                 self.kind
-                    .messages_for_agent(&Cow::Owned(format!("{}@local", agent.get_name())))
+                    .messages_for_agent(&Aid::ams())
                     .unwrap_or_default(),
             );
 

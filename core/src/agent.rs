@@ -12,8 +12,6 @@ use crate::fipa::{self, AmsAgentDescription, RegisterAction};
 
 pub(crate) use self::ams::AmsAgent;
 
-pub type Aid = Cow<'static, str>;
-
 mod ams;
 
 enum AgentState {
@@ -65,7 +63,7 @@ impl<E: 'static> AgentLike for Agent<E> {
         match self.state {
             Initiated => {
                 // First register the agent with the ams.
-                let ams_aid = Cow::Borrowed("ams@local");
+                let ams_aid = Aid::local("ams");
 
                 ctx.send_message(MessageEnvelope::new(
                     ams_aid.clone(),
@@ -104,4 +102,103 @@ impl<E: 'static> AgentLike for Agent<E> {
     fn get_name(&self) -> Cow<str> {
         Cow::from(&self.name)
     }
+
+    fn get_aid(&self) -> Aid {
+        Aid::local(self.get_name())
+    }
 }
+
+#[derive(Debug, Clone, PartialOrd, Ord)]
+pub enum Aid {
+    Ams,
+    Other { name: String, ap: AgentPlatform },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AgentPlatform {
+    Local,
+    Public(String),
+}
+
+impl Aid {
+    pub(crate) fn local(agent: impl ToString) -> Self {
+        let agent = agent.to_string();
+        if agent == "ams" {
+            return Self::ams();
+        }
+        Self::Other {
+            name: agent.to_string(),
+            ap: AgentPlatform::Local,
+        }
+    }
+
+    pub(crate) fn ams() -> Self {
+        Self::Ams
+    }
+}
+
+impl core::str::FromStr for Aid {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s == "ams@local" {
+            return Ok(Self::Ams);
+        }
+        let Some((name, ap)) = s.split_once('@') else {
+            return Err(
+                "Failed to parse aid: incorrect format (expected <agent-name>@<agent-platform>)"
+                    .into(),
+            );
+        };
+        Ok(Self::Other {
+            name: name.to_string(),
+            ap: ap.parse()?,
+        })
+    }
+}
+
+impl core::str::FromStr for AgentPlatform {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(match s {
+            "local" => Self::Local,
+            s => Self::Public(s.to_string()),
+        })
+    }
+}
+
+impl core::fmt::Display for Aid {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Ams => write!(f, "ams@local"),
+            Self::Other { name, ap } => write!(f, "{}@{}", name, ap),
+        }
+    }
+}
+
+impl core::fmt::Display for AgentPlatform {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Local => write!(f, "local"),
+            Self::Public(v) => f.write_str(v),
+        }
+    }
+}
+
+impl PartialEq for Aid {
+    fn eq(&self, other: &Self) -> bool {
+        use Aid::*;
+        match (self, other) {
+            // AMS special case: both either Ams or Other { name: "ams", ap: Local }
+            (Ams, Ams) => true,
+            (Ams, Other { name, ap }) | (Other { name, ap }, Ams) => {
+                name.eq_ignore_ascii_case("ams") && ap == &AgentPlatform::Local
+            }
+            // All other cases: structural equality
+            (Other { name: n1, ap: ap1 }, Other { name: n2, ap: ap2 }) => n1 == n2 && ap1 == ap2,
+        }
+    }
+}
+
+impl Eq for Aid {}

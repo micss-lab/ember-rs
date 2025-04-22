@@ -1,5 +1,4 @@
 use alloc::collections::btree_map::BTreeMap;
-use alloc::format;
 use alloc::vec::Vec;
 use core::ops::{Deref, DerefMut};
 
@@ -26,7 +25,7 @@ impl Deref for Adt {
 impl Adt {
     pub(super) fn new(ams: &AmsAgent) -> Self {
         Self(BTreeMap::from([(
-            format!("{}@local", ams.get_name()).into(),
+            ams.get_aid(),
             AgentReference { inbox: Vec::new() },
         )]))
     }

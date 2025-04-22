@@ -2,7 +2,7 @@ use alloc::borrow::Cow;
 use alloc::collections::vec_deque::VecDeque;
 use alloc::vec::Vec;
 
-use crate::acl::message::{Message, MessageEnvelope, MessageFilter, Performative};
+use crate::acl::message::{MessageFilter, Performative};
 use crate::adt::{Adt, AgentReference};
 use crate::behaviour::complex::queue::BehaviourScheduler;
 use crate::behaviour::parallel::{FinishStrategy, ParallelBehaviourQueue};
@@ -44,6 +44,10 @@ impl AgentLike for AmsAgent {
     fn get_name(&self) -> Cow<str> {
         Cow::Borrowed("ams")
     }
+
+    fn get_aid(&self) -> Aid {
+        Aid::ams()
+    }
 }
 
 impl AmsAgent {
@@ -77,8 +81,12 @@ impl AmsAgent {
 
         use alloc::collections::btree_map::Entry;
 
-        let aid: Aid = match agent.name {
-            Some(name) => Cow::Owned(name),
+        let aid: Aid = match agent.name.map(|n| n.parse()) {
+            Some(Ok(aid)) => aid,
+            Some(Err(e)) => {
+                log::error!("Cannot register agent: {}", e);
+                return;
+            }
             None => {
                 log::error!("Cannot register an agent without a name.");
                 return;
