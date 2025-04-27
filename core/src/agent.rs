@@ -76,7 +76,7 @@ impl<E: 'static> AgentLike for Agent<E> {
                         content: RegisterAction {
                             ams: AmsAgentDescription { name: None },
                             agent: AmsAgentDescription {
-                                name: Some(format!("{}@local", self.get_name().to_string())),
+                                name: Some(format!("{}@local", self.get_name())),
                             },
                         }
                         .into_content()
