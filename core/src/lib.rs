@@ -5,10 +5,10 @@ extern crate alloc;
 #[cfg(not(target_os = "none"))]
 extern crate std;
 
-pub use self::agent::Agent;
+pub use self::agent::{Agent, Aid};
 pub use self::container::Container;
 
-mod acl;
+pub mod acl;
 mod adt;
 mod agent;
 pub mod behaviour;

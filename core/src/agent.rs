@@ -121,7 +121,7 @@ pub enum AgentPlatform {
 }
 
 impl Aid {
-    pub(crate) fn local(agent: impl ToString) -> Self {
+    pub fn local(agent: impl ToString) -> Self {
         let agent = agent.to_string();
         if agent == "ams" {
             return Self::ams();
@@ -132,7 +132,7 @@ impl Aid {
         }
     }
 
-    pub(crate) fn ams() -> Self {
+    pub fn ams() -> Self {
         Self::Ams
     }
 }

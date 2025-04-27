@@ -10,6 +10,8 @@ mod setup_example {
     #[macro_export]
     macro_rules! setup_example {
         () => {
+            extern crate alloc;
+
             #[cfg(target_os = "none")]
             mod esp_imports {
                 pub(super) use esp_backtrace as _;
