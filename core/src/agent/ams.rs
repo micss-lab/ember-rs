@@ -23,6 +23,7 @@ pub(crate) struct AmsAgent {
 impl AgentLike for AmsAgent {
     fn update(&mut self, ctx: &mut ContainerContext) -> bool {
         log::trace!("Ticking ams agent");
+
         let mut context = Context::new_using_container(&mut *ctx);
         self.behaviours.action(&mut context);
 

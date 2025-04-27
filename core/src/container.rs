@@ -1,7 +1,6 @@
 use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;
-use alloc::format;
 
 use crate::adt::Adt;
 use crate::agent::{Agent, Aid, AmsAgent};
@@ -21,10 +20,9 @@ pub struct Container<K = Main> {
 }
 
 mod kind {
+    use alloc::boxed::Box;
     use alloc::collections::VecDeque;
-    use alloc::format;
     use alloc::vec::Vec;
-    use alloc::{borrow::Cow, boxed::Box};
 
     use crate::acl::message::Message;
     use crate::adt::Adt;
@@ -124,7 +122,7 @@ impl Container<Main> {
 
             let mut context = ContainerContext::new(
                 self.kind
-                    .messages_for_agent(&Aid::ams())
+                    .messages_for_agent(&agent.get_aid())
                     .unwrap_or_default(),
             );
 

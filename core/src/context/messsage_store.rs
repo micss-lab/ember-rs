@@ -2,7 +2,7 @@ use alloc::{borrow::Cow, collections::vec_deque::VecDeque};
 
 use crate::acl::message::{Message, MessageFilter};
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone)]
 pub(crate) struct MessageStore {
     messages: VecDeque<Message>,
 }

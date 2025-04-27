@@ -48,12 +48,17 @@ impl<E: 'static> BehaviourQueue<E> {
     pub(super) fn pop(&mut self) -> Option<Box<dyn Behaviour<Event = E>>> {
         let mut amount = self.behaviours.len();
         Some(loop {
+            if amount == 0 {
+                // No behaviour is found that can be scheduled.
+                return None;
+            }
             let behaviour = self.behaviours.pop_front()?;
             let id = behaviour.id();
 
             // Next behaviour if it has been blocked.
             if self.blocked_ids.contains(&id) {
                 self.behaviours.push_back(behaviour);
+                amount -= 1;
                 continue;
             }
 
@@ -63,10 +68,6 @@ impl<E: 'static> BehaviourQueue<E> {
             }
 
             amount -= 1;
-            if amount == 0 {
-                // No behaviour is found that can be scheduled.
-                return None;
-            }
         })
     }
 
@@ -84,6 +85,10 @@ impl<E: 'static> BehaviourQueue<E> {
         }
         self.blocked_ids.insert(id)
     }
+
+    pub(super) fn unblock_all(&mut self) {
+        self.blocked_ids.clear();
+    }
 }
 
 pub(crate) trait BehaviourScheduler<E: 'static> {
@@ -97,9 +102,16 @@ pub(crate) trait BehaviourScheduler<E: 'static> {
 
     fn block(&mut self, id: BehaviourId) -> bool;
 
+    fn unblock_all(&mut self);
+
     fn is_finished(&self) -> bool;
 
     fn action(&mut self, ctx: &mut Context<E>) -> bool {
+        // Unblock all previously blocked behaviours.
+        if ctx.container.new_messages {
+            self.unblock_all();
+        }
+
         let Some(mut behaviour) = self.next() else {
             return self.is_finished();
         };

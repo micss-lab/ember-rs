@@ -19,6 +19,7 @@ pub(crate) struct ContainerContext {
     pub(crate) should_stop: bool,
     pub(crate) message_outbox: Vec<MessageEnvelope>,
     pub(crate) message_inbox: MessageStore,
+    pub(crate) new_messages: bool,
 }
 
 #[derive(Default)]
@@ -132,8 +133,10 @@ impl<E> Context<E> {
 impl ContainerContext {
     pub(crate) fn new(messages: impl Into<MessageStore>) -> Self {
         let messages = messages.into();
+        let new_messages = !messages.is_empty();
         Self {
             message_inbox: messages,
+            new_messages,
             ..Default::default()
         }
     }
@@ -144,6 +147,7 @@ impl ContainerContext {
             should_stop,
             message_outbox,
             message_inbox,
+            new_messages,
         }: Self,
     ) {
         self.should_stop |= should_stop;
@@ -157,6 +161,7 @@ impl ContainerContext {
         );
         self.message_outbox = message_outbox;
         self.message_inbox = message_inbox;
+        self.new_messages = new_messages;
     }
 
     pub(crate) fn send_message(&mut self, message: MessageEnvelope) {
