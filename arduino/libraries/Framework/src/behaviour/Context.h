@@ -3,19 +3,19 @@
 
 #include "../FrameworkCore.h"
 
-#include "Message.h"
+#include "Event.h"
 
 namespace framework {
 
 namespace behaviour {
 
-template<class M=void>
+template<class E=void>
 class Context {
   public:
-    Context(__ffi::Context<__ffi::Message>* context);
+    Context(__ffi::Context<__ffi::Event>* context);
 
   public:
-    void message_parent(Message<M>&& message);
+    void emit_event(Event<E>&& event);
 
     void stop_container();
     void remove_agent();
@@ -23,32 +23,32 @@ class Context {
 
   private:
     // Does not own the context value (essentially a mutable reference to the context).
-    __ffi::Context<__ffi::Message>* context;
+    __ffi::Context<__ffi::Event>* context;
 };
 
 // ======================= Impl =======================
 
-template<class M>
-Context<M>::Context(__ffi::Context<__ffi::Message>* context):
+template<class E>
+Context<E>::Context(__ffi::Context<__ffi::Event>* context):
     context(context) {}
 
-template<class M>
-void Context<M>::message_parent(Message<M>&& message) {
-    __ffi::context_message_parent(this->context, message.move_object());
+template<class E>
+void Context<E>::emit_event(Event<E>&& event) {
+    __ffi::context_emit_event(this->context, event.move_object());
 }
 
-template<class M>
-void Context<M>::stop_container() {
+template<class E>
+void Context<E>::stop_container() {
     __ffi::context_stop_container(this->context);
 }
 
-template<class M>
-void Context<M>::remove_agent() {
+template<class E>
+void Context<E>::remove_agent() {
     __ffi::context_remove_agent(this->context);
 }
 
-template<class M>
-void Context<M>::block_behaviour() {
+template<class E>
+void Context<E>::block_behaviour() {
     __ffi::context_block_behaviour(this->context);
 }
 

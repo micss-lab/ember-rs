@@ -8,7 +8,7 @@
 #include "Agent.h"
 #include "Container.h"
 
-#include "behaviour/Message.h"
+#include "behaviour/Event.h"
 #include "behaviour/Context.h"
 #include "behaviour/OneShotBehaviour.h"
 #include "behaviour/CyclicBehaviour.h"

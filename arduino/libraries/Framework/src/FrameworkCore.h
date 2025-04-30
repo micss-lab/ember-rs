@@ -10,12 +10,12 @@ enum class ScheduleStrategy {
   End,
 };
 
-template<typename M = void>
+template<typename E = void>
 struct Agent;
 
 struct Container;
 
-template<typename M = void>
+template<typename E = void>
 struct Context;
 
 struct CyclicBehaviour;
@@ -24,12 +24,12 @@ struct OneShotBehaviour;
 
 struct SequentialBehaviour;
 
-template<typename M = void>
+template<typename E = void>
 struct SequentialBehaviourQueue;
 
 struct TickerBehaviour;
 
-struct Message {
+struct Event {
   void *inner;
 };
 
@@ -42,9 +42,9 @@ extern "C" {
 
 void initialize_allocator();
 
-Message *message_new(void *message);
+Event *event_new(void *event);
 
-void message_free(Message *message);
+void event_free(Event *event);
 
 /**
  * Creates a new container instance.
@@ -58,87 +58,87 @@ Container *container_new();
 
 void container_free(Container *container);
 
-void container_add_agent(Container *container, Agent<Message> *agent);
+void container_add_agent(Container *container, Agent<Event> *agent);
 
 int32_t container_start(Container *container);
 
 ContainerPollResult container_poll(Container *container);
 
-Agent<Message> *agent_new(const char *name);
+Agent<Event> *agent_new(const char *name);
 
-void agent_free(Agent<Message> *agent);
+void agent_free(Agent<Event> *agent);
 
-void agent_add_behaviour_oneshot(Agent<Message> *agent, OneShotBehaviour *oneshot);
+void agent_add_behaviour_oneshot(Agent<Event> *agent, OneShotBehaviour *oneshot);
 
-void agent_add_behaviour_cyclic(Agent<Message> *agent, CyclicBehaviour *cyclic);
+void agent_add_behaviour_cyclic(Agent<Event> *agent, CyclicBehaviour *cyclic);
 
-void agent_add_behaviour_ticker(Agent<Message> *agent, TickerBehaviour *ticker);
+void agent_add_behaviour_ticker(Agent<Event> *agent, TickerBehaviour *ticker);
 
-void agent_add_behaviour_sequential(Agent<Message> *agent, SequentialBehaviour *sequential);
+void agent_add_behaviour_sequential(Agent<Event> *agent, SequentialBehaviour *sequential);
 
-void context_message_parent(Context<Message> *context, Message *message);
+void context_emit_event(Context<Event> *context, Event *event);
 
-void context_stop_container(Context<Message> *context);
+void context_stop_container(Context<Event> *context);
 
-void context_remove_agent(Context<Message> *context);
+void context_remove_agent(Context<Event> *context);
 
-void context_block_behaviour(Context<Message> *context);
+void context_block_behaviour(Context<Event> *context);
 
-void context_insert_behaviour_oneshot(Context<Message> *context,
+void context_insert_behaviour_oneshot(Context<Event> *context,
                                       OneShotBehaviour *oneshot,
                                       ScheduleStrategy strategy);
 
-void context_insert_behaviour_cyclic(Context<Message> *context,
+void context_insert_behaviour_cyclic(Context<Event> *context,
                                      CyclicBehaviour *cyclic,
                                      ScheduleStrategy strategy);
 
-void context_insert_behaviour_ticker(Context<Message> *context,
+void context_insert_behaviour_ticker(Context<Event> *context,
                                      TickerBehaviour *ticker,
                                      ScheduleStrategy strategy);
 
-void context_insert_behaviour_sequential(Context<Message> *context,
+void context_insert_behaviour_sequential(Context<Event> *context,
                                          SequentialBehaviour *sequential,
                                          ScheduleStrategy strategy);
 
-OneShotBehaviour *behaviour_oneshot_new(void *inner, void (*action)(void*, Context<Message>*));
+OneShotBehaviour *behaviour_oneshot_new(void *inner, void (*action)(void*, Context<Event>*));
 
 void behaviour_oneshot_free(OneShotBehaviour *oneshot);
 
 CyclicBehaviour *behaviour_cyclic_new(void *inner,
-                                      void (*action)(void*, Context<Message>*),
+                                      void (*action)(void*, Context<Event>*),
                                       bool (*is_finished)(void*));
 
 void behaviour_cyclic_free(CyclicBehaviour *cyclic);
 
 TickerBehaviour *behaviour_ticker_new(void *inner,
                                       uint64_t (*interval)(void*),
-                                      void (*action)(void*, Context<Message>*),
+                                      void (*action)(void*, Context<Event>*),
                                       bool (*is_finished)(void*));
 
 void behaviour_ticker_free(TickerBehaviour *ticker);
 
 SequentialBehaviour *behaviour_sequential_new(void *inner,
-                                              SequentialBehaviourQueue<Message> *initial_behaviours,
-                                              void (*handle_child_message)(void*, Message*),
-                                              void (*after_child_action)(void*, Context<Message>*));
+                                              SequentialBehaviourQueue<Event> *initial_behaviours,
+                                              void (*handle_child_event)(void*, Event*),
+                                              void (*after_child_action)(void*, Context<Event>*));
 
 void behaviour_sequential_free(SequentialBehaviour *sequential);
 
-SequentialBehaviourQueue<Message> *behaviour_sequential_queue_new();
+SequentialBehaviourQueue<Event> *behaviour_sequential_queue_new();
 
-void behaviour_sequential_queue_add_behaviour_oneshot(SequentialBehaviourQueue<Message> *queue,
+void behaviour_sequential_queue_add_behaviour_oneshot(SequentialBehaviourQueue<Event> *queue,
                                                       OneShotBehaviour *oneshot);
 
-void behaviour_sequential_queue_add_behaviour_cyclic(SequentialBehaviourQueue<Message> *queue,
+void behaviour_sequential_queue_add_behaviour_cyclic(SequentialBehaviourQueue<Event> *queue,
                                                      CyclicBehaviour *cyclic);
 
-void behaviour_sequential_queue_add_behaviour_ticker(SequentialBehaviourQueue<Message> *queue,
+void behaviour_sequential_queue_add_behaviour_ticker(SequentialBehaviourQueue<Event> *queue,
                                                      TickerBehaviour *ticker);
 
-void behaviour_sequential_queue_add_behaviour_sequential(SequentialBehaviourQueue<Message> *queue,
+void behaviour_sequential_queue_add_behaviour_sequential(SequentialBehaviourQueue<Event> *queue,
                                                          SequentialBehaviour *sequential);
 
-void behaviour_sequential_queue_free(SequentialBehaviourQueue<Message> *queue);
+void behaviour_sequential_queue_free(SequentialBehaviourQueue<Event> *queue);
 
 /**
  * Initialize the libraries global logger.

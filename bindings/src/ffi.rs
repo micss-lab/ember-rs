@@ -53,25 +53,25 @@ mod esp {
     }
 }
 
-mod message {
+mod event {
     use core::ffi::c_void;
 
     use super::util::{drop_raw, new};
 
     #[repr(C)]
-    pub struct Message {
+    pub struct Event {
         inner: *mut c_void,
     }
 
     #[no_mangle]
-    extern "C" fn message_new(message: *mut c_void) -> *mut Message {
-        new(Message { inner: message })
+    extern "C" fn event_new(event: *mut c_void) -> *mut Event {
+        new(Event { inner: event })
     }
 
     #[no_mangle]
-    extern "C" fn message_free(message: *mut Message) {
-        non_null_or_bail!(message, "attemted to free message null-pointer");
-        unsafe { drop_raw(message) }
+    extern "C" fn event_free(event: *mut Event) {
+        non_null_or_bail!(event, "attemted to free event null-pointer");
+        unsafe { drop_raw(event) }
     }
 }
 
@@ -80,7 +80,7 @@ mod container {
 
     use crate::ffi::util::{drop_raw, ref_from_raw};
 
-    use super::message::Message;
+    use super::event::Event;
     use super::util::{from_raw, new};
 
     /// Creates a new container instance.
@@ -91,7 +91,7 @@ mod container {
     /// with the accompanying [`container_free`].
     #[no_mangle]
     pub extern "C" fn container_new() -> *mut Container {
-        log::trace!("Creating new container\r");
+        log::trace!("Creating new container");
         new(Container::default())
     }
 
@@ -102,7 +102,7 @@ mod container {
     }
 
     #[no_mangle]
-    pub extern "C" fn container_add_agent(container: *mut Container, agent: *mut Agent<Message>) {
+    pub extern "C" fn container_add_agent(container: *mut Container, agent: *mut Agent<Event>) {
         non_null!(container, "got container null-pointer");
         non_null!(agent, "got agent null-pointer");
         let agent = unsafe { from_raw(agent) };
@@ -147,17 +147,17 @@ mod agent {
 
     use super::behaviour::complex::SequentialBehaviour;
     use super::behaviour::simple::{CyclicBehaviour, OneShotBehaviour, TickerBehaviour};
-    use super::message::Message;
+    use super::event::Event;
     use super::util::{drop_raw, from_raw, new, ref_from_raw, string_from_raw};
 
     #[no_mangle]
-    pub extern "C" fn agent_new(name: *const c_char) -> *mut Agent<Message> {
+    pub extern "C" fn agent_new(name: *const c_char) -> *mut Agent<Event> {
         let name = unsafe { string_from_raw(name) };
         new(Agent::new(name))
     }
 
     #[no_mangle]
-    pub extern "C" fn agent_free(agent: *mut Agent<Message>) {
+    pub extern "C" fn agent_free(agent: *mut Agent<Event>) {
         non_null_or_bail!(agent, "attemted to free agent null-pointer");
         unsafe { drop_raw(agent) }
     }
@@ -165,7 +165,7 @@ mod agent {
     // TODO: Add more behaviours here.
     #[no_mangle]
     pub extern "C" fn agent_add_behaviour_oneshot(
-        agent: *mut Agent<Message>,
+        agent: *mut Agent<Event>,
         oneshot: *mut OneShotBehaviour,
     ) {
         non_null!(agent, "got agent null-pointer");
@@ -177,7 +177,7 @@ mod agent {
 
     #[no_mangle]
     pub extern "C" fn agent_add_behaviour_cyclic(
-        agent: *mut Agent<Message>,
+        agent: *mut Agent<Event>,
         cyclic: *mut CyclicBehaviour,
     ) {
         non_null!(agent, "got agent null-pointer");
@@ -189,7 +189,7 @@ mod agent {
 
     #[no_mangle]
     pub extern "C" fn agent_add_behaviour_ticker(
-        agent: *mut Agent<Message>,
+        agent: *mut Agent<Event>,
         ticker: *mut TickerBehaviour,
     ) {
         non_null!(agent, "got agent null-pointer");
@@ -201,7 +201,7 @@ mod agent {
 
     #[no_mangle]
     pub extern "C" fn agent_add_behaviour_sequential(
-        agent: *mut Agent<Message>,
+        agent: *mut Agent<Event>,
         sequential: *mut SequentialBehaviour,
     ) {
         non_null!(agent, "got agent null-pointer");
@@ -217,39 +217,36 @@ mod context {
 
     use super::behaviour::complex::SequentialBehaviour;
     use super::behaviour::simple::{CyclicBehaviour, OneShotBehaviour, TickerBehaviour};
-    use super::message::Message;
+    use super::event::Event;
     use super::util::{from_raw, ref_from_raw};
 
     // No `new` or `free` needed as this is a mutable borrow from rust.
 
     #[no_mangle]
-    pub extern "C" fn context_message_parent(
-        context: *mut Context<Message>,
-        message: *mut Message,
-    ) {
+    pub extern "C" fn context_emit_event(context: *mut Context<Event>, event: *mut Event) {
         non_null!(context, "got a context null-pointer");
-        non_null!(message, "got a message null-pointer");
+        non_null!(event, "got a event null-pointer");
         let context = unsafe { ref_from_raw(context) };
-        let message = unsafe { from_raw(message) };
-        context.message_parent(message);
+        let event = unsafe { from_raw(event) };
+        context.emit_event(event);
     }
 
     #[no_mangle]
-    pub extern "C" fn context_stop_container(context: *mut Context<Message>) {
+    pub extern "C" fn context_stop_container(context: *mut Context<Event>) {
         non_null!(context, "got a context null-pointer");
         let context = unsafe { ref_from_raw(context) };
         context.stop_container();
     }
 
     #[no_mangle]
-    pub extern "C" fn context_remove_agent(context: *mut Context<Message>) {
+    pub extern "C" fn context_remove_agent(context: *mut Context<Event>) {
         non_null!(context, "got a context null-pointer");
         let context = unsafe { ref_from_raw(context) };
         context.remove_agent();
     }
 
     #[no_mangle]
-    pub extern "C" fn context_block_behaviour(context: *mut Context<Message>) {
+    pub extern "C" fn context_block_behaviour(context: *mut Context<Event>) {
         non_null!(context, "got a context null-pointer");
         let context = unsafe { ref_from_raw(context) };
         context.block_behaviour();
@@ -263,8 +260,8 @@ mod context {
     }
 
     fn context_insert_behaviour<K>(
-        context: &mut Context<Message>,
-        behaviour: impl IntoBehaviour<K, Message = Message>,
+        context: &mut Context<Event>,
+        behaviour: impl IntoBehaviour<K, Event = Event>,
         strategy: ScheduleStrategy,
     ) {
         match strategy {
@@ -275,7 +272,7 @@ mod context {
 
     #[no_mangle]
     pub extern "C" fn context_insert_behaviour_oneshot(
-        context: *mut Context<Message>,
+        context: *mut Context<Event>,
         oneshot: *mut OneShotBehaviour,
         strategy: ScheduleStrategy,
     ) {
@@ -288,7 +285,7 @@ mod context {
 
     #[no_mangle]
     pub extern "C" fn context_insert_behaviour_cyclic(
-        context: *mut Context<Message>,
+        context: *mut Context<Event>,
         cyclic: *mut CyclicBehaviour,
         strategy: ScheduleStrategy,
     ) {
@@ -301,7 +298,7 @@ mod context {
 
     #[no_mangle]
     pub extern "C" fn context_insert_behaviour_ticker(
-        context: *mut Context<Message>,
+        context: *mut Context<Event>,
         ticker: *mut TickerBehaviour,
         strategy: ScheduleStrategy,
     ) {
@@ -314,7 +311,7 @@ mod context {
 
     #[no_mangle]
     pub extern "C" fn context_insert_behaviour_sequential(
-        context: *mut Context<Message>,
+        context: *mut Context<Event>,
         sequential: *mut SequentialBehaviour,
         strategy: ScheduleStrategy,
     ) {
@@ -327,14 +324,14 @@ mod context {
 }
 
 mod behaviour {
-    use super::message::Message;
+    use super::event::Event;
 
     pub(super) mod simple {
         pub(in crate::ffi) use self::cyclic::CyclicBehaviour;
         pub(in crate::ffi) use self::oneshot::OneShotBehaviour;
         pub(in crate::ffi) use self::ticker::TickerBehaviour;
 
-        use super::Message;
+        use super::Event;
         use crate::ffi::util::{drop_raw, new};
 
         mod oneshot {
@@ -345,19 +342,19 @@ mod behaviour {
                 Context, OneShotBehaviour as OneShotBehaviourTrait,
             };
 
-            use super::{drop_raw, new, Message};
+            use super::{drop_raw, new, Event};
 
             pub struct OneShotBehaviour {
                 /// Type value defined by the user implementing the trait.
                 inner: *mut c_void,
                 /// Action to be performed.
-                action: extern "C" fn(*mut c_void, *mut Context<Message>),
+                action: extern "C" fn(*mut c_void, *mut Context<Event>),
             }
 
             impl OneShotBehaviourTrait for OneShotBehaviour {
-                type Message = Message;
+                type Event = Event;
 
-                fn action(&self, ctx: &mut Context<Self::Message>) {
+                fn action(&self, ctx: &mut Context<Self::Event>) {
                     (self.action)(self.inner, ptr::from_mut(ctx))
                 }
             }
@@ -365,7 +362,7 @@ mod behaviour {
             #[no_mangle]
             pub extern "C" fn behaviour_oneshot_new(
                 inner: *mut c_void,
-                action: extern "C" fn(*mut c_void, *mut Context<Message>),
+                action: extern "C" fn(*mut c_void, *mut Context<Event>),
             ) -> *mut OneShotBehaviour {
                 new(OneShotBehaviour { inner, action })
             }
@@ -385,21 +382,21 @@ mod behaviour {
                 Context, CyclicBehaviour as CyclicBehaviourTrait,
             };
 
-            use super::{drop_raw, new, Message};
+            use super::{drop_raw, new, Event};
 
             pub struct CyclicBehaviour {
                 /// Type value defined by the user implementing the trait.
                 inner: *mut c_void,
                 /// Action to be performed.
-                action: extern "C" fn(*mut c_void, *mut Context<Message>),
+                action: extern "C" fn(*mut c_void, *mut Context<Event>),
                 /// Whether the behaviour has finished.
                 is_finished: extern "C" fn(*mut c_void) -> bool,
             }
 
             impl CyclicBehaviourTrait for CyclicBehaviour {
-                type Message = Message;
+                type Event = Event;
 
-                fn action(&mut self, ctx: &mut Context<Self::Message>) {
+                fn action(&mut self, ctx: &mut Context<Self::Event>) {
                     (self.action)(self.inner, ptr::from_mut(ctx));
                 }
 
@@ -411,7 +408,7 @@ mod behaviour {
             #[no_mangle]
             pub extern "C" fn behaviour_cyclic_new(
                 inner: *mut c_void,
-                action: extern "C" fn(*mut c_void, *mut Context<Message>),
+                action: extern "C" fn(*mut c_void, *mut Context<Event>),
                 is_finished: extern "C" fn(*mut c_void) -> bool,
             ) -> *mut CyclicBehaviour {
                 new(CyclicBehaviour {
@@ -437,13 +434,13 @@ mod behaviour {
                 Context, TickerBehaviour as TickerBehaviourTrait,
             };
 
-            use super::{drop_raw, new, Message};
+            use super::{drop_raw, new, Event};
 
             pub struct TickerBehaviour {
                 /// Type value defined by the user implementing the trait.
                 inner: *mut c_void,
                 /// Action to be performed.
-                action: extern "C" fn(*mut c_void, *mut Context<Message>),
+                action: extern "C" fn(*mut c_void, *mut Context<Event>),
                 /// Whether the behaviour has finished.
                 is_finished: extern "C" fn(*mut c_void) -> bool,
                 /// Interval in miliseconds until the next scheduled action.
@@ -451,13 +448,13 @@ mod behaviour {
             }
 
             impl TickerBehaviourTrait for TickerBehaviour {
-                type Message = Message;
+                type Event = Event;
 
                 fn interval(&self) -> Duration {
                     Duration::from_millis((self.interval)(self.inner))
                 }
 
-                fn action(&mut self, ctx: &mut Context<Self::Message>) {
+                fn action(&mut self, ctx: &mut Context<Self::Event>) {
                     (self.action)(self.inner, ptr::from_mut(ctx));
                 }
 
@@ -470,7 +467,7 @@ mod behaviour {
             pub extern "C" fn behaviour_ticker_new(
                 inner: *mut c_void,
                 interval: extern "C" fn(*mut c_void) -> u64,
-                action: extern "C" fn(*mut c_void, *mut Context<Message>),
+                action: extern "C" fn(*mut c_void, *mut Context<Event>),
                 is_finished: extern "C" fn(*mut c_void) -> bool,
             ) -> *mut TickerBehaviour {
                 new(TickerBehaviour {
@@ -492,7 +489,7 @@ mod behaviour {
     pub(super) mod complex {
         pub(in crate::ffi) use self::sequential::SequentialBehaviour;
 
-        use super::Message;
+        use super::Event;
         use crate::ffi::util::{drop_raw, from_raw, new, ref_from_raw};
 
         mod sequential {
@@ -507,11 +504,11 @@ mod behaviour {
                 Context,
             };
 
-            use super::{drop_raw, from_raw, new, ref_from_raw, Message};
+            use super::{drop_raw, from_raw, new, ref_from_raw, Event};
 
             mod queue {
                 use super::{
-                    drop_raw, from_raw, new, ref_from_raw, Message, SequentialBehaviour,
+                    drop_raw, from_raw, new, ref_from_raw, Event, SequentialBehaviour,
                     SequentialBehaviourQueue,
                 };
                 use crate::ffi::behaviour::simple::{
@@ -520,13 +517,13 @@ mod behaviour {
 
                 #[no_mangle]
                 pub extern "C" fn behaviour_sequential_queue_new(
-                ) -> *mut SequentialBehaviourQueue<Message> {
+                ) -> *mut SequentialBehaviourQueue<Event> {
                     new(SequentialBehaviourQueue::new())
                 }
 
                 #[no_mangle]
                 pub extern "C" fn behaviour_sequential_queue_add_behaviour_oneshot(
-                    queue: *mut SequentialBehaviourQueue<Message>,
+                    queue: *mut SequentialBehaviourQueue<Event>,
                     oneshot: *mut OneShotBehaviour,
                 ) {
                     non_null!(queue, "got sequential queue null-pointer");
@@ -538,7 +535,7 @@ mod behaviour {
 
                 #[no_mangle]
                 pub extern "C" fn behaviour_sequential_queue_add_behaviour_cyclic(
-                    queue: *mut SequentialBehaviourQueue<Message>,
+                    queue: *mut SequentialBehaviourQueue<Event>,
                     cyclic: *mut CyclicBehaviour,
                 ) {
                     non_null!(queue, "got sequential queue null-pointer");
@@ -550,7 +547,7 @@ mod behaviour {
 
                 #[no_mangle]
                 pub extern "C" fn behaviour_sequential_queue_add_behaviour_ticker(
-                    queue: *mut SequentialBehaviourQueue<Message>,
+                    queue: *mut SequentialBehaviourQueue<Event>,
                     ticker: *mut TickerBehaviour,
                 ) {
                     non_null!(queue, "got sequential queue null-pointer");
@@ -562,7 +559,7 @@ mod behaviour {
 
                 #[no_mangle]
                 pub extern "C" fn behaviour_sequential_queue_add_behaviour_sequential(
-                    queue: *mut SequentialBehaviourQueue<Message>,
+                    queue: *mut SequentialBehaviourQueue<Event>,
                     sequential: *mut SequentialBehaviour,
                 ) {
                     non_null!(queue, "got sequential queue null-pointer");
@@ -574,7 +571,7 @@ mod behaviour {
 
                 #[no_mangle]
                 pub extern "C" fn behaviour_sequential_queue_free(
-                    queue: *mut SequentialBehaviourQueue<Message>,
+                    queue: *mut SequentialBehaviourQueue<Event>,
                 ) {
                     non_null_or_bail!(
                         queue,
@@ -588,19 +585,19 @@ mod behaviour {
                 /// Type value defined by the user implementing the trait.
                 inner: *mut c_void,
                 /// List of initial behaviours to be scheduled.
-                initial_behaviours: Cell<*mut SequentialBehaviourQueue<Message>>,
-                /// Function to be executed for every message a child has sent to the parent.
-                handle_child_message: extern "C" fn(*mut c_void, *mut Message),
+                initial_behaviours: Cell<*mut SequentialBehaviourQueue<Event>>,
+                /// Function to be executed for every event a child has emitted.
+                handle_child_event: extern "C" fn(*mut c_void, *mut Event),
                 /// Function to be executed after a child behaviour has performed its action.
-                after_child_action: extern "C" fn(*mut c_void, *mut Context<Message>),
+                after_child_action: extern "C" fn(*mut c_void, *mut Context<Event>),
             }
 
             impl SequentialBehaviourTrait for SequentialBehaviour {
-                type Message = Message;
+                type Event = Event;
 
-                type ChildMessage = Message;
+                type ChildEvent = Event;
 
-                fn initial_behaviours(&self) -> SequentialBehaviourQueue<Self::ChildMessage> {
+                fn initial_behaviours(&self) -> SequentialBehaviourQueue<Self::ChildEvent> {
                     // Replace the initial behaviours pointer with a null-pointer.
                     non_null!(
                         self.initial_behaviours.get(),
@@ -610,13 +607,13 @@ mod behaviour {
                     unsafe { from_raw(result) }
                 }
 
-                fn handle_child_message(&mut self, message: Self::ChildMessage) {
-                    (self.handle_child_message)(self.inner, new(message))
+                fn handle_child_event(&mut self, event: Self::ChildEvent) {
+                    (self.handle_child_event)(self.inner, new(event))
                 }
 
                 fn after_child_action(
                     &mut self,
-                    ctx: &mut no_std_framework_core::behaviour::Context<Self::Message>,
+                    ctx: &mut no_std_framework_core::behaviour::Context<Self::Event>,
                 ) {
                     (self.after_child_action)(self.inner, ptr::from_mut(ctx));
                 }
@@ -625,16 +622,16 @@ mod behaviour {
             #[no_mangle]
             pub extern "C" fn behaviour_sequential_new(
                 inner: *mut c_void,
-                initial_behaviours: *mut SequentialBehaviourQueue<Message>,
-                handle_child_message: extern "C" fn(*mut c_void, *mut Message),
-                after_child_action: extern "C" fn(*mut c_void, *mut Context<Message>),
+                initial_behaviours: *mut SequentialBehaviourQueue<Event>,
+                handle_child_event: extern "C" fn(*mut c_void, *mut Event),
+                after_child_action: extern "C" fn(*mut c_void, *mut Context<Event>),
             ) -> *mut SequentialBehaviour {
                 non_null!(inner, "got inner null-pointer");
                 non_null!(initial_behaviours, "got initial behaviours null-pointer");
                 new(SequentialBehaviour {
                     inner,
                     initial_behaviours: initial_behaviours.into(),
-                    handle_child_message,
+                    handle_child_event,
                     after_child_action,
                 })
             }

@@ -11,28 +11,28 @@
 
 namespace framework {
 
-template<typename Message=void>
+template<typename Event=void>
 class Agent: 
-    public Object<__ffi::Agent<__ffi::Message>> {
+    public Object<__ffi::Agent<__ffi::Event>> {
   public:
     Agent(const char* const name);
     virtual ~Agent();
     
-    void add_behaviour(std::unique_ptr<behaviour::Behaviour<Message>>&& behaviour);
+    void add_behaviour(std::unique_ptr<behaviour::Behaviour<Event>>&& behaviour);
 };
 
 // ======================= Impl =======================
 
-template<typename Message>
-Agent<Message>::Agent(const char* const name):
+template<typename Event>
+Agent<Event>::Agent(const char* const name):
     Object(__ffi::agent_new(name), __ffi::agent_free) {}
 
-template<typename Message>
-Agent<Message>::~Agent() {};
+template<typename Event>
+Agent<Event>::~Agent() {};
 
-template<typename Message>
-void Agent<Message>::add_behaviour(std::unique_ptr<behaviour::Behaviour<Message>>&& behaviour_) {
-    behaviour::Behaviour<Message>* behaviour = behaviour_.release();
+template<typename Event>
+void Agent<Event>::add_behaviour(std::unique_ptr<behaviour::Behaviour<Event>>&& behaviour_) {
+    behaviour::Behaviour<Event>* behaviour = behaviour_.release();
     behaviour->__ffi_add_behaviour_to_agent(this->object);
 }
 
