@@ -130,7 +130,7 @@ struct Metrics {
 
 impl From<Content> for Metrics {
     fn from(content: Content) -> Self {
-        let Content::Other { mut content, .. } = content else {
+        let Content::Other { content, .. } = content else {
             panic!("message content invalid");
         };
         content.parse().expect("failed to parse content as metrics")
