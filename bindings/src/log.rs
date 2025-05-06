@@ -1,5 +1,4 @@
 use cfg_if::cfg_if;
-use esp_println::print;
 use log::LevelFilter;
 
 /// Intializes the libraries global logger.
@@ -18,14 +17,13 @@ pub(crate) fn initialize_logging(level: LevelFilter) {
             if #[cfg(target_os = "none")] {
                 use crate::esp;
                 esp::initialize_logging(level);
+                // Set newline mode to linux line endings.
+                esp_println::print!("\x1b[20h");
             } else {
                 // Do nothing for now.
                 let _ = level;
             }
         }
-
-        // Set newline mode to linux line endings.
-        print!("\x1b[20h");
 
         unsafe { INIT = true };
     })
