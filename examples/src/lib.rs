@@ -41,7 +41,7 @@ mod setup_example {
             #[cfg(not(target_os = "none"))]
             fn main() {
                 use no_std_framework_examples::local;
-                local::init_logger(log::LevelFilter::Trace);
+                local::init_logger(log::LevelFilter::Debug);
 
                 example();
             }

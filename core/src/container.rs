@@ -8,6 +8,8 @@ use crate::adt::Adt;
 use crate::agent::{Agent, Aid, AmsAgent};
 use crate::context::ContainerContext;
 
+use self::mts::Mts;
+
 mod mts;
 
 pub struct Container {
@@ -17,6 +19,8 @@ pub struct Container {
     ams: AmsAgent,
     /// Register of agents running on this platform.
     ladt: Adt,
+    /// Message transport service.
+    mts: Mts,
 }
 
 pub trait AgentLike: 'static {
@@ -49,6 +53,9 @@ impl Container {
         // Iterate over all agents once, only rescheduling agents that are not removed.
         let mut amount = self.agents.len();
 
+        // Poll the message transport system.
+        self.mts.receive_messages(&mut self.ladt);
+
         while let Some(mut agent) = self.agents.pop_front() {
             self.poll_associated_agents()?;
 
@@ -61,7 +68,7 @@ impl Container {
 
             // Handle all messages the agent wants to send.
             for message in context.message_outbox.into_iter() {
-                mts::send_message(message, &mut self.ladt);
+                self.mts.send_message(message, &mut self.ladt);
             }
 
             if context.should_stop {
@@ -101,6 +108,11 @@ impl Container {
     pub fn add_agent<E: 'static>(&mut self, agent: Agent<E>) {
         self.agents.push_back(Box::new(agent));
     }
+
+    pub fn with_http(mut self, port: u16) -> Self {
+        self.mts.enable_http(port);
+        self
+    }
 }
 
 impl Default for Container {
@@ -111,6 +123,7 @@ impl Default for Container {
             agents: VecDeque::default(),
             ams,
             ladt,
+            mts: Mts::new(),
         }
     }
 }
