@@ -9,13 +9,10 @@ use std::format;
 use bytes::{BufMut, Bytes, BytesMut};
 use multipart::server::{Multipart, ReadEntry, ReadEntryResult};
 use serde::ser::SerializeStruct;
-use tiny_http::{Request, Server};
+use tiny_http::Server;
 
-use crate::acl::message::{AclRepresentation, Message};
-use crate::{
-    acl::message::{MessageEnvelope, MessageKind},
-    Aid,
-};
+use crate::acl::message::{AclRepresentation, Message, MessageEnvelope, MessageKind};
+use crate::agent::Aid;
 
 use super::Acc;
 
@@ -30,8 +27,6 @@ impl HttpChannel {
         }
     }
 }
-
-type Boundary = [u8; 16];
 
 impl Acc for HttpChannel {
     fn send(&mut self, address: &Aid, message: MessageEnvelope) -> Result<(), ()> {
@@ -290,32 +285,4 @@ fn encode_message(message: MessageEnvelope, boundary: &[u8; 16]) -> Bytes {
     body.put_slice(b"\r\n");
 
     body.freeze()
-}
-
-fn get_multipart_boundary(req: &Request) -> Option<Boundary> {
-    const BOUNDARY: &str = "boundary=";
-
-    let content_type = req
-        .headers()
-        .iter()
-        .find(|header| header.field.equiv("Content-Type"))?
-        .value
-        .as_str();
-
-    // Extract the boundary value from the header.
-    let boundary_value = content_type.find(BOUNDARY).map(|pos| {
-        let after_boundary = &content_type[pos + BOUNDARY.len()..];
-        match after_boundary.split_once(';') {
-            Some((value, _)) => value,
-            None => after_boundary,
-        }
-    })?;
-
-    // Trim surrounding double quotes if present.
-    let boundary = boundary_value
-        .strip_prefix('"')
-        .and_then(|s| s.strip_suffix('"'))
-        .unwrap_or(boundary_value);
-
-    Some(hex::decode(boundary).ok()?.try_into().ok()?)
 }
