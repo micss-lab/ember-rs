@@ -172,7 +172,7 @@ impl FromStr for Metrics {
 impl From<Metrics> for MessageEnvelope {
     fn from(value: Metrics) -> Self {
         MessageEnvelope::new(
-            Aid::remote("server", "localhost:1337"),
+            Aid::general("server", "localhost:1337"),
             Message {
                 performative: Performative::Inform,
                 sender: None,

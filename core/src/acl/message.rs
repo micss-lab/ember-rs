@@ -1,11 +1,15 @@
 pub use self::filter::MessageFilter;
 
-use chrono::{DateTime, Utc};
-
 use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::format;
 use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
+use core::str::FromStr;
+
+use bstr::BStr;
+use chrono::{DateTime, Utc};
+
 use serde::ser::{SerializeSeq, SerializeStruct};
 
 use crate::acl::ser;
@@ -14,6 +18,7 @@ use crate::agent::Aid;
 use super::sl;
 
 mod filter;
+mod parser;
 
 // type Encoding = String;
 
@@ -150,6 +155,13 @@ impl core::fmt::Display for Message {
     }
 }
 
+impl Message {
+    pub(crate) fn try_from_bytes(bytes: impl AsRef<BStr>) -> Result<Self, ()> {
+        self::parser::messsage::message(&crate::util::parsing::BStr::from(bytes.as_ref()))
+            .map_err(|e| log::error!("error parsing acl message: {}", e))
+    }
+}
+
 impl Performative {
     fn as_str(&self) -> &'static str {
         use Performative::*;
@@ -181,25 +193,61 @@ impl Performative {
     }
 }
 
+impl FromStr for Performative {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        use Performative::*;
+        Ok(match s {
+            "accept-proposal" => AcceptProposal,
+            "agree" => Agree,
+            "cancel" => Cancel,
+            "cfp" => Cfp,
+            "confirm" => Confirm,
+            "disconfirm" => Disconfirm,
+            "failure" => Failure,
+            "inform" => Inform,
+            "inform-if" => InformIf,
+            "inform-ref" => InformRef,
+            "not-understood" => NotUnderstood,
+            "propose" => Propose,
+            "query-if" => QueryIf,
+            "query-ref" => QueryRef,
+            "refuse" => Refuse,
+            "reject-proposal" => RejectProposal,
+            "request" => Request,
+            "request-when" => RequestWhen,
+            "request-whenever" => RequestWhenever,
+            "subscribe" => Subscribe,
+            "proxy" => Proxy,
+            "propagate" => Propagate,
+
+            // TODO: Should the error case become the unknown performative?
+            "unknown" => Unknown,
+            _ => return Err(()),
+        })
+    }
+}
+
 impl serde::Serialize for Message {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
     {
         // TODO: Add other fields here.
-        let mut message = serializer.serialize_struct(self.performative.as_str(), 4)?;
+        let mut message = serializer.serialize_struct(self.performative.as_str(), 3)?;
         // message.serialize_field("sender", &self.sender)?;
         message.serialize_field("receiver", &self.receiver)?;
         match &self.content {
             Content::Sl(sl) => {
                 message.serialize_field("lanuage", "fipa-sl0")?;
-                message.serialize_field("content", &sl.to_string())?;
+                message.serialize_field("content", &format!("\"{}\"", sl.to_string()))?;
             }
             Content::Other { kind, content } => {
                 if let Some(kind) = kind {
                     message.serialize_field("language", &kind.to_string())?;
                 }
-                message.serialize_field("content", &content)?;
+                message.serialize_field("content", &format!("\"{}\"", content))?;
             }
         }
         message.end()

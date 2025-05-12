@@ -1,14 +1,17 @@
 extern crate std;
 
+use alloc::collections::btree_map::BTreeMap;
 use alloc::string::ToString;
+use alloc::vec::Vec;
 use core::time::Duration;
 use std::format;
 
 use bytes::{BufMut, Bytes, BytesMut};
-use multipart_any::server::{HttpRequest, Multipart};
+use multipart::server::{Multipart, ReadEntry, ReadEntryResult};
 use serde::ser::SerializeStruct;
-use tiny_http::Server;
+use tiny_http::{Request, Server};
 
+use crate::acl::message::{AclRepresentation, Message};
 use crate::{
     acl::message::{MessageEnvelope, MessageKind},
     Aid,
@@ -27,6 +30,8 @@ impl HttpChannel {
         }
     }
 }
+
+type Boundary = [u8; 16];
 
 impl Acc for HttpChannel {
     fn send(&mut self, address: &Aid, message: MessageEnvelope) -> Result<(), ()> {
@@ -63,18 +68,67 @@ impl Acc for HttpChannel {
     }
 
     fn receive(&mut self) -> Option<MessageEnvelope> {
-        let req = self.server.try_recv().expect("receiving message failed")?;
+        use std::io::Read;
+
+        let mut req = self.server.try_recv().expect("receiving message failed")?;
         log::debug!("Request received: {:?}", req);
 
-        let Ok(req) = Multipart::from_request(req as HttpRequest) else {
+        let Ok(mut req) = Multipart::from_request(&mut req) else {
             log::error!("Request is not multipart");
             return None;
         };
-        None
+
+        let ReadEntryResult::Entry(mut envelope) = req.read_entry_mut() else {
+            log::error!("Error extracting message envelope from multipart request");
+            return None;
+        };
+
+        let mut buf = Vec::with_capacity(128);
+        let len = envelope
+            .data
+            .read_to_end(&mut buf)
+            .expect("failed to read envelope data");
+        log::trace!("Read envelope of length {} bytes", len);
+        log::debug!("Envelope: `{}`", bstr::BString::from(buf.trim_ascii()));
+
+        let envelope = match serde_bencode::from_bytes::<HttpEnvelopeDe>(&buf) {
+            Ok(envelope) => envelope,
+            Err(e) => {
+                log::error!("Error parsing message envelope: {}", e);
+                return None;
+            }
+        };
+
+        let ReadEntryResult::Entry(mut message) = req.read_entry_mut() else {
+            log::error!("Error extracting message from multipart request");
+            return None;
+        };
+
+        buf.clear();
+        let len = message
+            .data
+            .read_to_end(&mut buf)
+            .expect("failed to read acl message data");
+        log::trace!("Read acl message of length {} bytes", len);
+        log::debug!("Acl message: `{}`", bstr::BString::from(buf.trim_ascii()));
+
+        let message = match Message::try_from_bytes(buf.as_slice()) {
+            Ok(message) => message,
+            Err(_e) => {
+                log::error!("Error parsing acl message");
+                return None;
+            }
+        };
+
+        Some(envelope.with_content(message))
     }
 }
 
 struct HttpEnvelopeSer<'a>(&'a MessageEnvelope);
+struct HttpEnvelopeDe {
+    to: Vec<Aid>,
+    from: Option<Aid>,
+}
 
 impl serde::Serialize for HttpEnvelopeSer<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -89,7 +143,103 @@ impl serde::Serialize for HttpEnvelopeSer<'_> {
     }
 }
 
+impl<'de> serde::Deserialize<'de> for HttpEnvelopeDe {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        enum Field {
+            To,
+            From,
+        }
+
+        impl<'de> serde::Deserialize<'de> for Field {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct FieldVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for FieldVisitor {
+                    type Value = Field;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter.write_str("`to` or `from`")
+                    }
+
+                    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        Ok(match v {
+                            "to" => Field::To,
+                            "from" => Field::From,
+                            _ => return Err(serde::de::Error::unknown_field(v, FIELDS)),
+                        })
+                    }
+                }
+
+                deserializer.deserialize_identifier(FieldVisitor)
+            }
+        }
+
+        struct HttpEnvelopeDeVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for HttpEnvelopeDeVisitor {
+            type Value = HttpEnvelopeDe;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("struct envelope")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let mut to = None;
+                let mut from = None;
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::To => {
+                            if to.is_some() {
+                                return Err(serde::de::Error::duplicate_field("to"));
+                            }
+                            to = Some(map.next_value()?);
+                        }
+                        Field::From => {
+                            if from.is_some() {
+                                return Err(serde::de::Error::duplicate_field("from"));
+                            }
+                            from = Some(map.next_value()?);
+                        }
+                    }
+                }
+                let to = to.ok_or_else(|| serde::de::Error::missing_field("to"))?;
+                Ok(HttpEnvelopeDe { to, from })
+            }
+        }
+
+        const FIELDS: &[&str] = &["to", "from"];
+        deserializer.deserialize_struct("envelope", FIELDS, HttpEnvelopeDeVisitor)
+    }
+}
+
+impl HttpEnvelopeDe {
+    fn with_content(self, message: Message) -> MessageEnvelope {
+        let Self { to, from } = self;
+        MessageEnvelope {
+            to,
+            from,
+            date: chrono::DateTime::<chrono::Utc>::MIN_UTC.into(),
+            acl_representation: AclRepresentation::BitEfficient,
+            parameters: BTreeMap::new(),
+            message: MessageKind::Structured(message),
+        }
+    }
+}
+
 fn encode_message(message: MessageEnvelope, boundary: &[u8; 16]) -> Bytes {
+    let boundary = hex::encode(boundary);
     let mut body = BytesMut::new();
 
     // Preamble.
@@ -98,7 +248,7 @@ fn encode_message(message: MessageEnvelope, boundary: &[u8; 16]) -> Bytes {
 
     // Message Envelope boundary.
     body.put_slice(b"--");
-    body.put_slice(boundary);
+    body.put_slice(boundary.as_bytes());
     body.put_slice(b"\r\n");
 
     // Message Envelope headers.
@@ -116,7 +266,7 @@ fn encode_message(message: MessageEnvelope, boundary: &[u8; 16]) -> Bytes {
 
     // Message Body boundary.
     body.put_slice(b"--");
-    body.put_slice(boundary);
+    body.put_slice(boundary.as_bytes());
     body.put_slice(b"\r\n");
 
     // Message Body headers.
@@ -134,10 +284,38 @@ fn encode_message(message: MessageEnvelope, boundary: &[u8; 16]) -> Bytes {
 
     // End boundary.
     body.put_slice(b"--");
-    body.put_slice(boundary);
+    body.put_slice(boundary.as_bytes());
     body.put_slice(b"--");
     body.put_slice(b"\r\n");
     body.put_slice(b"\r\n");
 
     body.freeze()
+}
+
+fn get_multipart_boundary(req: &Request) -> Option<Boundary> {
+    const BOUNDARY: &str = "boundary=";
+
+    let content_type = req
+        .headers()
+        .iter()
+        .find(|header| header.field.equiv("Content-Type"))?
+        .value
+        .as_str();
+
+    // Extract the boundary value from the header.
+    let boundary_value = content_type.find(BOUNDARY).map(|pos| {
+        let after_boundary = &content_type[pos + BOUNDARY.len()..];
+        match after_boundary.split_once(';') {
+            Some((value, _)) => value,
+            None => after_boundary,
+        }
+    })?;
+
+    // Trim surrounding double quotes if present.
+    let boundary = boundary_value
+        .strip_prefix('"')
+        .and_then(|s| s.strip_suffix('"'))
+        .unwrap_or(boundary_value);
+
+    Some(hex::decode(boundary).ok()?.try_into().ok()?)
 }

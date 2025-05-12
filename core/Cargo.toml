@@ -17,10 +17,12 @@ serde = { version = "1.0", default-features = false }
 embassy-time = "0.3"
 
 [target.'cfg(not(target_os = "none"))'.dependencies]
+
+# Http acc specific dependencies.
 tiny_http = "0.12"
 ureq = { version = "3.0", default-features = false }
 rand = "0.9"
 hex = "0.4"
-multipart-any = { version = "0.16.1-p1", default-features = false, features = ["server", "tiny_http"] }
 bytes = "1.10"
 serde_bencode = "0.2"
+multipart = { git = "https://github.com/exellentcoin26/multipart-rs.git", features = ["server", "tiny_http"] }

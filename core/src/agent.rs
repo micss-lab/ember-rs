@@ -58,7 +58,7 @@ impl<E: 'static> AgentLike for Agent<E> {
         use crate::acl::codec::AgentActionCodec;
         use AgentState::*;
 
-        log::trace!("Ticking agent `{}`", self.name);
+        // log::trace!("Ticking agent `{}`", self.name);
 
         match self.state {
             Initiated => {
@@ -83,7 +83,7 @@ impl<E: 'static> AgentLike for Agent<E> {
                         .into(),
                     },
                 ));
-                log::debug!("Sending ams register request.");
+                log::debug!("Sending ams register request for agent `{}`.", self.name);
                 self.state = Active;
                 return false;
             }
@@ -132,12 +132,17 @@ impl Aid {
         Self::local("ams")
     }
 
-    pub fn remote(agent: impl ToString, platform: impl ToString) -> Self {
+    pub fn general(agent: impl ToString, platform: impl ToString) -> Self {
+        let platform = {
+            let platform = platform.to_string();
+            match platform.as_str() {
+                "local" => AgentPlatform::Local,
+                _ => AgentPlatform::Public(platform),
+            }
+        };
+
         Self {
-            name: (
-                agent.to_string(),
-                AgentPlatform::Public(platform.to_string()),
-            ),
+            name: (agent.to_string(), platform),
         }
     }
 
@@ -206,5 +211,79 @@ impl serde::Serialize for Aid {
         let mut aid = serializer.serialize_struct("agent-identifier", 1)?;
         aid.serialize_field("name", &self.to_string())?;
         aid.end()
+    }
+}
+
+impl<'de> serde::Deserialize<'de> for Aid {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        enum Field {
+            Name,
+        }
+
+        impl<'de> serde::Deserialize<'de> for Field {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct FieldVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for FieldVisitor {
+                    type Value = Field;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter.write_str("`name`")
+                    }
+
+                    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        Ok(match v {
+                            "name" => Field::Name,
+                            _ => return Err(serde::de::Error::unknown_field(v, FIELDS)),
+                        })
+                    }
+                }
+
+                deserializer.deserialize_identifier(FieldVisitor)
+            }
+        }
+
+        struct AidVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for AidVisitor {
+            type Value = Aid;
+
+            fn expecting(&self, formatter: &mut alloc::fmt::Formatter) -> alloc::fmt::Result {
+                formatter.write_str("struct agent-identifier")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let mut name = None;
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Name => {
+                            if name.is_some() {
+                                return Err(serde::de::Error::duplicate_field("name"));
+                            }
+                            name = Some(map.next_value()?);
+                        }
+                    }
+                }
+
+                let name: String = name.ok_or_else(|| serde::de::Error::missing_field("name"))?;
+
+                Ok(name.parse().map_err(serde::de::Error::custom)?)
+            }
+        }
+
+        const FIELDS: &[&str] = &["name"];
+        deserializer.deserialize_struct("agent-identifier", FIELDS, AidVisitor)
     }
 }
