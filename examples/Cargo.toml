@@ -19,6 +19,7 @@ log = "0.4.22"
 no-std-framework-core = { path = "../core" }
 
 [target.'cfg(not(target_os = "none"))'.dependencies]
+env_logger = "0.11.8"
 critical-section = { version = "1.2.0", features = ["std"] }
 
 [target.'cfg(target_os = "none")'.dependencies]
