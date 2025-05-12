@@ -2,6 +2,8 @@ use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
+use bstr::ByteSlice;
+use core::fmt::Write;
 use core::marker::PhantomData;
 use core::ops::Deref;
 
@@ -13,7 +15,8 @@ pub struct Content(pub Vec<ContentElement>);
 
 impl Content {
     pub fn parse(input: impl AsRef<bstr::BStr>) -> Result<Self, String> {
-        parser::sl0_content::content(&parser::BStr::from(input.as_ref())).map_err(|e| e.to_string())
+        parser::sl0_content::content(&crate::util::parsing::BStr::from(input.as_ref()))
+            .map_err(|e| e.to_string())
     }
 }
 
@@ -130,111 +133,10 @@ impl<C> FromIterator<Term> for Collection<C> {
 }
 
 mod parser {
-    pub(super) use self::input::BStr;
-
-    mod input {
-        pub(crate) struct BStr<'a>(&'a bstr::BStr);
-
-        impl<'a> From<&'a bstr::BStr> for BStr<'a> {
-            fn from(value: &'a bstr::BStr) -> Self {
-                Self(value)
-            }
-        }
-
-        impl<'a> core::ops::Deref for BStr<'a> {
-            type Target = bstr::BStr;
-
-            fn deref(&self) -> &Self::Target {
-                self.0
-            }
-        }
-
-        pub struct LineCol {
-            /// Byte offset from start of string (0-indexed).
-            pub offset: usize,
-
-            /// Line (1-indexed).
-            pub line: usize,
-
-            /// Column (1-indexed).
-            pub column: usize,
-        }
-
-        impl core::fmt::Display for LineCol {
-            fn fmt(
-                &self,
-                fmt: &mut ::core::fmt::Formatter,
-            ) -> ::core::result::Result<(), ::core::fmt::Error> {
-                write!(
-                    fmt,
-                    "({}:{})[byte: {}]",
-                    self.line, self.column, self.offset
-                )
-            }
-        }
-
-        impl<'a> peg::Parse for BStr<'a> {
-            type PositionRepr = LineCol;
-
-            #[inline]
-            fn start(&self) -> usize {
-                0
-            }
-
-            #[inline]
-            fn is_eof(&self, pos: usize) -> bool {
-                pos >= self.len()
-            }
-
-            fn position_repr(&self, pos: usize) -> LineCol {
-                use bstr::ByteSlice;
-
-                let before = &self[..pos];
-                let line = before.iter().filter(|&&c| c == b'\n').count() + 1;
-                let column = before.chars().rev().take_while(|&c| c != '\n').count() + 1;
-                LineCol {
-                    line,
-                    column,
-                    offset: pos,
-                }
-            }
-        }
-
-        impl<'a, 'input> peg::ParseElem<'input> for BStr<'a> {
-            type Element = u8;
-
-            #[inline]
-            fn parse_elem(&'input self, pos: usize) -> peg::RuleResult<u8> {
-                match self[pos..].first() {
-                    Some(c) => peg::RuleResult::Matched(pos + 1, *c),
-                    None => peg::RuleResult::Failed,
-                }
-            }
-        }
-
-        impl<'a> peg::ParseLiteral for BStr<'a> {
-            #[inline]
-            fn parse_string_literal(&self, pos: usize, literal: &str) -> peg::RuleResult<()> {
-                let l = literal.len();
-                if self.len() >= pos + l && self[pos..pos + l] == literal.as_bytes() {
-                    peg::RuleResult::Matched(pos + l, ())
-                } else {
-                    peg::RuleResult::Failed
-                }
-            }
-        }
-        impl<'a, 'input> peg::ParseSlice<'input> for BStr<'a> {
-            type Slice = &'input bstr::BStr;
-
-            #[inline]
-            fn parse_slice(&'input self, p1: usize, p2: usize) -> &'input bstr::BStr {
-                &self[p1..p2]
-            }
-        }
-    }
+    use crate::util::parsing::BStr;
 
     peg::parser! {
-        pub(super) grammar sl0_content<'a>() for input::BStr<'a> {
+        pub(super) grammar sl0_content<'a>() for BStr<'a> {
             use bstr::ByteSlice;
             use chrono::{DateTime, FixedOffset, Utc};
 
@@ -262,7 +164,7 @@ mod parser {
             rule atomic_formula() -> Predicate
                 = s:propostion_symbol() { Predicate::Regular { symbol: s, terms: Vec::with_capacity(0) }}
                 / lbrace() _ "result" _ lhs:term() _ rhs:term() _ rbrace() { Predicate::Result { lhs, rhs } }
-                / lbrace() _ s:predicate_symbol() _ t:(t:term() _ { t })+ _ rbrace() { Predicate::  Regular { symbol: s, terms: t } }
+                / lbrace() _ s:predicate_symbol() _ t:(t:term() _ { t })+ _ rbrace() { Predicate::Regular { symbol: s, terms: t } }
                 / "true" { Predicate::Bool(true) }
                 / "false" { Predicate::Bool(false) }
 
@@ -604,6 +506,154 @@ mod parser {
             fn complex_datetime() {
                 parse("((action agent1 2023-05-17T10:30:00.123+02:00))").unwrap();
             }
+        }
+    }
+}
+
+mod serialize {
+    use core::fmt::Write;
+
+    use bstr::ByteSlice;
+
+    use super::{AgentAction, Content, ContentElement, Predicate, Term};
+
+    impl core::fmt::Display for Content {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            f.write_char('(')?;
+            for e in self.0.iter() {
+                write!(f, "{}", e)?;
+            }
+            f.write_char(')')
+        }
+    }
+
+    impl core::fmt::Display for ContentElement {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            use ContentElement::*;
+            match self {
+                AgentAction(a) => write!(f, "{}", a),
+                Predicate(p) => write!(f, "{}", p),
+            }
+        }
+    }
+
+    impl core::fmt::Display for Predicate {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            match self {
+                Predicate::Regular { symbol, terms } => {
+                    if terms.len() != 0 {
+                        f.write_char('(')?;
+                    }
+                    f.write_str(symbol.to_str().expect("symbol should be utf-8"))?;
+                    for t in terms {
+                        write!(f, " {}", t)?;
+                    }
+                    if terms.len() != 0 {
+                        f.write_char(')')?;
+                    }
+                    Ok(())
+                }
+                Predicate::Result { lhs, rhs } => {
+                    f.write_str("(result")?;
+                    write!(f, " {}", lhs)?;
+                    write!(f, " {}", rhs)?;
+                    f.write_char(')')
+                }
+                Predicate::Done { action } => {
+                    f.write_str("(done")?;
+                    write!(f, " {}", action)?;
+                    f.write_char(')')
+                }
+                Predicate::Bool(b) => f.write_str(if *b { "true" } else { "false" }),
+            }
+        }
+    }
+
+    impl core::fmt::Display for AgentAction {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            let Self { agent, action } = self;
+            f.write_str("(action")?;
+            write!(f, " {}", agent)?;
+            write!(f, " {}", action)
+        }
+    }
+
+    impl core::fmt::Display for Term {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            use Term::*;
+            match self {
+                Constant(c) => write!(f, "{}", c),
+                Set(s) => {
+                    f.write_str("(set")?;
+                    for t in s.items.iter() {
+                        write!(f, " {}", t)?;
+                    }
+                    f.write_char(')')
+                }
+                Sequence(s) => {
+                    f.write_str("(sequence")?;
+                    for t in s.items.iter() {
+                        write!(f, " {}", t)?;
+                    }
+                    f.write_char(')')
+                }
+                Concept(c) => write!(f, "{}", c),
+                Action(a) => write!(f, "{}", a),
+            }
+        }
+    }
+}
+
+impl core::fmt::Display for Concept {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let Self { symbol, parameters } = self;
+        f.write_char('(')?;
+        f.write_str(&symbol.to_str().expect("symbol should be utf-8"))?;
+        match parameters {
+            ConceptParameters::Positional(parameters) => {
+                for p in parameters.iter() {
+                    write!(f, " {}", p)?;
+                }
+            }
+            ConceptParameters::ByName(parameters) => {
+                for (n, v) in parameters.iter() {
+                    write!(
+                        f,
+                        " {} {}",
+                        n.to_str().expect("parameter name should be utf-8"),
+                        v
+                    )?;
+                }
+            }
+        }
+        f.write_char(')')
+    }
+}
+
+impl core::fmt::Display for Constant {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        use Constant::*;
+        match self {
+            Number(n) => write!(f, "{}", n),
+            String(s) => {
+                f.write_char('"')?;
+                match s.to_str() {
+                    Ok(s) => f.write_str(s)?,
+                    Err(_) => unimplemented!(),
+                }
+                f.write_char('"')
+            }
+            Datatime(_) => todo!(),
+        }
+    }
+}
+
+impl core::fmt::Display for Number {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        use Number::*;
+        match self {
+            Int(i) => write!(f, "{}", i),
+            Float(fl) => write!(f, "{}", fl),
         }
     }
 }

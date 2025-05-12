@@ -58,7 +58,7 @@ impl<E: 'static> AgentLike for Agent<E> {
         use crate::acl::codec::AgentActionCodec;
         use AgentState::*;
 
-        log::trace!("Ticking agent `{}`", self.name);
+        // log::trace!("Ticking agent `{}`", self.name);
 
         match self.state {
             Initiated => {
@@ -83,7 +83,7 @@ impl<E: 'static> AgentLike for Agent<E> {
                         .into(),
                     },
                 ));
-                log::debug!("Sending ams register request.");
+                log::debug!("Sending ams register request for agent `{}`.", self.name);
                 self.state = Active;
                 return false;
             }
@@ -108,10 +108,9 @@ impl<E: 'static> AgentLike for Agent<E> {
     }
 }
 
-#[derive(Debug, Clone, PartialOrd, Ord)]
-pub enum Aid {
-    Ams,
-    Other { name: String, ap: AgentPlatform },
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Aid {
+    name: (String, AgentPlatform),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -120,20 +119,43 @@ pub enum AgentPlatform {
     Public(String),
 }
 
+pub type TransportAddress = String;
+
 impl Aid {
     pub fn local(agent: impl ToString) -> Self {
-        let agent = agent.to_string();
-        if agent == "ams" {
-            return Self::ams();
-        }
-        Self::Other {
-            name: agent.to_string(),
-            ap: AgentPlatform::Local,
+        Self {
+            name: (agent.to_string(), AgentPlatform::Local),
         }
     }
 
     pub fn ams() -> Self {
-        Self::Ams
+        Self::local("ams")
+    }
+
+    pub fn general(agent: impl ToString, platform: impl ToString) -> Self {
+        let platform = {
+            let platform = platform.to_string();
+            match platform.as_str() {
+                "local" => AgentPlatform::Local,
+                _ => AgentPlatform::Public(platform),
+            }
+        };
+
+        Self {
+            name: (agent.to_string(), platform),
+        }
+    }
+
+    pub fn is_local(&self) -> bool {
+        matches!(self.name.1, AgentPlatform::Local)
+    }
+
+    pub fn to_local(self) -> Self {
+        Self::local(self.name.0)
+    }
+
+    pub(crate) fn to_transport_address(&self) -> TransportAddress {
+        format!("http://{}/acc", self.name.1)
     }
 }
 
@@ -141,18 +163,14 @@ impl core::str::FromStr for Aid {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s == "ams@local" {
-            return Ok(Self::Ams);
-        }
         let Some((name, ap)) = s.split_once('@') else {
             return Err(
                 "Failed to parse aid: incorrect format (expected <agent-name>@<agent-platform>)"
                     .into(),
             );
         };
-        Ok(Self::Other {
-            name: name.to_string(),
-            ap: ap.parse()?,
+        Ok(Self {
+            name: (name.to_string(), ap.parse()?),
         })
     }
 }
@@ -170,10 +188,7 @@ impl core::str::FromStr for AgentPlatform {
 
 impl core::fmt::Display for Aid {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        match self {
-            Self::Ams => write!(f, "ams@local"),
-            Self::Other { name, ap } => write!(f, "{}@{}", name, ap),
-        }
+        write!(f, "{}@{}", self.name.0, self.name.1)
     }
 }
 
@@ -186,19 +201,89 @@ impl core::fmt::Display for AgentPlatform {
     }
 }
 
-impl PartialEq for Aid {
-    fn eq(&self, other: &Self) -> bool {
-        use Aid::*;
-        match (self, other) {
-            // AMS special case: both either Ams or Other { name: "ams", ap: Local }
-            (Ams, Ams) => true,
-            (Ams, Other { name, ap }) | (Other { name, ap }, Ams) => {
-                name.eq_ignore_ascii_case("ams") && ap == &AgentPlatform::Local
-            }
-            // All other cases: structural equality
-            (Other { name: n1, ap: ap1 }, Other { name: n2, ap: ap2 }) => n1 == n2 && ap1 == ap2,
-        }
+impl serde::Serialize for Aid {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+
+        let mut aid = serializer.serialize_struct("agent-identifier", 1)?;
+        aid.serialize_field("name", &self.to_string())?;
+        aid.end()
     }
 }
 
-impl Eq for Aid {}
+impl<'de> serde::Deserialize<'de> for Aid {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        enum Field {
+            Name,
+        }
+
+        impl<'de> serde::Deserialize<'de> for Field {
+            fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct FieldVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for FieldVisitor {
+                    type Value = Field;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        formatter.write_str("`name`")
+                    }
+
+                    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        Ok(match v {
+                            "name" => Field::Name,
+                            _ => return Err(serde::de::Error::unknown_field(v, FIELDS)),
+                        })
+                    }
+                }
+
+                deserializer.deserialize_identifier(FieldVisitor)
+            }
+        }
+
+        struct AidVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for AidVisitor {
+            type Value = Aid;
+
+            fn expecting(&self, formatter: &mut alloc::fmt::Formatter) -> alloc::fmt::Result {
+                formatter.write_str("struct agent-identifier")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::MapAccess<'de>,
+            {
+                let mut name = None;
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Name => {
+                            if name.is_some() {
+                                return Err(serde::de::Error::duplicate_field("name"));
+                            }
+                            name = Some(map.next_value()?);
+                        }
+                    }
+                }
+
+                let name: String = name.ok_or_else(|| serde::de::Error::missing_field("name"))?;
+
+                Ok(name.parse().map_err(serde::de::Error::custom)?)
+            }
+        }
+
+        const FIELDS: &[&str] = &["name"];
+        deserializer.deserialize_struct("agent-identifier", FIELDS, AidVisitor)
+    }
+}
