@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+elf = "build/stop_container.ino.elf"
+firmware = "build/stop_container.ino.bin"

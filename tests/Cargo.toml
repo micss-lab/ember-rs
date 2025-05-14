@@ -1,0 +1,10 @@
+[package]
+name = "no-std-framework-tests"
+version = "0.1.0"
+edition = "2021"
+
+[target.'cfg(not(target_os = "none"))'.dev-dependencies]
+no-std-framework-core = { path = "../core" }
+critical-section = { version = "1.2.0", features = ["std"] }
+test-log = "0.2.16"
+log = "0.4.22"

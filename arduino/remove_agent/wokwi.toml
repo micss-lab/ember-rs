@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+elf = "build/remove_agent.ino.elf"
+firmware = "build/remove_agent.ino.bin"

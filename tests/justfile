@@ -1,0 +1,7 @@
+cargo-args := "--locked"
+
+default:
+    just --list
+
+run CARGO_EXTRA_ARGS="":
+    cargo test-local {{cargo-args}} {{CARGO_EXTRA_ARGS}}

@@ -1,0 +1,9 @@
+# Nix-related artifacts.
+/.devenv
+
+# Rust build artifacts.
+/target
+
+# Editor artifacts.
+.idea
+.ccls-cache

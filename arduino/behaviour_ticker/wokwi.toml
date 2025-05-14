@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+elf = "build/behaviour_ticker.ino.elf"
+firmware = "build/behaviour_ticker.ino.bin"

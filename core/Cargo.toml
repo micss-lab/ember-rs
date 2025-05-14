@@ -1,0 +1,28 @@
+[package]
+name = "no-std-framework-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bstr = { version = "1.11", default-features = false, features = ["alloc"] }
+cfg-if = "1"
+chrono = { version = "0.4", default-features = false }
+critical-section = "1.2"
+libm = "0.2"
+log = "0.4"
+peg = { version = "0.8", default-features = false, git = "https://github.com/exellentcoin26/rust-peg.git" }
+serde = { version = "1.0", default-features = false }
+
+[target.'cfg(target_os = "none")'.dependencies]
+embassy-time = "0.3"
+
+[target.'cfg(not(target_os = "none"))'.dependencies]
+
+# Http acc specific dependencies.
+tiny_http = "0.12"
+ureq = { version = "3.0", default-features = false }
+rand = "0.9"
+hex = "0.4"
+bytes = "1.10"
+serde_bencode = "0.2"
+multipart = { git = "https://github.com/exellentcoin26/multipart-rs.git", features = ["server", "tiny_http"] }

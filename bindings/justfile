@@ -1,0 +1,13 @@
+target-dir := "`cargo metadata --format-version 1 | jq -r '.target_directory'`"
+
+default:
+    @ echo -n "\"Bindings\" module defines following "
+    @ just --list
+
+build:
+    cargo build --release --target riscv32imc-unknown-none-elf --package no-std-framework-bindings
+
+update-arduino-lib: build
+    echo {{target-dir}}
+    cp {{target-dir}}/riscv32imc-unknown-none-elf/release/libframework_core.a ../arduino/libraries/Framework/src/esp32c3/FrameworkCore.a
+    cp {{target-dir}}/bindings.hpp ../arduino/libraries/Framework/src/FrameworkCore.h

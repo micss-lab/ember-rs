@@ -1,0 +1,35 @@
+[package]
+name = "no-std-framework-examples"
+version = "0.1.0"
+edition = "2021"
+
+[profile.dev]
+opt-level = 3
+debug = false
+strip = "none"
+debug-assertions = false
+overflow-checks = false
+lto = false
+incremental = false
+codegen-units = 16
+rpath = false
+
+[dependencies]
+log = "0.4.22"
+no-std-framework-core = { path = "../core" }
+
+[target.'cfg(not(target_os = "none"))'.dependencies]
+env_logger = "0.11.8"
+critical-section = { version = "1.2.0", features = ["std"] }
+
+[target.'cfg(target_os = "none")'.dependencies]
+esp-alloc = "0.5.0"
+esp-println = { version = "0.12.0", features = ["esp32c3", "log"] }
+esp-backtrace = { version = "0.14.2", default-features = false, features = [
+    "esp32c3",
+    "println",
+    "panic-handler",
+] }
+esp-hal = { version = "0.22.0", features = ["esp32c3"] }
+# Provides an `embassy-time` time-driver implementation.
+esp-hal-embassy = { version = "0.5.0", features = ["esp32c3"] }
