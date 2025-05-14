@@ -62,10 +62,11 @@
               cargoVendorDir = craneLib.vendorMultipleCargoDeps {
                 inherit (craneLib.findCargoFiles sources.cargo) cargoConfigs;
                 cargoLockList = [
-                  ./core/Cargo.lock
-                  ./examples/Cargo.lock
-                  ./tests/Cargo.lock
-                  ./bindings/Cargo.lock
+                  ./Cargo.lock
+                  # ./core/Cargo.lock
+                  # ./examples/Cargo.lock
+                  # ./tests/Cargo.lock
+                  # ./bindings/Cargo.lock
                 ];
               };
 
