@@ -109,6 +109,7 @@ impl Container {
         self.agents.push_back(Box::new(agent));
     }
 
+    #[cfg(not(target_os = "none"))]
     pub fn with_http(mut self, port: u16) -> Self {
         self.mts.enable_http(port);
         self

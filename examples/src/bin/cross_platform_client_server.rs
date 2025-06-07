@@ -1,6 +1,9 @@
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
 
+// Avoid unused imports on unsupported targets.
+#![cfg_attr(target_os = "none", allow(unused))]
+
 use alloc::format;
 use core::str::FromStr;
 
@@ -113,6 +116,12 @@ where
     }
 }
 
+#[cfg(target_os = "none")]
+fn example() {
+    panic!("This example only works on targets with the standard library");
+}
+
+#[cfg(not(target_os = "none"))]
 fn example() {
     let mut client_container = Container::default()
         .with_http(1338)

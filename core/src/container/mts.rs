@@ -13,6 +13,7 @@ impl Mts {
         }
     }
 
+    #[cfg(not(target_os = "none"))]
     pub(super) fn enable_http(&mut self, port: u16) {
         self.channels.enable_http(port);
     }

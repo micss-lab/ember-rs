@@ -1,7 +1,9 @@
 use crate::{acl::message::MessageEnvelope, Aid};
 
+#[cfg(not(target_os = "none"))]
 use self::http::HttpChannel;
 
+#[cfg(not(target_os = "none"))]
 mod http;
 
 pub(crate) trait Acc {
@@ -11,14 +13,19 @@ pub(crate) trait Acc {
 }
 
 pub(crate) struct Channels {
+    #[cfg(not(target_os = "none"))]
     http: Option<HttpChannel>,
 }
 
 impl Channels {
     pub(crate) fn new() -> Self {
-        Self { http: None }
+        Self {
+            #[cfg(not(target_os = "none"))]
+            http: None,
+        }
     }
 
+    #[cfg(not(target_os = "none"))]
     pub(crate) fn enable_http(&mut self, port: u16) {
         if self.http.is_some() {
             log::warn!("Http already enabled. Nothing changed.");
@@ -30,12 +37,24 @@ impl Channels {
 
 impl Acc for Channels {
     fn send(&mut self, address: &Aid, message: MessageEnvelope) -> Result<(), ()> {
-        self.http
-            .as_mut()
-            .map_or(Err(()), |http| http.send(address, message))
+        cfg_if::cfg_if! {
+            if #[cfg(not(target_os = "none"))] {
+                self.http
+                    .as_mut()
+                    .map_or(Err(()), |http| http.send(address, message))
+            } else {
+                Ok(())
+            }
+        }
     }
 
     fn receive(&mut self) -> Option<MessageEnvelope> {
-        self.http.as_mut()?.receive()
+        cfg_if::cfg_if! {
+            if #[cfg(not(target_os = "none"))] {
+                self.http.as_mut()?.receive()
+            } else {
+                None
+            }
+        }
     }
 }

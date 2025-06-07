@@ -11,7 +11,7 @@ critical-section = "1.2"
 libm = "0.2"
 log = "0.4"
 peg = { version = "0.8", default-features = false, git = "https://github.com/exellentcoin26/rust-peg.git" }
-serde = { version = "1.0", default-features = false }
+serde = { version = "1.0", default-features = false, features = ["alloc"] }
 
 [target.'cfg(target_os = "none")'.dependencies]
 embassy-time = "0.3"
