@@ -1,4 +1,4 @@
 [wokwi]
 version = 1
-firmware = "../target/riscv32imc-unknown-none-elf/debug/client_server"
-elf = "../target/riscv32imc-unknown-none-elf/debug/client_server"
+firmware = "../target/xtensa-esp32-none-elf/debug/client_server"
+elf = "../target/xtensa-esp32-none-elf/debug/client_server"
