@@ -34,6 +34,17 @@ where
     fn into_behaviour(self) -> Box<dyn Behaviour<Event = Self::Event>>;
 }
 
+// This way the user can convert the behaviour to a boxed one by themselves and still pass it to
+// functions expecting and "IntoBehaviour" impl.
+struct BoxedBehviour;
+impl<E> IntoBehaviour<BoxedBehviour> for Box<dyn Behaviour<Event = E>> {
+    type Event = E;
+
+    fn into_behaviour(self) -> Box<dyn Behaviour<Event = Self::Event>> {
+        self
+    }
+}
+
 fn get_id() -> BehaviourId {
     static ID_COUNTER: AtomicU32 = AtomicU32::new(0);
     BehaviourId(ID_COUNTER.get_increment())
