@@ -1,5 +1,4 @@
 use alloc::boxed::Box;
-use alloc::vec::Vec;
 
 pub use self::complex::{parallel, sequential};
 pub use self::simple::{CyclicBehaviour, OneShotBehaviour, TickerBehaviour};
@@ -10,8 +9,6 @@ use crate::util::sync::AtomicU32;
 
 pub(crate) mod complex;
 mod simple;
-
-pub(crate) type BehaviourVec<E> = Vec<Box<dyn Behaviour<Event = E>>>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
@@ -36,7 +33,8 @@ where
 
 // This way the user can convert the behaviour to a boxed one by themselves and still pass it to
 // functions expecting and "IntoBehaviour" impl.
-struct BoxedBehviour;
+#[doc(hidden)]
+pub struct BoxedBehviour;
 impl<E> IntoBehaviour<BoxedBehviour> for Box<dyn Behaviour<Event = E>> {
     type Event = E;
 

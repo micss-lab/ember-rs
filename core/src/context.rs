@@ -1,10 +1,8 @@
-use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use self::messsage_store::MessageStore;
 use crate::acl::message::{Message, MessageEnvelope, MessageFilter};
-use crate::behaviour::complex::queue::ScheduleStrategy;
-use crate::behaviour::{BehaviourId, BehaviourVec, IntoBehaviour};
+use crate::behaviour::BehaviourId;
 
 mod messsage_store;
 
@@ -29,7 +27,6 @@ pub(crate) struct AgentContext {
 
 pub(crate) struct LocalContext<E> {
     pub(crate) events: Vec<E>,
-    pub(crate) new_behaviours: Option<BTreeMap<ScheduleStrategy, BehaviourVec<E>>>,
     pub(crate) removed_behaviours: Vec<BehaviourId>,
     pub(crate) should_block: bool,
 }
@@ -38,7 +35,6 @@ impl<E> Default for LocalContext<E> {
     fn default() -> Self {
         Self {
             events: Vec::with_capacity(0),
-            new_behaviours: None,
             removed_behaviours: Vec::with_capacity(0),
             should_block: false,
         }
@@ -71,36 +67,6 @@ impl<E: 'static> Context<E> {
 
     pub fn block_behaviour(&mut self) {
         self.local.should_block = true;
-    }
-
-    fn insert_behaviour<K>(
-        &mut self,
-        behaviour: impl IntoBehaviour<K, Event = E>,
-        strategy: ScheduleStrategy,
-    ) -> BehaviourId {
-        let behaviour = behaviour.into_behaviour();
-        let id = behaviour.id();
-        self.local
-            .new_behaviours
-            .get_or_insert_with(BTreeMap::default)
-            .entry(strategy)
-            .or_default()
-            .push(behaviour);
-        id
-    }
-
-    pub fn insert_next_behaviour<K>(
-        &mut self,
-        behaviour: impl IntoBehaviour<K, Event = E>,
-    ) -> BehaviourId {
-        self.insert_behaviour(behaviour, ScheduleStrategy::Next)
-    }
-
-    pub fn append_behaviour<K>(
-        &mut self,
-        behaviour: impl IntoBehaviour<K, Event = E>,
-    ) -> BehaviourId {
-        self.insert_behaviour(behaviour, ScheduleStrategy::End)
     }
 
     pub fn remove_behaviour(&mut self, id: BehaviourId) {

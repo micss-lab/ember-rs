@@ -1,7 +1,9 @@
 use alloc::boxed::Box;
+use alloc::collections::vec_deque::VecDeque;
 
+use super::blocked::BlockTracker;
 use super::macros::{complex_action_impl, complex_behaviour_methods};
-use super::queue::{BehaviourQueue, BehaviourScheduler, ScheduleStrategy};
+use super::scheduler::BehaviourScheduler;
 use super::{get_id, Behaviour, BehaviourId, ComplexBehaviour, Context, IntoBehaviour};
 
 pub trait ParallelBehaviour {
@@ -9,13 +11,18 @@ pub trait ParallelBehaviour {
 
     type ChildEvent;
 
-    fn initial_behaviours(&self) -> ParallelBehaviourQueue<Self::ChildEvent>;
+    fn finish_strategy(&self) -> FinishStrategy;
+
+    fn initial_behaviours(
+        &self,
+    ) -> impl IntoIterator<Item = Box<dyn Behaviour<Event = Self::ChildEvent>>>;
 
     complex_behaviour_methods!();
 }
 
 pub struct ParallelBehaviourQueue<E> {
-    queue: BehaviourQueue<E>,
+    blocked: BlockTracker,
+    behaviours: VecDeque<Box<dyn Behaviour<Event = E>>>,
     finished: usize,
     strategy: FinishStrategy,
 }
@@ -28,57 +35,79 @@ pub enum FinishStrategy {
 }
 
 impl<E: 'static> ParallelBehaviourQueue<E> {
-    pub fn new(strategy: FinishStrategy) -> Self {
+    pub fn new<K>(
+        behaviours: impl IntoIterator<Item = impl IntoBehaviour<K, Event = E>>,
+        strategy: FinishStrategy,
+    ) -> Self {
+        let behaviours: VecDeque<_> = behaviours.into_iter().map(|b| b.into_behaviour()).collect();
+        let blocked = BlockTracker::new(behaviours.iter().map(|b| b.id()));
         Self {
-            queue: BehaviourQueue::new(),
+            blocked,
+            behaviours,
             finished: 0,
             strategy,
         }
     }
-}
 
-impl<E: 'static> ParallelBehaviourQueue<E> {
-    pub fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Event = E>) -> BehaviourId {
-        let behaviour = behaviour.into_behaviour();
-        let id = behaviour.id();
-        self.schedule(behaviour, ScheduleStrategy::End);
-        id
+    pub(crate) fn new_empty(strategy: FinishStrategy) -> Self {
+        Self {
+            blocked: BlockTracker::default(),
+            behaviours: VecDeque::default(),
+            finished: 0,
+            strategy,
+        }
     }
 
-    pub fn with_behaviour<K>(mut self, behaviour: impl IntoBehaviour<K, Event = E>) -> Self {
+    pub(crate) fn with_behaviour<K>(mut self, behaviour: impl IntoBehaviour<K, Event = E>) -> Self {
         self.add_behaviour(behaviour);
         self
+    }
+
+    pub(crate) fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Event = E>) {
+        let behaviour = behaviour.into_behaviour();
+        self.blocked.register(behaviour.id());
+        self.behaviours.push_back(behaviour);
     }
 }
 
 impl<E: 'static> BehaviourScheduler<E> for ParallelBehaviourQueue<E> {
     fn next(&mut self) -> Option<Box<dyn Behaviour<Event = E>>> {
-        self.queue.pop()
-    }
-
-    fn schedule(&mut self, behaviour: Box<dyn Behaviour<Event = E>>, strategy: ScheduleStrategy) {
-        self.queue.push(behaviour, strategy)
+        let behaviour = self.behaviours.pop_front()?;
+        let id = behaviour.id();
+        if self
+            .blocked
+            .is_blocked(id)
+            .expect("scheduled behaviour should be registered with block tracker")
+        {
+            return None;
+        }
+        self.blocked.unregister(id);
+        Some(behaviour)
     }
 
     fn reschedule(&mut self, behaviour: Box<dyn Behaviour<Event = E>>) {
-        self.schedule(behaviour, ScheduleStrategy::End);
+        self.blocked.register(behaviour.id());
+        self.behaviours.push_back(behaviour);
     }
 
     fn remove(&mut self, id: BehaviourId) -> bool {
-        self.queue.remove(id)
+        let len = self.behaviours.len();
+        self.blocked.unregister(id);
+        self.behaviours.retain(|b| b.id() != id);
+        len != self.behaviours.len()
     }
 
     fn block(&mut self, id: BehaviourId) -> bool {
-        self.queue.block(id)
+        self.blocked.block(id)
     }
 
     fn unblock_all(&mut self) {
-        self.queue.unblock_all();
+        self.blocked.unblock_all();
     }
 
     fn is_finished(&self) -> bool {
         match self.strategy {
-            FinishStrategy::All => self.queue.is_empty(),
+            FinishStrategy::All => self.behaviours.is_empty(),
             FinishStrategy::One => self.finished >= 1,
             FinishStrategy::N(n) => self.finished >= n,
             FinishStrategy::Never => false,
@@ -112,7 +141,7 @@ where
     type Event = E;
 
     fn into_behaviour(self) -> Box<dyn Behaviour<Event = Self::Event>> {
-        let queue = self.initial_behaviours();
+        let queue = ParallelBehaviourQueue::new(self.initial_behaviours(), self.finish_strategy());
         Box::new(ComplexBehaviour {
             id: get_id(),
             kind: ParallelBehaviourImpl(self),

@@ -3,7 +3,6 @@ use alloc::format;
 use alloc::string::{String, ToString};
 
 use crate::acl::message::{Message, MessageEnvelope, Performative};
-use crate::behaviour::complex::queue::{BehaviourScheduler, ScheduleStrategy};
 use crate::behaviour::parallel::{FinishStrategy, ParallelBehaviourQueue};
 use crate::behaviour::{BehaviourId, IntoBehaviour};
 use crate::container::AgentLike;
@@ -33,7 +32,7 @@ impl<E: 'static> Agent<E> {
     pub fn new(name: impl ToString) -> Self {
         Self {
             name: name.to_string(),
-            behaviours: ParallelBehaviourQueue::new(FinishStrategy::Never),
+            behaviours: ParallelBehaviourQueue::new_empty(FinishStrategy::Never),
             state: AgentState::Initiated,
         }
     }
@@ -48,7 +47,7 @@ impl<E: 'static> Agent<E> {
     pub fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Event = E>) -> BehaviourId {
         let behaviour = behaviour.into_behaviour();
         let id = behaviour.id();
-        self.behaviours.schedule(behaviour, ScheduleStrategy::End);
+        self.behaviours.add_behaviour(behaviour);
         id
     }
 }
@@ -56,6 +55,7 @@ impl<E: 'static> Agent<E> {
 impl<E: 'static> AgentLike for Agent<E> {
     fn update(&mut self, ctx: &mut ContainerContext) -> bool {
         use crate::acl::codec::AgentActionCodec;
+        use crate::behaviour::complex::scheduler::BehaviourScheduler;
         use AgentState::*;
 
         // log::trace!("Ticking agent `{}`", self.name);

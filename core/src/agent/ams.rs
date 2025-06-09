@@ -4,7 +4,6 @@ use alloc::vec::Vec;
 
 use crate::acl::message::{MessageFilter, Performative};
 use crate::adt::{Adt, AgentReference};
-use crate::behaviour::complex::queue::BehaviourScheduler;
 use crate::behaviour::parallel::{FinishStrategy, ParallelBehaviourQueue};
 use crate::behaviour::{CyclicBehaviour, OneShotBehaviour};
 use crate::container::AgentLike;
@@ -22,6 +21,8 @@ pub(crate) struct AmsAgent {
 
 impl AgentLike for AmsAgent {
     fn update(&mut self, ctx: &mut ContainerContext) -> bool {
+        use crate::behaviour::complex::scheduler::BehaviourScheduler;
+
         // log::trace!("Ticking ams agent");
 
         let mut context = Context::new_using_container(&mut *ctx);
@@ -53,7 +54,7 @@ impl AgentLike for AmsAgent {
 
 impl AmsAgent {
     pub(crate) fn new() -> Self {
-        let behaviours = ParallelBehaviourQueue::new(FinishStrategy::Never)
+        let behaviours = ParallelBehaviourQueue::new_empty(FinishStrategy::Never)
             .with_behaviour(StartupMessage)
             .with_behaviour(FipaAgentManagementBehaviour::new());
         Self {
