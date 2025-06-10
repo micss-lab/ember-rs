@@ -38,6 +38,7 @@ impl<E: 'static> BehaviourScheduler<E> for SequentialBehaviourQueue<E> {
             .is_blocked(id)
             .expect("scheduled behaviour should be registered with block tracker")
         {
+            self.reschedule(behaviour);
             return None;
         }
         self.blocked.unregister(id);
