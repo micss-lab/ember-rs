@@ -1,5 +1,5 @@
 use alloc::boxed::Box;
-use alloc::collections::vec_deque::VecDeque;
+use alloc::collections::{BTreeSet, VecDeque};
 
 use super::blocked::BlockTracker;
 use super::scheduler::BehaviourScheduler;
@@ -67,18 +67,26 @@ impl<E: 'static> ParallelBehaviourQueue<E> {
 
 impl<E: 'static> BehaviourScheduler<E> for ParallelBehaviourQueue<E> {
     fn next(&mut self) -> Option<Box<dyn Behaviour<Event = E>>> {
-        let behaviour = self.behaviours.pop_front()?;
-        let id = behaviour.id();
-        if self
-            .blocked
-            .is_blocked(id)
-            .expect("scheduled behaviour should be registered with block tracker")
-        {
-            self.reschedule(behaviour);
-            return None;
+        let mut seen = BTreeSet::new();
+        while let Some(behaviour) = self.behaviours.pop_front() {
+            let id = behaviour.id();
+
+            if self
+                .blocked
+                .is_blocked(id)
+                .expect("scheduled behaviour should be registered with block tracker")
+            {
+                self.reschedule(behaviour);
+                if !seen.insert(id) {
+                    return None;
+                }
+                continue;
+            }
+
+            self.blocked.unregister(id);
+            return Some(behaviour);
         }
-        self.blocked.unregister(id);
-        Some(behaviour)
+        None
     }
 
     fn reschedule(&mut self, behaviour: Box<dyn Behaviour<Event = E>>) {
