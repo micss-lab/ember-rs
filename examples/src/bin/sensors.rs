@@ -5,10 +5,13 @@ use no_std_framework_examples::setup_example;
 
 setup_example!();
 
+use alloc::boxed::Box;
 use core::time::Duration;
 
-use no_std_framework_core::behaviour::sequential::{SequentialBehaviour, SequentialBehaviourQueue};
-use no_std_framework_core::behaviour::{Context, OneShotBehaviour, TickerBehaviour};
+use no_std_framework_core::behaviour::sequential::SequentialBehaviour;
+use no_std_framework_core::behaviour::{
+    Behaviour, ComplexBehaviour, Context, IntoBehaviour, OneShotBehaviour, TickerBehaviour,
+};
 use no_std_framework_core::{Agent, Container};
 
 struct SensorInit;
@@ -60,12 +63,16 @@ impl TickerBehaviour for SensorValueReader {
 
 struct MotorMovements;
 
-impl SequentialBehaviour for MotorMovements {
+impl ComplexBehaviour for MotorMovements {
     type Event = ();
 
     type ChildEvent = ();
+}
 
-    fn initial_behaviours(&self) -> SequentialBehaviourQueue<Self::ChildEvent> {
+impl SequentialBehaviour for MotorMovements {
+    fn initial_behaviours(
+        &self,
+    ) -> impl IntoIterator<Item = Box<dyn Behaviour<Event = Self::ChildEvent>>> {
         struct MotorStartUp;
 
         impl OneShotBehaviour for MotorStartUp {
@@ -96,10 +103,11 @@ impl SequentialBehaviour for MotorMovements {
             }
         }
 
-        SequentialBehaviourQueue::new()
-            .with_behaviour(MotorStartUp)
-            .with_behaviour(MotorTurn)
-            .with_behaviour(MotorShutDown)
+        [
+            MotorStartUp.into_behaviour(),
+            MotorTurn.into_behaviour(),
+            MotorShutDown.into_behaviour(),
+        ]
     }
 }
 
