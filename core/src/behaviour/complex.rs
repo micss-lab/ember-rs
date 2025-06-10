@@ -1,6 +1,7 @@
 use self::scheduler::BehaviourScheduler;
 use super::{get_id, Behaviour, BehaviourId, Context, IntoBehaviour};
 
+pub mod fsm;
 pub mod parallel;
 pub mod sequential;
 
