@@ -2,22 +2,17 @@ use alloc::boxed::Box;
 use alloc::collections::vec_deque::VecDeque;
 
 use super::blocked::BlockTracker;
-use super::macros::{complex_action_impl, complex_behaviour_methods};
 use super::scheduler::BehaviourScheduler;
-use super::{get_id, Behaviour, BehaviourId, ComplexBehaviour, Context, IntoBehaviour};
+use super::{
+    get_id, Behaviour, BehaviourId, ComplexBehaviour, ComplexBehaviourImpl, Context, IntoBehaviour,
+};
 
-pub trait ParallelBehaviour {
-    type Event;
-
-    type ChildEvent;
-
+pub trait ParallelBehaviour: ComplexBehaviour {
     fn finish_strategy(&self) -> FinishStrategy;
 
     fn initial_behaviours(
         &self,
     ) -> impl IntoIterator<Item = Box<dyn Behaviour<Event = Self::ChildEvent>>>;
-
-    complex_behaviour_methods!();
 }
 
 pub struct ParallelBehaviourQueue<E> {
@@ -115,20 +110,21 @@ impl<E: 'static> BehaviourScheduler<E> for ParallelBehaviourQueue<E> {
     }
 }
 
+#[repr(transparent)]
 struct ParallelBehaviourImpl<P: ParallelBehaviour>(P);
 
-impl<P, E: 'static, CE: 'static> Behaviour
-    for ComplexBehaviour<ParallelBehaviourImpl<P>, ParallelBehaviourQueue<CE>>
-where
-    P: ParallelBehaviour<Event = E, ChildEvent = CE> + 'static,
-{
-    type Event = E;
+impl<P: ParallelBehaviour> ComplexBehaviour for ParallelBehaviourImpl<P> {
+    type Event = P::Event;
 
-    fn id(&self) -> BehaviourId {
-        self.id
+    type ChildEvent = P::ChildEvent;
+
+    fn handle_child_event(&mut self, message: Self::ChildEvent) {
+        self.0.handle_child_event(message)
     }
 
-    complex_action_impl!();
+    fn after_child_action(&mut self, ctx: &mut Context<Self::Event>) {
+        self.0.after_child_action(ctx)
+    }
 }
 
 #[doc(hidden)]
@@ -142,10 +138,10 @@ where
 
     fn into_behaviour(self) -> Box<dyn Behaviour<Event = Self::Event>> {
         let queue = ParallelBehaviourQueue::new(self.initial_behaviours(), self.finish_strategy());
-        Box::new(ComplexBehaviour {
+        Box::new(ComplexBehaviourImpl {
             id: get_id(),
-            kind: ParallelBehaviourImpl(self),
-            queue,
+            user_impl: ParallelBehaviourImpl(self),
+            scheduler: queue,
         })
     }
 }

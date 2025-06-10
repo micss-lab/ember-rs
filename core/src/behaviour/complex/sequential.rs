@@ -2,20 +2,15 @@ use alloc::boxed::Box;
 use alloc::collections::vec_deque::VecDeque;
 
 use super::blocked::BlockTracker;
-use super::macros::{complex_action_impl, complex_behaviour_methods};
 use super::scheduler::BehaviourScheduler;
-use super::{get_id, Behaviour, BehaviourId, ComplexBehaviour, Context, IntoBehaviour};
+use super::{
+    get_id, Behaviour, BehaviourId, ComplexBehaviour, ComplexBehaviourImpl, Context, IntoBehaviour,
+};
 
-pub trait SequentialBehaviour {
-    type Event;
-
-    type ChildEvent;
-
+pub trait SequentialBehaviour: ComplexBehaviour {
     fn initial_behaviours(
         &self,
     ) -> impl IntoIterator<Item = Box<dyn Behaviour<Event = Self::ChildEvent>>>;
-
-    complex_behaviour_methods!();
 }
 
 pub struct SequentialBehaviourQueue<E> {
@@ -74,20 +69,21 @@ impl<E: 'static> BehaviourScheduler<E> for SequentialBehaviourQueue<E> {
     }
 }
 
-struct SequentialBehaviourImpl<S: SequentialBehaviour>(S);
+#[repr(transparent)]
+struct SequentialBehaviourImpl<S>(S);
 
-impl<S, E: 'static, CE: 'static> Behaviour
-    for ComplexBehaviour<SequentialBehaviourImpl<S>, SequentialBehaviourQueue<CE>>
-where
-    S: SequentialBehaviour<Event = E, ChildEvent = CE> + 'static,
-{
-    type Event = E;
+impl<S: SequentialBehaviour> ComplexBehaviour for SequentialBehaviourImpl<S> {
+    type Event = S::Event;
 
-    fn id(&self) -> BehaviourId {
-        self.id
+    type ChildEvent = S::ChildEvent;
+
+    fn handle_child_event(&mut self, message: Self::ChildEvent) {
+        self.0.handle_child_event(message)
     }
 
-    complex_action_impl!();
+    fn after_child_action(&mut self, ctx: &mut Context<Self::Event>) {
+        self.0.after_child_action(ctx)
+    }
 }
 
 #[doc(hidden)]
@@ -101,10 +97,10 @@ where
 
     fn into_behaviour(self) -> Box<dyn Behaviour<Event = Self::Event>> {
         let queue = SequentialBehaviourQueue::new(self.initial_behaviours());
-        Box::new(ComplexBehaviour {
+        Box::new(ComplexBehaviourImpl {
             id: get_id(),
-            kind: SequentialBehaviourImpl(self),
-            queue,
+            user_impl: SequentialBehaviourImpl(self),
+            scheduler: queue,
         })
     }
 }
