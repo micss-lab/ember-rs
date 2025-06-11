@@ -48,9 +48,16 @@ impl<T, E> Fsm<T, E> {
     pub fn builder() -> FsmBuilder<T, E> {
         FsmBuilder::new()
     }
+}
 
+impl<T: Ord, E> Fsm<T, E> {
     fn handle_trigger(&mut self, trigger: T) {
-        todo!()
+        self.current = *self
+            .transitions
+            .get(&self.current)
+            .expect("current behaviour does not have any transitions")
+            .get(&trigger)
+            .expect("current behaviour does not have a transition for the received trigger");
     }
 }
 
@@ -178,7 +185,10 @@ struct FsmBehaviourImpl<F: FsmBehaviour> {
     fsm: Fsm<F::TransitionTrigger, F::ChildEvent>,
 }
 
-impl<F: FsmBehaviour> ComplexBehaviour for FsmBehaviourImpl<F> {
+impl<F: FsmBehaviour> ComplexBehaviour for FsmBehaviourImpl<F>
+where
+    F::TransitionTrigger: Ord,
+{
     type Event = F::Event;
 
     type ChildEvent = FsmEvent<F::TransitionTrigger, F::ChildEvent>;
@@ -199,7 +209,7 @@ impl<F> ScheduledComplexBehaviour for FsmBehaviourImpl<F>
 where
     F: FsmBehaviour,
     F::ChildEvent: 'static,
-    F::TransitionTrigger: 'static,
+    F::TransitionTrigger: 'static + Ord,
 {
     fn scheduler(&mut self) -> &mut impl BehaviourScheduler<Self::ChildEvent> {
         &mut self.fsm
@@ -212,6 +222,7 @@ pub struct FsmKind;
 impl<T: 'static, E: 'static> IntoBehaviour<FsmKind> for T
 where
     T: FsmBehaviour<Event = E>,
+    T::TransitionTrigger: Ord,
 {
     type Event = E;
 
