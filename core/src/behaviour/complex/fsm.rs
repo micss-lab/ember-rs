@@ -6,6 +6,7 @@ use super::blocked::BlockTracker;
 use super::scheduler::BehaviourScheduler;
 use super::{
     get_id, Behaviour, BehaviourId, ComplexBehaviour, ComplexBehaviourImpl, Context, IntoBehaviour,
+    ScheduledComplexBehaviour,
 };
 
 pub trait FsmBehaviour: ComplexBehaviour {
@@ -46,6 +47,10 @@ impl<T, E> Default for FsmBuilder<T, E> {
 impl<T, E> Fsm<T, E> {
     pub fn builder() -> FsmBuilder<T, E> {
         FsmBuilder::new()
+    }
+
+    fn handle_trigger(&mut self, trigger: T) {
+        todo!()
     }
 }
 
@@ -126,15 +131,32 @@ impl<T, E> FsmBuilder<T, E> {
 
 impl<T: 'static, E: 'static> BehaviourScheduler<FsmEvent<T, E>> for Fsm<T, E> {
     fn next(&mut self) -> Option<Box<dyn Behaviour<Event = FsmEvent<T, E>>>> {
-        todo!()
+        let behaviour = self
+            .behaviours
+            .remove(&self.current)
+            .expect("currently active behaviour should exist");
+        let id = behaviour.id();
+        if self
+            .blocked
+            .is_blocked(id)
+            .expect("scheduled behaviour should be registered with block tracker")
+        {
+            self.reschedule(behaviour);
+            return None;
+        }
+        self.blocked.unregister(id);
+        Some(behaviour)
     }
 
     fn reschedule(&mut self, behaviour: Box<dyn Behaviour<Event = FsmEvent<T, E>>>) {
-        todo!()
+        let id = behaviour.id();
+        self.blocked.register(id);
+        self.behaviours.insert(id, behaviour);
     }
 
-    fn remove(&mut self, id: BehaviourId) -> bool {
-        todo!()
+    fn remove(&mut self, _: BehaviourId) -> bool {
+        // TODO: No idea what should be the default behaviour here.
+        unimplemented!("Cannot remove child behaviour from an fsm behaviour.")
     }
 
     fn block(&mut self, id: BehaviourId) -> bool {
@@ -151,8 +173,10 @@ impl<T: 'static, E: 'static> BehaviourScheduler<FsmEvent<T, E>> for Fsm<T, E> {
     }
 }
 
-#[repr(transparent)]
-struct FsmBehaviourImpl<F: FsmBehaviour>(F);
+struct FsmBehaviourImpl<F: FsmBehaviour> {
+    user_impl: F,
+    fsm: Fsm<F::TransitionTrigger, F::ChildEvent>,
+}
 
 impl<F: FsmBehaviour> ComplexBehaviour for FsmBehaviourImpl<F> {
     type Event = F::Event;
@@ -161,22 +185,34 @@ impl<F: FsmBehaviour> ComplexBehaviour for FsmBehaviourImpl<F> {
 
     fn handle_child_event(&mut self, message: Self::ChildEvent) {
         match message {
-            FsmEvent::Trigger(t) => todo!(),
-            FsmEvent::Event(e) => self.0.handle_child_event(e),
+            FsmEvent::Trigger(t) => self.fsm.handle_trigger(t),
+            FsmEvent::Event(e) => self.user_impl.handle_child_event(e),
         }
     }
 
     fn after_child_action(&mut self, ctx: &mut Context<Self::Event>) {
-        self.0.after_child_action(ctx)
+        self.user_impl.after_child_action(ctx)
+    }
+}
+
+impl<F> ScheduledComplexBehaviour for FsmBehaviourImpl<F>
+where
+    F: FsmBehaviour,
+    F::ChildEvent: 'static,
+    F::TransitionTrigger: Ord + 'static,
+{
+    fn scheduler(&mut self) -> &mut impl BehaviourScheduler<Self::ChildEvent> {
+        &mut self.fsm
     }
 }
 
 #[doc(hidden)]
 pub struct FsmKind;
 
-impl<T, E: 'static> IntoBehaviour<FsmKind> for T
+impl<T: 'static, E: 'static> IntoBehaviour<FsmKind> for T
 where
-    T: FsmBehaviour<Event = E> + 'static,
+    T: FsmBehaviour<Event = E>,
+    T::TransitionTrigger: Ord,
 {
     type Event = E;
 
@@ -184,8 +220,10 @@ where
         let fsm = self.fsm();
         Box::new(ComplexBehaviourImpl {
             id: get_id(),
-            user_impl: FsmBehaviourImpl(self),
-            scheduler: fsm,
+            inner: FsmBehaviourImpl {
+                user_impl: self,
+                fsm,
+            },
         })
     }
 }
