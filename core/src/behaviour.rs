@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-pub use self::complex::{parallel, sequential, ComplexBehaviour};
+pub use self::complex::{fsm, parallel, sequential, ComplexBehaviour};
 pub use self::simple::{CyclicBehaviour, OneShotBehaviour, TickerBehaviour};
 
 pub use crate::context::Context;
