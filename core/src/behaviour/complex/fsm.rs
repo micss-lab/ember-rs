@@ -199,7 +199,7 @@ impl<F> ScheduledComplexBehaviour for FsmBehaviourImpl<F>
 where
     F: FsmBehaviour,
     F::ChildEvent: 'static,
-    F::TransitionTrigger: Ord + 'static,
+    F::TransitionTrigger: 'static,
 {
     fn scheduler(&mut self) -> &mut impl BehaviourScheduler<Self::ChildEvent> {
         &mut self.fsm
@@ -212,7 +212,6 @@ pub struct FsmKind;
 impl<T: 'static, E: 'static> IntoBehaviour<FsmKind> for T
 where
     T: FsmBehaviour<Event = E>,
-    T::TransitionTrigger: Ord,
 {
     type Event = E;
 
