@@ -5,6 +5,7 @@ use super::blocked::BlockTracker;
 use super::scheduler::BehaviourScheduler;
 use super::{
     get_id, Behaviour, BehaviourId, ComplexBehaviour, ComplexBehaviourImpl, Context, IntoBehaviour,
+    ScheduledComplexBehaviour,
 };
 
 pub trait SequentialBehaviour: ComplexBehaviour {
@@ -13,7 +14,7 @@ pub trait SequentialBehaviour: ComplexBehaviour {
     ) -> impl IntoIterator<Item = Box<dyn Behaviour<Event = Self::ChildEvent>>>;
 }
 
-pub struct SequentialBehaviourQueue<E> {
+struct SequentialBehaviourQueue<E> {
     blocked: BlockTracker,
     behaviours: VecDeque<Box<dyn Behaviour<Event = E>>>,
 }
@@ -70,8 +71,10 @@ impl<E: 'static> BehaviourScheduler<E> for SequentialBehaviourQueue<E> {
     }
 }
 
-#[repr(transparent)]
-struct SequentialBehaviourImpl<S>(S);
+struct SequentialBehaviourImpl<S: SequentialBehaviour> {
+    user_impl: S,
+    queue: SequentialBehaviourQueue<S::ChildEvent>,
+}
 
 impl<S: SequentialBehaviour> ComplexBehaviour for SequentialBehaviourImpl<S> {
     type Event = S::Event;
@@ -79,20 +82,29 @@ impl<S: SequentialBehaviour> ComplexBehaviour for SequentialBehaviourImpl<S> {
     type ChildEvent = S::ChildEvent;
 
     fn handle_child_event(&mut self, message: Self::ChildEvent) {
-        self.0.handle_child_event(message)
+        self.user_impl.handle_child_event(message)
     }
 
     fn after_child_action(&mut self, ctx: &mut Context<Self::Event>) {
-        self.0.after_child_action(ctx)
+        self.user_impl.after_child_action(ctx)
+    }
+}
+
+impl<S: SequentialBehaviour> ScheduledComplexBehaviour for SequentialBehaviourImpl<S>
+where
+    Self::ChildEvent: 'static,
+{
+    fn scheduler(&mut self) -> &mut impl BehaviourScheduler<Self::ChildEvent> {
+        &mut self.queue
     }
 }
 
 #[doc(hidden)]
 pub struct Sequential;
 
-impl<T, E: 'static> IntoBehaviour<Sequential> for T
+impl<T: 'static, E: 'static> IntoBehaviour<Sequential> for T
 where
-    T: SequentialBehaviour<Event = E> + 'static,
+    T: SequentialBehaviour<Event = E>,
 {
     type Event = E;
 
@@ -100,8 +112,10 @@ where
         let queue = SequentialBehaviourQueue::new(self.initial_behaviours());
         Box::new(ComplexBehaviourImpl {
             id: get_id(),
-            user_impl: SequentialBehaviourImpl(self),
-            scheduler: queue,
+            inner: SequentialBehaviourImpl {
+                user_impl: self,
+                queue,
+            },
         })
     }
 }

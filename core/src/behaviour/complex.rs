@@ -1,6 +1,7 @@
 use self::scheduler::BehaviourScheduler;
 use super::{get_id, Behaviour, BehaviourId, Context, IntoBehaviour};
 
+pub mod fsm;
 pub mod parallel;
 pub mod sequential;
 
@@ -21,16 +22,21 @@ pub trait ComplexBehaviour {
     }
 }
 
-struct ComplexBehaviourImpl<I, S> {
-    id: BehaviourId,
-    user_impl: I,
-    scheduler: S,
+trait ScheduledComplexBehaviour: ComplexBehaviour
+where
+    Self::ChildEvent: 'static,
+{
+    fn scheduler(&mut self) -> &mut impl BehaviourScheduler<Self::ChildEvent>;
 }
 
-impl<I, S, E: 'static, CE: 'static> Behaviour for ComplexBehaviourImpl<I, S>
+struct ComplexBehaviourImpl<I> {
+    id: BehaviourId,
+    inner: I,
+}
+
+impl<I, E: 'static, CE: 'static> Behaviour for ComplexBehaviourImpl<I>
 where
-    I: ComplexBehaviour<Event = E, ChildEvent = CE> + 'static,
-    S: BehaviourScheduler<CE> + 'static,
+    I: ScheduledComplexBehaviour<Event = E, ChildEvent = CE> + 'static,
 {
     type Event = E;
 
@@ -42,19 +48,19 @@ where
         let mut context = Context::from_upper(&mut *ctx);
 
         // 1. Execute next scheduled behaviour.
-        self.scheduler.action(&mut context);
+        self.inner.scheduler().action(&mut context);
 
         // 2. Handle events the behaviour produced.
         while let Some(event) = context.local.events.pop() {
-            self.user_impl.handle_child_event(event);
+            self.inner.handle_child_event(event);
         }
 
         // 3. Update the parent context.
         ctx.merge(context);
 
         // 4. Run user defined actions for this complex behaviour.
-        self.user_impl.after_child_action(ctx);
+        self.inner.after_child_action(ctx);
 
-        self.scheduler.is_finished()
+        self.inner.scheduler().is_finished()
     }
 }

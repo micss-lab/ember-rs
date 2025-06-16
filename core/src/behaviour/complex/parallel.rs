@@ -5,6 +5,7 @@ use super::blocked::BlockTracker;
 use super::scheduler::BehaviourScheduler;
 use super::{
     get_id, Behaviour, BehaviourId, ComplexBehaviour, ComplexBehaviourImpl, Context, IntoBehaviour,
+    ScheduledComplexBehaviour,
 };
 
 pub trait ParallelBehaviour: ComplexBehaviour {
@@ -15,7 +16,7 @@ pub trait ParallelBehaviour: ComplexBehaviour {
     ) -> impl IntoIterator<Item = Box<dyn Behaviour<Event = Self::ChildEvent>>>;
 }
 
-pub struct ParallelBehaviourQueue<E> {
+pub(crate) struct ParallelBehaviourQueue<E> {
     blocked: BlockTracker,
     behaviours: VecDeque<Box<dyn Behaviour<Event = E>>>,
     finished: usize,
@@ -119,8 +120,10 @@ impl<E: 'static> BehaviourScheduler<E> for ParallelBehaviourQueue<E> {
     }
 }
 
-#[repr(transparent)]
-struct ParallelBehaviourImpl<P: ParallelBehaviour>(P);
+struct ParallelBehaviourImpl<P: ParallelBehaviour> {
+    user_impl: P,
+    queue: ParallelBehaviourQueue<P::ChildEvent>,
+}
 
 impl<P: ParallelBehaviour> ComplexBehaviour for ParallelBehaviourImpl<P> {
     type Event = P::Event;
@@ -128,20 +131,29 @@ impl<P: ParallelBehaviour> ComplexBehaviour for ParallelBehaviourImpl<P> {
     type ChildEvent = P::ChildEvent;
 
     fn handle_child_event(&mut self, message: Self::ChildEvent) {
-        self.0.handle_child_event(message)
+        self.user_impl.handle_child_event(message)
     }
 
     fn after_child_action(&mut self, ctx: &mut Context<Self::Event>) {
-        self.0.after_child_action(ctx)
+        self.user_impl.after_child_action(ctx)
+    }
+}
+
+impl<P: ParallelBehaviour> ScheduledComplexBehaviour for ParallelBehaviourImpl<P>
+where
+    Self::ChildEvent: 'static,
+{
+    fn scheduler(&mut self) -> &mut impl BehaviourScheduler<Self::ChildEvent> {
+        &mut self.queue
     }
 }
 
 #[doc(hidden)]
 pub struct Parallel;
 
-impl<T, E: 'static> IntoBehaviour<Parallel> for T
+impl<T: 'static, E: 'static> IntoBehaviour<Parallel> for T
 where
-    T: ParallelBehaviour<Event = E> + 'static,
+    T: ParallelBehaviour<Event = E>,
 {
     type Event = E;
 
@@ -149,8 +161,10 @@ where
         let queue = ParallelBehaviourQueue::new(self.initial_behaviours(), self.finish_strategy());
         Box::new(ComplexBehaviourImpl {
             id: get_id(),
-            user_impl: ParallelBehaviourImpl(self),
-            scheduler: queue,
+            inner: ParallelBehaviourImpl {
+                user_impl: self,
+                queue,
+            },
         })
     }
 }
