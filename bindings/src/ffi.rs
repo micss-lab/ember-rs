@@ -213,10 +213,8 @@ mod agent {
 }
 
 mod context {
-    use no_std_framework_core::behaviour::{Context, IntoBehaviour};
+    use no_std_framework_core::behaviour::Context;
 
-    use super::behaviour::complex::SequentialBehaviour;
-    use super::behaviour::simple::{CyclicBehaviour, OneShotBehaviour, TickerBehaviour};
     use super::event::Event;
     use super::util::{from_raw, ref_from_raw};
 
@@ -257,69 +255,6 @@ mod context {
     pub enum ScheduleStrategy {
         Next,
         End,
-    }
-
-    fn context_insert_behaviour<K>(
-        context: &mut Context<Event>,
-        behaviour: impl IntoBehaviour<K, Event = Event>,
-        strategy: ScheduleStrategy,
-    ) {
-        match strategy {
-            ScheduleStrategy::Next => context.insert_next_behaviour(behaviour),
-            ScheduleStrategy::End => context.append_behaviour(behaviour),
-        };
-    }
-
-    #[no_mangle]
-    pub extern "C" fn context_insert_behaviour_oneshot(
-        context: *mut Context<Event>,
-        oneshot: *mut OneShotBehaviour,
-        strategy: ScheduleStrategy,
-    ) {
-        non_null!(context, "got context null-pointer");
-        non_null!(oneshot, "got oneshot behaviour null-pointer");
-        let context = unsafe { ref_from_raw(context) };
-        let behaviour = unsafe { from_raw(oneshot) };
-        context_insert_behaviour(context, behaviour, strategy);
-    }
-
-    #[no_mangle]
-    pub extern "C" fn context_insert_behaviour_cyclic(
-        context: *mut Context<Event>,
-        cyclic: *mut CyclicBehaviour,
-        strategy: ScheduleStrategy,
-    ) {
-        non_null!(context, "got context null-pointer");
-        non_null!(cyclic, "got cyclic behaviour null-pointer");
-        let context = unsafe { ref_from_raw(context) };
-        let behaviour = unsafe { from_raw(cyclic) };
-        context_insert_behaviour(context, behaviour, strategy);
-    }
-
-    #[no_mangle]
-    pub extern "C" fn context_insert_behaviour_ticker(
-        context: *mut Context<Event>,
-        ticker: *mut TickerBehaviour,
-        strategy: ScheduleStrategy,
-    ) {
-        non_null!(context, "got context null-pointer");
-        non_null!(ticker, "got ticker behaviour null-pointer");
-        let context = unsafe { ref_from_raw(context) };
-        let behaviour = unsafe { from_raw(ticker) };
-        context_insert_behaviour(context, behaviour, strategy);
-    }
-
-    #[no_mangle]
-    pub extern "C" fn context_insert_behaviour_sequential(
-        context: *mut Context<Event>,
-        sequential: *mut SequentialBehaviour,
-        strategy: ScheduleStrategy,
-    ) {
-        non_null!(context, "got context null-pointer");
-        non_null!(sequential, "got sequential behaviour null-pointer");
-        let context = unsafe { ref_from_raw(context) };
-        let behaviour = unsafe { from_raw(sequential) };
-        context_insert_behaviour(context, behaviour, strategy);
     }
 }
 
@@ -489,123 +424,134 @@ mod behaviour {
     pub(super) mod complex {
         pub(in crate::ffi) use self::sequential::SequentialBehaviour;
 
+        use super::simple;
         use super::Event;
         use crate::ffi::util::{drop_raw, from_raw, new, ref_from_raw};
 
+        mod array {
+            use alloc::boxed::Box;
+            use alloc::vec::Vec;
+
+            use no_std_framework_core::behaviour::{Behaviour, IntoBehaviour};
+
+            use super::sequential::SequentialBehaviour;
+            use super::simple::{CyclicBehaviour, OneShotBehaviour, TickerBehaviour};
+            use super::{drop_raw, from_raw, new, ref_from_raw, Event};
+
+            pub struct BehaviourVec(Vec<Box<dyn Behaviour<Event = Event>>>);
+
+            impl BehaviourVec {
+                fn new() -> Self {
+                    BehaviourVec(Vec::new())
+                }
+
+                fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Event = Event>) {
+                    self.0.push(behaviour.into_behaviour());
+                }
+            }
+
+            impl IntoIterator for BehaviourVec {
+                type Item = Box<dyn Behaviour<Event = Event>>;
+
+                type IntoIter = alloc::vec::IntoIter<Self::Item>;
+
+                fn into_iter(self) -> Self::IntoIter {
+                    self.0.into_iter()
+                }
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_vec_new() -> *mut BehaviourVec {
+                new(BehaviourVec::new())
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_vec_add_behaviour_oneshot(
+                queue: *mut BehaviourVec,
+                oneshot: *mut OneShotBehaviour,
+            ) {
+                non_null!(queue, "got sequential queue null-pointer");
+                non_null!(oneshot, "got oneshot behaviour null-pointer");
+                let queue = unsafe { ref_from_raw(queue) };
+                let behaviour = unsafe { from_raw(oneshot) };
+                queue.add_behaviour(behaviour);
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_vec_add_behaviour_cyclic(
+                queue: *mut BehaviourVec,
+                cyclic: *mut CyclicBehaviour,
+            ) {
+                non_null!(queue, "got sequential queue null-pointer");
+                non_null!(cyclic, "got cyclic behaviour null-pointer");
+                let queue = unsafe { ref_from_raw(queue) };
+                let behaviour = unsafe { from_raw(cyclic) };
+                queue.add_behaviour(behaviour);
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_vec_add_behaviour_ticker(
+                queue: *mut BehaviourVec,
+                ticker: *mut TickerBehaviour,
+            ) {
+                non_null!(queue, "got sequential queue null-pointer");
+                non_null!(ticker, "got ticker behaviour null-pointer");
+                let queue = unsafe { ref_from_raw(queue) };
+                let behaviour = unsafe { from_raw(ticker) };
+                queue.add_behaviour(behaviour);
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_vec_add_behaviour_sequential(
+                queue: *mut BehaviourVec,
+                sequential: *mut SequentialBehaviour,
+            ) {
+                non_null!(queue, "got sequential queue null-pointer");
+                non_null!(sequential, "got sequential behaviour null-pointer");
+                let queue = unsafe { ref_from_raw(queue) };
+                let behaviour = unsafe { from_raw(sequential) };
+                queue.add_behaviour(behaviour);
+            }
+
+            #[no_mangle]
+            pub extern "C" fn behaviour_vec_free(queue: *mut BehaviourVec) {
+                non_null_or_bail!(
+                    queue,
+                    "attemted to free sequential behaviour queue null-pointer"
+                );
+                unsafe { drop_raw(queue) };
+            }
+        }
+
         mod sequential {
+            use alloc::boxed::Box;
             use core::cell::Cell;
             use core::ffi::c_void;
             use core::ptr;
 
             use no_std_framework_core::behaviour::{
-                sequential::{
-                    SequentialBehaviour as SequentialBehaviourTrait, SequentialBehaviourQueue,
-                },
-                Context,
+                sequential::SequentialBehaviour as SequentialBehaviourTrait, Behaviour,
+                ComplexBehaviour, Context,
             };
 
-            use super::{drop_raw, from_raw, new, ref_from_raw, Event};
-
-            mod queue {
-                use super::{
-                    drop_raw, from_raw, new, ref_from_raw, Event, SequentialBehaviour,
-                    SequentialBehaviourQueue,
-                };
-                use crate::ffi::behaviour::simple::{
-                    CyclicBehaviour, OneShotBehaviour, TickerBehaviour,
-                };
-
-                #[no_mangle]
-                pub extern "C" fn behaviour_sequential_queue_new(
-                ) -> *mut SequentialBehaviourQueue<Event> {
-                    new(SequentialBehaviourQueue::new())
-                }
-
-                #[no_mangle]
-                pub extern "C" fn behaviour_sequential_queue_add_behaviour_oneshot(
-                    queue: *mut SequentialBehaviourQueue<Event>,
-                    oneshot: *mut OneShotBehaviour,
-                ) {
-                    non_null!(queue, "got sequential queue null-pointer");
-                    non_null!(oneshot, "got oneshot behaviour null-pointer");
-                    let queue = unsafe { ref_from_raw(queue) };
-                    let behaviour = unsafe { from_raw(oneshot) };
-                    queue.add_behaviour(behaviour);
-                }
-
-                #[no_mangle]
-                pub extern "C" fn behaviour_sequential_queue_add_behaviour_cyclic(
-                    queue: *mut SequentialBehaviourQueue<Event>,
-                    cyclic: *mut CyclicBehaviour,
-                ) {
-                    non_null!(queue, "got sequential queue null-pointer");
-                    non_null!(cyclic, "got cyclic behaviour null-pointer");
-                    let queue = unsafe { ref_from_raw(queue) };
-                    let behaviour = unsafe { from_raw(cyclic) };
-                    queue.add_behaviour(behaviour);
-                }
-
-                #[no_mangle]
-                pub extern "C" fn behaviour_sequential_queue_add_behaviour_ticker(
-                    queue: *mut SequentialBehaviourQueue<Event>,
-                    ticker: *mut TickerBehaviour,
-                ) {
-                    non_null!(queue, "got sequential queue null-pointer");
-                    non_null!(ticker, "got ticker behaviour null-pointer");
-                    let queue = unsafe { ref_from_raw(queue) };
-                    let behaviour = unsafe { from_raw(ticker) };
-                    queue.add_behaviour(behaviour);
-                }
-
-                #[no_mangle]
-                pub extern "C" fn behaviour_sequential_queue_add_behaviour_sequential(
-                    queue: *mut SequentialBehaviourQueue<Event>,
-                    sequential: *mut SequentialBehaviour,
-                ) {
-                    non_null!(queue, "got sequential queue null-pointer");
-                    non_null!(sequential, "got sequential behaviour null-pointer");
-                    let queue = unsafe { ref_from_raw(queue) };
-                    let behaviour = unsafe { from_raw(sequential) };
-                    queue.add_behaviour(behaviour);
-                }
-
-                #[no_mangle]
-                pub extern "C" fn behaviour_sequential_queue_free(
-                    queue: *mut SequentialBehaviourQueue<Event>,
-                ) {
-                    non_null_or_bail!(
-                        queue,
-                        "attemted to free sequential behaviour queue null-pointer"
-                    );
-                    unsafe { drop_raw(queue) };
-                }
-            }
+            use super::array::BehaviourVec;
+            use super::{drop_raw, from_raw, new, Event};
 
             pub struct SequentialBehaviour {
                 /// Type value defined by the user implementing the trait.
                 inner: *mut c_void,
                 /// List of initial behaviours to be scheduled.
-                initial_behaviours: Cell<*mut SequentialBehaviourQueue<Event>>,
+                initial_behaviours: Cell<*mut BehaviourVec>,
                 /// Function to be executed for every event a child has emitted.
                 handle_child_event: extern "C" fn(*mut c_void, *mut Event),
                 /// Function to be executed after a child behaviour has performed its action.
                 after_child_action: extern "C" fn(*mut c_void, *mut Context<Event>),
             }
 
-            impl SequentialBehaviourTrait for SequentialBehaviour {
+            impl ComplexBehaviour for SequentialBehaviour {
                 type Event = Event;
 
                 type ChildEvent = Event;
-
-                fn initial_behaviours(&self) -> SequentialBehaviourQueue<Self::ChildEvent> {
-                    // Replace the initial behaviours pointer with a null-pointer.
-                    non_null!(
-                        self.initial_behaviours.get(),
-                        "initial behaviours can only be fetched once"
-                    );
-                    let result = self.initial_behaviours.replace(ptr::null_mut());
-                    unsafe { from_raw(result) }
-                }
 
                 fn handle_child_event(&mut self, event: Self::ChildEvent) {
                     (self.handle_child_event)(self.inner, new(event))
@@ -619,10 +565,25 @@ mod behaviour {
                 }
             }
 
+            impl SequentialBehaviourTrait for SequentialBehaviour {
+                fn initial_behaviours(
+                    &self,
+                ) -> impl IntoIterator<Item = Box<dyn Behaviour<Event = Self::ChildEvent>>>
+                {
+                    // Replace the initial behaviours pointer with a null-pointer.
+                    non_null!(
+                        self.initial_behaviours.get(),
+                        "initial behaviours can only be fetched once"
+                    );
+                    let result = self.initial_behaviours.replace(ptr::null_mut());
+                    unsafe { from_raw(result) }
+                }
+            }
+
             #[no_mangle]
             pub extern "C" fn behaviour_sequential_new(
                 inner: *mut c_void,
-                initial_behaviours: *mut SequentialBehaviourQueue<Event>,
+                initial_behaviours: *mut BehaviourVec,
                 handle_child_event: extern "C" fn(*mut c_void, *mut Event),
                 after_child_action: extern "C" fn(*mut c_void, *mut Context<Event>),
             ) -> *mut SequentialBehaviour {
