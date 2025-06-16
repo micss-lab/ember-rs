@@ -16,7 +16,7 @@ pub trait ParallelBehaviour: ComplexBehaviour {
     ) -> impl IntoIterator<Item = Box<dyn Behaviour<Event = Self::ChildEvent>>>;
 }
 
-pub struct ParallelBehaviourQueue<E> {
+pub(crate) struct ParallelBehaviourQueue<E> {
     blocked: BlockTracker,
     behaviours: VecDeque<Box<dyn Behaviour<Event = E>>>,
     finished: usize,

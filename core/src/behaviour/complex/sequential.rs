@@ -14,7 +14,7 @@ pub trait SequentialBehaviour: ComplexBehaviour {
     ) -> impl IntoIterator<Item = Box<dyn Behaviour<Event = Self::ChildEvent>>>;
 }
 
-pub struct SequentialBehaviourQueue<E> {
+struct SequentialBehaviourQueue<E> {
     blocked: BlockTracker,
     behaviours: VecDeque<Box<dyn Behaviour<Event = E>>>,
 }
