@@ -70,6 +70,7 @@
 
               enterShell = ''
                 export PATH="$HOME/.rustup/toolchains/esp/bin:$PATH"
+                export PATH="$HOME/.rustup/toolchains/esp/xtensa-esp-elf/esp-13.2.0_20230928/xtensa-esp-elf/bin:$PATH"
               '';
             })
           ];
