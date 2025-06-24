@@ -5,13 +5,10 @@
 
 namespace framework::__ffi {
 
-enum class ScheduleStrategy {
-  Next,
-  End,
-};
-
 template<typename E = void>
 struct Agent;
+
+struct BehaviourVec;
 
 struct Container;
 
@@ -23,9 +20,6 @@ struct CyclicBehaviour;
 struct OneShotBehaviour;
 
 struct SequentialBehaviour;
-
-template<typename E = void>
-struct SequentialBehaviourQueue;
 
 struct TickerBehaviour;
 
@@ -84,22 +78,6 @@ void context_remove_agent(Context<Event> *context);
 
 void context_block_behaviour(Context<Event> *context);
 
-void context_insert_behaviour_oneshot(Context<Event> *context,
-                                      OneShotBehaviour *oneshot,
-                                      ScheduleStrategy strategy);
-
-void context_insert_behaviour_cyclic(Context<Event> *context,
-                                     CyclicBehaviour *cyclic,
-                                     ScheduleStrategy strategy);
-
-void context_insert_behaviour_ticker(Context<Event> *context,
-                                     TickerBehaviour *ticker,
-                                     ScheduleStrategy strategy);
-
-void context_insert_behaviour_sequential(Context<Event> *context,
-                                         SequentialBehaviour *sequential,
-                                         ScheduleStrategy strategy);
-
 OneShotBehaviour *behaviour_oneshot_new(void *inner, void (*action)(void*, Context<Event>*));
 
 void behaviour_oneshot_free(OneShotBehaviour *oneshot);
@@ -117,28 +95,24 @@ TickerBehaviour *behaviour_ticker_new(void *inner,
 
 void behaviour_ticker_free(TickerBehaviour *ticker);
 
+BehaviourVec *behaviour_vec_new();
+
+void behaviour_vec_add_behaviour_oneshot(BehaviourVec *queue, OneShotBehaviour *oneshot);
+
+void behaviour_vec_add_behaviour_cyclic(BehaviourVec *queue, CyclicBehaviour *cyclic);
+
+void behaviour_vec_add_behaviour_ticker(BehaviourVec *queue, TickerBehaviour *ticker);
+
+void behaviour_vec_add_behaviour_sequential(BehaviourVec *queue, SequentialBehaviour *sequential);
+
+void behaviour_vec_free(BehaviourVec *queue);
+
 SequentialBehaviour *behaviour_sequential_new(void *inner,
-                                              SequentialBehaviourQueue<Event> *initial_behaviours,
+                                              BehaviourVec *initial_behaviours,
                                               void (*handle_child_event)(void*, Event*),
                                               void (*after_child_action)(void*, Context<Event>*));
 
 void behaviour_sequential_free(SequentialBehaviour *sequential);
-
-SequentialBehaviourQueue<Event> *behaviour_sequential_queue_new();
-
-void behaviour_sequential_queue_add_behaviour_oneshot(SequentialBehaviourQueue<Event> *queue,
-                                                      OneShotBehaviour *oneshot);
-
-void behaviour_sequential_queue_add_behaviour_cyclic(SequentialBehaviourQueue<Event> *queue,
-                                                     CyclicBehaviour *cyclic);
-
-void behaviour_sequential_queue_add_behaviour_ticker(SequentialBehaviourQueue<Event> *queue,
-                                                     TickerBehaviour *ticker);
-
-void behaviour_sequential_queue_add_behaviour_sequential(SequentialBehaviourQueue<Event> *queue,
-                                                         SequentialBehaviour *sequential);
-
-void behaviour_sequential_queue_free(SequentialBehaviourQueue<Event> *queue);
 
 /**
  * Initialize the libraries global logger.
