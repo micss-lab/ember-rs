@@ -219,9 +219,11 @@ fn aid_to_mac(aid: &Aid) -> [u8; 6] {
     use crate::agent::AgentPlatform::*;
     let mac = match aid.platform() {
         Local => panic!("espnow channel does not support sending messages to localhost"),
-        Public(p) => p
-            .parse::<MacAddr6>()
-            .expect("failed to parse destination platform as mac address"),
+        Public(p) => {
+            log::debug!("Destination mac: `{}`", p);
+            p.parse::<MacAddr6>()
+                .expect("failed to parse destination platform as mac address")
+        }
     };
     mac.into_array()
 }
