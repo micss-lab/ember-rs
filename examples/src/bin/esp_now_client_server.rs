@@ -3,7 +3,6 @@
 
 use alloc::format;
 use core::str::FromStr;
-use esp_wifi::esp_now;
 
 use no_std_framework_core::acl::message::{
     Content, Message, MessageEnvelope, Performative, Receiver,
@@ -205,7 +204,7 @@ impl FromStr for Metrics {
 impl From<Metrics> for MessageEnvelope {
     fn from(value: Metrics) -> Self {
         MessageEnvelope::new(
-            Aid::general("server", hex::encode(esp_now::BROADCAST_ADDRESS)),
+            Aid::general("server", "ffffffffffff"),
             Message {
                 performative: Performative::Inform,
                 sender: None,
