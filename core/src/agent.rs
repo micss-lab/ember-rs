@@ -154,8 +154,12 @@ impl Aid {
         Self::local(self.name.0)
     }
 
-    pub(crate) fn to_transport_address(&self) -> TransportAddress {
-        format!("http://{}/acc", self.name.1)
+    pub(crate) fn platform(&self) -> &AgentPlatform {
+        &self.name.1
+    }
+
+    pub(crate) fn local_name(&self) -> &str {
+        &self.name.0
     }
 }
 
@@ -259,6 +263,16 @@ impl<'de> serde::Deserialize<'de> for Aid {
 
             fn expecting(&self, formatter: &mut alloc::fmt::Formatter) -> alloc::fmt::Result {
                 formatter.write_str("struct agent-identifier")
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let name: String = seq
+                    .next_element()?
+                    .ok_or_else(|| serde::de::Error::invalid_length(0, &self))?;
+                Ok(name.parse().map_err(serde::de::Error::custom)?)
             }
 
             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>

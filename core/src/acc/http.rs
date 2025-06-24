@@ -1,10 +1,10 @@
 extern crate std;
 
-use alloc::collections::btree_map::BTreeMap;
-use alloc::string::ToString;
-use alloc::vec::Vec;
-use core::time::Duration;
+use std::collections::BTreeMap;
 use std::format;
+use std::string::{String, ToString};
+use std::time::Duration;
+use std::vec::Vec;
 
 use bytes::{BufMut, Bytes, BytesMut};
 use multipart::server::{Multipart, ReadEntry, ReadEntryResult};
@@ -34,7 +34,7 @@ impl Acc for HttpChannel {
         let mut boundary = [0u8; 16];
         rand::rng().fill_bytes(&mut boundary);
 
-        let response = match ureq::post(address.to_transport_address())
+        let response = match ureq::post(aid_to_url(address))
             .version(ureq::http::Version::HTTP_11)
             .content_type(format!(
                 "multipart/mixed; boundary=\"{}\"; charset=\"ascii\"",
@@ -285,4 +285,13 @@ fn encode_message(message: MessageEnvelope, boundary: &[u8; 16]) -> Bytes {
     body.put_slice(b"\r\n");
 
     body.freeze()
+}
+
+fn aid_to_url(aid: &Aid) -> String {
+    use crate::agent::AgentPlatform::*;
+    let host = match aid.platform() {
+        Local => "localhost",
+        Public(h) => h,
+    };
+    format!("http://{}/acc", host)
 }

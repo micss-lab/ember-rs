@@ -1,21 +1,19 @@
+#[cfg(feature = "acc-espnow")]
+use esp_wifi::esp_now;
+
 use crate::acc::{Acc, Channels};
 use crate::acl::message::MessageEnvelope;
 use crate::adt::Adt;
 
-pub(super) struct Mts {
-    channels: Channels,
+pub(super) struct Mts<'c> {
+    channels: Channels<'c>,
 }
 
-impl Mts {
+impl Mts<'_> {
     pub(super) fn new() -> Self {
         Mts {
             channels: Channels::new(),
         }
-    }
-
-    #[cfg(not(target_os = "none"))]
-    pub(super) fn enable_http(&mut self, port: u16) {
-        self.channels.enable_http(port);
     }
 
     pub(super) fn send_message(&mut self, envelope: MessageEnvelope, adt: &mut Adt) {
@@ -52,5 +50,23 @@ impl Mts {
             // Send the message as if it was to the local agent.
             self.send_message(message, &mut *adt);
         }
+    }
+}
+
+impl Mts<'_> {
+    #[cfg(feature = "acc-http")]
+    pub(super) fn enable_http(&mut self, port: u16) {
+        self.channels.enable_http(port);
+    }
+}
+
+impl<'c> Mts<'c> {
+    #[cfg(feature = "acc-espnow")]
+    pub(super) fn enable_espnow(
+        &mut self,
+        sender: Option<esp_now::EspNowSender<'c>>,
+        receiver: Option<esp_now::EspNowReceiver<'c>>,
+    ) {
+        self.channels.enable_espnow(sender, receiver)
     }
 }

@@ -3,6 +3,9 @@ use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 use alloc::vec::Vec;
 
+#[cfg(feature = "acc-espnow")]
+use esp_wifi::esp_now;
+
 use crate::acl::message::Message;
 use crate::adt::Adt;
 use crate::agent::{Agent, Aid, AmsAgent};
@@ -12,7 +15,7 @@ use self::mts::Mts;
 
 mod mts;
 
-pub struct Container {
+pub struct Container<'c> {
     /// Agents managed by this container.
     agents: VecDeque<Box<dyn AgentLike>>,
     /// Ams agent managing this cotainers.
@@ -20,7 +23,7 @@ pub struct Container {
     /// Register of agents running on this platform.
     ladt: Adt,
     /// Message transport service.
-    mts: Mts,
+    mts: Mts<'c>,
 }
 
 pub trait AgentLike: 'static {
@@ -31,7 +34,7 @@ pub trait AgentLike: 'static {
     fn get_aid(&self) -> Aid;
 }
 
-impl Container {
+impl Container<'_> {
     pub fn start(mut self) -> Result<(), Box<dyn core::error::Error>> {
         loop {
             let should_stop = self.poll()?;
@@ -108,15 +111,29 @@ impl Container {
     pub fn add_agent<E: 'static>(&mut self, agent: Agent<E>) {
         self.agents.push_back(Box::new(agent));
     }
+}
 
-    #[cfg(not(target_os = "none"))]
+impl Container<'_> {
+    #[cfg(feature = "acc-http")]
     pub fn with_http(mut self, port: u16) -> Self {
         self.mts.enable_http(port);
         self
     }
 }
 
-impl Default for Container {
+impl<'c> Container<'c> {
+    #[cfg(feature = "acc-espnow")]
+    pub fn with_espnow(
+        mut self,
+        sender: Option<esp_now::EspNowSender<'c>>,
+        receiver: Option<esp_now::EspNowReceiver<'c>>,
+    ) -> Self {
+        self.mts.enable_espnow(sender, receiver);
+        self
+    }
+}
+
+impl Default for Container<'_> {
     fn default() -> Self {
         let ams = AmsAgent::new();
         let ladt = Adt::new(&ams);
