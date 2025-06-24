@@ -6,6 +6,7 @@ use no_std_framework_examples::setup_example;
 
 setup_example!();
 
+use alloc::boxed::Box;
 use alloc::string::String;
 use core::cell::Cell;
 
