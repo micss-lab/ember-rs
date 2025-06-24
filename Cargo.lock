@@ -710,6 +710,7 @@ dependencies = [
  "embedded-io 0.6.1",
  "embedded-io-async",
  "enumset",
+ "esp-alloc",
  "esp-build",
  "esp-config",
  "esp-hal",
@@ -1135,6 +1136,8 @@ dependencies = [
  "esp-hal",
  "esp-hal-embassy",
  "esp-println",
+ "esp-wifi",
+ "hex",
  "log",
  "no-std-framework-core",
 ]
