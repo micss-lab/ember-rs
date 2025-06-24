@@ -30,7 +30,7 @@ mod util {
         *Box::from_raw(pointer)
     }
 
-    pub(super) unsafe fn ref_from_raw<T>(pointer: *mut T) -> &'static mut T {
+    pub(super) unsafe fn ref_from_raw<'a, T>(pointer: *mut T) -> &'a mut T {
         &mut *pointer
     }
 
@@ -90,7 +90,7 @@ mod container {
     /// The ownership of the instance is transferred to the caller. Make sure to free the memory
     /// with the accompanying [`container_free`].
     #[no_mangle]
-    pub extern "C" fn container_new() -> *mut Container {
+    pub extern "C" fn container_new() -> *mut Container<'static> {
         log::trace!("Creating new container");
         new(Container::default())
     }
@@ -126,7 +126,7 @@ mod container {
     }
 
     #[no_mangle]
-    pub extern "C" fn container_poll(container: *mut Container) -> ContainerPollResult {
+    pub extern "C" fn container_poll<'a>(container: *mut Container<'a>) -> ContainerPollResult {
         non_null!(container, "got container null-pointer");
         let container = unsafe { ref_from_raw(container) };
         let (should_stop, status) = match container.poll() {
