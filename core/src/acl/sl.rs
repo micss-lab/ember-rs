@@ -541,14 +541,14 @@ mod serialize {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             match self {
                 Predicate::Regular { symbol, terms } => {
-                    if terms.len() != 0 {
+                    if !terms.is_empty() {
                         f.write_char('(')?;
                     }
                     f.write_str(symbol.to_str().expect("symbol should be utf-8"))?;
                     for t in terms {
                         write!(f, " {}", t)?;
                     }
-                    if terms.len() != 0 {
+                    if !terms.is_empty() {
                         f.write_char(')')?;
                     }
                     Ok(())
@@ -608,7 +608,7 @@ impl core::fmt::Display for Concept {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let Self { symbol, parameters } = self;
         f.write_char('(')?;
-        f.write_str(&symbol.to_str().expect("symbol should be utf-8"))?;
+        f.write_str(symbol.to_str().expect("symbol should be utf-8"))?;
         match parameters {
             ConceptParameters::Positional(parameters) => {
                 for p in parameters.iter() {

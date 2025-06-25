@@ -16,8 +16,8 @@ mod ams;
 enum AgentState {
     Initiated,
     Active,
-    Suspended,
     // TODO: Implement these.
+    // Suspended,
     // Waiting,
     // Transit,
 }
@@ -88,7 +88,6 @@ impl<E: 'static> AgentLike for Agent<E> {
                 return false;
             }
             Active => (),
-            Suspended => return false,
         }
 
         let mut context = Context::new_using_container(&mut *ctx);
@@ -118,8 +117,6 @@ pub enum AgentPlatform {
     Local,
     Public(String),
 }
-
-pub type TransportAddress = String;
 
 impl Aid {
     pub fn local(agent: impl ToString) -> Self {
@@ -154,11 +151,11 @@ impl Aid {
         Self::local(self.name.0)
     }
 
-    pub(crate) fn platform(&self) -> &AgentPlatform {
+    pub fn platform(&self) -> &AgentPlatform {
         &self.name.1
     }
 
-    pub(crate) fn local_name(&self) -> &str {
+    pub fn local_name(&self) -> &str {
         &self.name.0
     }
 }
@@ -272,7 +269,7 @@ impl<'de> serde::Deserialize<'de> for Aid {
                 let name: String = seq
                     .next_element()?
                     .ok_or_else(|| serde::de::Error::invalid_length(0, &self))?;
-                Ok(name.parse().map_err(serde::de::Error::custom)?)
+                name.parse().map_err(serde::de::Error::custom)
             }
 
             fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
@@ -293,7 +290,7 @@ impl<'de> serde::Deserialize<'de> for Aid {
 
                 let name: String = name.ok_or_else(|| serde::de::Error::missing_field("name"))?;
 
-                Ok(name.parse().map_err(serde::de::Error::custom)?)
+                name.parse().map_err(serde::de::Error::custom)
             }
         }
 

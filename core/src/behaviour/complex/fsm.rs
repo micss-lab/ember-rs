@@ -95,7 +95,7 @@ where
     ) -> Self {
         self.transitions
             .entry(src)
-            .or_insert_with(BTreeMap::default)
+            .or_default()
             .insert(trigger, destination);
         self
     }
@@ -118,7 +118,7 @@ impl<T, E> FsmBuilder<T, E> {
 
         let transition_ids: BTreeSet<_> = {
             let src_ids = transitions.keys().copied();
-            let dest_ids = transitions.values().map(|v| v.values()).flatten().copied();
+            let dest_ids = transitions.values().flat_map(|v| v.values()).copied();
             src_ids.chain(dest_ids).collect()
         };
 
@@ -163,7 +163,8 @@ impl<T: 'static, E: 'static> BehaviourScheduler<FsmEvent<T, E>> for Fsm<T, E> {
 
     fn remove(&mut self, _: BehaviourId) -> bool {
         // TODO: No idea what should be the default behaviour here.
-        unimplemented!("Cannot remove child behaviour from an fsm behaviour.")
+        log::warn!("Cannot remove a child behaviour from an fsm behaviour");
+        false
     }
 
     fn block(&mut self, id: BehaviourId) -> bool {

@@ -72,6 +72,7 @@ impl Acc for Channels<'_> {
             } else if #[cfg(feature = "acc-espnow")] {
                 self.espnow.as_mut().map_or(Err(()), |espnow| espnow.send(address, message))
             } else {
+                let _ = (address, message);
                 Ok(())
             }
         }

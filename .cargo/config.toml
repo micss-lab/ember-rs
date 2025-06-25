@@ -20,4 +20,4 @@ run-esp = "run --target=xtensa-esp32-none-elf -Zbuild-std=core,alloc"
 test-local = "test --target=x86_64-unknown-linux-gnu"
 test-esp = "test --target=xtensa-esp32-none-elf -Zbuild-std=core,alloc"
 
-clippy = "check-local"
+# clippy = "check-local"

@@ -28,12 +28,12 @@ pub(crate) trait BehaviourScheduler<E: 'static> {
 
         let finished = behaviour.action(&mut *ctx);
 
-        // TODO: Remove requested behaviours.
-        // core::mem::take(&mut ctx.local.removed_behaviours)
-        //     .into_iter()
-        //     .for_each(|id| {
-        //         self.remove(id);
-        //     });
+        // Remove requested behaviours.
+        core::mem::take(&mut ctx.local.removed_behaviours)
+            .into_iter()
+            .for_each(|id| {
+                self.remove(id);
+            });
 
         if !finished {
             self.reschedule(behaviour);

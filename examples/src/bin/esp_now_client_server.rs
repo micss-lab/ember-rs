@@ -1,6 +1,8 @@
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
 
+#![cfg_attr(not(target_os = "none"), allow(unused))]
+
 use alloc::format;
 use core::str::FromStr;
 
@@ -137,7 +139,7 @@ fn example() {
     )
     .expect("failed to initialize wifi");
 
-    let (manager, sender, receiver) = esp_wifi::esp_now::EspNow::new(&init, peripherals.WIFI)
+    let (_manager, sender, receiver) = esp_wifi::esp_now::EspNow::new(&init, peripherals.WIFI)
         .expect("failed to initialize esp-now")
         .split();
 

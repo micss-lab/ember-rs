@@ -241,7 +241,7 @@ impl serde::Serialize for Message {
         match &self.content {
             Content::Sl(sl) => {
                 message.serialize_field("lanuage", "fipa-sl0")?;
-                message.serialize_field("content", &format!("\"{}\"", sl.to_string()))?;
+                message.serialize_field("content", &format!("\"{}\"", sl))?;
             }
             Content::Other { kind, content } => {
                 if let Some(kind) = kind {

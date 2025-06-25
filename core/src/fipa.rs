@@ -23,6 +23,7 @@ pub enum DecodeAsOntologyError {
     UnexpectedOntology,
     UnexpectedLanguage,
     UnsupportedMessage,
+    #[allow(dead_code)]
     Decode(DecodeError),
 }
 

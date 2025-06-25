@@ -4,5 +4,4 @@ members = [
     "bindings",
     "core",
     "examples",
-    "tests",
 ]

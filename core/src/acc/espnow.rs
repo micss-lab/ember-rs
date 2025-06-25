@@ -1,16 +1,14 @@
 pub(super) use esp_wifi::esp_now::{EspNowReceiver, EspNowSender};
 
 use alloc::collections::btree_map::BTreeMap;
-use alloc::format;
 use alloc::string::ToString;
 use alloc::vec::Vec;
-use core::time::Duration;
 
 use esp_wifi::esp_now::{EspNowReceiver as Receiver, EspNowSender as Sender};
 use macaddr::MacAddr6;
 use serde::ser::SerializeStruct;
 
-use crate::acl::message::{AclRepresentation, Content, Message, MessageEnvelope, MessageKind};
+use crate::acl::message::{AclRepresentation, Message, MessageEnvelope, MessageKind};
 use crate::agent::Aid;
 
 use super::Acc;
@@ -47,9 +45,7 @@ impl<'c> Acc for EspNowChannel<'c> {
     }
 
     fn receive(&mut self) -> Option<MessageEnvelope> {
-        let Some(message) = self.receiver.as_mut().and_then(|r| r.receive()) else {
-            return None;
-        };
+        let message = self.receiver.as_mut().and_then(|r| r.receive())?;
         let envelope = postcard::from_bytes::<EspNowMessageDe>(message.data())
             .expect("failed to deserialize data into envelope")
             .into_envelope();
@@ -190,7 +186,6 @@ impl<'de> serde::Deserialize<'de> for EspNowContentDe {
             where
                 E: serde::de::Error,
             {
-                use bstr::ByteSlice;
                 Ok(EspNowContentDe {
                     message: Message::try_from_bytes(v)
                         .expect("failed to parse content as acl message"),

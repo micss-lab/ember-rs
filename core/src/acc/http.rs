@@ -54,7 +54,7 @@ impl Acc for HttpChannel {
                 log::warn!("Remote acc did not respond");
                 return Ok(());
             }
-            Err(e) => Err(e).expect("failed to send message"),
+            Err(e) => panic!("{1}: {:?}", e, "failed to send message"),
         };
 
         log::debug!("Received response: {:?}", response);

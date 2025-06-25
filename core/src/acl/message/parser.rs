@@ -55,21 +55,21 @@ impl MessageBuilder {
     }
 
     fn set_receiver(&mut self, receiver: Receiver) -> Result<()> {
-        if let Some(_) = self.receiver.replace(receiver) {
+        if self.receiver.replace(receiver).is_some() {
             return Err("set_receiver");
         }
         Ok(())
     }
 
     fn set_language(&mut self, language: BString) -> Result<()> {
-        if let Some(_) = self.language.replace(language) {
+        if self.language.replace(language).is_some() {
             return Err("set_language");
         }
         Ok(())
     }
 
     fn set_content(&mut self, content: BString) -> Result<()> {
-        if let Some(_) = self.content.replace(content) {
+        if self.content.replace(content).is_some() {
             return Err("set_content");
         }
         Ok(())
@@ -98,7 +98,7 @@ impl AidBuilder {
     }
 
     fn set_name(&mut self, name: BString) -> Result<()> {
-        if let Some(_) = self.name.replace(name) {
+        if self.name.replace(name).is_some() {
             return Err("set_name");
         }
         Ok(())

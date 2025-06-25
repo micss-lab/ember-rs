@@ -22,7 +22,7 @@ impl Mts<'_> {
         } else {
             for t in envelope.to.iter() {
                 if t.is_local() {
-                    match adt.get_mut(&t) {
+                    match adt.get_mut(t) {
                         Some(i) => i.inbox.push(envelope.clone()),
                         None => {
                             log::error!(
@@ -31,11 +31,8 @@ impl Mts<'_> {
                             );
                         }
                     }
-                } else {
-                    // TODO: Handle/print the error.
-                    if let Err(_) = self.channels.send(t, envelope.clone()) {
-                        log::error!("Failed to send message to agent `{}`.", t);
-                    }
+                } else if self.channels.send(t, envelope.clone()).is_err() {
+                    log::error!("Failed to send message to agent `{}`.", t);
                 }
             }
         }

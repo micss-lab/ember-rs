@@ -126,7 +126,7 @@ mod container {
     }
 
     #[no_mangle]
-    pub extern "C" fn container_poll<'a>(container: *mut Container<'a>) -> ContainerPollResult {
+    pub extern "C" fn container_poll(container: *mut Container<'_>) -> ContainerPollResult {
         non_null!(container, "got container null-pointer");
         let container = unsafe { ref_from_raw(container) };
         let (should_stop, status) = match container.poll() {
