@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+firmware = "../../target/xtensa-esp32-none-elf/release/case-study-http-server"
+elf = "../../target/xtensa-esp32-none-elf/release/case-study-http-server"

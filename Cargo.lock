@@ -150,6 +150,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 
 [[package]]
+name = "case-study-http-server"
+version = "0.1.0"
+dependencies = [
+ "esp-alloc",
+ "esp-backtrace",
+ "esp-hal",
+ "esp-println",
+]
+
+[[package]]
 name = "cbindgen"
 version = "0.27.0"
 source = "git+https://github.com/exellentcoin26/cbindgen.git#e5d6c0c7c2d136c0aaca66349c1332dcd2c40798"

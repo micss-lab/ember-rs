@@ -4,4 +4,6 @@ members = [
     "bindings",
     "core",
     "examples",
+
+    "case-studies/http-server",
 ]
