@@ -3,24 +3,19 @@ extern crate alloc;
 use esp_backtrace as _;
 
 use blocking_network_stack::Stack;
-use esp_hal::{
-    clock::CpuClock,
-    peripheral::Peripheral,
-    peripherals::{Peripherals, RADIO_CLK, TIMG0, WIFI},
-    rng::Rng,
-    timer::timg::TimerGroup,
-};
-use esp_wifi::{
-    wifi::{WifiController, WifiDevice, WifiStaDevice},
-    EspWifiController,
-};
+use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
+use esp_wifi::wifi::{WifiController, WifiDevice, WifiStaDevice};
 use smoltcp::{
     iface::{Interface, SocketSet, SocketStorage},
     socket::dhcpv4,
     wire::DhcpOption,
 };
 
-const HOSTNAME: &'static [u8] = b"esp-http-server";
+const HOSTNAME: &[u8] = b"esp-http-server";
+
+const SSID: Option<&str> = option_env!("HTTP_SERVER_SSID");
+const AP_PASSWORD: Option<&str> = option_env!("HTTP_SERVER_AP_PASSWORD");
+const WIFI_CHANNEL: Option<u8> = Some(6);
 
 const HEAP_SIZE: usize = 72 * 1024;
 
@@ -35,7 +30,7 @@ pub(crate) fn main() {
 
     log::info!("Running case study `http-server`.");
 
-    let mut peripherals = esp_hal::init({
+    let peripherals = esp_hal::init({
         let mut config = esp_hal::Config::default();
         config.cpu_clock = CpuClock::max();
         config
@@ -47,15 +42,17 @@ pub(crate) fn main() {
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let wifi_init = esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK)
         .expect("failed to initialize wifi control.");
-    let (wifi_device, controller) =
+    let (wifi_device, mut controller) =
         esp_wifi::wifi::new_with_mode(&wifi_init, peripherals.WIFI, esp_wifi::wifi::WifiStaDevice)
             .expect("failed to initialize wifi device");
 
     log::info!("Setting up network stack.");
 
-    let stack = create_network_stack(wifi_device, rng.random());
+    let mut stack = create_network_stack(wifi_device, rng.random());
 
     log::info!("Connecting to access point.");
+
+    connect_to_access_point(&mut controller, &mut stack)
 }
 
 fn create_network_stack<'a>(
@@ -104,4 +101,78 @@ fn create_network_stack<'a>(
         || esp_hal::time::now().duration_since_epoch().to_millis(),
         random,
     )
+}
+
+fn connect_to_access_point<'a>(
+    controller: &mut WifiController,
+    stack: &mut Stack<'static, WifiDevice<'a, WifiStaDevice>>,
+) {
+    use esp_wifi::wifi::{AuthMethod, ClientConfiguration, Configuration};
+
+    let ssid = SSID.unwrap_or("Wokwi-GUEST");
+    let password = AP_PASSWORD.unwrap_or_default();
+
+    let auth_method = if password.is_empty() {
+        AuthMethod::None
+    } else {
+        AuthMethod::WPA2Personal
+    };
+
+    let config = ClientConfiguration {
+        ssid: ssid.try_into().unwrap(),
+        password: password.try_into().unwrap(),
+        auth_method,
+        channel: WIFI_CHANNEL,
+        ..Default::default()
+    };
+
+    controller
+        .set_configuration(&Configuration::Client(config))
+        .expect("failed to set wifi configuration");
+
+    controller.start().expect("failed to start wifi controller");
+
+    log::info!("Scanning for wifi networks.");
+    let aps = controller
+        .scan_n::<6>()
+        .inspect(|aps| {
+            log::debug!("Found following networks:");
+            for ap in aps.0.iter() {
+                log::debug!("- {:?}", ap);
+            }
+        })
+        .expect("failed to scan for networks")
+        .0;
+
+    if aps.into_iter().find(|ap| ap.ssid == ssid).is_none() {
+        panic!("SSID `{}` not found.", ssid);
+    }
+
+    log::info!("Connecting to access point `{}`", ssid);
+    controller
+        .connect()
+        .expect("failed to connect to access point");
+
+    loop {
+        match controller.is_connected() {
+            Ok(true) => {
+                log::info!("Connected!");
+                break;
+            }
+            Err(err) => panic!("failed to connect to access point: {:?}", err),
+            _ => {
+                continue;
+            }
+        }
+    }
+
+    log::trace!("Waiting for an ip address.");
+    loop {
+        stack.work();
+
+        if stack.is_iface_up() {
+            log::info!("Got ip address: {:?}", stack.get_ip_info().unwrap().ip);
+            break;
+        }
+    }
 }
