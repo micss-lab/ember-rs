@@ -1,5 +1,3 @@
-extern crate alloc;
-
 use esp_backtrace as _;
 
 use blocking_network_stack::Stack;
@@ -7,9 +5,12 @@ use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
 use esp_wifi::wifi::{WifiController, WifiDevice, WifiStaDevice};
 use smoltcp::{
     iface::{Interface, SocketSet, SocketStorage},
+    phy::Device,
     socket::dhcpv4,
     wire::DhcpOption,
 };
+
+const HEAP_SIZE: usize = 72 * 1024;
 
 const HOSTNAME: &[u8] = b"esp-http-server";
 
@@ -17,10 +18,12 @@ const SSID: Option<&str> = option_env!("HTTP_SERVER_SSID");
 const AP_PASSWORD: Option<&str> = option_env!("HTTP_SERVER_AP_PASSWORD");
 const WIFI_CHANNEL: Option<u8> = Some(6);
 
-const HEAP_SIZE: usize = 72 * 1024;
+const HTTP_PORT: u16 = 80;
 
 const SOCKET_COUNT: usize = 10;
 static mut SOCKET_STORE: [SocketStorage; SOCKET_COUNT] = [SocketStorage::EMPTY; SOCKET_COUNT];
+
+mod http;
 
 pub(crate) fn main() {
     // Set newline mode to linux line endings.
@@ -38,7 +41,6 @@ pub(crate) fn main() {
     let mut rng = Rng::new(peripherals.RNG);
 
     log::trace!("Initializing wifi device.");
-
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     let wifi_init = esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK)
         .expect("failed to initialize wifi control.");
@@ -46,19 +48,19 @@ pub(crate) fn main() {
         esp_wifi::wifi::new_with_mode(&wifi_init, peripherals.WIFI, esp_wifi::wifi::WifiStaDevice)
             .expect("failed to initialize wifi device");
 
-    log::info!("Setting up network stack.");
-
+    log::trace!("Setting up network stack.");
     let mut stack = create_network_stack(wifi_device, rng.random());
 
-    log::info!("Connecting to access point.");
+    log::trace!("Connecting to access point.");
+    connect_to_access_point(&mut controller, &mut stack);
 
-    connect_to_access_point(&mut controller, &mut stack)
+    http::serve(&mut stack, HTTP_PORT);
 }
 
-fn create_network_stack<'a>(
-    mut wifi: WifiDevice<'a, WifiStaDevice>,
+fn create_network_stack(
+    mut wifi: WifiDevice<WifiStaDevice>,
     random: u32,
-) -> Stack<'static, WifiDevice<'a, WifiStaDevice>> {
+) -> Stack<'static, WifiDevice<WifiStaDevice>> {
     let mut sockets = SocketSet::new(unsafe { &mut SOCKET_STORE[..] });
 
     let dhcp_socket = {
@@ -86,12 +88,11 @@ fn create_network_stack<'a>(
             let hw_address = HardwareAddress::Ethernet(EthernetAddress::from_bytes(&mac));
             Config::new(hw_address)
         };
-        let iface = Interface::new(
+        Interface::new(
             config,
             &mut wifi,
             Instant::from_micros(esp_hal::time::now().duration_since_epoch().to_micros() as i64),
-        );
-        iface
+        )
     };
 
     Stack::new(
@@ -103,9 +104,9 @@ fn create_network_stack<'a>(
     )
 }
 
-fn connect_to_access_point<'a>(
+fn connect_to_access_point(
     controller: &mut WifiController,
-    stack: &mut Stack<'static, WifiDevice<'a, WifiStaDevice>>,
+    stack: &mut Stack<'static, impl Device>,
 ) {
     use esp_wifi::wifi::{AuthMethod, ClientConfiguration, Configuration};
 
@@ -144,7 +145,7 @@ fn connect_to_access_point<'a>(
         .expect("failed to scan for networks")
         .0;
 
-    if aps.into_iter().find(|ap| ap.ssid == ssid).is_none() {
+    if !aps.into_iter().any(|ap| ap.ssid == ssid) {
         panic!("SSID `{}` not found.", ssid);
     }
 
