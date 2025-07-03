@@ -10,10 +10,78 @@ use smoltcp::phy::Device;
 
 mod routes {
     use alloc::format;
-    use alloc::string::String;
+    use alloc::string::{String, ToString};
 
-    pub(super) fn index() -> &'static str {
-        "Hello from rust on an esp32!"
+    #[derive(Default)]
+    pub(super) enum LedState {
+        On,
+        #[default]
+        Off,
+    }
+
+    impl core::fmt::Display for LedState {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            write!(
+                f,
+                "{}",
+                match self {
+                    Self::On => "on",
+                    Self::Off => "off",
+                }
+            )
+        }
+    }
+
+    impl LedState {
+        pub(super) fn toggle(&mut self) {
+            *self = match self {
+                Self::On => Self::Off,
+                Self::Off => Self::On,
+            }
+        }
+    }
+
+    #[derive(Default)]
+    pub(super) struct State {
+        pub(super) led1: LedState,
+        pub(super) led2: LedState,
+    }
+
+    pub(super) fn index(state: &State) -> String {
+        format!(
+            r#"
+                <!DOCTYPE html><html>
+                  <head>
+                    <title>ESP32 Web Server Demo</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <style>
+                      html {{ font-family: sans-serif; text-align: center; }}
+                      body {{ display: inline-flex; flex-direction: column; }}
+                      h1 {{ margin-bottom: 1.2em; }}
+                      h2 {{ margin: 0; }}
+                      div {{ display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; grid-auto-flow: column; grid-gap: 1em; }}
+                      .btn {{ background-color: #5B5; border: none; color: #fff; padding: 0.5em 1em; font-size: 2em; text-decoration: none }}
+                      .btn.off {{ background-color: #333; }}
+                    </style>
+                  </head>
+
+                  <body>
+                    <h1>ESP32 Web Server</h1>
+
+                    <div>
+                      <h2>LED 1</h2>
+                      <a href="/toggle/1" class="btn {}">{}</a>
+                      <h2>LED 2</h2>
+                      <a href="/toggle/2" class="btn {}">{}</a>
+                    </div>
+                  </body>
+                </html>
+            "#,
+            state.led1,
+            state.led1.to_string().to_uppercase(),
+            state.led2,
+            state.led2.to_string().to_uppercase(),
+        )
     }
 
     pub(super) fn not_found(method: &str, path: &str) -> String {
@@ -27,6 +95,7 @@ where
 {
     stack: Stack<'static, D>,
     port: u16,
+    state: routes::State,
 }
 
 impl<D> Server<D>
@@ -34,7 +103,11 @@ where
     D: Device,
 {
     pub(super) fn new(stack: Stack<'static, D>, port: u16) -> Self {
-        Self { stack, port }
+        Self {
+            stack,
+            port,
+            state: routes::State::default(),
+        }
     }
 }
 
@@ -69,7 +142,7 @@ where
 
         log::debug!("Incoming request: {:?}", req);
 
-        let (status, body) = handle_request(req);
+        let (status, body) = handle_request(req, &mut self.state);
         write_response(&mut socket, status, body);
 
         log::trace!("Closing socket.");
@@ -82,9 +155,19 @@ where
     }
 }
 
-fn handle_request(req: Request) -> (u16, String) {
+fn handle_request(req: Request, state: &mut routes::State) -> (u16, String) {
     match (req.method.unwrap_or("GET"), req.path.unwrap_or("/")) {
-        ("GET", "/") => (200, routes::index().into()),
+        ("GET", "/") => (200, routes::index(state)),
+        ("GET", path) if path.starts_with("/toggle/") => {
+            let (_, led) = path.split_once("/toggle/").unwrap();
+            match led.parse() {
+                Ok(1) => state.led1.toggle(),
+                Ok(2) => state.led2.toggle(),
+                Ok(idx) => return (400, format!("Unknown led index {idx}")),
+                Err(err) => return (400, format!("Invalid led index {led}: {}", err)),
+            }
+            (200, routes::index(state))
+        }
         (method, path) => (404, routes::not_found(method, path)),
     }
 }
