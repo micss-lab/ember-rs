@@ -2,12 +2,11 @@ use alloc::format;
 use alloc::string::String;
 
 use blocking_network_stack::Stack;
+
 use embedded_io::Write;
 use httparse::Request;
+use no_std_framework_core::behaviour::{Context, CyclicBehaviour};
 use smoltcp::phy::Device;
-
-static mut RX_BUFFER: [u8; 1024] = [0u8; 1024];
-static mut TX_BUFFER: [u8; 2048] = [0u8; 2048];
 
 mod routes {
     use alloc::format;
@@ -22,17 +21,38 @@ mod routes {
     }
 }
 
-pub(super) fn serve(stack: &mut Stack<'static, impl Device>, port: u16) {
-    use embedded_io::Read;
+pub(super) struct Server<D>
+where
+    D: Device,
+{
+    stack: Stack<'static, D>,
+    port: u16,
+}
 
-    log::info!("Http server started on port `{}`", port);
+impl<D> Server<D>
+where
+    D: Device,
+{
+    pub(super) fn new(stack: Stack<'static, D>, port: u16) -> Self {
+        Self { stack, port }
+    }
+}
 
-    loop {
-        let mut socket =
-            stack.get_socket(unsafe { &mut RX_BUFFER[..] }, unsafe { &mut TX_BUFFER[..] });
-        if let Err(err) = socket.listen(port) {
+impl<D> CyclicBehaviour for Server<D>
+where
+    D: Device,
+{
+    type Event = ();
+
+    fn action(&mut self, _: &mut Context<Self::Event>) {
+        use embedded_io::Read;
+
+        let mut rx_buffer = [0u8; 1024];
+        let mut tx_buffer = [0u8; 2048];
+        let mut socket = self.stack.get_socket(&mut rx_buffer, &mut tx_buffer);
+        if let Err(err) = socket.listen(self.port) {
             log::error!("Error listening for incoming connection: {:?}", err);
-            continue;
+            return;
         }
 
         log::trace!("Incoming connection.");
@@ -55,6 +75,10 @@ pub(super) fn serve(stack: &mut Stack<'static, impl Device>, port: u16) {
         log::trace!("Closing socket.");
         socket.flush().expect("failed to flush socket");
         socket.close();
+    }
+
+    fn is_finished(&self) -> bool {
+        false
     }
 }
 

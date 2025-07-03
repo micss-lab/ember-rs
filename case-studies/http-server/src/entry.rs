@@ -1,8 +1,14 @@
+use core::cell::OnceCell;
+
 use esp_backtrace as _;
 
 use blocking_network_stack::Stack;
 use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
-use esp_wifi::wifi::{WifiController, WifiDevice, WifiStaDevice};
+use esp_wifi::{
+    wifi::{WifiController, WifiDevice, WifiStaDevice},
+    EspWifiController,
+};
+use no_std_framework_core::{Agent, Container};
 use smoltcp::{
     iface::{Interface, SocketSet, SocketStorage},
     phy::Device,
@@ -23,6 +29,8 @@ const HTTP_PORT: u16 = 80;
 const SOCKET_COUNT: usize = 10;
 static mut SOCKET_STORE: [SocketStorage; SOCKET_COUNT] = [SocketStorage::EMPTY; SOCKET_COUNT];
 
+static mut WIFI_INIT: OnceCell<EspWifiController> = OnceCell::new();
+
 mod http;
 
 pub(crate) fn main() {
@@ -42,11 +50,20 @@ pub(crate) fn main() {
 
     log::trace!("Initializing wifi device.");
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let wifi_init = esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK)
-        .expect("failed to initialize wifi control.");
-    let (wifi_device, mut controller) =
-        esp_wifi::wifi::new_with_mode(&wifi_init, peripherals.WIFI, esp_wifi::wifi::WifiStaDevice)
-            .expect("failed to initialize wifi device");
+    unsafe {
+        WIFI_INIT
+            .set(
+                esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK)
+                    .expect("failed to initialize wifi control."),
+            )
+            .unwrap();
+    }
+    let (wifi_device, mut controller) = esp_wifi::wifi::new_with_mode(
+        unsafe { WIFI_INIT.get() }.unwrap(),
+        peripherals.WIFI,
+        esp_wifi::wifi::WifiStaDevice,
+    )
+    .expect("failed to initialize wifi device");
 
     log::trace!("Setting up network stack.");
     let mut stack = create_network_stack(wifi_device, rng.random());
@@ -54,7 +71,12 @@ pub(crate) fn main() {
     log::trace!("Connecting to access point.");
     connect_to_access_point(&mut controller, &mut stack);
 
-    http::serve(&mut stack, HTTP_PORT);
+    log::info!("Starting http server on port {}", HTTP_PORT);
+    let server = http::Server::new(stack, HTTP_PORT);
+    Container::default()
+        .with_agent(Agent::new("server").with_behaviour(server))
+        .start()
+        .unwrap()
 }
 
 fn create_network_stack(
