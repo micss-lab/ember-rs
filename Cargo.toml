@@ -6,4 +6,5 @@ members = [
     "examples",
 
     "case-studies/http-server",
+    "case-studies/ntp-server",
 ]
