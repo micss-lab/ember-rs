@@ -194,8 +194,8 @@ where
 
     type ChildEvent = FsmEvent<F::TransitionTrigger, F::ChildEvent>;
 
-    fn handle_child_event(&mut self, message: Self::ChildEvent) {
-        match message {
+    fn handle_child_event(&mut self, event: Self::ChildEvent) {
+        match event {
             FsmEvent::Trigger(t) => self.fsm.handle_trigger(t),
             FsmEvent::Event(e) => self.user_impl.handle_child_event(e),
         }

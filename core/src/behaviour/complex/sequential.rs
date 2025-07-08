@@ -81,8 +81,8 @@ impl<S: SequentialBehaviour> ComplexBehaviour for SequentialBehaviourImpl<S> {
 
     type ChildEvent = S::ChildEvent;
 
-    fn handle_child_event(&mut self, message: Self::ChildEvent) {
-        self.user_impl.handle_child_event(message)
+    fn handle_child_event(&mut self, event: Self::ChildEvent) {
+        self.user_impl.handle_child_event(event)
     }
 
     fn after_child_action(&mut self, ctx: &mut Context<Self::Event>) {

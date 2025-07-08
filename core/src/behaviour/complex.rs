@@ -13,8 +13,8 @@ pub trait ComplexBehaviour {
 
     type ChildEvent;
 
-    fn handle_child_event(&mut self, message: Self::ChildEvent) {
-        let _ = message;
+    fn handle_child_event(&mut self, event: Self::ChildEvent) {
+        let _ = event;
     }
 
     fn after_child_action(&mut self, ctx: &mut Context<Self::Event>) {
