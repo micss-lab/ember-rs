@@ -7,4 +7,5 @@ members = [
 
     "case-studies/http-server",
     "case-studies/ntp-server",
+    "case-studies/home-automation",
 ]

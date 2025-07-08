@@ -1,0 +1,100 @@
+use alloc::format;
+
+use no_std_framework_core::{
+    acl::message::{Message, Performative, Receiver},
+    behaviour::{Context, TickerBehaviour},
+    Agent, Aid,
+};
+
+use super::util::wrap_message;
+
+pub fn dht22_agent(measurements: impl IntoIterator<Item = Measurement> + 'static) -> Agent<()> {
+    Agent::new("dht22").with_behaviour(Sensor::new(measurements.into_iter()))
+}
+
+pub mod ontology {
+    pub struct Dht22Ontology;
+
+    impl Dht22Ontology {
+        pub const fn name() -> &'static str {
+            "Dht22-Ontology"
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Measurement {
+    pub temperature: f32,
+    pub humidity: f32,
+}
+
+impl core::str::FromStr for Measurement {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let (temperature, humidity) = {
+            let (t, h) = s.split_once(',').ok_or(())?;
+            (t.parse().map_err(|_| ())?, h.parse().map_err(|_| ())?)
+        };
+
+        Ok(Self {
+            temperature,
+            humidity,
+        })
+    }
+}
+
+impl Measurement {
+    fn into_message(self) -> Message {
+        use no_std_framework_core::acl::message::Content;
+
+        Message {
+            performative: Performative::Inform,
+            sender: None,
+            receiver: Receiver::Single(Aid::local("control")),
+            reply_to: None,
+            ontology: Some(ontology::Dht22Ontology::name().into()),
+            content: Content::Other {
+                kind: None,
+                content: format!("{},{}", self.temperature, self.humidity),
+            },
+        }
+    }
+}
+
+pub struct Sensor<M> {
+    measurements: M,
+    is_empty: bool,
+}
+
+impl<M> Sensor<M> {
+    pub fn new(measurements: M) -> Self {
+        Self {
+            measurements,
+            is_empty: false,
+        }
+    }
+}
+
+impl<M> TickerBehaviour for Sensor<M>
+where
+    M: Iterator<Item = Measurement>,
+{
+    type Event = ();
+
+    fn interval(&self) -> core::time::Duration {
+        core::time::Duration::from_secs(5)
+    }
+
+    fn action(&mut self, ctx: &mut Context<Self::Event>) {
+        let Some(measurement) = self.measurements.next() else {
+            self.is_empty = true;
+            return;
+        };
+        ctx.send_message(wrap_message(measurement.into_message()))
+    }
+
+    fn is_finished(&self) -> bool {
+        self.is_empty
+    }
+}
