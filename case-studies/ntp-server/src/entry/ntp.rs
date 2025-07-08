@@ -33,7 +33,7 @@ where
         core::time::Duration::from_secs(2)
     }
 
-    fn action(&mut self, ctx: &mut Context<Self::Event>) {
+    fn action(&mut self, _ctx: &mut Context<Self::Event>) {
         let (mut rx_buffer, mut rx_metadata) = (
             [0u8; 2048],
             [smoltcp::socket::udp::PacketMetadata::EMPTY; 4],
@@ -126,8 +126,8 @@ where
 }
 
 fn core_to_smoltcp_wire(addr: core::net::IpAddr) -> smoltcp::wire::IpAddress {
-    use core::net::{IpAddr, Ipv4Addr};
-    use smoltcp::wire::{IpAddress as SmoltcpIpAddr, Ipv4Address as SmoltcpIpv4Addr};
+    use core::net::IpAddr;
+    use smoltcp::wire::Ipv4Address as SmoltcpIpv4Addr;
 
     match addr {
         IpAddr::V4(addr) => {
@@ -139,7 +139,7 @@ fn core_to_smoltcp_wire(addr: core::net::IpAddr) -> smoltcp::wire::IpAddress {
 }
 
 fn smoltcp_wire_to_core(addr: smoltcp::wire::IpAddress) -> core::net::IpAddr {
-    use core::net::{IpAddr, Ipv4Addr};
+    use core::net::Ipv4Addr;
     use smoltcp::wire::{IpAddress as SmoltcpIpAddr, Ipv4Address as SmoltcpIpv4Addr};
 
     match addr {
@@ -151,10 +151,7 @@ fn await_future<F>(mut fut: F) -> F::Output
 where
     F: core::future::Future,
 {
-    use core::{
-        pin::{pin, Pin},
-        task::Context,
-    };
+    use core::{pin::pin, task::Context};
     use futures::task::noop_waker;
 
     let waker = noop_waker();
