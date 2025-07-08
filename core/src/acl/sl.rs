@@ -75,6 +75,19 @@ pub enum ConceptParameters {
     ByName(Vec<(bstr::BString, Term)>),
 }
 
+impl ConceptParameters {
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Positional(p) => p.len(),
+            Self::ByName(p) => p.len(),
+        }
+    }
+}
+
 /// Numerical, string, and time-related constants.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Constant {
