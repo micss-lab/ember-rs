@@ -8,6 +8,8 @@ pub trait CyclicBehaviour {
     fn action(&mut self, ctx: &mut Context<Self::Event>);
 
     fn is_finished(&self) -> bool;
+
+    fn reset(&mut self) {}
 }
 
 struct CyclicBehaviourImpl<C: CyclicBehaviour> {
@@ -28,6 +30,10 @@ where
     fn action(&mut self, ctx: &mut Context<Self::Event>) -> bool {
         self.cyclic.action(ctx);
         self.cyclic.is_finished()
+    }
+
+    fn reset(&mut self) {
+        self.cyclic.reset();
     }
 }
 

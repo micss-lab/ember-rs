@@ -7,6 +7,10 @@ pub(crate) trait BehaviourScheduler<E: 'static> {
 
     fn reschedule(&mut self, behaviour: Box<dyn Behaviour<Event = E>>);
 
+    fn reschedule_finished(&mut self, behaviour: Box<dyn Behaviour<Event = E>>) {
+        let _ = behaviour;
+    }
+
     fn remove(&mut self, id: BehaviourId) -> bool;
 
     fn block(&mut self, id: BehaviourId) -> bool;
@@ -37,6 +41,8 @@ pub(crate) trait BehaviourScheduler<E: 'static> {
 
         if !finished {
             self.reschedule(behaviour);
+        } else {
+            self.reschedule_finished(behaviour);
         }
 
         // Block the current behaviour if requested.

@@ -20,6 +20,8 @@ pub trait ComplexBehaviour {
     fn after_child_action(&mut self, ctx: &mut Context<Self::Event>) {
         let _ = ctx;
     }
+
+    fn reset(&mut self) {}
 }
 
 trait ScheduledComplexBehaviour: ComplexBehaviour
@@ -62,5 +64,9 @@ where
         self.inner.after_child_action(ctx);
 
         self.inner.scheduler().is_finished()
+    }
+
+    fn reset(&mut self) {
+        self.inner.reset();
     }
 }
