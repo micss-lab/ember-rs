@@ -20,6 +20,8 @@ pub trait Behaviour: 'static {
     fn id(&self) -> BehaviourId;
 
     fn action(&mut self, ctx: &mut Context<Self::Event>) -> bool;
+
+    fn reset(&mut self);
 }
 
 pub trait IntoBehaviour<Kind>

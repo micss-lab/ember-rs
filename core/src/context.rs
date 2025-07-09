@@ -28,7 +28,8 @@ pub(crate) struct AgentContext {
 pub(crate) struct LocalContext<E> {
     pub(crate) events: Vec<E>,
     pub(crate) removed_behaviours: Vec<BehaviourId>,
-    pub(crate) should_block: bool,
+    pub(crate) block: bool,
+    pub(crate) reset: bool,
 }
 
 impl<E> Default for LocalContext<E> {
@@ -36,7 +37,8 @@ impl<E> Default for LocalContext<E> {
         Self {
             events: Vec::with_capacity(0),
             removed_behaviours: Vec::with_capacity(0),
-            should_block: false,
+            block: false,
+            reset: false,
         }
     }
 }
@@ -66,7 +68,11 @@ impl<E: 'static> Context<E> {
     }
 
     pub fn block_behaviour(&mut self) {
-        self.local.should_block = true;
+        self.local.block = true;
+    }
+
+    pub fn reset_behaviour(&mut self) {
+        self.local.reset = true;
     }
 
     pub fn remove_behaviour(&mut self, id: BehaviourId) {
