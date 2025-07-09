@@ -1,6 +1,5 @@
 use alloc::boxed::Box;
-use alloc::collections::btree_map::BTreeMap;
-use alloc::collections::BTreeSet;
+use alloc::collections::{BTreeMap, BTreeSet};
 
 use super::blocked::BlockTracker;
 use super::scheduler::BehaviourScheduler;
@@ -26,6 +25,7 @@ pub struct Fsm<T, E> {
     final_states: BTreeSet<BehaviourId>,
     transitions: BTreeMap<BehaviourId, BTreeMap<T, BehaviourId>>,
     behaviours: BTreeMap<BehaviourId, Box<dyn Behaviour<Event = FsmEvent<T, E>>>>,
+    can_finish: bool,
 }
 
 pub struct FsmBuilder<T, E> {
@@ -132,6 +132,7 @@ impl<T, E> FsmBuilder<T, E> {
             final_states,
             transitions,
             behaviours,
+            can_finish: false,
         })
     }
 }
@@ -159,6 +160,20 @@ impl<T: 'static, E: 'static> BehaviourScheduler<FsmEvent<T, E>> for Fsm<T, E> {
         let id = behaviour.id();
         self.blocked.register(id);
         self.behaviours.insert(id, behaviour);
+
+        // An unfinished behaviour is rescheduled.
+        self.can_finish = false;
+    }
+
+    fn reschedule_finished(&mut self, mut behaviour: Box<dyn Behaviour<Event = FsmEvent<T, E>>>) {
+        behaviour.reset();
+        let id = behaviour.id();
+        self.reschedule(behaviour);
+
+        // If the behaviour that just finished is final, allow the fsm behaviour to finish.
+        // NOTE: This should be done AFTER rescheduling the behaviour as the regular `reschedule`
+        // will mark the fsm as not being able to finish.
+        self.can_finish = self.final_states.contains(&id)
     }
 
     fn remove(&mut self, _: BehaviourId) -> bool {
@@ -176,8 +191,7 @@ impl<T: 'static, E: 'static> BehaviourScheduler<FsmEvent<T, E>> for Fsm<T, E> {
     }
 
     fn is_finished(&self) -> bool {
-        // Only allow this behaviour to finish if the final behaviour is also finished.
-        self.final_states.contains(&self.current) && !self.behaviours.contains_key(&self.current)
+        self.can_finish
     }
 }
 
@@ -203,6 +217,10 @@ where
 
     fn after_child_action(&mut self, ctx: &mut Context<Self::Event>) {
         self.user_impl.after_child_action(ctx)
+    }
+
+    fn reset(&mut self) {
+        unimplemented!("an fsm behaviour cannot be reset");
     }
 }
 

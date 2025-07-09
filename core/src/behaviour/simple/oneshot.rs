@@ -6,11 +6,13 @@ pub trait OneShotBehaviour {
     type Event;
 
     fn action(&self, ctx: &mut Context<Self::Event>);
+
+    fn reset(&mut self) {}
 }
 
 struct OneShotBehaviourImpl<O: OneShotBehaviour> {
     id: BehaviourId,
-    oneshot: Option<O>,
+    oneshot: O,
 }
 
 impl<E: 'static, O> Behaviour for OneShotBehaviourImpl<O>
@@ -24,11 +26,12 @@ where
     }
 
     fn action(&mut self, ctx: &mut Context<Self::Event>) -> bool {
-        self.oneshot
-            .take()
-            .expect("oneshot behaviour should only be called once")
-            .action(ctx);
+        self.oneshot.action(ctx);
         true
+    }
+
+    fn reset(&mut self) {
+        self.oneshot.reset();
     }
 }
 
@@ -44,7 +47,7 @@ where
     fn into_behaviour(self) -> Box<dyn Behaviour<Event = Self::Event>> {
         Box::new(OneShotBehaviourImpl {
             id: get_id(),
-            oneshot: Some(self),
+            oneshot: self,
         })
     }
 }

@@ -11,6 +11,8 @@ pub trait TickerBehaviour {
     fn action(&mut self, ctx: &mut Context<Self::Event>);
 
     fn is_finished(&self) -> bool;
+
+    fn reset(&mut self) {}
 }
 
 struct TickerBehaviourImpl<T: TickerBehaviour> {
@@ -42,6 +44,11 @@ where
         self.ticker.action(ctx);
         self.interval = from_std_duration(self.ticker.interval());
         self.ticker.is_finished()
+    }
+
+    fn reset(&mut self) {
+        self.ticker.reset();
+        self.last_tick = None;
     }
 }
 
