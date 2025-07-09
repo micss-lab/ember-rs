@@ -70,8 +70,30 @@ mod event {
 
     #[no_mangle]
     extern "C" fn event_free(event: *mut Event) {
-        non_null_or_bail!(event, "attemted to free event null-pointer");
+        non_null_or_bail!(event, "attempted to free event null-pointer");
         unsafe { drop_raw(event) }
+    }
+}
+
+mod agent_state {
+    use core::ffi::c_void;
+
+    use super::util::{drop_raw, new};
+
+    #[repr(C)]
+    pub struct AgentState {
+        inner: *mut c_void,
+    }
+
+    #[no_mangle]
+    extern "C" fn agent_state_new(agent_state: *mut c_void) -> *mut AgentState {
+        new(AgentState { inner: agent_state })
+    }
+
+    #[no_mangle]
+    extern "C" fn agent_state_free(agent_state: *mut AgentState) {
+        non_null_or_bail!(agent_state, "attempted to free agent state null-pointer");
+        unsafe { drop_raw(agent_state) }
     }
 }
 
@@ -80,6 +102,7 @@ mod container {
 
     use crate::ffi::util::{drop_raw, ref_from_raw};
 
+    use super::agent_state::AgentState;
     use super::event::Event;
     use super::util::{from_raw, new};
 
@@ -102,7 +125,10 @@ mod container {
     }
 
     #[no_mangle]
-    pub extern "C" fn container_add_agent(container: *mut Container, agent: *mut Agent<Event>) {
+    pub extern "C" fn container_add_agent(
+        container: *mut Container,
+        agent: *mut Agent<AgentState, Event>,
+    ) {
         non_null!(container, "got container null-pointer");
         non_null!(agent, "got agent null-pointer");
         let agent = unsafe { from_raw(agent) };
@@ -145,19 +171,25 @@ mod agent {
 
     use no_std_framework_core::Agent;
 
+    use super::agent_state::AgentState;
     use super::behaviour::complex::SequentialBehaviour;
     use super::behaviour::simple::{CyclicBehaviour, OneShotBehaviour, TickerBehaviour};
     use super::event::Event;
     use super::util::{drop_raw, from_raw, new, ref_from_raw, string_from_raw};
 
     #[no_mangle]
-    pub extern "C" fn agent_new(name: *const c_char) -> *mut Agent<Event> {
+    pub extern "C" fn agent_new(
+        name: *const c_char,
+        agent_state: *mut AgentState,
+    ) -> *mut Agent<AgentState, Event> {
         let name = unsafe { string_from_raw(name) };
-        new(Agent::new(name))
+        non_null!(agent_state, "got agent state null-pointer");
+        let agent_state = unsafe { from_raw(agent_state) };
+        new(Agent::new(name, agent_state))
     }
 
     #[no_mangle]
-    pub extern "C" fn agent_free(agent: *mut Agent<Event>) {
+    pub extern "C" fn agent_free(agent: *mut Agent<AgentState, Event>) {
         non_null_or_bail!(agent, "attemted to free agent null-pointer");
         unsafe { drop_raw(agent) }
     }
@@ -165,7 +197,7 @@ mod agent {
     // TODO: Add more behaviours here.
     #[no_mangle]
     pub extern "C" fn agent_add_behaviour_oneshot(
-        agent: *mut Agent<Event>,
+        agent: *mut Agent<AgentState, Event>,
         oneshot: *mut OneShotBehaviour,
     ) {
         non_null!(agent, "got agent null-pointer");
@@ -177,7 +209,7 @@ mod agent {
 
     #[no_mangle]
     pub extern "C" fn agent_add_behaviour_cyclic(
-        agent: *mut Agent<Event>,
+        agent: *mut Agent<AgentState, Event>,
         cyclic: *mut CyclicBehaviour,
     ) {
         non_null!(agent, "got agent null-pointer");
@@ -189,7 +221,7 @@ mod agent {
 
     #[no_mangle]
     pub extern "C" fn agent_add_behaviour_ticker(
-        agent: *mut Agent<Event>,
+        agent: *mut Agent<AgentState, Event>,
         ticker: *mut TickerBehaviour,
     ) {
         non_null!(agent, "got agent null-pointer");
@@ -201,7 +233,7 @@ mod agent {
 
     #[no_mangle]
     pub extern "C" fn agent_add_behaviour_sequential(
-        agent: *mut Agent<Event>,
+        agent: *mut Agent<AgentState, Event>,
         sequential: *mut SequentialBehaviour,
     ) {
         non_null!(agent, "got agent null-pointer");
@@ -259,6 +291,7 @@ mod context {
 }
 
 mod behaviour {
+    use super::agent_state::AgentState;
     use super::event::Event;
 
     pub(super) mod simple {
@@ -266,7 +299,7 @@ mod behaviour {
         pub(in crate::ffi) use self::oneshot::OneShotBehaviour;
         pub(in crate::ffi) use self::ticker::TickerBehaviour;
 
-        use super::Event;
+        use super::{AgentState, Event};
         use crate::ffi::util::{drop_raw, new};
 
         mod oneshot {
@@ -277,27 +310,34 @@ mod behaviour {
                 Context, OneShotBehaviour as OneShotBehaviourTrait,
             };
 
-            use super::{drop_raw, new, Event};
+            use super::{drop_raw, new};
+            use super::{AgentState, Event};
 
             pub struct OneShotBehaviour {
                 /// Type value defined by the user implementing the trait.
                 inner: *mut c_void,
                 /// Action to be performed.
-                action: extern "C" fn(*mut c_void, *mut Context<Event>),
+                action: extern "C" fn(*mut c_void, *mut Context<Event>, *mut AgentState),
             }
 
             impl OneShotBehaviourTrait for OneShotBehaviour {
+                type AgentState = AgentState;
+
                 type Event = Event;
 
-                fn action(&self, ctx: &mut Context<Self::Event>) {
-                    (self.action)(self.inner, ptr::from_mut(ctx))
+                fn action(
+                    &self,
+                    ctx: &mut Context<Self::Event>,
+                    agent_state: &mut Self::AgentState,
+                ) {
+                    (self.action)(self.inner, ptr::from_mut(ctx), ptr::from_mut(agent_state))
                 }
             }
 
             #[no_mangle]
             pub extern "C" fn behaviour_oneshot_new(
                 inner: *mut c_void,
-                action: extern "C" fn(*mut c_void, *mut Context<Event>),
+                action: extern "C" fn(*mut c_void, *mut Context<Event>, *mut AgentState),
             ) -> *mut OneShotBehaviour {
                 new(OneShotBehaviour { inner, action })
             }
@@ -317,22 +357,29 @@ mod behaviour {
                 Context, CyclicBehaviour as CyclicBehaviourTrait,
             };
 
-            use super::{drop_raw, new, Event};
+            use super::{drop_raw, new};
+            use super::{AgentState, Event};
 
             pub struct CyclicBehaviour {
                 /// Type value defined by the user implementing the trait.
                 inner: *mut c_void,
                 /// Action to be performed.
-                action: extern "C" fn(*mut c_void, *mut Context<Event>),
+                action: extern "C" fn(*mut c_void, *mut Context<Event>, *mut AgentState),
                 /// Whether the behaviour has finished.
                 is_finished: extern "C" fn(*mut c_void) -> bool,
             }
 
             impl CyclicBehaviourTrait for CyclicBehaviour {
+                type AgentState = AgentState;
+
                 type Event = Event;
 
-                fn action(&mut self, ctx: &mut Context<Self::Event>) {
-                    (self.action)(self.inner, ptr::from_mut(ctx));
+                fn action(
+                    &mut self,
+                    ctx: &mut Context<Self::Event>,
+                    agent_state: &mut Self::AgentState,
+                ) {
+                    (self.action)(self.inner, ptr::from_mut(ctx), ptr::from_mut(agent_state));
                 }
 
                 fn is_finished(&self) -> bool {
@@ -343,7 +390,7 @@ mod behaviour {
             #[no_mangle]
             pub extern "C" fn behaviour_cyclic_new(
                 inner: *mut c_void,
-                action: extern "C" fn(*mut c_void, *mut Context<Event>),
+                action: extern "C" fn(*mut c_void, *mut Context<Event>, *mut AgentState),
                 is_finished: extern "C" fn(*mut c_void) -> bool,
             ) -> *mut CyclicBehaviour {
                 new(CyclicBehaviour {
@@ -369,13 +416,14 @@ mod behaviour {
                 Context, TickerBehaviour as TickerBehaviourTrait,
             };
 
-            use super::{drop_raw, new, Event};
+            use super::{drop_raw, new};
+            use super::{AgentState, Event};
 
             pub struct TickerBehaviour {
                 /// Type value defined by the user implementing the trait.
                 inner: *mut c_void,
                 /// Action to be performed.
-                action: extern "C" fn(*mut c_void, *mut Context<Event>),
+                action: extern "C" fn(*mut c_void, *mut Context<Event>, *mut AgentState),
                 /// Whether the behaviour has finished.
                 is_finished: extern "C" fn(*mut c_void) -> bool,
                 /// Interval in miliseconds until the next scheduled action.
@@ -383,14 +431,20 @@ mod behaviour {
             }
 
             impl TickerBehaviourTrait for TickerBehaviour {
+                type AgentState = AgentState;
+
                 type Event = Event;
 
                 fn interval(&self) -> Duration {
                     Duration::from_millis((self.interval)(self.inner))
                 }
 
-                fn action(&mut self, ctx: &mut Context<Self::Event>) {
-                    (self.action)(self.inner, ptr::from_mut(ctx));
+                fn action(
+                    &mut self,
+                    ctx: &mut Context<Self::Event>,
+                    agent_state: &mut Self::AgentState,
+                ) {
+                    (self.action)(self.inner, ptr::from_mut(ctx), ptr::from_mut(agent_state));
                 }
 
                 fn is_finished(&self) -> bool {
@@ -402,7 +456,7 @@ mod behaviour {
             pub extern "C" fn behaviour_ticker_new(
                 inner: *mut c_void,
                 interval: extern "C" fn(*mut c_void) -> u64,
-                action: extern "C" fn(*mut c_void, *mut Context<Event>),
+                action: extern "C" fn(*mut c_void, *mut Context<Event>, *mut AgentState),
                 is_finished: extern "C" fn(*mut c_void) -> bool,
             ) -> *mut TickerBehaviour {
                 new(TickerBehaviour {
@@ -425,7 +479,7 @@ mod behaviour {
         pub(in crate::ffi) use self::sequential::SequentialBehaviour;
 
         use super::simple;
-        use super::Event;
+        use super::{AgentState, Event};
         use crate::ffi::util::{drop_raw, from_raw, new, ref_from_raw};
 
         mod array {
@@ -436,22 +490,28 @@ mod behaviour {
 
             use super::sequential::SequentialBehaviour;
             use super::simple::{CyclicBehaviour, OneShotBehaviour, TickerBehaviour};
-            use super::{drop_raw, from_raw, new, ref_from_raw, Event};
+            use super::{drop_raw, from_raw, new, ref_from_raw};
+            use super::{AgentState, Event};
 
-            pub struct BehaviourVec(Vec<Box<dyn Behaviour<Event = Event>>>);
+            pub struct BehaviourVec(
+                Vec<Box<dyn Behaviour<AgentState = AgentState, Event = Event>>>,
+            );
 
             impl BehaviourVec {
                 fn new() -> Self {
                     BehaviourVec(Vec::new())
                 }
 
-                fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Event = Event>) {
+                fn add_behaviour<K>(
+                    &mut self,
+                    behaviour: impl IntoBehaviour<K, AgentState = AgentState, Event = Event>,
+                ) {
                     self.0.push(behaviour.into_behaviour());
                 }
             }
 
             impl IntoIterator for BehaviourVec {
-                type Item = Box<dyn Behaviour<Event = Event>>;
+                type Item = Box<dyn Behaviour<AgentState = AgentState, Event = Event>>;
 
                 type IntoIter = alloc::vec::IntoIter<Self::Item>;
 
@@ -535,7 +595,8 @@ mod behaviour {
             };
 
             use super::array::BehaviourVec;
-            use super::{drop_raw, from_raw, new, Event};
+            use super::{drop_raw, from_raw, new};
+            use super::{AgentState, Event};
 
             pub struct SequentialBehaviour {
                 /// Type value defined by the user implementing the trait.
@@ -545,10 +606,13 @@ mod behaviour {
                 /// Function to be executed for every event a child has emitted.
                 handle_child_event: extern "C" fn(*mut c_void, *mut Event),
                 /// Function to be executed after a child behaviour has performed its action.
-                after_child_action: extern "C" fn(*mut c_void, *mut Context<Event>),
+                after_child_action:
+                    extern "C" fn(*mut c_void, *mut Context<Event>, *mut AgentState),
             }
 
             impl ComplexBehaviour for SequentialBehaviour {
+                type AgentState = AgentState;
+
                 type Event = Event;
 
                 type ChildEvent = Event;
@@ -560,16 +624,24 @@ mod behaviour {
                 fn after_child_action(
                     &mut self,
                     ctx: &mut no_std_framework_core::behaviour::Context<Self::Event>,
+                    agent_state: &mut Self::AgentState,
                 ) {
-                    (self.after_child_action)(self.inner, ptr::from_mut(ctx));
+                    (self.after_child_action)(
+                        self.inner,
+                        ptr::from_mut(ctx),
+                        ptr::from_mut(agent_state),
+                    );
                 }
             }
 
             impl SequentialBehaviourTrait for SequentialBehaviour {
                 fn initial_behaviours(
                     &self,
-                ) -> impl IntoIterator<Item = Box<dyn Behaviour<Event = Self::ChildEvent>>>
-                {
+                ) -> impl IntoIterator<
+                    Item = Box<
+                        dyn Behaviour<AgentState = Self::AgentState, Event = Self::ChildEvent>,
+                    >,
+                > {
                     // Replace the initial behaviours pointer with a null-pointer.
                     non_null!(
                         self.initial_behaviours.get(),
@@ -585,7 +657,11 @@ mod behaviour {
                 inner: *mut c_void,
                 initial_behaviours: *mut BehaviourVec,
                 handle_child_event: extern "C" fn(*mut c_void, *mut Event),
-                after_child_action: extern "C" fn(*mut c_void, *mut Context<Event>),
+                after_child_action: extern "C" fn(
+                    *mut c_void,
+                    *mut Context<Event>,
+                    *mut AgentState,
+                ),
             ) -> *mut SequentialBehaviour {
                 non_null!(inner, "got inner null-pointer");
                 non_null!(initial_behaviours, "got initial behaviours null-pointer");

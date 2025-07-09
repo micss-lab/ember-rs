@@ -3,9 +3,11 @@ use alloc::boxed::Box;
 use super::{get_id, Behaviour, BehaviourId, Context, IntoBehaviour};
 
 pub trait OneShotBehaviour {
+    type AgentState;
+
     type Event;
 
-    fn action(&self, ctx: &mut Context<Self::Event>);
+    fn action(&self, ctx: &mut Context<Self::Event>, agent_state: &mut Self::AgentState);
 
     fn reset(&mut self) {}
 }
@@ -15,18 +17,24 @@ struct OneShotBehaviourImpl<O: OneShotBehaviour> {
     oneshot: O,
 }
 
-impl<E: 'static, O> Behaviour for OneShotBehaviourImpl<O>
+impl<O, S, E: 'static> Behaviour for OneShotBehaviourImpl<O>
 where
-    O: OneShotBehaviour<Event = E> + 'static,
+    O: OneShotBehaviour<AgentState = S, Event = E> + 'static,
 {
+    type AgentState = S;
+
     type Event = E;
 
     fn id(&self) -> BehaviourId {
         self.id
     }
 
-    fn action(&mut self, ctx: &mut Context<Self::Event>) -> bool {
-        self.oneshot.action(ctx);
+    fn action(
+        &mut self,
+        ctx: &mut Context<Self::Event>,
+        agent_state: &mut Self::AgentState,
+    ) -> bool {
+        self.oneshot.action(ctx, agent_state);
         true
     }
 
@@ -38,13 +46,15 @@ where
 #[doc(hidden)]
 pub struct OneShot;
 
-impl<T, E: 'static> IntoBehaviour<OneShot> for T
+impl<T, S, E: 'static> IntoBehaviour<OneShot> for T
 where
-    T: OneShotBehaviour<Event = E> + 'static,
+    T: OneShotBehaviour<AgentState = S, Event = E> + 'static,
 {
+    type AgentState = S;
+
     type Event = E;
 
-    fn into_behaviour(self) -> Box<dyn Behaviour<Event = Self::Event>> {
+    fn into_behaviour(self) -> Box<dyn Behaviour<AgentState = S, Event = Self::Event>> {
         Box::new(OneShotBehaviourImpl {
             id: get_id(),
             oneshot: self,

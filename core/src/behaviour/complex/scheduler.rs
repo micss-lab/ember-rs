@@ -2,12 +2,12 @@ use alloc::boxed::Box;
 
 use super::{Behaviour, BehaviourId, Context};
 
-pub(crate) trait BehaviourScheduler<E: 'static> {
-    fn next(&mut self) -> Option<Box<dyn Behaviour<Event = E>>>;
+pub(crate) trait BehaviourScheduler<S: 'static, E: 'static> {
+    fn next(&mut self) -> Option<Box<dyn Behaviour<AgentState = S, Event = E>>>;
 
-    fn reschedule(&mut self, behaviour: Box<dyn Behaviour<Event = E>>);
+    fn reschedule(&mut self, behaviour: Box<dyn Behaviour<AgentState = S, Event = E>>);
 
-    fn reschedule_finished(&mut self, behaviour: Box<dyn Behaviour<Event = E>>) {
+    fn reschedule_finished(&mut self, behaviour: Box<dyn Behaviour<AgentState = S, Event = E>>) {
         let _ = behaviour;
     }
 
@@ -19,7 +19,7 @@ pub(crate) trait BehaviourScheduler<E: 'static> {
 
     fn is_finished(&self) -> bool;
 
-    fn action(&mut self, ctx: &mut Context<E>) -> bool {
+    fn action(&mut self, ctx: &mut Context<E>, agent_state: &mut S) -> bool {
         if ctx.container.new_messages {
             // Unblock all previously blocked behaviours.
             self.unblock_all();
@@ -30,7 +30,7 @@ pub(crate) trait BehaviourScheduler<E: 'static> {
         };
         let id = behaviour.id();
 
-        let finished = behaviour.action(&mut *ctx);
+        let finished = behaviour.action(&mut *ctx, agent_state);
 
         // Remove requested behaviours.
         core::mem::take(&mut ctx.local.removed_behaviours)

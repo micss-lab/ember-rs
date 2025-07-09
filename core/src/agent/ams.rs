@@ -14,7 +14,7 @@ use super::Aid;
 
 pub(crate) struct AmsAgent {
     /// Inner agent on which ams behaviours will be stored.
-    behaviours: ParallelBehaviourQueue<ActionKind>,
+    behaviours: ParallelBehaviourQueue<(), ActionKind>,
     /// Queue of actions to be performed using the hosting platform.
     actions: VecDeque<ActionKind>,
 }
@@ -26,7 +26,7 @@ impl AgentLike for AmsAgent {
         // log::trace!("Ticking ams agent");
 
         let mut context = Context::new_using_container(&mut *ctx);
-        self.behaviours.action(&mut context);
+        self.behaviours.action(&mut context, &mut ());
 
         // Do nothing with the container context for now.
         // if let Some(container_ctx) = context.container.take() {
@@ -113,9 +113,11 @@ impl AmsAgent {
 struct StartupMessage;
 
 impl OneShotBehaviour for StartupMessage {
+    type AgentState = ();
+
     type Event = ActionKind;
 
-    fn action(&self, _: &mut Context<Self::Event>) {
+    fn action(&self, _: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         log::debug!("Ams agent has registered.");
     }
 }
@@ -136,9 +138,11 @@ impl FipaAgentManagementBehaviour {
 }
 
 impl CyclicBehaviour for FipaAgentManagementBehaviour {
+    type AgentState = ();
+
     type Event = ActionKind;
 
-    fn action(&mut self, ctx: &mut Context<Self::Event>) {
+    fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         let Some(message) = ctx.receive_message(Some(&self.filter)) else {
             log::trace!("Blocking agent management behaviour");
             ctx.block_behaviour();

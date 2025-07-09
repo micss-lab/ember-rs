@@ -3,9 +3,11 @@ use alloc::boxed::Box;
 use super::{get_id, Behaviour, BehaviourId, Context, IntoBehaviour};
 
 pub trait CyclicBehaviour {
+    type AgentState;
+
     type Event;
 
-    fn action(&mut self, ctx: &mut Context<Self::Event>);
+    fn action(&mut self, ctx: &mut Context<Self::Event>, agent_state: &mut Self::AgentState);
 
     fn is_finished(&self) -> bool;
 
@@ -17,18 +19,24 @@ struct CyclicBehaviourImpl<C: CyclicBehaviour> {
     cyclic: C,
 }
 
-impl<E: 'static, C> Behaviour for CyclicBehaviourImpl<C>
+impl<S, E: 'static, C> Behaviour for CyclicBehaviourImpl<C>
 where
-    C: CyclicBehaviour<Event = E> + 'static,
+    C: CyclicBehaviour<AgentState = S, Event = E> + 'static,
 {
+    type AgentState = S;
+
     type Event = E;
 
     fn id(&self) -> BehaviourId {
         self.id
     }
 
-    fn action(&mut self, ctx: &mut Context<Self::Event>) -> bool {
-        self.cyclic.action(ctx);
+    fn action(
+        &mut self,
+        ctx: &mut Context<Self::Event>,
+        agent_state: &mut Self::AgentState,
+    ) -> bool {
+        self.cyclic.action(ctx, agent_state);
         self.cyclic.is_finished()
     }
 
@@ -40,13 +48,17 @@ where
 #[doc(hidden)]
 pub struct Cyclic;
 
-impl<T, E: 'static> IntoBehaviour<Cyclic> for T
+impl<T, S, E: 'static> IntoBehaviour<Cyclic> for T
 where
-    T: CyclicBehaviour<Event = E> + 'static,
+    T: CyclicBehaviour<AgentState = S, Event = E> + 'static,
 {
+    type AgentState = S;
+
     type Event = E;
 
-    fn into_behaviour(self) -> Box<dyn Behaviour<Event = Self::Event>> {
+    fn into_behaviour(
+        self,
+    ) -> Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::Event>> {
         Box::new(CyclicBehaviourImpl {
             id: get_id(),
             cyclic: self,

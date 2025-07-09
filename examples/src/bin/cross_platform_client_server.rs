@@ -1,6 +1,5 @@
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
-
 // Avoid unused imports on unsupported targets.
 #![cfg_attr(target_os = "none", allow(unused))]
 
@@ -74,9 +73,11 @@ const VALUES: [Metrics; 10] = [
 struct MetricsReceiver;
 
 impl CyclicBehaviour for MetricsReceiver {
+    type AgentState = ();
+
     type Event = ();
 
-    fn action(&mut self, ctx: &mut Context<Self::Event>) {
+    fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         let Some(message) = ctx.receive_message(None) else {
             log::debug!("No message received. Waiting...");
             ctx.block_behaviour();
@@ -99,13 +100,15 @@ impl<V> TickerBehaviour for ReadMetrics<V>
 where
     V: Iterator<Item = Metrics>,
 {
+    type AgentState = ();
+
     type Event = ();
 
     fn interval(&self) -> core::time::Duration {
         core::time::Duration::from_millis(5000)
     }
 
-    fn action(&mut self, ctx: &mut Context<Self::Event>) {
+    fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         let metrics = self.0.next().expect("could not take measurement");
         log::debug!("Sending metrics.");
         ctx.send_message(metrics.into())
