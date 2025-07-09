@@ -39,6 +39,10 @@ pub(crate) trait BehaviourScheduler<E: 'static> {
                 self.remove(id);
             });
 
+        if ctx.local.reset {
+            behaviour.reset();
+        }
+
         if !finished {
             self.reschedule(behaviour);
         } else {
@@ -46,7 +50,7 @@ pub(crate) trait BehaviourScheduler<E: 'static> {
         }
 
         // Block the current behaviour if requested.
-        if ctx.local.should_block {
+        if ctx.local.block {
             self.block(id);
         }
 

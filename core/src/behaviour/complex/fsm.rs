@@ -161,7 +161,7 @@ impl<T: 'static, E: 'static> BehaviourScheduler<FsmEvent<T, E>> for Fsm<T, E> {
         self.blocked.register(id);
         self.behaviours.insert(id, behaviour);
 
-        // An unfished behaviour is rescheduled.
+        // An unfinished behaviour is rescheduled.
         self.can_finish = false;
     }
 
