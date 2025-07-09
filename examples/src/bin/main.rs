@@ -13,9 +13,11 @@ use no_std_framework_core::{
 struct Stopper;
 
 impl OneShotBehaviour for Stopper {
+    type AgentState = ();
+
     type Event = ();
 
-    fn action(&self, ctx: &mut Context<Self::Event>) {
+    fn action(&self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         log::info!("Stopping agent");
         ctx.remove_agent();
     }
@@ -23,7 +25,7 @@ impl OneShotBehaviour for Stopper {
 
 fn example() {
     let container = Container::default()
-        .with_agent(Agent::<()>::new("agent-0").with_behaviour(Stopper))
-        .with_agent(Agent::<()>::new("agent-1").with_behaviour(Stopper));
+        .with_agent(Agent::new("agent-0", ()).with_behaviour(Stopper))
+        .with_agent(Agent::new("agent-1", ()).with_behaviour(Stopper));
     container.start().unwrap();
 }

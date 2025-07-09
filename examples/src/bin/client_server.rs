@@ -71,9 +71,11 @@ const VALUES: [Metrics; 10] = [
 struct MetricsReceiver;
 
 impl CyclicBehaviour for MetricsReceiver {
+    type AgentState = ();
+
     type Event = ();
 
-    fn action(&mut self, ctx: &mut Context<Self::Event>) {
+    fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         let Some(message) = ctx.receive_message(None) else {
             log::debug!("No message received. Waiting...");
             ctx.block_behaviour();
@@ -96,13 +98,15 @@ impl<V> TickerBehaviour for ReadMetrics<V>
 where
     V: Iterator<Item = Metrics>,
 {
+    type AgentState = ();
+
     type Event = ();
 
     fn interval(&self) -> core::time::Duration {
         core::time::Duration::from_millis(5000)
     }
 
-    fn action(&mut self, ctx: &mut Context<Self::Event>) {
+    fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         let metrics = self.0.next().expect("could not take measurement");
         log::debug!("Sending metrics.");
         ctx.send_message(metrics.into())
@@ -115,8 +119,10 @@ where
 
 fn example() {
     let container = Container::default()
-        .with_agent(Agent::new("server").with_behaviour(MetricsReceiver))
-        .with_agent(Agent::new("client").with_behaviour(ReadMetrics(VALUES.into_iter().cycle())));
+        .with_agent(Agent::new("server", ()).with_behaviour(MetricsReceiver))
+        .with_agent(
+            Agent::new("client", ()).with_behaviour(ReadMetrics(VALUES.into_iter().cycle())),
+        );
 
     container.start().expect("container exited with error");
 }

@@ -13,9 +13,11 @@ const MESSAGE_AMOUNT: usize = 10;
 struct InformationPrinter;
 
 impl OneShotBehaviour for InformationPrinter {
+    type AgentState = ();
+
     type Event = ();
 
-    fn action(&self, _: &mut Context<Self::Event>) {
+    fn action(&self, _: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         log::info!("This agent has two behaviours.");
         log::info!("One will print infinitely, the other will stop the first after {MESSAGE_AMOUNT} iterations.")
     }
@@ -24,9 +26,11 @@ impl OneShotBehaviour for InformationPrinter {
 struct MessagePrinter;
 
 impl CyclicBehaviour for MessagePrinter {
+    type AgentState = ();
+
     type Event = ();
 
-    fn action(&mut self, _: &mut Context<Self::Event>) {
+    fn action(&mut self, _: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         log::info!("Hello there!");
     }
 
@@ -47,9 +51,11 @@ impl MessagePrinterStopper {
 }
 
 impl CyclicBehaviour for MessagePrinterStopper {
+    type AgentState = ();
+
     type Event = ();
 
-    fn action(&mut self, ctx: &mut Context<Self::Event>) {
+    fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         self.count -= 1;
         if self.is_finished() {
             ctx.remove_behaviour(self.behaviour);
@@ -62,7 +68,7 @@ impl CyclicBehaviour for MessagePrinterStopper {
 }
 
 fn example() {
-    let mut agent = Agent::new("messaging-agent").with_behaviour(InformationPrinter);
+    let mut agent = Agent::new("messaging-agent", ()).with_behaviour(InformationPrinter);
     let behavour_id = agent.add_behaviour(MessagePrinter);
     let agent = agent.with_behaviour(MessagePrinterStopper::new(behavour_id, MESSAGE_AMOUNT));
     let container = Container::default().with_agent(agent);

@@ -30,7 +30,7 @@ enum ManagerMessage {
     Finished,
 }
 
-fn manager() -> Agent<()> {
+fn manager() -> Agent<(), ()> {
     #[derive(PartialEq, Eq, PartialOrd, Ord)]
     enum ManagerTrigger {
         TaskSent,
@@ -40,9 +40,11 @@ fn manager() -> Agent<()> {
     struct SendWworkerTask(Cell<String>);
 
     impl OneShotBehaviour for SendWworkerTask {
+        type AgentState = ();
+
         type Event = FsmEvent<ManagerTrigger, ()>;
 
-        fn action(&self, ctx: &mut Context<Self::Event>) {
+        fn action(&self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
             log::trace!("Sending task to worker");
             unsafe {
                 WORKER_MESSAGE = Some(WorkerMessage {
@@ -56,9 +58,11 @@ fn manager() -> Agent<()> {
     struct ReceiveAcknowledgement;
 
     impl CyclicBehaviour for ReceiveAcknowledgement {
+        type AgentState = ();
+
         type Event = FsmEvent<ManagerTrigger, ()>;
 
-        fn action(&mut self, ctx: &mut Context<Self::Event>) {
+        fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
             log::trace!("Waiting for acknowledgement.");
 
             let Some(message) = (unsafe { MANAGER_MESSAGE.take() }) else {
@@ -82,13 +86,15 @@ fn manager() -> Agent<()> {
     }
 
     impl TickerBehaviour for ReceiveFinish {
+        type AgentState = ();
+
         type Event = FsmEvent<ManagerTrigger, ()>;
 
         fn interval(&self) -> core::time::Duration {
             core::time::Duration::from_millis(500)
         }
 
-        fn action(&mut self, _: &mut Context<Self::Event>) {
+        fn action(&mut self, _: &mut Context<Self::Event>, _: &mut Self::AgentState) {
             let Some(message) = (unsafe { MANAGER_MESSAGE.take() }) else {
                 return;
             };
@@ -110,6 +116,8 @@ fn manager() -> Agent<()> {
     struct ManagerBehaviour;
 
     impl ComplexBehaviour for ManagerBehaviour {
+        type AgentState = ();
+
         type Event = ();
 
         type ChildEvent = ();
@@ -118,7 +126,7 @@ fn manager() -> Agent<()> {
     impl FsmBehaviour for ManagerBehaviour {
         type TransitionTrigger = ManagerTrigger;
 
-        fn fsm(&self) -> Fsm<Self::TransitionTrigger, Self::ChildEvent> {
+        fn fsm(&self) -> Fsm<Self::AgentState, Self::TransitionTrigger, Self::ChildEvent> {
             let send_worker_task =
                 behaviour_with_id(SendWworkerTask(Cell::new("Print this message".into())));
             let receive_acknowledgement = behaviour_with_id(ReceiveAcknowledgement);
@@ -143,10 +151,10 @@ fn manager() -> Agent<()> {
         }
     }
 
-    Agent::new("manager").with_behaviour(ManagerBehaviour)
+    Agent::new("manager", ()).with_behaviour(ManagerBehaviour)
 }
 
-fn worker() -> Agent<()> {
+fn worker() -> Agent<(), ()> {
     static mut CURRENT_TASK: Option<String> = None;
 
     #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -159,13 +167,15 @@ fn worker() -> Agent<()> {
     struct ReceiveTask;
 
     impl TickerBehaviour for ReceiveTask {
+        type AgentState = ();
+
         type Event = FsmEvent<WorkerTrigger, ()>;
 
         fn interval(&self) -> core::time::Duration {
             core::time::Duration::from_millis(500)
         }
 
-        fn action(&mut self, ctx: &mut Context<Self::Event>) {
+        fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
             log::trace!("Waiting for task from manager");
             let Some(message) = (unsafe { WORKER_MESSAGE.take() }) else {
                 return;
@@ -184,9 +194,11 @@ fn worker() -> Agent<()> {
     struct SendAcknowledgement;
 
     impl OneShotBehaviour for SendAcknowledgement {
+        type AgentState = ();
+
         type Event = FsmEvent<WorkerTrigger, ()>;
 
-        fn action(&self, ctx: &mut Context<Self::Event>) {
+        fn action(&self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
             unsafe {
                 MANAGER_MESSAGE = Some(ManagerMessage::Acknowledge);
             }
@@ -197,9 +209,11 @@ fn worker() -> Agent<()> {
     struct PerformTask;
 
     impl OneShotBehaviour for PerformTask {
+        type AgentState = ();
+
         type Event = FsmEvent<WorkerTrigger, ()>;
 
-        fn action(&self, ctx: &mut Context<Self::Event>) {
+        fn action(&self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
             log::info!("Performing task by printing given message");
             log::info!("message: {}", unsafe { CURRENT_TASK.take() }.unwrap());
             ctx.emit_event(FsmEvent::Trigger(WorkerTrigger::PerformedTask));
@@ -209,9 +223,11 @@ fn worker() -> Agent<()> {
     struct SendFinishedMessage;
 
     impl OneShotBehaviour for SendFinishedMessage {
+        type AgentState = ();
+
         type Event = FsmEvent<WorkerTrigger, ()>;
 
-        fn action(&self, _: &mut Context<Self::Event>) {
+        fn action(&self, _: &mut Context<Self::Event>, _: &mut Self::AgentState) {
             log::info!("Worker finished performing task");
             unsafe {
                 MANAGER_MESSAGE = Some(ManagerMessage::Finished);
@@ -222,6 +238,8 @@ fn worker() -> Agent<()> {
     struct WorkerBehaviour;
 
     impl ComplexBehaviour for WorkerBehaviour {
+        type AgentState = ();
+
         type Event = ();
 
         type ChildEvent = ();
@@ -230,7 +248,7 @@ fn worker() -> Agent<()> {
     impl FsmBehaviour for WorkerBehaviour {
         type TransitionTrigger = WorkerTrigger;
 
-        fn fsm(&self) -> Fsm<Self::TransitionTrigger, Self::ChildEvent> {
+        fn fsm(&self) -> Fsm<Self::AgentState, Self::TransitionTrigger, Self::ChildEvent> {
             let receive_task = behaviour_with_id(ReceiveTask);
             let send_acknowledgement = behaviour_with_id(SendAcknowledgement);
             let perform_task = behaviour_with_id(PerformTask);
@@ -261,7 +279,7 @@ fn worker() -> Agent<()> {
         }
     }
 
-    Agent::new("worker").with_behaviour(WorkerBehaviour)
+    Agent::new("worker", ()).with_behaviour(WorkerBehaviour)
 }
 
 fn example() {
@@ -271,9 +289,9 @@ fn example() {
     container.start().unwrap();
 }
 
-fn behaviour_with_id<K, E: 'static>(
-    behaviour: impl IntoBehaviour<K, Event = E>,
-) -> (BehaviourId, Box<dyn Behaviour<Event = E>>) {
+fn behaviour_with_id<K, S: 'static, E: 'static>(
+    behaviour: impl IntoBehaviour<K, AgentState = S, Event = E>,
+) -> (BehaviourId, Box<dyn Behaviour<AgentState = S, Event = E>>) {
     let behaviour = behaviour.into_behaviour();
     (behaviour.id(), behaviour)
 }
