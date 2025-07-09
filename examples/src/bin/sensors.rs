@@ -17,9 +17,11 @@ use no_std_framework_core::{Agent, Container};
 struct SensorInit;
 
 impl OneShotBehaviour for SensorInit {
+    type AgentState = ();
+
     type Event = ();
 
-    fn action(&self, _: &mut Context<Self::Event>) {
+    fn action(&self, _: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         log::info!("Sensors and actuators have been configured");
         log::info!("Oneshot event ended");
     }
@@ -28,13 +30,15 @@ impl OneShotBehaviour for SensorInit {
 struct AgentAliveBroadCast;
 
 impl TickerBehaviour for AgentAliveBroadCast {
+    type AgentState = ();
+
     type Event = ();
 
     fn interval(&self) -> Duration {
         Duration::from_secs(1)
     }
 
-    fn action(&mut self, _: &mut Context<Self::Event>) {
+    fn action(&mut self, _: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         log::info!("Broadcasting that this agent is alive.");
     }
 
@@ -46,13 +50,15 @@ impl TickerBehaviour for AgentAliveBroadCast {
 struct SensorValueReader;
 
 impl TickerBehaviour for SensorValueReader {
+    type AgentState = ();
+
     type Event = ();
 
     fn interval(&self) -> Duration {
         Duration::from_millis(200)
     }
 
-    fn action(&mut self, _: &mut Context<Self::Event>) {
+    fn action(&mut self, _: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         log::info!("Reading sensor values...");
     }
 
@@ -64,6 +70,8 @@ impl TickerBehaviour for SensorValueReader {
 struct MotorMovements;
 
 impl ComplexBehaviour for MotorMovements {
+    type AgentState = ();
+
     type Event = ();
 
     type ChildEvent = ();
@@ -72,13 +80,17 @@ impl ComplexBehaviour for MotorMovements {
 impl SequentialBehaviour for MotorMovements {
     fn initial_behaviours(
         &self,
-    ) -> impl IntoIterator<Item = Box<dyn Behaviour<Event = Self::ChildEvent>>> {
+    ) -> impl IntoIterator<
+        Item = Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::ChildEvent>>,
+    > {
         struct MotorStartUp;
 
         impl OneShotBehaviour for MotorStartUp {
+            type AgentState = ();
+
             type Event = ();
 
-            fn action(&self, _: &mut Context<Self::Event>) {
+            fn action(&self, _: &mut Context<Self::Event>, _: &mut Self::AgentState) {
                 log::info!("1 - Motors are turned on");
             }
         }
@@ -86,9 +98,11 @@ impl SequentialBehaviour for MotorMovements {
         struct MotorTurn;
 
         impl OneShotBehaviour for MotorTurn {
+            type AgentState = ();
+
             type Event = ();
 
-            fn action(&self, _: &mut Context<Self::Event>) {
+            fn action(&self, _: &mut Context<Self::Event>, _: &mut Self::AgentState) {
                 log::info!("2 - Motors are turned 90 degrees ");
             }
         }
@@ -96,9 +110,11 @@ impl SequentialBehaviour for MotorMovements {
         struct MotorShutDown;
 
         impl OneShotBehaviour for MotorShutDown {
+            type AgentState = ();
+
             type Event = ();
 
-            fn action(&self, _: &mut Context<Self::Event>) {
+            fn action(&self, _: &mut Context<Self::Event>, _: &mut Self::AgentState) {
                 log::info!("3 - Motors are turned off 3")
             }
         }
@@ -113,7 +129,7 @@ impl SequentialBehaviour for MotorMovements {
 
 fn example() {
     let container = Container::default().with_agent(
-        Agent::new("sensor-agent")
+        Agent::new("sensor-agent", ())
             .with_behaviour(SensorInit)
             .with_behaviour(AgentAliveBroadCast)
             .with_behaviour(SensorValueReader)

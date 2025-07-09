@@ -26,7 +26,7 @@ pub struct Container<'c> {
     mts: Mts<'c>,
 }
 
-pub trait AgentLike: 'static {
+pub trait AgentLike {
     fn update(&mut self, context: &mut ContainerContext) -> bool;
 
     fn get_name(&self) -> Cow<str>;
@@ -103,12 +103,12 @@ impl Container<'_> {
         )
     }
 
-    pub fn with_agent<E: 'static>(mut self, agent: Agent<E>) -> Self {
+    pub fn with_agent<S: 'static, E: 'static>(mut self, agent: Agent<S, E>) -> Self {
         self.add_agent(agent);
         self
     }
 
-    pub fn add_agent<E: 'static>(&mut self, agent: Agent<E>) {
+    pub fn add_agent<S: 'static, E: 'static>(&mut self, agent: Agent<S, E>) {
         self.agents.push_back(Box::new(agent));
     }
 }

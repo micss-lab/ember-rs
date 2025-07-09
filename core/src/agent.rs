@@ -13,7 +13,7 @@ pub(crate) use self::ams::AmsAgent;
 
 mod ams;
 
-enum AgentState {
+enum ExecutionState {
     Initiated,
     Active,
     // TODO: Implement these.
@@ -22,29 +22,35 @@ enum AgentState {
     // Transit,
 }
 
-pub struct Agent<E> {
+pub struct Agent<S, E> {
     pub(crate) name: String,
-    behaviours: ParallelBehaviourQueue<E>,
-    state: AgentState,
+    behaviours: ParallelBehaviourQueue<S, E>,
+    execution_state: ExecutionState,
+    state: S,
 }
 
-impl<E: 'static> Agent<E> {
-    pub fn new(name: impl ToString) -> Self {
+impl<S: 'static, E: 'static> Agent<S, E> {
+    pub fn new(name: impl ToString, state: S) -> Self {
         Self {
             name: name.to_string(),
             behaviours: ParallelBehaviourQueue::new_empty(FinishStrategy::Never),
-            state: AgentState::Initiated,
+            execution_state: ExecutionState::Initiated,
+            state,
         }
     }
-}
 
-impl<E: 'static> Agent<E> {
-    pub fn with_behaviour<K>(mut self, behaviour: impl IntoBehaviour<K, Event = E>) -> Self {
+    pub fn with_behaviour<K>(
+        mut self,
+        behaviour: impl IntoBehaviour<K, AgentState = S, Event = E>,
+    ) -> Self {
         self.add_behaviour(behaviour);
         self
     }
 
-    pub fn add_behaviour<K>(&mut self, behaviour: impl IntoBehaviour<K, Event = E>) -> BehaviourId {
+    pub fn add_behaviour<K>(
+        &mut self,
+        behaviour: impl IntoBehaviour<K, AgentState = S, Event = E>,
+    ) -> BehaviourId {
         let behaviour = behaviour.into_behaviour();
         let id = behaviour.id();
         self.behaviours.add_behaviour(behaviour);
@@ -52,15 +58,15 @@ impl<E: 'static> Agent<E> {
     }
 }
 
-impl<E: 'static> AgentLike for Agent<E> {
+impl<S: 'static, E: 'static> AgentLike for Agent<S, E> {
     fn update(&mut self, ctx: &mut ContainerContext) -> bool {
         use crate::acl::codec::AgentActionCodec;
         use crate::behaviour::complex::scheduler::BehaviourScheduler;
-        use AgentState::*;
+        use ExecutionState::*;
 
         // log::trace!("Ticking agent `{}`", self.name);
 
-        match self.state {
+        match self.execution_state {
             Initiated => {
                 // First register the agent with the ams.
                 let ams_aid = Aid::local("ams");
@@ -84,14 +90,14 @@ impl<E: 'static> AgentLike for Agent<E> {
                     },
                 ));
                 log::debug!("Sending ams register request for agent `{}`.", self.name);
-                self.state = Active;
+                self.execution_state = Active;
                 return false;
             }
             Active => (),
         }
 
         let mut context = Context::new_using_container(&mut *ctx);
-        self.behaviours.action(&mut context);
+        self.behaviours.action(&mut context, &mut self.state);
 
         ctx.merge(context.container);
 

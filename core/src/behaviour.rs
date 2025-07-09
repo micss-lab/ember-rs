@@ -17,9 +17,11 @@ pub struct BehaviourId(u32);
 pub trait Behaviour: 'static {
     type Event;
 
+    type AgentState;
+
     fn id(&self) -> BehaviourId;
 
-    fn action(&mut self, ctx: &mut Context<Self::Event>) -> bool;
+    fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) -> bool;
 
     fn reset(&mut self);
 }
@@ -30,17 +32,25 @@ where
 {
     type Event;
 
-    fn into_behaviour(self) -> Box<dyn Behaviour<Event = Self::Event>>;
+    type AgentState;
+
+    fn into_behaviour(
+        self,
+    ) -> Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::Event>>;
 }
 
 // This way the user can convert the behaviour to a boxed one by themselves and still pass it to
 // functions expecting and "IntoBehaviour" impl.
 #[doc(hidden)]
 pub struct BoxedBehviour;
-impl<E> IntoBehaviour<BoxedBehviour> for Box<dyn Behaviour<Event = E>> {
+impl<S, E> IntoBehaviour<BoxedBehviour> for Box<dyn Behaviour<AgentState = S, Event = E>> {
     type Event = E;
 
-    fn into_behaviour(self) -> Box<dyn Behaviour<Event = Self::Event>> {
+    type AgentState = S;
+
+    fn into_behaviour(
+        self,
+    ) -> Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::Event>> {
         self
     }
 }

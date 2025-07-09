@@ -11,9 +11,11 @@ use no_std_framework_core::{Agent, Container};
 struct InformationPrinter;
 
 impl OneShotBehaviour for InformationPrinter {
+    type AgentState = ();
+
     type Event = ();
 
-    fn action(&self, _: &mut Context<Self::Event>) {
+    fn action(&self, _: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         log::info!("This agent has one behaviour.");
         log::info!("It will seemingly print for an infinite amount of time,");
         log::info!(
@@ -25,9 +27,11 @@ impl OneShotBehaviour for InformationPrinter {
 struct MessageChecker;
 
 impl CyclicBehaviour for MessageChecker {
+    type AgentState = ();
+
     type Event = ();
 
-    fn action(&mut self, ctx: &mut Context<Self::Event>) {
+    fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         log::info!("Checking for messages");
         ctx.block_behaviour();
     }
@@ -39,7 +43,7 @@ impl CyclicBehaviour for MessageChecker {
 
 fn example() {
     let container = Container::default().with_agent(
-        Agent::new("messaging-agent")
+        Agent::new("messaging-agent", ())
             .with_behaviour(InformationPrinter)
             .with_behaviour(MessageChecker),
     );
