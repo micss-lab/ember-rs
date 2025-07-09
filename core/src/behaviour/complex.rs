@@ -13,12 +13,19 @@ pub trait ComplexBehaviour {
 
     type ChildEvent;
 
+    type AgentState;
+
     fn handle_child_event(&mut self, event: Self::ChildEvent) {
         let _ = event;
     }
 
-    fn after_child_action(&mut self, ctx: &mut Context<Self::Event>) {
+    fn after_child_action(
+        &mut self,
+        ctx: &mut Context<Self::Event>,
+        agent_state: &mut Self::AgentState,
+    ) {
         let _ = ctx;
+        let _ = agent_state;
     }
 
     fn reset(&mut self) {}
@@ -26,9 +33,10 @@ pub trait ComplexBehaviour {
 
 trait ScheduledComplexBehaviour: ComplexBehaviour
 where
+    Self::AgentState: 'static,
     Self::ChildEvent: 'static,
 {
-    fn scheduler(&mut self) -> &mut impl BehaviourScheduler<Self::ChildEvent>;
+    fn scheduler(&mut self) -> &mut impl BehaviourScheduler<Self::AgentState, Self::ChildEvent>;
 }
 
 struct ComplexBehaviourImpl<I> {
@@ -36,21 +44,27 @@ struct ComplexBehaviourImpl<I> {
     inner: I,
 }
 
-impl<I, E: 'static, CE: 'static> Behaviour for ComplexBehaviourImpl<I>
+impl<I, S: 'static, E: 'static, CE: 'static> Behaviour for ComplexBehaviourImpl<I>
 where
-    I: ScheduledComplexBehaviour<Event = E, ChildEvent = CE> + 'static,
+    I: ScheduledComplexBehaviour<AgentState = S, Event = E, ChildEvent = CE> + 'static,
 {
     type Event = E;
+
+    type AgentState = S;
 
     fn id(&self) -> BehaviourId {
         self.id
     }
 
-    fn action(&mut self, ctx: &mut Context<Self::Event>) -> bool {
+    fn action(
+        &mut self,
+        ctx: &mut Context<Self::Event>,
+        agent_state: &mut Self::AgentState,
+    ) -> bool {
         let mut context = Context::from_upper(&mut *ctx);
 
         // 1. Execute next scheduled behaviour.
-        self.inner.scheduler().action(&mut context);
+        self.inner.scheduler().action(&mut context, agent_state);
 
         // 2. Handle events the behaviour produced.
         while let Some(event) = context.local.events.pop() {
@@ -61,7 +75,7 @@ where
         ctx.merge(context);
 
         // 4. Run user defined actions for this complex behaviour.
-        self.inner.after_child_action(ctx);
+        self.inner.after_child_action(ctx, agent_state);
 
         self.inner.scheduler().is_finished()
     }
