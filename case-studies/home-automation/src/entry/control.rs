@@ -8,6 +8,7 @@ use no_std_framework_core::{
 };
 
 use crate::entry::{
+    dht22::ontology::Dht22Ontology,
     fan::{
         self,
         ontology::{FanAction, FanMessage},
@@ -91,11 +92,7 @@ impl CyclicBehaviour for Receiver {
             };
 
             if ontology == dht22::ontology::Dht22Ontology::name() {
-                let Content::Other { content, .. } = message.content else {
-                    unimplemented!();
-                };
-                let measurement = content.parse().unwrap();
-
+                let measurement = Dht22Ontology::decode_message(message).unwrap();
                 self.handle_dht22_measurement(measurement, ctx);
             }
         }

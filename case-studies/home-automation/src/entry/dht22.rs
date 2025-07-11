@@ -13,11 +13,20 @@ pub fn dht22_agent(measurements: impl IntoIterator<Item = Measurement> + 'static
 }
 
 pub mod ontology {
+    use no_std_framework_core::acl::message::Message;
+
     pub struct Dht22Ontology;
 
     impl Dht22Ontology {
         pub const fn name() -> &'static str {
             "Dht22-Ontology"
+        }
+
+        pub fn decode_message(message: Message) -> Result<Measurement, ()> {
+            let Content::Other { content, .. } = message.content else {
+                return Err(());
+            };
+            content.parse().map_err(|_| ())
         }
     }
 }
