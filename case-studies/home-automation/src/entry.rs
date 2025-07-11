@@ -85,8 +85,8 @@ pub fn main() {
     Container::default()
         .with_agent(fan::fan_agent())
         .with_agent(dht22::dht22_agent(MEASUREMENTS.into_iter().cycle()))
-        .with_agent(control::control_agent())
         .with_agent(lock::lock_agent(LOCK_PASSWORD, unlock_button, uart_rx))
+        .with_agent(control::control_agent())
         .start()
         .unwrap()
 }

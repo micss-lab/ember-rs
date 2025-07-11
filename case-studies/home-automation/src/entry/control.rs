@@ -25,6 +25,7 @@ struct Receiver {
     temperature: f32,
     humidity: f32,
     human_detected: bool,
+    fan_powered: bool,
 }
 
 impl Receiver {
@@ -33,6 +34,7 @@ impl Receiver {
             temperature: 0.0,
             humidity: 0.0,
             human_detected: true,
+            fan_powered: false,
         }
     }
 
@@ -53,8 +55,11 @@ impl Receiver {
             self.humidity
         );
 
-        if self.temperature >= 23.0 && self.human_detected {
-            self.toggle_fan(ctx)
+        let fan_powered_wanted = self.temperature >= 23.0 && self.human_detected;
+
+        if self.fan_powered != fan_powered_wanted {
+            self.toggle_fan(ctx);
+            self.fan_powered = fan_powered_wanted;
         }
     }
 

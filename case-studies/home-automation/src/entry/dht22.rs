@@ -85,7 +85,7 @@ where
     type Event = ();
 
     fn interval(&self) -> core::time::Duration {
-        core::time::Duration::from_secs(5)
+        core::time::Duration::from_secs(3)
     }
 
     fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
