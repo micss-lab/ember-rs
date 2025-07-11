@@ -2,6 +2,45 @@
   "version": 1,
   "author": "Anonymous maker",
   "editor": "wokwi",
-  "parts": [ { "id": "esp", "type": "board-esp32-devkit-c-v4" } ],
-  "connections": [ [ "esp:TX", "$serialMonitor:RX", "" ], [ "esp:RX", "$serialMonitor:TX", "" ] ]
+  "parts": [
+    {
+      "type": "wokwi-breadboard-mini",
+      "id": "bb1",
+      "top": 29.7,
+      "left": 99.5,
+      "rotate": 90,
+      "attrs": {}
+    },
+    { "type": "board-esp32-devkit-c-v4", "id": "esp", "top": 0, "left": 0, "attrs": {} },
+    {
+      "type": "wokwi-text",
+      "id": "text1",
+      "top": -9.6,
+      "left": 144,
+      "attrs": { "text": "Unlock door" }
+    },
+    {
+      "type": "wokwi-pushbutton",
+      "id": "btn1",
+      "top": 15.8,
+      "left": 153.6,
+      "attrs": { "color": "green", "xray": "1" }
+    }
+  ],
+  "connections": [
+    [ "esp:TX", "$serialMonitor:RX", "", [] ],
+    [ "esp:RX", "$serialMonitor:TX", "", [] ],
+    [ "esp:GND.2", "bb1:2b.j", "black", [ "v0" ] ],
+    [ "esp:22", "bb1:4b.j", "green", [ "h0" ] ],
+    [ "btn1:1.l", "bb1:2b.h", "", [ "$bb" ] ],
+    [ "btn1:2.l", "bb1:4b.h", "", [ "$bb" ] ],
+    [ "btn1:1.r", "bb1:2t.c", "", [ "$bb" ] ],
+    [ "btn1:2.r", "bb1:4t.c", "", [ "$bb" ] ]
+  ],
+  "serialMonitor": {
+    "display": "auto",
+    "newline": "lf",
+    "convertEol": false
+  },
+  "dependencies": {}
 }

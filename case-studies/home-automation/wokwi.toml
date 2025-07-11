@@ -2,8 +2,3 @@
 version = 1
 firmware = "../../target/xtensa-esp32-none-elf/release/case-study-home-automation"
 elf = "../../target/xtensa-esp32-none-elf/release/case-study-home-automation"
-
-[[net.forward]]
-from = "localhost:8080"
-to = "target:80"
-

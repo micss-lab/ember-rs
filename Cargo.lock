@@ -169,6 +169,7 @@ checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 name = "case-study-home-automation"
 version = "0.1.0"
 dependencies = [
+ "bstr",
  "chrono",
  "embassy-time-driver",
  "embedded-io 0.6.1",

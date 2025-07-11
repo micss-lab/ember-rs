@@ -1,6 +1,11 @@
 use esp_backtrace as _;
 use esp_hal_embassy as _;
 
+use esp_hal::{
+    clock::CpuClock,
+    gpio::{Input, Pull},
+    uart::UartRx,
+};
 use no_std_framework_core::Container;
 
 use self::dht22::Measurement;
@@ -50,9 +55,12 @@ const MEASUREMENTS: [Measurement; 10] = [
     },
 ];
 
+const LOCK_PASSWORD: &[u8] = b"1234";
+
 mod control;
 mod dht22;
 mod fan;
+mod lock;
 mod util;
 
 pub fn main() {
@@ -63,10 +71,22 @@ pub fn main() {
 
     log::info!("Running case study `home-automation`.");
 
+    let peripherals = esp_hal::init({
+        let mut config = esp_hal::Config::default();
+        config.cpu_clock = CpuClock::max();
+        config
+    });
+
+    let uart_rx = UartRx::new(peripherals.UART1, peripherals.GPIO3).unwrap();
+    let unlock_button = Input::new(peripherals.GPIO22, Pull::Up);
+
+    log::trace!("Initialized peripherals");
+
     Container::default()
         .with_agent(fan::fan_agent())
         .with_agent(dht22::dht22_agent(MEASUREMENTS.into_iter().cycle()))
         .with_agent(control::control_agent())
+        .with_agent(lock::lock_agent(LOCK_PASSWORD, unlock_button, uart_rx))
         .start()
         .unwrap()
 }

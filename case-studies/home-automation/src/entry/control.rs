@@ -66,7 +66,6 @@ impl Receiver {
             reply_to: None,
             ontology: Some(fan::ontology::FanOntology::name().into()),
             content: message::Content::Sl(AgentActionCodec::into_content(FanMessage {
-                fan: 0,
                 action: FanAction::Toggle,
             })),
         }))
