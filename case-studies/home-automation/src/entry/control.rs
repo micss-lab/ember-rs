@@ -17,8 +17,8 @@ use crate::entry::{
 
 use super::dht22;
 
-pub fn control_agent() -> Agent<()> {
-    Agent::new("control").with_behaviour(Receiver::new())
+pub fn control_agent() -> Agent<(), ()> {
+    Agent::new("control", ()).with_behaviour(Receiver::new())
 }
 
 struct Receiver {
@@ -74,9 +74,11 @@ impl Receiver {
 }
 
 impl CyclicBehaviour for Receiver {
+    type AgentState = ();
+
     type Event = ();
 
-    fn action(&mut self, ctx: &mut Context<Self::Event>) {
+    fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         use no_std_framework_core::acl::message::Content;
 
         while let Some(message) = ctx.receive_message(None) {

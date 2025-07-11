@@ -10,8 +10,8 @@ use no_std_framework_core::{
 
 use self::ontology::FanAction;
 
-pub fn fan_agent() -> Agent<()> {
-    Agent::new("fan").with_behaviour(Fan { state: false })
+pub fn fan_agent() -> Agent<(), ()> {
+    Agent::new("fan", ()).with_behaviour(Fan { state: false })
 }
 
 pub mod ontology {
@@ -100,13 +100,15 @@ pub mod ontology {
 struct FanInteractions;
 
 impl TickerBehaviour for FanInteractions {
+    type AgentState = ();
+
     type Event = FanAction;
 
     fn interval(&self) -> core::time::Duration {
         core::time::Duration::from_millis(250)
     }
 
-    fn action(&mut self, ctx: &mut Context<Self::Event>) {
+    fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         let Some(message) = ctx.receive_message(None) else {
             ctx.block_behaviour();
             return;
@@ -126,6 +128,8 @@ struct Fan {
 }
 
 impl ComplexBehaviour for Fan {
+    type AgentState = ();
+
     type Event = ();
 
     type ChildEvent = FanAction;
@@ -147,7 +151,9 @@ impl ParallelBehaviour for Fan {
 
     fn initial_behaviours(
         &self,
-    ) -> impl IntoIterator<Item = Box<dyn Behaviour<Event = Self::ChildEvent>>> {
+    ) -> impl IntoIterator<
+        Item = Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::ChildEvent>>,
+    > {
         [FanInteractions.into_behaviour()]
     }
 }

@@ -74,7 +74,7 @@ pub(crate) fn main() {
     log::info!("Starting http server on port {}", HTTP_PORT);
     let server = http::Server::new(stack, HTTP_PORT);
     Container::default()
-        .with_agent(Agent::new("server").with_behaviour(server))
+        .with_agent(Agent::new("server", ()).with_behaviour(server))
         .start()
         .unwrap()
 }

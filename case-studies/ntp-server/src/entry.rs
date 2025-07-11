@@ -73,7 +73,7 @@ pub(crate) fn main() {
 
     let server = ntp::Server::new(stack);
     Container::default()
-        .with_agent(Agent::new("server").with_behaviour(server))
+        .with_agent(Agent::new("server", ()).with_behaviour(server))
         .start()
         .unwrap()
 }

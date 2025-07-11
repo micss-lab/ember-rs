@@ -8,8 +8,8 @@ use no_std_framework_core::{
 
 use super::util::wrap_message;
 
-pub fn dht22_agent(measurements: impl IntoIterator<Item = Measurement> + 'static) -> Agent<()> {
-    Agent::new("dht22").with_behaviour(Sensor::new(measurements.into_iter()))
+pub fn dht22_agent(measurements: impl IntoIterator<Item = Measurement> + 'static) -> Agent<(), ()> {
+    Agent::new("dht22", ()).with_behaviour(Sensor::new(measurements.into_iter()))
 }
 
 pub mod ontology {
@@ -80,13 +80,15 @@ impl<M> TickerBehaviour for Sensor<M>
 where
     M: Iterator<Item = Measurement>,
 {
+    type AgentState = ();
+
     type Event = ();
 
     fn interval(&self) -> core::time::Duration {
         core::time::Duration::from_secs(5)
     }
 
-    fn action(&mut self, ctx: &mut Context<Self::Event>) {
+    fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         let Some(measurement) = self.measurements.next() else {
             self.is_empty = true;
             return;

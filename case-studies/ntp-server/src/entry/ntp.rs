@@ -27,13 +27,15 @@ impl<D> TickerBehaviour for Server<D>
 where
     D: Device,
 {
+    type AgentState = ();
+
     type Event = ();
 
     fn interval(&self) -> core::time::Duration {
         core::time::Duration::from_secs(2)
     }
 
-    fn action(&mut self, _ctx: &mut Context<Self::Event>) {
+    fn action(&mut self, _ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         let (mut rx_buffer, mut rx_metadata) = (
             [0u8; 2048],
             [smoltcp::socket::udp::PacketMetadata::EMPTY; 4],

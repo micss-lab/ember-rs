@@ -115,9 +115,11 @@ impl<D> CyclicBehaviour for Server<D>
 where
     D: Device,
 {
+    type AgentState = ();
+
     type Event = ();
 
-    fn action(&mut self, _: &mut Context<Self::Event>) {
+    fn action(&mut self, _: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         use embedded_io::Read;
 
         let mut rx_buffer = [0u8; 1024];
