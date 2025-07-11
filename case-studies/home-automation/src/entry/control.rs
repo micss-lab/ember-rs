@@ -13,10 +13,11 @@ use crate::entry::{
         self,
         ontology::{FanAction, FanMessage},
     },
+    pir::{self, ontology::PirOntology},
     util::wrap_message,
 };
 
-use super::dht22;
+use super::{dht22, pir::ontology::PirMessage};
 
 pub fn control_agent() -> Agent<(), ()> {
     Agent::new("control", ()).with_behaviour(Receiver::new())
@@ -34,7 +35,7 @@ impl Receiver {
         Self {
             temperature: 0.0,
             humidity: 0.0,
-            human_detected: true,
+            human_detected: false,
             fan_powered: false,
         }
     }
@@ -56,6 +57,16 @@ impl Receiver {
             self.humidity
         );
 
+        self.check_fan_state(ctx);
+    }
+
+    fn handle_pir_message(&mut self, message: PirMessage, ctx: &mut Context<()>) {
+        self.human_detected = message.object_detected;
+
+        self.check_fan_state(ctx);
+    }
+
+    fn check_fan_state(&mut self, ctx: &mut Context<()>) {
         let fan_powered_wanted = self.temperature >= 23.0 && self.human_detected;
 
         if self.fan_powered != fan_powered_wanted {
@@ -84,16 +95,17 @@ impl CyclicBehaviour for Receiver {
     type Event = ();
 
     fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
-        use no_std_framework_core::acl::message::Content;
-
         while let Some(message) = ctx.receive_message(None) {
-            let Some(ontology) = message.ontology else {
+            let Some(ontology) = message.ontology.as_ref() else {
                 unimplemented!();
             };
 
             if ontology == dht22::ontology::Dht22Ontology::name() {
                 let measurement = Dht22Ontology::decode_message(message).unwrap();
                 self.handle_dht22_measurement(measurement, ctx);
+            } else if ontology == pir::ontology::PirOntology::name() {
+                let message = PirOntology::decode_message(message).unwrap();
+                self.handle_pir_message(message, ctx);
             }
         }
         ctx.block_behaviour();

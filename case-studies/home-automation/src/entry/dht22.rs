@@ -13,7 +13,9 @@ pub fn dht22_agent(measurements: impl IntoIterator<Item = Measurement> + 'static
 }
 
 pub mod ontology {
-    use no_std_framework_core::acl::message::Message;
+    use no_std_framework_core::acl::message::{Content, Message};
+
+    use super::Measurement;
 
     pub struct Dht22Ontology;
 

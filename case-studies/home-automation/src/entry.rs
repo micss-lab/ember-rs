@@ -61,6 +61,7 @@ mod control;
 mod dht22;
 mod fan;
 mod lock;
+mod pir;
 mod util;
 
 pub fn main() {
@@ -79,6 +80,7 @@ pub fn main() {
 
     let uart_rx = UartRx::new(peripherals.UART1, peripherals.GPIO3).unwrap();
     let unlock_button = Input::new(peripherals.GPIO22, Pull::Up);
+    let pir_pin = Input::new(peripherals.GPIO18, Pull::None);
 
     log::trace!("Initialized peripherals");
 
@@ -86,6 +88,7 @@ pub fn main() {
         .with_agent(fan::fan_agent())
         .with_agent(dht22::dht22_agent(MEASUREMENTS.into_iter().cycle()))
         .with_agent(lock::lock_agent(LOCK_PASSWORD, unlock_button, uart_rx))
+        .with_agent(pir::pir_agent(pir_pin))
         .with_agent(control::control_agent())
         .start()
         .unwrap()

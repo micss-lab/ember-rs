@@ -25,6 +25,21 @@
       "top": 15.8,
       "left": 153.6,
       "attrs": { "color": "green", "xray": "1" }
+    },
+    {
+      "type": "wokwi-pir-motion-sensor",
+      "id": "pir1",
+      "top": 59.32,
+      "left": 240.5,
+      "rotate": 90,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-text",
+      "id": "text2",
+      "top": 28.8,
+      "left": 249.6,
+      "attrs": { "text": "Detect human" }
     }
   ],
   "connections": [
@@ -35,12 +50,17 @@
     [ "btn1:1.l", "bb1:2b.h", "", [ "$bb" ] ],
     [ "btn1:2.l", "bb1:4b.h", "", [ "$bb" ] ],
     [ "btn1:1.r", "bb1:2t.c", "", [ "$bb" ] ],
-    [ "btn1:2.r", "bb1:4t.c", "", [ "$bb" ] ]
+    [ "btn1:2.r", "bb1:4t.c", "", [ "$bb" ] ],
+    [ "esp:5V", "bb1:9b.j", "red", [ "h-14.21", "v19.2", "h124.8", "v-124.8" ] ],
+    [ "bb1:9b.f", "bb1:9t.e", "red", [ "h0" ] ],
+    [ "bb1:2b.i", "bb1:11b.i", "black", [ "h0" ] ],
+    [ "bb1:11b.f", "bb1:11t.e", "black", [ "h0" ] ],
+    [ "esp:18", "bb1:10b.j", "green", [ "h0" ] ],
+    [ "pir1:VCC", "bb1:9t.a", "", [ "$bb" ] ],
+    [ "pir1:OUT", "bb1:10t.a", "", [ "$bb" ] ],
+    [ "pir1:GND", "bb1:11t.a", "", [ "$bb" ] ],
+    [ "bb1:10b.f", "bb1:10t.e", "green", [ "h0" ] ]
   ],
-  "serialMonitor": {
-    "display": "auto",
-    "newline": "lf",
-    "convertEol": false
-  },
+  "serialMonitor": { "display": "auto", "newline": "lf", "convertEol": false },
   "dependencies": {}
 }
