@@ -37,6 +37,7 @@ impl MessageBuilder {
                 log::error!("failed to parse content as sl0: {}", e);
                 "content"
             })?),
+            Some(b"bytes") => Content::Bytes(content.to_vec()),
             None => Content::Other {
                 kind: None,
                 content: content.to_string(),
