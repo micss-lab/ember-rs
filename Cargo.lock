@@ -225,6 +225,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "case-study-plant-monitoring"
+version = "0.1.0"
+dependencies = [
+ "bstr",
+ "chrono",
+ "embassy-time-driver",
+ "embedded-io 0.6.1",
+ "esp-alloc",
+ "esp-backtrace",
+ "esp-hal",
+ "esp-hal-embassy",
+ "esp-println",
+ "esp-wifi",
+ "libm",
+ "log",
+ "no-std-framework-core",
+ "postcard",
+ "serde",
+ "smoltcp",
+]
+
+[[package]]
 name = "cbindgen"
 version = "0.27.0"
 source = "git+https://github.com/exellentcoin26/cbindgen.git#e5d6c0c7c2d136c0aaca66349c1332dcd2c40798"

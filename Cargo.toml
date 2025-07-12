@@ -5,7 +5,8 @@ members = [
     "core",
     "examples",
 
+    "case-studies/home-automation",
     "case-studies/http-server",
     "case-studies/ntp-server",
-    "case-studies/home-automation",
+    "case-studies/plant-monitoring",
 ]
