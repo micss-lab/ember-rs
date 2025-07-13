@@ -79,8 +79,10 @@ impl<E: 'static> Context<E> {
         self.local.removed_behaviours.push(id);
     }
 
-    pub fn receive_message(&mut self, filter: Option<&MessageFilter>) -> Option<Message> {
-        self.container.message_inbox.find_and_take(filter)
+    pub fn receive_message(&mut self, filter: Option<Cow<'_, MessageFilter>>) -> Option<Message> {
+        self.container
+            .message_inbox
+            .find_and_take(filter)
     }
 
     pub fn send_message(&mut self, message: MessageEnvelope) {

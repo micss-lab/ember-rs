@@ -143,7 +143,7 @@ impl CyclicBehaviour for FipaAgentManagementBehaviour {
     type Event = ActionKind;
 
     fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
-        let Some(message) = ctx.receive_message(Some(&self.filter)) else {
+        let Some(message) = ctx.receive_message(Some(Cow::Borrowed(&self.filter))) else {
             log::trace!("Blocking agent management behaviour");
             ctx.block_behaviour();
             return;
