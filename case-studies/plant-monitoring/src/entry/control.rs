@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use esp_hal::gpio::Input;
 use no_std_framework_core::{
     acl::message::MessageFilter,
@@ -118,26 +119,26 @@ impl CyclicBehaviour for Receiver {
     fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) {
         let mut received = false;
 
-        while let Some(message) = ctx.receive_message(temp_ontology_message_filter().as_ref()) {
+        while let Some(message) = ctx.receive_message(temp_ontology_message_filter()) {
             received = true;
             let measurement = temp::ontology::TempOntology::decode_message(message).unwrap();
             state.handle_temp_measurement(measurement);
         }
 
-        while let Some(message) = ctx.receive_message(moisture_ontology_message_filter().as_ref()) {
+        while let Some(message) = ctx.receive_message(moisture_ontology_message_filter()) {
             received = true;
             let moisture_percent =
                 moist::ontology::MoistureOntology::decode_message(message).unwrap();
             state.handle_moisture_measurement(moisture_percent.0);
         }
 
-        while let Some(message) = ctx.receive_message(light_ontology_message_filter().as_ref()) {
+        while let Some(message) = ctx.receive_message(light_ontology_message_filter()) {
             received = true;
             let light_level = light::ontology::LightOntology::decode_message(message).unwrap();
             state.handle_light_level(light_level.0);
         }
 
-        while let Some(message) = ctx.receive_message(pump_ontology_message_filter().as_ref()) {
+        while let Some(message) = ctx.receive_message(pump_ontology_message_filter()) {
             received = true;
             let pump_status = pump::ontology::PumpOntology::decode_message(message).unwrap();
             state.handle_pump_status(pump_status);
@@ -153,28 +154,28 @@ impl CyclicBehaviour for Receiver {
     }
 }
 
-fn temp_ontology_message_filter() -> Option<MessageFilter> {
-    Some(MessageFilter::ontology(
+fn temp_ontology_message_filter() -> Option<Cow<'static, MessageFilter>> {
+    Some(Cow::Owned(MessageFilter::ontology(
         temp::ontology::TempOntology::name().into(),
-    ))
+    )))
 }
 
-fn moisture_ontology_message_filter() -> Option<MessageFilter> {
-    Some(MessageFilter::ontology(
+fn moisture_ontology_message_filter() -> Option<Cow<'static, MessageFilter>> {
+    Some(Cow::Owned(MessageFilter::ontology(
         moist::ontology::MoistureOntology::name().into(),
-    ))
+    )))
 }
 
-fn light_ontology_message_filter() -> Option<MessageFilter> {
-    Some(MessageFilter::ontology(
+fn light_ontology_message_filter() -> Option<Cow<'static, MessageFilter>> {
+    Some(Cow::Owned(MessageFilter::ontology(
         light::ontology::LightOntology::name().into(),
-    ))
+    )))
 }
 
-fn pump_ontology_message_filter() -> Option<MessageFilter> {
-    Some(MessageFilter::ontology(
+fn pump_ontology_message_filter() -> Option<Cow<'static, MessageFilter>> {
+    Some(Cow::Owned(MessageFilter::ontology(
         pump::ontology::PumpOntology::name().into(),
-    ))
+    )))
 }
 
 struct StatusPrinter;
