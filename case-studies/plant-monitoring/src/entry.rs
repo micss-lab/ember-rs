@@ -20,7 +20,7 @@ use esp_hal_embassy as _;
 use esp_hal::{
     analog::adc::{Adc, AdcConfig, Attenuation},
     clock::CpuClock,
-    gpio::{Level, Output},
+    gpio::{Input, Level, Output, Pull},
 };
 use no_std_framework_core::Container;
 
@@ -36,8 +36,9 @@ const MOISTURE_THRESHOLD: f32 = 60.0;
 const MOISTURE_LOW_THRESHOLD: f32 = 30.0;
 const MOISTURE_HIGH_THRESHOLD: f32 = 80.0;
 
-const TEMP_HIGH_THRESHOLD: f32 = 36.0;
-const TEMP_LOW_THRESHOLD: f32 = -18.0;
+// const TEMP_HIGH_THRESHOLD: f32 = 36.0;
+// const TEMP_LOW_THRESHOLD: f32 = -18.0;
+
 const MIN_LUX: f32 = 0.1;
 const MAX_LUX: f32 = 100000.0;
 
@@ -88,6 +89,7 @@ mod control;
 mod light;
 mod moist;
 mod notif;
+mod pump;
 mod temp;
 mod util;
 
@@ -110,7 +112,9 @@ pub fn main() {
     let ldr_sensor_pin = adc_config.enable_pin(peripherals.GPIO26, Attenuation::Attenuation11dB);
     let potentiometer_sensor_pin =
         adc_config.enable_pin(peripherals.GPIO27, Attenuation::Attenuation11dB);
-    let light_alert_pin = Output::new(peripherals.GPIO16, Level::Low);
+    let light_alert_pin = Output::new(peripherals.GPIO4, Level::Low);
+    let pump_light = Output::new(peripherals.GPIO17, Level::Low);
+    let user_switch = Input::new(peripherals.GPIO15, Pull::Up);
 
     let adc = Rc::new(RefCell::new(Adc::new(peripherals.ADC2, adc_config)));
 
@@ -124,7 +128,8 @@ pub fn main() {
             light_alert_pin,
         ))
         .with_agent(moist::moisture_agent(potentiometer_sensor_pin, adc))
-        .with_agent(control::control_agent())
+        .with_agent(pump::pump_agent(pump_light))
+        .with_agent(control::control_agent(user_switch))
         .start()
         .unwrap()
 }

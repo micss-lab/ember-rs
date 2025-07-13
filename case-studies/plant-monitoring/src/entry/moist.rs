@@ -6,8 +6,12 @@ use no_std_framework_core::{
     behaviour::{Context, TickerBehaviour},
     Agent,
 };
+use ontology::MoisturePercent;
 
-use super::notif::{ThresholdConfig, ThresholdNotification};
+use super::{
+    notif::{ThresholdConfig, ThresholdNotification},
+    util::wrap_message,
+};
 
 pub fn moisture_agent<P: AdcChannel + 'static, ADCI: RegisterAccess>(
     potentiometer_sensor_pin: AdcPin<P, ADCI>,
@@ -49,6 +53,45 @@ impl ThresholdConfig for MoistureState {
     }
 }
 
+pub mod ontology {
+    use no_std_framework_core::{
+        acl::message::{Content, Message, Performative, Receiver},
+        Aid,
+    };
+    use serde::{Deserialize, Serialize};
+
+    pub struct MoistureOntology;
+
+    #[derive(Serialize, Deserialize)]
+    pub struct MoisturePercent(pub f32);
+
+    impl MoistureOntology {
+        pub const fn name() -> &'static str {
+            "Moisture-Ontology"
+        }
+
+        pub fn decode_message(message: Message) -> Result<MoisturePercent, ()> {
+            let Content::Bytes(content) = message.content else {
+                return Err(());
+            };
+            postcard::from_bytes(&content).map_err(|_| ())
+        }
+    }
+
+    impl MoisturePercent {
+        pub fn into_message(self) -> Message {
+            Message {
+                performative: Performative::Inform,
+                sender: None,
+                receiver: Receiver::Single(Aid::local("control")),
+                reply_to: None,
+                ontology: Some(MoistureOntology::name().into()),
+                content: Content::Bytes(postcard::to_allocvec(&self).unwrap()),
+            }
+        }
+    }
+}
+
 struct PotentiometerSensor<P, ADCI: 'static> {
     pin: AdcPin<P, ADCI>,
     adc: Rc<RefCell<Adc<'static, ADCI>>>,
@@ -73,7 +116,7 @@ where
         core::time::Duration::from_millis(100)
     }
 
-    fn action(&mut self, _: &mut Context<Self::Event>, state: &mut Self::AgentState) {
+    fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) {
         let moisture = loop {
             match self.adc.borrow_mut().read_oneshot(&mut self.pin) {
                 Ok(r) => break r,
@@ -82,8 +125,8 @@ where
             }
         };
         let percent = f32::from(moisture) / 4095.0 * 100.0;
-        log::debug!("moisture percent: {}", percent);
         state.percent = percent;
+        ctx.send_message(wrap_message(MoisturePercent(percent).into_message()))
     }
 
     fn is_finished(&self) -> bool {

@@ -1,5 +1,3 @@
-use alloc::format;
-
 use no_std_framework_core::{
     acl::message::{Message, Performative, Receiver},
     behaviour::{Context, TickerBehaviour},
