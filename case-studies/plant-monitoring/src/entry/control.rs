@@ -19,8 +19,8 @@ use super::{
 pub fn control_agent(user_switch: Input<'static>) -> Agent<ControlState, ()> {
     Agent::new("control", ControlState::default())
         .with_behaviour(Receiver)
-        .with_behaviour(StatusPrinter)
         .with_behaviour(PumpControl::new(user_switch))
+        .with_behaviour(StatusPrinter)
 }
 
 #[derive(Default)]
