@@ -9,7 +9,7 @@ use esp_wifi::esp_now;
 use crate::acl::message::MessageEnvelope;
 use crate::adt::Adt;
 use crate::agent::{Agent, Aid, AmsAgent};
-use crate::context::ContainerContext;
+use crate::context::{ContainerContext, MessageStore};
 
 use self::mts::Mts;
 
@@ -74,6 +74,8 @@ impl Container<'_> {
                 self.mts.send_message(message, &mut self.ladt);
             }
 
+            self.return_unhandled_messages(&agent.get_aid(), context.message_inbox);
+
             if context.should_stop {
                 return Ok(true);
             }
@@ -97,6 +99,17 @@ impl Container<'_> {
                 .into_iter()
                 .collect(),
         )
+    }
+
+    fn return_unhandled_messages(&mut self, aid: &Aid, messages: MessageStore) {
+        if messages.is_empty() {
+            return;
+        }
+        self.ladt
+            .get_mut(aid)
+            .expect("agent returning messages should be in ladt")
+            .inbox
+            .extend(messages)
     }
 
     pub fn with_agent<S: 'static, E: 'static>(mut self, agent: Agent<S, E>) -> Self {

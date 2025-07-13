@@ -1,8 +1,10 @@
+use alloc::borrow::Cow;
 use alloc::vec::Vec;
 
-use self::messsage_store::MessageStore;
 use crate::acl::message::{Message, MessageEnvelope, MessageFilter};
 use crate::behaviour::BehaviourId;
+
+pub(crate) use self::messsage_store::MessageStore;
 
 mod messsage_store;
 
