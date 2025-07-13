@@ -6,10 +6,10 @@ use alloc::vec::Vec;
 #[cfg(feature = "acc-espnow")]
 use esp_wifi::esp_now;
 
-use crate::acl::message::Message;
+use crate::acl::message::MessageEnvelope;
 use crate::adt::Adt;
 use crate::agent::{Agent, Aid, AmsAgent};
-use crate::context::ContainerContext;
+use crate::context::{ContainerContext, MessageStore};
 
 use self::mts::Mts;
 
@@ -74,6 +74,8 @@ impl Container<'_> {
                 self.mts.send_message(message, &mut self.ladt);
             }
 
+            self.return_unhandled_messages(&agent.get_aid(), context.message_inbox);
+
             if context.should_stop {
                 return Ok(true);
             }
@@ -91,16 +93,23 @@ impl Container<'_> {
         Ok(false)
     }
 
-    fn messages_for_agent(&mut self, aid: &Aid) -> Option<Vec<Message>> {
-        use crate::acl::message::MessageKind;
+    fn messages_for_agent(&mut self, aid: &Aid) -> Option<Vec<MessageEnvelope>> {
         Some(
             core::mem::take(&mut self.ladt.get_mut(aid)?.inbox)
                 .into_iter()
-                .map(|m| match m.message {
-                    MessageKind::Structured(m) => m,
-                })
                 .collect(),
         )
+    }
+
+    fn return_unhandled_messages(&mut self, aid: &Aid, messages: MessageStore) {
+        if messages.is_empty() {
+            return;
+        }
+        self.ladt
+            .get_mut(aid)
+            .expect("agent returning messages should be in ladt")
+            .inbox
+            .extend(messages)
     }
 
     pub fn with_agent<S: 'static, E: 'static>(mut self, agent: Agent<S, E>) -> Self {

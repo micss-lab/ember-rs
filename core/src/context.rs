@@ -1,8 +1,10 @@
+use alloc::borrow::Cow;
 use alloc::vec::Vec;
 
-use self::messsage_store::MessageStore;
 use crate::acl::message::{Message, MessageEnvelope, MessageFilter};
 use crate::behaviour::BehaviourId;
+
+pub(crate) use self::messsage_store::MessageStore;
 
 mod messsage_store;
 
@@ -79,8 +81,10 @@ impl<E: 'static> Context<E> {
         self.local.removed_behaviours.push(id);
     }
 
-    pub fn receive_message(&mut self, filter: Option<&MessageFilter>) -> Option<Message> {
-        self.container.message_inbox.find_and_take(filter)
+    pub fn receive_message(&mut self, filter: Option<Cow<'_, MessageFilter>>) -> Option<Message> {
+        self.container
+            .message_inbox
+            .find_and_take_as_message(filter)
     }
 
     pub fn send_message(&mut self, message: MessageEnvelope) {
