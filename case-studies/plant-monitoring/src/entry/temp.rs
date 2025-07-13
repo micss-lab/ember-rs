@@ -5,6 +5,7 @@ use no_std_framework_core::{
     behaviour::{Context, TickerBehaviour},
     Agent, Aid,
 };
+use serde::{Deserialize, Serialize};
 
 use super::util::wrap_message;
 
@@ -27,34 +28,18 @@ pub mod ontology {
         }
 
         pub fn decode_message(message: Message) -> Result<Measurement, ()> {
-            let Content::Other { content, .. } = message.content else {
+            let Content::Bytes(content) = message.content else {
                 return Err(());
             };
-            content.parse().map_err(|_| ())
+            postcard::from_bytes(&content).map_err(|_| ())
         }
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Measurement {
     pub temperature: f32,
     pub humidity: f32,
-}
-
-impl core::str::FromStr for Measurement {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (temperature, humidity) = {
-            let (t, h) = s.split_once(',').ok_or(())?;
-            (t.parse().map_err(|_| ())?, h.parse().map_err(|_| ())?)
-        };
-
-        Ok(Self {
-            temperature,
-            humidity,
-        })
-    }
 }
 
 impl Measurement {
@@ -67,10 +52,7 @@ impl Measurement {
             receiver: Receiver::Single(Aid::local("control")),
             reply_to: None,
             ontology: Some(ontology::TempOntology::name().into()),
-            content: Content::Other {
-                kind: None,
-                content: format!("{},{}", self.temperature, self.humidity),
-            },
+            content: Content::Bytes(postcard::to_allocvec(&self).unwrap()),
         }
     }
 }
