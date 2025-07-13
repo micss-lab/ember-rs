@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 #[cfg(feature = "acc-espnow")]
 use esp_wifi::esp_now;
 
-use crate::acl::message::Message;
+use crate::acl::message::MessageEnvelope;
 use crate::adt::Adt;
 use crate::agent::{Agent, Aid, AmsAgent};
 use crate::context::ContainerContext;
@@ -91,14 +91,10 @@ impl Container<'_> {
         Ok(false)
     }
 
-    fn messages_for_agent(&mut self, aid: &Aid) -> Option<Vec<Message>> {
-        use crate::acl::message::MessageKind;
+    fn messages_for_agent(&mut self, aid: &Aid) -> Option<Vec<MessageEnvelope>> {
         Some(
             core::mem::take(&mut self.ladt.get_mut(aid)?.inbox)
                 .into_iter()
-                .map(|m| match m.message {
-                    MessageKind::Structured(m) => m,
-                })
                 .collect(),
         )
     }

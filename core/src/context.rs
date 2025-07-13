@@ -82,7 +82,7 @@ impl<E: 'static> Context<E> {
     pub fn receive_message(&mut self, filter: Option<Cow<'_, MessageFilter>>) -> Option<Message> {
         self.container
             .message_inbox
-            .find_and_take(filter)
+            .find_and_take_as_message(filter)
     }
 
     pub fn send_message(&mut self, message: MessageEnvelope) {
