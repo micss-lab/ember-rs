@@ -139,12 +139,12 @@ fn manager() -> Agent<(), ()> {
                 .with_transition(
                     send_worker_task.0,
                     receive_acknowledgement.0,
-                    ManagerTrigger::TaskSent,
+                    Some(ManagerTrigger::TaskSent),
                 )
                 .with_transition(
                     receive_acknowledgement.0,
                     receive_finish.0,
-                    ManagerTrigger::AcknowledgementReceived,
+                    Some(ManagerTrigger::AcknowledgementReceived),
                 )
                 .try_build(send_worker_task.0)
                 .expect("fsm failed to build")
@@ -262,17 +262,17 @@ fn worker() -> Agent<(), ()> {
                 .with_transition(
                     receive_task.0,
                     send_acknowledgement.0,
-                    WorkerTrigger::TaskReceived,
+                    Some(WorkerTrigger::TaskReceived),
                 )
                 .with_transition(
                     send_acknowledgement.0,
                     perform_task.0,
-                    WorkerTrigger::SentAcknowledgement,
+                    Some(WorkerTrigger::SentAcknowledgement),
                 )
                 .with_transition(
                     perform_task.0,
                     send_finished.0,
-                    WorkerTrigger::PerformedTask,
+                    Some(WorkerTrigger::PerformedTask),
                 )
                 .try_build(receive_task.0)
                 .expect("fsm failed to build")

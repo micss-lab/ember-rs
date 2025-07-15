@@ -19,18 +19,25 @@ pub enum FsmEvent<T, E> {
     Event(E),
 }
 
+#[derive(Default, PartialEq, Eq, PartialOrd, Ord)]
+enum Trigger<T> {
+    Other(T),
+    #[default]
+    Default,
+}
+
 pub struct Fsm<S, T, E> {
     blocked: BlockTracker,
     current: BehaviourId,
     final_states: BTreeSet<BehaviourId>,
-    transitions: BTreeMap<BehaviourId, BTreeMap<T, BehaviourId>>,
+    transitions: BTreeMap<BehaviourId, BTreeMap<Trigger<T>, BehaviourId>>,
     behaviours: BTreeMap<BehaviourId, Box<dyn Behaviour<AgentState = S, Event = FsmEvent<T, E>>>>,
     can_finish: bool,
 }
 
 pub struct FsmBuilder<S, T, E> {
     final_states: BTreeSet<BehaviourId>,
-    transitions: BTreeMap<BehaviourId, BTreeMap<T, BehaviourId>>,
+    transitions: BTreeMap<BehaviourId, BTreeMap<Trigger<T>, BehaviourId>>,
     behaviours: BTreeMap<BehaviourId, Box<dyn Behaviour<AgentState = S, Event = FsmEvent<T, E>>>>,
 }
 
@@ -51,13 +58,9 @@ impl<S, T, E> Fsm<S, T, E> {
 }
 
 impl<S, T: Ord, E> Fsm<S, T, E> {
-    fn handle_trigger(&mut self, trigger: T) {
-        self.current = *self
-            .transitions
-            .get(&self.current)
-            .expect("current behaviour does not have any transitions")
-            .get(&trigger)
-            .expect("current behaviour does not have a transition for the received trigger");
+    fn handle_trigger(&mut self, trigger: Trigger<T>) -> Option<BehaviourId> {
+        self.current = *self.transitions.get(&self.current)?.get(&trigger)?;
+        Some(self.current)
     }
 }
 
@@ -91,12 +94,12 @@ where
         mut self,
         src: BehaviourId,
         destination: BehaviourId,
-        trigger: T,
+        trigger: Option<T>,
     ) -> Self {
         self.transitions
             .entry(src)
             .or_default()
-            .insert(trigger, destination);
+            .insert(trigger.map(Trigger::Other).unwrap_or_default(), destination);
         self
     }
 }
@@ -137,7 +140,10 @@ impl<S, T, E> FsmBuilder<S, T, E> {
     }
 }
 
-impl<S: 'static, T: 'static, E: 'static> BehaviourScheduler<S, FsmEvent<T, E>> for Fsm<S, T, E> {
+impl<S: 'static, T: 'static, E: 'static> BehaviourScheduler<S, FsmEvent<T, E>> for Fsm<S, T, E>
+where
+    T: Ord,
+{
     fn next(&mut self) -> Option<Box<dyn Behaviour<AgentState = S, Event = FsmEvent<T, E>>>> {
         let behaviour = self
             .behaviours
@@ -176,10 +182,15 @@ impl<S: 'static, T: 'static, E: 'static> BehaviourScheduler<S, FsmEvent<T, E>> f
         let id = behaviour.id();
         self.reschedule(behaviour);
 
+        if id == self.current {
+            // Take the default transition if there is one registered.
+            let _ = self.handle_trigger(Trigger::Default);
+        }
+
         // If the behaviour that just finished is final, allow the fsm behaviour to finish.
         // NOTE: This should be done AFTER rescheduling the behaviour as the regular `reschedule`
         // will mark the fsm as not being able to finish.
-        self.can_finish = self.final_states.contains(&id)
+        self.can_finish = self.final_states.contains(&id);
     }
 
     fn remove(&mut self, _: BehaviourId) -> bool {
@@ -218,7 +229,11 @@ where
 
     fn handle_child_event(&mut self, event: Self::ChildEvent) {
         match event {
-            FsmEvent::Trigger(t) => self.fsm.handle_trigger(t),
+            FsmEvent::Trigger(t) => {
+                self.fsm
+                    .handle_trigger(Trigger::Other(t))
+                    .expect("behaviour did not have transition for the received trigger");
+            }
             FsmEvent::Event(e) => self.user_impl.handle_child_event(e),
         }
     }
