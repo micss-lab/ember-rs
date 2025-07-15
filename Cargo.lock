@@ -166,6 +166,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 
 [[package]]
+name = "case-study-colour-combinations"
+version = "0.1.0"
+dependencies = [
+ "esp-alloc",
+ "esp-backtrace",
+ "esp-hal",
+ "esp-hal-embassy",
+ "esp-println",
+ "log",
+ "no-std-framework-core",
+]
+
+[[package]]
 name = "case-study-home-automation"
 version = "0.1.0"
 dependencies = [
