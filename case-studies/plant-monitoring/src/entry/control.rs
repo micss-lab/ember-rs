@@ -61,12 +61,10 @@ impl ControlState {
     fn handle_pump_status(&mut self, status: PumpStatus) {
         if !status.changed {
             log::warn!("Pump already in requested state.");
+        } else if status.active {
+            log::info!("Pump successfully activated!");
         } else {
-            if status.active {
-                log::info!("Pump successfully activated!");
-            } else {
-                log::info!("Pump successfully deactivated!");
-            }
+            log::info!("Pump successfully deactivated!");
         }
 
         self.pump_active = status.active;
