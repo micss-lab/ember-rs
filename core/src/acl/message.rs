@@ -107,6 +107,7 @@ pub enum Performative {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Content {
     Sl(sl::Content),
+    Bytes(Vec<u8>),
     Other {
         kind: Option<OtherLanguage>,
         content: String,
@@ -242,6 +243,10 @@ impl serde::Serialize for Message {
             Content::Sl(sl) => {
                 message.serialize_field("lanuage", "fipa-sl0")?;
                 message.serialize_field("content", &format!("\"{}\"", sl))?;
+            }
+            Content::Bytes(b) => {
+                message.serialize_field("language", "bytes")?;
+                message.serialize_field("content", b.as_slice())?;
             }
             Content::Other { kind, content } => {
                 if let Some(kind) = kind {

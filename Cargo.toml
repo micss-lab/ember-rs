@@ -4,4 +4,10 @@ members = [
     "bindings",
     "core",
     "examples",
+
+    "case-studies/colour-combinations",
+    "case-studies/home-automation",
+    "case-studies/http-server",
+    "case-studies/ntp-server",
+    "case-studies/plant-monitoring",
 ]
