@@ -1,6 +1,34 @@
-use core::marker::PhantomData;
+//! # Colour combination
+//!
+//! Colour combination agent maximizing the score of assembling a random sequence of colors with a
+//! decision window of 2 colors.
+//!
+//! ## Scores table.
+//!
+//! | Colour 1 | Colour 2 | Score |
+//! | ======== | ======== | ===== |
+//! | Red      | Red      | 100   |
+//! | Red      | OC(Any)  | 50    |
+//! | OC(Any)  | Red      | 50    |
+//! | OC(Same) | OC(Same) | 25    |
+//! | OC(Any)  | OC(Any)  | 0     |
+//!
+//! ## Algorithm.
+//!
+//! 1. If the first arrived brick is red, it should press and grab it, then it should merge it with
+//! the non-red second one to achieve 50 points.
+//! 2. If the second brick is also red, it merges them to achieve a 100 score.
+//! 3. If the first one is a non-red brick and the second one is a non-red brick, and they have the
+//! same colours, they are pressed to obtain a 25 score.
+//! 4. If the first one is a non-red brick and the second one is a non-red brick, and they do not
+//! have the same colours, then the first one is ejected, and the second one is accepted into the
+//! press platform.
+//! 5. If the first one is a non-red brick and the second one is a red brick, then the first one is
+//! ejected, and the second one is accepted into the press platform, assuming there can be a
+//! red/red chance.
 
 use alloc::boxed::Box;
+use core::marker::PhantomData;
 
 use no_std_framework_core::{
     behaviour::{
@@ -11,21 +39,74 @@ use no_std_framework_core::{
     Agent,
 };
 
-pub fn colour_agent<I>(sequence: impl IntoIterator<IntoIter = I>) -> Agent<Sequence<I>, ()>
+pub fn colour_agent<I>(
+    sequence: impl IntoIterator<IntoIter = I>,
+) -> Agent<ColourCombinatorState<impl Iterator<Item = Colour>>, ()>
 where
     I: Iterator<Item = Colour> + 'static,
 {
-    Agent::new("colour", Sequence(sequence.into_iter())).with_behaviour(ColourCombinator::default())
+    Agent::new("colour", ColourCombinatorState::new(sequence.into_iter()))
+        .with_behaviour(ColourCombinator::default())
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Colour {
     Red,
     Green,
     Blue,
 }
 
-pub struct Sequence<I>(I);
+pub struct ColourCombinatorState<I> {
+    iter: I,
+    score: u32,
+    next: Option<Colour>,
+}
+
+impl<I> ColourCombinatorState<I> {
+    fn new(iter: I) -> Self {
+        Self {
+            iter,
+            score: 0,
+            next: None,
+        }
+    }
+
+    fn made_combination(&mut self, c1: Colour, c2: Colour) {
+        log::info!("Making combination between {:?} and {:?}.", c1, c2);
+
+        let val = match (c1, c2) {
+            (Colour::Red, Colour::Red) => 100,
+            (Colour::Red, _) | (_, Colour::Red) => 50,
+            (Colour::Green, Colour::Green) | (Colour::Blue, Colour::Blue) => 25,
+            _ => 0,
+        };
+        self.score += val;
+    }
+}
+
+impl<I> ColourCombinatorState<I>
+where
+    I: Iterator<Item = Colour>,
+{
+    fn next_window(&mut self) -> Option<(Colour, Option<Colour>)> {
+        match self
+            .next
+            .take()
+            .or_else(|| self.iter.next())
+            .map(|c1| (c1, self.iter.next()))
+        {
+            r @ Some((_, Some(c2))) => {
+                self.next = Some(c2);
+                r
+            }
+            r => r,
+        }
+    }
+
+    fn next(&mut self) -> Option<Colour> {
+        self.next.take().or_else(|| self.iter.next())
+    }
+}
 
 struct ColourCombinator<I>(PhantomData<I>);
 
@@ -40,7 +121,7 @@ impl<I> ComplexBehaviour for ColourCombinator<I> {
 
     type ChildEvent = ();
 
-    type AgentState = Sequence<I>;
+    type AgentState = ColourCombinatorState<I>;
 }
 
 impl<I> FsmBehaviour for ColourCombinator<I>
@@ -50,33 +131,33 @@ where
     type TransitionTrigger = Colour;
 
     fn fsm(&self) -> Fsm<Self::AgentState, Self::TransitionTrigger, Self::ChildEvent> {
-        let (read_id, read) = behaviour_with_id(Read::default());
+        let (empty_id, empty) = behaviour_with_id(Empty::default());
         let (red_id, red) = behaviour_with_id(Red::default());
         let (blue_id, blue) = behaviour_with_id(Blue::default());
         let (green_id, green) = behaviour_with_id(Green::default());
 
         Fsm::builder()
-            .with_behaviour(read, true)
+            .with_behaviour(empty, true)
             .with_behaviour(red, false)
             .with_behaviour(blue, false)
             .with_behaviour(green, false)
-            .with_transition(red_id, read_id, None)
-            .with_transition(blue_id, read_id, None)
-            .with_transition(green_id, read_id, None)
-            .with_transition(read_id, red_id, Some(Colour::Red))
-            .with_transition(read_id, blue_id, Some(Colour::Blue))
-            .with_transition(read_id, green_id, Some(Colour::Green))
-            .try_build(read_id)
+            .with_transition(red_id, empty_id, None)
+            .with_transition(blue_id, empty_id, None)
+            .with_transition(green_id, empty_id, None)
+            .with_transition(empty_id, red_id, Some(Colour::Red))
+            .with_transition(empty_id, blue_id, Some(Colour::Blue))
+            .with_transition(empty_id, green_id, Some(Colour::Green))
+            .try_build(empty_id)
             .unwrap()
     }
 }
 
-struct Read<I> {
+struct Empty<I> {
     finsish: bool,
     _marker: PhantomData<I>,
 }
 
-impl<I> Default for Read<I> {
+impl<I> Default for Empty<I> {
     fn default() -> Self {
         Self {
             finsish: false,
@@ -85,21 +166,38 @@ impl<I> Default for Read<I> {
     }
 }
 
-impl<I> CyclicBehaviour for Read<I>
+impl<I> CyclicBehaviour for Empty<I>
 where
     I: Iterator<Item = Colour>,
 {
-    type AgentState = Sequence<I>;
+    type AgentState = ColourCombinatorState<I>;
 
     type Event = FsmEvent<Colour, ()>;
 
     fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) {
-        let Some(colour) = state.0.next() else {
-            self.finsish = true;
-            return;
+        let window = match state.next_window() {
+            Some((c1, Some(c2))) => (c1, c2),
+            Some((c1, None)) => {
+                ctx.emit_event(FsmEvent::Trigger(c1));
+                return;
+            }
+            None => {
+                log::info!("Final score: {}", state.score);
+                self.finsish = true;
+                return;
+            }
         };
 
-        ctx.emit_event(FsmEvent::Trigger(colour));
+        match window {
+            (Colour::Red, _) => ctx.emit_event(FsmEvent::Trigger(Colour::Red)),
+            (colour @ Colour::Green, Colour::Green) | (colour @ Colour::Blue, Colour::Blue) => {
+                ctx.emit_event(FsmEvent::Trigger(colour))
+            }
+            (colour, _) => {
+                log::info!("Ejecting brick {:?}", colour);
+                return;
+            }
+        }
     }
 
     fn is_finished(&self) -> bool {
@@ -115,13 +213,34 @@ impl<I> Default for Red<I> {
     }
 }
 
-impl<I> OneShotBehaviour for Red<I> {
-    type AgentState = Sequence<I>;
+impl<I> OneShotBehaviour for Red<I>
+where
+    I: Iterator<Item = Colour>,
+{
+    type AgentState = ColourCombinatorState<I>;
 
     type Event = FsmEvent<Colour, ()>;
 
-    fn action(&self, _: &mut Context<Self::Event>, _: &mut Self::AgentState) {
-        log::info!("Red State");
+    fn action(&self, _: &mut Context<Self::Event>, state: &mut Self::AgentState) {
+        log::info!("Storing red brick.");
+
+        let colour: Option<Colour> = (|| loop {
+            break match state.next_window()? {
+                (Colour::Red, _) => Some(Colour::Red),
+                (c, Some(Colour::Red)) => {
+                    log::info!("Ejecting brick: {:?}", c);
+                    continue;
+                }
+                (c, _) => Some(c),
+            };
+        })();
+
+        let Some(colour) = colour else {
+            log::warn!("Failed to make a final combination!");
+            return;
+        };
+
+        state.made_combination(Colour::Red, colour);
     }
 }
 
@@ -133,13 +252,23 @@ impl<I> Default for Green<I> {
     }
 }
 
-impl<I> OneShotBehaviour for Green<I> {
-    type AgentState = Sequence<I>;
+impl<I> OneShotBehaviour for Green<I>
+where
+    I: Iterator<Item = Colour>,
+{
+    type AgentState = ColourCombinatorState<I>;
 
     type Event = FsmEvent<Colour, ()>;
 
-    fn action(&self, _: &mut Context<Self::Event>, _: &mut Self::AgentState) {
-        log::info!("Green State");
+    fn action(&self, _: &mut Context<Self::Event>, state: &mut Self::AgentState) {
+        log::info!("Storing green brick.");
+
+        let Some(colour) = state.next() else {
+            log::warn!("Failed to make a final combination!");
+            return;
+        };
+
+        state.made_combination(Colour::Green, colour);
     }
 }
 
@@ -151,13 +280,23 @@ impl<I> Default for Blue<I> {
     }
 }
 
-impl<I> OneShotBehaviour for Blue<I> {
-    type AgentState = Sequence<I>;
+impl<I> OneShotBehaviour for Blue<I>
+where
+    I: Iterator<Item = Colour>,
+{
+    type AgentState = ColourCombinatorState<I>;
 
     type Event = FsmEvent<Colour, ()>;
 
-    fn action(&self, _: &mut Context<Self::Event>, _: &mut Self::AgentState) {
-        log::info!("Blue State");
+    fn action(&self, _: &mut Context<Self::Event>, state: &mut Self::AgentState) {
+        log::info!("Storing blue brick.");
+
+        let Some(colour) = state.next() else {
+            log::warn!("Failed to make a final combination!");
+            return;
+        };
+
+        state.made_combination(Colour::Blue, colour);
     }
 }
 
