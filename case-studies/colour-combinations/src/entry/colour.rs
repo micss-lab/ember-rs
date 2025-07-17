@@ -39,12 +39,9 @@ use no_std_framework_core::{
     Agent,
 };
 
-pub fn colour_agent<I>(
-    sequence: impl IntoIterator<IntoIter = I>,
-) -> Agent<ColourCombinatorState<impl Iterator<Item = Colour>>, ()>
-where
-    I: Iterator<Item = Colour> + 'static,
-{
+pub fn colour_agent(
+    sequence: impl IntoIterator<Item = Colour> + 'static,
+) -> Agent<ColourCombinatorState<impl Iterator<Item = Colour>>, ()> {
     Agent::new("colour", ColourCombinatorState::new(sequence.into_iter()))
         .with_behaviour(ColourCombinator::default())
 }
