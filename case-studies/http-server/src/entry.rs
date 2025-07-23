@@ -1,9 +1,10 @@
+use alloc::collections::BTreeSet;
 use core::cell::OnceCell;
 
 use esp_backtrace as _;
 
 use blocking_network_stack::Stack;
-use esp_hal::{clock::CpuClock, rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{clock::CpuClock, delay::Delay, rng::Rng, timer::timg::TimerGroup};
 use esp_wifi::{
     wifi::{WifiController, WifiDevice, WifiStaDevice},
     EspWifiController,
@@ -20,9 +21,10 @@ const HEAP_SIZE: usize = 72 * 1024;
 
 const HOSTNAME: &[u8] = b"esp-http-server";
 
-const SSID: Option<&str> = option_env!("HTTP_SERVER_SSID");
-const AP_PASSWORD: Option<&str> = option_env!("HTTP_SERVER_AP_PASSWORD");
+const SSID: Option<&str> = option_env!("CASE_STUDY_SSID");
+const AP_PASSWORD: Option<&str> = option_env!("CASE_STUDY_AP_PASSWORD");
 const WIFI_CHANNEL: Option<u8> = Some(6);
+const WIFI_AP_SCAN_COUNT: u32 = 3;
 
 const HTTP_PORT: u16 = 80;
 
@@ -156,19 +158,32 @@ fn connect_to_access_point(
     controller.start().expect("failed to start wifi controller");
 
     log::info!("Scanning for wifi networks.");
-    let aps = controller
-        .scan_n::<6>()
-        .inspect(|aps| {
-            log::debug!("Found following networks:");
-            for ap in aps.0.iter() {
-                log::debug!("- {:?}", ap);
-            }
-        })
-        .expect("failed to scan for networks")
-        .0;
 
-    if !aps.into_iter().any(|ap| ap.ssid == ssid) {
-        panic!("SSID `{}` not found.", ssid);
+    let mut scan_networks = || {
+        controller
+            .scan_n::<6>()
+            .expect("failed to scan for networks")
+    };
+    let (mut found, mut count, mut printed) = (false, 0, BTreeSet::new());
+    let delay = Delay::new();
+    log::debug!("Found following networks:");
+    while !found && count < WIFI_AP_SCAN_COUNT {
+        log::trace!("Scanning");
+        count += 1;
+        found = scan_networks()
+            .0
+            .into_iter()
+            .inspect(|ap| {
+                if printed.insert(ap.ssid.clone()) {
+                    log::debug!("- {:?}", ap);
+                }
+            })
+            .any(|ap| ap.ssid == ssid);
+        delay.delay_millis(200);
+    }
+
+    if !found {
+        log::warn!("SSID `{}` not found, attempting to connect anyway.", ssid);
     }
 
     log::info!("Connecting to access point `{}`", ssid);
