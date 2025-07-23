@@ -3,6 +3,7 @@ ESP_LOG = "trace"
 
 [target.xtensa-esp32-none-elf]
 rustflags = ["-C", "link-arg=-nostartfiles"]
+runner = "espflash flash --monitor"
 
 [build]
 target-dir = "./target"

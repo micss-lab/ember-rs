@@ -55,6 +55,8 @@
                   python-pkgs.pyserial
                 ]))
 
+                pkgs.espflash
+
                 pkgs.just
                 pkgs.jq
               ];
