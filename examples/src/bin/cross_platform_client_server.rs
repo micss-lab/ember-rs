@@ -129,12 +129,14 @@ fn example() {
     let mut client_container = Container::default()
         .with_http(1338)
         // .with_agent(Agent::new("server").with_behaviour(MetricsReceiver))
-        .with_agent(Agent::new("client").with_behaviour(ReadMetrics(VALUES.into_iter().cycle())));
+        .with_agent(
+            Agent::new("client", ()).with_behaviour(ReadMetrics(VALUES.into_iter().cycle())),
+        );
 
     let mut server_container = Container::default()
         .with_http(1337)
         // .with_agent(Agent::new("server").with_behaviour(MetricsReceiver))
-        .with_agent(Agent::new("server").with_behaviour(MetricsReceiver));
+        .with_agent(Agent::new("server", ()).with_behaviour(MetricsReceiver));
 
     loop {
         server_container
