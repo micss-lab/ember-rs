@@ -89,7 +89,7 @@ mod routes {
     }
 }
 
-pub(super) struct Server<D>
+pub struct Server<D>
 where
     D: Device,
 {
@@ -102,7 +102,7 @@ impl<D> Server<D>
 where
     D: Device,
 {
-    pub(super) fn new(stack: Stack<'static, D>, port: u16) -> Self {
+    pub fn new(stack: Stack<'static, D>, port: u16) -> Self {
         Self {
             stack,
             port,

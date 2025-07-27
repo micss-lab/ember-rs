@@ -24,23 +24,12 @@ use esp_hal::{
 };
 use no_std_framework_core::Container;
 
-use self::temp::Measurement;
+use case_study_plant_monitoring::{
+    control, light, moist, pump,
+    temp::{self, Measurement},
+};
 
 const HEAP_SIZE: usize = 72 * 1024;
-
-const LIGHT_ALERT_THRESHOLD: f32 = 2000.0;
-const LIGHT_LOW_THRESHOLD: f32 = 100.0;
-const LIGHT_HIGH_THRESHOLD: f32 = 2200.0;
-
-const MOISTURE_THRESHOLD: f32 = 60.0;
-const MOISTURE_LOW_THRESHOLD: f32 = 30.0;
-const MOISTURE_HIGH_THRESHOLD: f32 = 80.0;
-
-// const TEMP_HIGH_THRESHOLD: f32 = 36.0;
-// const TEMP_LOW_THRESHOLD: f32 = -18.0;
-
-const MIN_LUX: f32 = 0.1;
-const MAX_LUX: f32 = 100000.0;
 
 const MEASUREMENTS: [Measurement; 10] = [
     Measurement {
@@ -84,14 +73,6 @@ const MEASUREMENTS: [Measurement; 10] = [
         humidity: 45.0,
     },
 ];
-
-mod control;
-mod light;
-mod moist;
-mod notif;
-mod pump;
-mod temp;
-mod util;
 
 pub fn main() {
     // Set newline mode to linux line endings.

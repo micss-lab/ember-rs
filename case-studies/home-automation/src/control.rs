@@ -7,7 +7,7 @@ use no_std_framework_core::{
     Agent, Aid,
 };
 
-use crate::entry::{
+use crate::{
     dht22::ontology::Dht22Ontology,
     fan::{
         self,

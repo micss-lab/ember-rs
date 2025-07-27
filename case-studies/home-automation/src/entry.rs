@@ -8,7 +8,11 @@ use esp_hal::{
 };
 use no_std_framework_core::Container;
 
-use self::dht22::Measurement;
+use case_study_home_automation::{
+    control,
+    dht22::{self, Measurement},
+    fan, lock, pir,
+};
 
 const HEAP_SIZE: usize = 72 * 1024;
 
@@ -56,13 +60,6 @@ const MEASUREMENTS: [Measurement; 10] = [
 ];
 
 const LOCK_PASSWORD: &[u8] = b"1234";
-
-mod control;
-mod dht22;
-mod fan;
-mod lock;
-mod pir;
-mod util;
 
 pub fn main() {
     // Set newline mode to linux line endings.

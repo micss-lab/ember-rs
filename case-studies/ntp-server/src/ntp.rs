@@ -7,7 +7,7 @@ use sntpc::{NtpContext, NtpTimestampGenerator, NtpUdpSocket};
 
 use super::wrapper::W;
 
-pub(super) struct Server<D>
+pub struct Server<D>
 where
     D: Device,
 {
@@ -18,7 +18,7 @@ impl<D> Server<D>
 where
     D: Device,
 {
-    pub(super) fn new(stack: Stack<'static, D>) -> Self {
+    pub fn new(stack: Stack<'static, D>) -> Self {
         Self { stack }
     }
 }

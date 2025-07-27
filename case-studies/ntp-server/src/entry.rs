@@ -18,6 +18,8 @@ use smoltcp::{
     wire::DhcpOption,
 };
 
+use case_study_ntp_server::ntp;
+
 const HEAP_SIZE: usize = 72 * 1024;
 
 const HOSTNAME: &[u8] = b"esp-ntp-server";
@@ -31,9 +33,6 @@ const SOCKET_COUNT: usize = 10;
 static mut SOCKET_STORE: [SocketStorage; SOCKET_COUNT] = [SocketStorage::EMPTY; SOCKET_COUNT];
 
 static mut WIFI_INIT: OnceCell<EspWifiController> = OnceCell::new();
-
-mod ntp;
-mod wrapper;
 
 pub(crate) fn main() {
     // Set newline mode to linux line endings.
