@@ -27,7 +27,7 @@ pub mod ontology {
 
     pub struct PumpOntology;
 
-    #[derive(Deserialize, Serialize)]
+    #[derive(Debug, Deserialize, Serialize)]
     pub enum PumpAction {
         Activate,
         Deactivate,

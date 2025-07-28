@@ -7,9 +7,9 @@
 //!     - [x] led
 //! - [x] potentiometer: moisture level
 //! - [ ] water pump
-//!     - [ ] led
+//!     - [x] led
 //!     - [ ] buzzer
-//!     - [ ] user switch: enable the pump manually
+//!     - [x] user switch: enable the pump manually
 
 use alloc::rc::Rc;
 use core::cell::RefCell;

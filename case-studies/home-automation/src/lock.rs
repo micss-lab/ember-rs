@@ -7,6 +7,9 @@ use no_std_framework_core::{
     behaviour::{Context, CyclicBehaviour, TickerBehaviour},
     Agent,
 };
+use ontology::DoorLockAction;
+
+use crate::util::wrap_message;
 
 pub fn lock_agent<P>(
     password: &'static [u8],
@@ -80,6 +83,55 @@ impl LockState {
     }
 }
 
+pub mod ontology {
+    use no_std_framework_core::{
+        acl::message::{Content, Message, Performative, Receiver},
+        Aid,
+    };
+    use serde::{Deserialize, Serialize};
+
+    pub struct DoorLockOntology;
+
+    #[derive(Serialize, Deserialize)]
+    pub enum DoorLockAction {
+        Lock,
+        Unlock,
+    }
+
+    impl DoorLockOntology {
+        pub const fn name() -> &'static str {
+            "Door-Lock-Ontology"
+        }
+
+        pub fn decode_message(message: Message) -> Result<DoorLockAction, ()> {
+            let Content::Bytes(content) = message.content else {
+                return Err(());
+            };
+            postcard::from_bytes(&content).map_err(|_| ())
+        }
+    }
+
+    impl DoorLockAction {
+        pub fn into_message(self) -> Message {
+            Message {
+                performative: Performative::Inform,
+                sender: None,
+                receiver: Receiver::Single(Aid::local("control")),
+                reply_to: None,
+                ontology: Some(DoorLockOntology::name().into()),
+                content: Content::Bytes(postcard::to_allocvec(&self).unwrap()),
+            }
+        }
+
+        pub fn locked(&self) -> bool {
+            match self {
+                DoorLockAction::Lock => true,
+                DoorLockAction::Unlock => false,
+            }
+        }
+    }
+}
+
 struct UnlockButton<P: 'static> {
     button: Input<'static, P>,
     was_pressed: bool,
@@ -102,11 +154,15 @@ where
 
     type Event = ();
 
-    fn action(&mut self, _: &mut Context<Self::Event>, state: &mut Self::AgentState) {
+    fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) {
         let is_pressed = self.button.is_low();
         if is_pressed && !self.was_pressed {
             log::info!("Unlock button pressed.");
             state.unlock();
+
+            if !state.locked {
+                ctx.send_message(wrap_message(DoorLockAction::Unlock.into_message()));
+            }
         }
         self.was_pressed = is_pressed;
     }
@@ -127,10 +183,11 @@ impl TickerBehaviour for AutoLock {
         core::time::Duration::from_secs(5)
     }
 
-    fn action(&mut self, _: &mut Context<Self::Event>, state: &mut Self::AgentState) {
+    fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) {
         if !state.locked {
             log::info!("Automatically locking door.");
-            state.lock()
+            state.lock();
+            ctx.send_message(wrap_message(DoorLockAction::Lock.into_message()))
         }
     }
 

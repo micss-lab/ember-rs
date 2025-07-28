@@ -4,6 +4,9 @@ use no_std_framework_core::{
 };
 
 use self::ontology::FanAction;
+use crate::util::wrap_message;
+
+pub use self::ontology::FanState;
 
 pub fn fan_agent() -> Agent<FanState, ()> {
     Agent::new("fan", FanState::default()).with_behaviour(FanInteractions)
@@ -12,11 +15,15 @@ pub fn fan_agent() -> Agent<FanState, ()> {
 pub mod ontology {
     use alloc::{string::String, vec::Vec};
 
-    use no_std_framework_core::acl::{
-        codec::{AgentActionCodec, ConceptCodec, ConstantCodec, DecodeError},
-        message::{Content, Message},
-        sl::{AgentAction, Concept, ConceptParameters},
+    use no_std_framework_core::{
+        acl::{
+            codec::{AgentActionCodec, ConceptCodec, ConstantCodec, DecodeError},
+            message::{Content, Message, Performative, Receiver},
+            sl::{AgentAction, Concept, ConceptParameters},
+        },
+        Aid,
     };
+    use serde::{Deserialize, Serialize};
 
     pub struct FanOntology;
 
@@ -28,12 +35,19 @@ pub mod ontology {
         Toggle,
     }
 
+    #[derive(Clone, Copy, Default, Serialize, Deserialize)]
+    pub enum FanState {
+        #[default]
+        On,
+        Off,
+    }
+
     impl FanOntology {
         pub fn name() -> &'static str {
             "Fan-Ontology"
         }
 
-        pub fn decode_message(message: Message) -> Result<FanMessage, ()> {
+        pub fn decode_sl_message<T: AgentActionCodec>(message: Message) -> Result<T, ()> {
             if !message.ontology.is_some_and(|o| o == Self::name()) {
                 return Err(());
             }
@@ -42,6 +56,14 @@ pub mod ontology {
             };
 
             AgentActionCodec::from_content(content).map_err(|_| ())
+        }
+
+        pub fn decode_message<T: for<'d> Deserialize<'d>>(message: Message) -> Result<T, ()> {
+            let Content::Bytes(content) = message.content else {
+                return Err(());
+            };
+
+            postcard::from_bytes(&content).map_err(|_| ())
         }
     }
 
@@ -85,13 +107,19 @@ pub mod ontology {
             }
         }
     }
-}
 
-#[derive(Default)]
-pub enum FanState {
-    #[default]
-    On,
-    Off,
+    impl FanState {
+        pub fn into_message(self) -> Message {
+            Message {
+                performative: Performative::Inform,
+                sender: None,
+                receiver: Receiver::Single(Aid::local("control")),
+                reply_to: None,
+                ontology: Some(FanOntology::name().into()),
+                content: Content::Bytes(postcard::to_allocvec(&self).unwrap()),
+            }
+        }
+    }
 }
 
 impl FanState {
@@ -115,16 +143,19 @@ impl TickerBehaviour for FanInteractions {
     }
 
     fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) {
+        use ontology::FanMessage;
+
         let Some(message) = ctx.receive_message(None) else {
             ctx.block_behaviour();
             return;
         };
-        let message = ontology::FanOntology::decode_message(message).unwrap();
+        let message: FanMessage = ontology::FanOntology::decode_sl_message(message).unwrap();
 
         match message.action {
             FanAction::Toggle => {
                 log::info!("Toggling fan.");
-                state.toggle()
+                state.toggle();
+                ctx.send_message(wrap_message(state.into_message()));
             }
         }
     }

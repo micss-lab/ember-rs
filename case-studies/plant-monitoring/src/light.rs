@@ -161,5 +161,5 @@ impl TickerBehaviour for LightAlert {
 }
 
 fn raw_light_to_lux(light: u16) -> f32 {
-    (1.0 - (f32::from(light - 32) / 4031.0)) * (super::MAX_LUX - super::MIN_LUX) + super::MIN_LUX
+    (1.0 - (f32::from(light - 32) / 4063.0)) * (super::MAX_LUX - super::MIN_LUX) + super::MIN_LUX
 }

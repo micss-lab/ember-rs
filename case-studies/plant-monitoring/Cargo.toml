@@ -13,10 +13,8 @@ esp-backtrace = { version = "0.14.2", default-features = false, features = ["esp
 esp-hal = { version = "0.22.0", features = ["esp32"] }
 esp-hal-embassy = { version = "0.5.0", features = ["esp32"] }
 esp-println = { version = "0.12.0", features = ["esp32", "log"] }
-esp-wifi = { version = "0.11.0", features = ["esp32", "wifi", "smoltcp", "utils"] }
 libm = "0.2"
 log = "0.4.27"
 no-std-framework-core = { path = "../../core" }
 postcard = { version = "1.1.2", default-features = false }
 serde = { version = "1.0.219", default-features = false, features = ["derive"] }
-smoltcp = { version = "0.11.0", default-features = false }
