@@ -18,10 +18,12 @@ use plant_monitoring::{light, moist, pump};
 const HEAP_SIZE: usize = 72 * 1024;
 
 const MOISTURE_THRESHOLD: f32 = 60.0;
+const FAN_TEMPERATURE_THRESHOLD: f32 = -1.0;
 
 const LOCK_PASSWORD: &[u8] = b"1234";
 
 mod control;
+mod temp;
 mod utils;
 
 pub fn main() {
@@ -54,6 +56,8 @@ pub fn main() {
     let pir_sensor = Input::new(peripherals.GPIO18, Pull::Up);
     let _fan_active_led = Output::new(peripherals.GPIO2, Level::Low);
 
+    let temperature_sensor = adc_config.enable_pin(peripherals.GPIO15, Attenuation::Attenuation6dB);
+
     let adc = Rc::new(RefCell::new(Adc::new(peripherals.ADC2, adc_config)));
 
     let serial_input = UartRx::new(peripherals.UART1, peripherals.GPIO3).unwrap();
@@ -62,6 +66,7 @@ pub fn main() {
         .with_agent(control::control_agent(pump_switch))
         .with_agent(moist::moisture_agent(potentiometer, adc.clone()))
         .with_agent(light::light_agent(ldr_sensor, adc.clone(), low_light_led))
+        .with_agent(temp::temperature_agent(temperature_sensor, adc.clone()))
         .with_agent(pump::pump_agent(pump_active_led))
         .with_agent(lock::lock_agent(
             LOCK_PASSWORD,

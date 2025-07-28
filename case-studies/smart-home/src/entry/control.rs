@@ -2,7 +2,10 @@ use alloc::borrow::Cow;
 
 use esp_hal::gpio::Input;
 use home_automation::{
-    fan::{ontology::FanOntology, FanState},
+    fan::{
+        ontology::{FanAction, FanMessage, FanOntology},
+        FanState,
+    },
     lock::ontology::DoorLockOntology,
     pir::ontology::PirOntology,
 };
@@ -28,6 +31,7 @@ pub fn control_agent(pump_switch: Input<'static>) -> Agent<HomeData, ()> {
         .with_behaviour(HumanDetectedReceiver)
         .with_behaviour(DoorLockActionReceiver)
         .with_behaviour(FanStateReceiver)
+        .with_behaviour(FanControl)
         .with_behaviour(DataPrinter)
         .with_behaviour(Trunk)
 }
@@ -36,6 +40,7 @@ pub fn control_agent(pump_switch: Input<'static>) -> Agent<HomeData, ()> {
 pub struct HomeData {
     moisture: f32,
     light_level: f32,
+    temperature: f32,
     pump_active: bool,
     door_locked: bool,
     fan_active: bool,
@@ -209,6 +214,36 @@ impl TickerBehaviour for FanStateReceiver {
             FanState::On => true,
             FanState::Off => false,
         };
+    }
+
+    fn is_finished(&self) -> bool {
+        false
+    }
+}
+
+struct FanControl;
+
+impl TickerBehaviour for FanControl {
+    type AgentState = HomeData;
+
+    type Event = ();
+
+    fn interval(&self) -> core::time::Duration {
+        core::time::Duration::from_secs(3)
+    }
+
+    fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) {
+        let should_fan_activate =
+            state.temperature >= super::FAN_TEMPERATURE_THRESHOLD && state.human_home;
+
+        if state.fan_active != should_fan_activate {
+            ctx.send_message(wrap_message(
+                FanMessage {
+                    action: FanAction::Toggle,
+                }
+                .into_message(),
+            ));
+        }
     }
 
     fn is_finished(&self) -> bool {

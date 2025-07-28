@@ -23,5 +23,8 @@ const MOISTURE_HIGH_THRESHOLD: f32 = 80.0;
 // const TEMP_HIGH_THRESHOLD: f32 = 36.0;
 // const TEMP_LOW_THRESHOLD: f32 = -18.0;
 
-const MIN_LUX: f32 = 0.1;
-const MAX_LUX: f32 = 3000.0;
+const LDR_RL10: f32 = 39.0;
+const LDR_GAMMA: f32 = 0.5;
+const LDR_VCC_VOLTAGE: f32 = 3.3;
+
+const LDR_ADC_RANGE_OFFSET: f32 = -500.0;

@@ -108,6 +108,19 @@ pub mod ontology {
         }
     }
 
+    impl FanMessage {
+        pub fn into_message(self) -> Message {
+            Message {
+                performative: Performative::Request,
+                sender: None,
+                receiver: Receiver::Single(Aid::local("fan")),
+                reply_to: None,
+                ontology: Some(FanOntology::name().into()),
+                content: Content::Sl(self.into_content()),
+            }
+        }
+    }
+
     impl FanState {
         pub fn into_message(self) -> Message {
             Message {

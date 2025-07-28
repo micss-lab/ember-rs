@@ -122,14 +122,14 @@ where
     }
 
     fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) {
-        let raw_light = loop {
+        let adc_reading = loop {
             match self.adc.borrow_mut().read_oneshot(&mut self.pin) {
                 Ok(r) => break r,
                 Err(esp_hal::prelude::nb::Error::WouldBlock) => continue,
                 Err(err) => panic!("failed to read analog sensor: {:?}", err),
             }
         };
-        let lux = raw_light_to_lux(raw_light);
+        let lux = adc_to_lux(adc_reading);
         state.lux = lux;
         ctx.send_message(wrap_message(LightLevel(lux).into_message()));
     }
@@ -160,6 +160,12 @@ impl TickerBehaviour for LightAlert {
     }
 }
 
-fn raw_light_to_lux(light: u16) -> f32 {
-    (1.0 - (f32::from(light - 32) / 4063.0)) * (super::MAX_LUX - super::MIN_LUX) + super::MIN_LUX
+fn adc_to_lux(adc: u16) -> f32 {
+    let adc = (f32::from(adc) + super::LDR_ADC_RANGE_OFFSET).clamp(0.0, 4096.0);
+    let voltage = adc / 4096.0 * super::LDR_VCC_VOLTAGE;
+    let resistance = 2000.0 * voltage / (1.0 - voltage / super::LDR_VCC_VOLTAGE);
+    libm::powf(
+        super::LDR_RL10 * 1e3_f32 * libm::powf(10.0, super::LDR_GAMMA) / resistance,
+        1.0 / super::LDR_GAMMA,
+    )
 }
