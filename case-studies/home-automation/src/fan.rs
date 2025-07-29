@@ -35,10 +35,10 @@ pub mod ontology {
         Toggle,
     }
 
-    #[derive(Clone, Copy, Default, Serialize, Deserialize)]
+    #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
     pub enum FanState {
-        #[default]
         On,
+        #[default]
         Off,
     }
 

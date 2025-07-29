@@ -20,6 +20,8 @@ const HEAP_SIZE: usize = 72 * 1024;
 const MOISTURE_THRESHOLD: f32 = 60.0;
 const FAN_TEMPERATURE_THRESHOLD: f32 = -1.0;
 
+const TEMP_SENSOR_VCC_VOLTAGE: f32 = 3.3;
+
 const LOCK_PASSWORD: &[u8] = b"1234";
 
 mod control;
@@ -54,7 +56,7 @@ pub fn main() {
     // Home automation.
     let unlock_door_switch = Input::new(peripherals.GPIO22, Pull::Up);
     let pir_sensor = Input::new(peripherals.GPIO18, Pull::Up);
-    let _fan_active_led = Output::new(peripherals.GPIO2, Level::Low);
+    let fan_active_led = Output::new(peripherals.GPIO2, Level::Low);
 
     let temperature_sensor = adc_config.enable_pin(peripherals.GPIO15, Attenuation::Attenuation6dB);
 
@@ -63,7 +65,6 @@ pub fn main() {
     let serial_input = UartRx::new(peripherals.UART1, peripherals.GPIO3).unwrap();
 
     Container::default()
-        .with_agent(control::control_agent(pump_switch))
         .with_agent(moist::moisture_agent(potentiometer, adc.clone()))
         .with_agent(light::light_agent(ldr_sensor, adc.clone(), low_light_led))
         .with_agent(temp::temperature_agent(temperature_sensor, adc.clone()))
@@ -75,6 +76,7 @@ pub fn main() {
         ))
         .with_agent(fan::fan_agent())
         .with_agent(pir::pir_agent(pir_sensor))
+        .with_agent(control::control_agent(pump_switch, fan_active_led))
         .start()
         .unwrap()
 }

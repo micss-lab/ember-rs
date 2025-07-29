@@ -1,6 +1,6 @@
 use alloc::borrow::Cow;
 
-use esp_hal::gpio::Input;
+use esp_hal::gpio::{Input, Output};
 use home_automation::{
     fan::{
         ontology::{FanAction, FanMessage, FanOntology},
@@ -20,17 +20,21 @@ use plant_monitoring::{
     pump::ontology::{PumpAction, PumpOntology, PumpStatus},
 };
 
-use super::utils::wrap_message;
+use super::{temp::ontology::TempOntology, utils::wrap_message};
 
-pub fn control_agent(pump_switch: Input<'static>) -> Agent<HomeData, ()> {
+pub fn control_agent(
+    pump_switch: Input<'static>,
+    fan_active_led: Output<'static>,
+) -> Agent<HomeData, ()> {
     Agent::new("control", HomeData::default())
         .with_behaviour(MoistureReceiver)
         .with_behaviour(LightLevelReceiver)
+        .with_behaviour(TemperatureReceiver)
         .with_behaviour(PumpStateReceiver)
         .with_behaviour(PumpControl::new(pump_switch))
         .with_behaviour(HumanDetectedReceiver)
         .with_behaviour(DoorLockActionReceiver)
-        .with_behaviour(FanStateReceiver)
+        .with_behaviour(FanStateReceiver::new(fan_active_led))
         .with_behaviour(FanControl)
         .with_behaviour(DataPrinter)
         .with_behaviour(Trunk)
@@ -93,6 +97,32 @@ impl TickerBehaviour for LightLevelReceiver {
             return;
         };
         state.light_level = LightOntology::decode_message(message).unwrap().0;
+    }
+
+    fn is_finished(&self) -> bool {
+        false
+    }
+}
+
+struct TemperatureReceiver;
+
+impl TickerBehaviour for TemperatureReceiver {
+    type AgentState = HomeData;
+
+    type Event = ();
+
+    fn interval(&self) -> core::time::Duration {
+        core::time::Duration::from_millis(100)
+    }
+
+    fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) {
+        let Some(message) = ctx.receive_message(Some(Cow::Owned(MessageFilter::ontology(
+            TempOntology::name().into(),
+        )))) else {
+            ctx.block_behaviour();
+            return;
+        };
+        state.temperature = TempOntology::decode_message(message).unwrap().0;
     }
 
     fn is_finished(&self) -> bool {
@@ -192,7 +222,15 @@ impl TickerBehaviour for HumanDetectedReceiver {
     }
 }
 
-struct FanStateReceiver;
+struct FanStateReceiver {
+    fan_active_led: Output<'static>,
+}
+
+impl FanStateReceiver {
+    fn new(fan_active_led: Output<'static>) -> Self {
+        Self { fan_active_led }
+    }
+}
 
 impl TickerBehaviour for FanStateReceiver {
     type AgentState = HomeData;
@@ -210,10 +248,12 @@ impl TickerBehaviour for FanStateReceiver {
             ctx.block_behaviour();
             return;
         };
+        log::debug!("Receiving state from fan");
         state.fan_active = match FanOntology::decode_message(message).unwrap() {
             FanState::On => true,
             FanState::Off => false,
         };
+        self.fan_active_led.set_level(state.fan_active.into())
     }
 
     fn is_finished(&self) -> bool {

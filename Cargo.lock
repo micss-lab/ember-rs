@@ -278,6 +278,7 @@ dependencies = [
  "log",
  "no-std-framework-core",
  "postcard",
+ "serde",
 ]
 
 [[package]]

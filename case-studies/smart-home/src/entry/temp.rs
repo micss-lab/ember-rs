@@ -1,5 +1,6 @@
 use alloc::rc::Rc;
 use core::cell::RefCell;
+use ontology::Temperature;
 
 use esp_hal::analog::adc::{Adc, AdcChannel, AdcPin, RegisterAccess};
 use no_std_framework_core::{
@@ -7,11 +8,52 @@ use no_std_framework_core::{
     Agent,
 };
 
+use super::utils::wrap_message;
+
 pub fn temperature_agent<P: AdcChannel + 'static, ADCI: RegisterAccess + 'static>(
     sensor: AdcPin<P, ADCI>,
     adc: Rc<RefCell<Adc<'static, ADCI>>>,
 ) -> Agent<(), ()> {
     Agent::new("temp", ()).with_behaviour(Sensor::new(sensor, adc))
+}
+
+pub mod ontology {
+    use no_std_framework_core::{
+        acl::message::{Content, Message, Performative, Receiver},
+        Aid,
+    };
+    use serde::{Deserialize, Serialize};
+
+    pub struct TempOntology;
+
+    #[derive(Serialize, Deserialize)]
+    pub struct Temperature(pub f32);
+
+    impl TempOntology {
+        pub const fn name() -> &'static str {
+            "Temp-Ontology"
+        }
+
+        pub fn decode_message(message: Message) -> Result<Temperature, ()> {
+            let Content::Bytes(content) = message.content else {
+                return Err(());
+            };
+            postcard::from_bytes(&content).map_err(|_| ())
+        }
+    }
+
+    impl Temperature {
+        pub fn into_message(self) -> Message {
+            Message {
+                performative: Performative::Inform,
+                sender: None,
+                receiver: Receiver::Single(Aid::local("control")),
+                reply_to: None,
+                ontology: Some(TempOntology::name().into()),
+                content: Content::Bytes(postcard::to_allocvec(&self).unwrap()),
+            }
+        }
+    }
 }
 
 struct Sensor<P, ADCI: 'static> {
@@ -46,11 +88,16 @@ where
                 Err(err) => panic!("failed to read analog sensor: {:?}", err),
             }
         };
-        esp_println::dbg!(adc_reading);
-        // ctx.send_message(wrap_message(LightLevel(lux).into_message()));
+        let temperature = adc_to_temperature(adc_reading);
+        ctx.send_message(wrap_message(Temperature(temperature).into_message()));
     }
 
     fn is_finished(&self) -> bool {
         false
     }
+}
+
+fn adc_to_temperature(adc: u16) -> f32 {
+    let voltage = f32::from(adc) / 4096.0 * super::TEMP_SENSOR_VCC_VOLTAGE;
+    voltage * 10.0
 }
