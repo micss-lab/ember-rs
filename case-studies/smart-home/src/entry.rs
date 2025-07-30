@@ -15,18 +15,11 @@ use no_std_framework_core::Container;
 use home_automation::{fan, lock, pir};
 use plant_monitoring::{light, moist, pump};
 
+use case_study_smart_home::{control, temp};
+
 const HEAP_SIZE: usize = 72 * 1024;
 
-const MOISTURE_THRESHOLD: f32 = 60.0;
-const FAN_TEMPERATURE_THRESHOLD: f32 = -1.0;
-
-const TEMP_SENSOR_VCC_VOLTAGE: f32 = 3.3;
-
 const LOCK_PASSWORD: &[u8] = b"1234";
-
-mod control;
-mod temp;
-mod utils;
 
 pub fn main() {
     // Set newline mode to linux line endings.
