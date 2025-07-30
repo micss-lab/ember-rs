@@ -119,26 +119,25 @@ impl CyclicBehaviour for Receiver {
 
         while let Some(message) = ctx.receive_message(temp_ontology_message_filter()) {
             received = true;
-            let measurement = temp::ontology::TempOntology::decode_message(message).unwrap();
+            let measurement = temp::ontology::TempOntology::decode_message(message);
             state.handle_temp_measurement(measurement);
         }
 
         while let Some(message) = ctx.receive_message(moisture_ontology_message_filter()) {
             received = true;
-            let moisture_percent =
-                moist::ontology::MoistureOntology::decode_message(message).unwrap();
+            let moisture_percent = moist::ontology::MoistureOntology::decode_message(message);
             state.handle_moisture_measurement(moisture_percent.0);
         }
 
         while let Some(message) = ctx.receive_message(light_ontology_message_filter()) {
             received = true;
-            let light_level = light::ontology::LightOntology::decode_message(message).unwrap();
+            let light_level = light::ontology::LightOntology::decode_message(message);
             state.handle_light_level(light_level.0);
         }
 
         while let Some(message) = ctx.receive_message(pump_ontology_message_filter()) {
             received = true;
-            let pump_status = pump::ontology::PumpOntology::decode_message(message).unwrap();
+            let pump_status = pump::ontology::PumpOntology::decode_message(message);
             state.handle_pump_status(pump_status);
         }
 

@@ -47,23 +47,23 @@ pub mod ontology {
             "Fan-Ontology"
         }
 
-        pub fn decode_sl_message<T: AgentActionCodec>(message: Message) -> Result<T, ()> {
+        pub fn decode_sl_message<T: AgentActionCodec>(message: Message) -> T {
             if !message.ontology.is_some_and(|o| o == Self::name()) {
-                return Err(());
+                panic!("message has incorrect ontology");
             }
             let Content::Sl(content) = message.content else {
-                return Err(());
+                panic!("received incorrect content type");
             };
 
-            AgentActionCodec::from_content(content).map_err(|_| ())
+            AgentActionCodec::from_content(content).expect("failed to parse content")
         }
 
-        pub fn decode_message<T: for<'d> Deserialize<'d>>(message: Message) -> Result<T, ()> {
+        pub fn decode_message<T: for<'d> Deserialize<'d>>(message: Message) -> T {
             let Content::Bytes(content) = message.content else {
-                return Err(());
+                panic!("received incorrect content type");
             };
 
-            postcard::from_bytes(&content).map_err(|_| ())
+            postcard::from_bytes(&content).expect("failed to parse content")
         }
     }
 
@@ -162,7 +162,7 @@ impl TickerBehaviour for FanInteractions {
             ctx.block_behaviour();
             return;
         };
-        let message: FanMessage = ontology::FanOntology::decode_sl_message(message).unwrap();
+        let message: FanMessage = ontology::FanOntology::decode_sl_message(message);
 
         match message.action {
             FanAction::Toggle => {

@@ -25,11 +25,11 @@ pub mod ontology {
             "Temp-Ontology"
         }
 
-        pub fn decode_message(message: Message) -> Result<Measurement, ()> {
+        pub fn decode_message(message: Message) -> Measurement {
             let Content::Bytes(content) = message.content else {
-                return Err(());
+                panic!("received incorrect content type");
             };
-            postcard::from_bytes(&content).map_err(|_| ())
+            postcard::from_bytes(&content).expect("failed to parse content")
         }
     }
 }

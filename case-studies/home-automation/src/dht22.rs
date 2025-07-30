@@ -24,11 +24,11 @@ pub mod ontology {
             "Dht22-Ontology"
         }
 
-        pub fn decode_message(message: Message) -> Result<Measurement, ()> {
+        pub fn decode_message(message: Message) -> Measurement {
             let Content::Other { content, .. } = message.content else {
-                return Err(());
+                panic!("received incorrect content type");
             };
-            content.parse().map_err(|_| ())
+            content.parse().expect("failed to parse message content")
         }
     }
 }

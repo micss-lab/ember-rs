@@ -44,14 +44,14 @@ pub mod ontology {
             "Pump-Ontology"
         }
 
-        pub fn decode_message<T>(message: Message) -> Result<T, ()>
+        pub fn decode_message<T>(message: Message) -> T
         where
             T: for<'de> Deserialize<'de>,
         {
             let Content::Bytes(content) = message.content else {
-                return Err(());
+                panic!("received incorrect content type");
             };
-            postcard::from_bytes(&content).map_err(|_| ())
+            postcard::from_bytes(&content).expect("failed to parse content")
         }
     }
 
@@ -95,7 +95,7 @@ impl CyclicBehaviour for PumpInteractions {
             return;
         };
 
-        let action = ontology::PumpOntology::decode_message(message).unwrap();
+        let action = ontology::PumpOntology::decode_message(message);
         match (action, state.active) {
             (PumpAction::Activate, false) => state.active = true,
             (PumpAction::Deactivate, true) => state.active = false,

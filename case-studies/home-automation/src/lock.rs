@@ -103,11 +103,11 @@ pub mod ontology {
             "Door-Lock-Ontology"
         }
 
-        pub fn decode_message(message: Message) -> Result<DoorLockAction, ()> {
+        pub fn decode_message(message: Message) -> DoorLockAction {
             let Content::Bytes(content) = message.content else {
-                return Err(());
+                panic!("received incorrect content type");
             };
-            postcard::from_bytes(&content).map_err(|_| ())
+            postcard::from_bytes(&content).expect("failed to parse content")
         }
     }
 

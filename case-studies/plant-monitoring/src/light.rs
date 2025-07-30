@@ -75,11 +75,11 @@ pub mod ontology {
             "Light-Ontology"
         }
 
-        pub fn decode_message(message: Message) -> Result<LightLevel, ()> {
+        pub fn decode_message(message: Message) -> LightLevel {
             let Content::Bytes(content) = message.content else {
-                return Err(());
+                panic!("receiverd incorrect content type")
             };
-            postcard::from_bytes(&content).map_err(|_| ())
+            postcard::from_bytes(&content).expect("failed to parse message content")
         }
     }
 

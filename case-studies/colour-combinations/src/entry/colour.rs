@@ -16,16 +16,16 @@
 //! ## Algorithm.
 //!
 //! 1. If the first arrived brick is red, it should press and grab it, then it should merge it with
-//! the non-red second one to achieve 50 points.
+//!    the non-red second one to achieve 50 points.
 //! 2. If the second brick is also red, it merges them to achieve a 100 score.
 //! 3. If the first one is a non-red brick and the second one is a non-red brick, and they have the
-//! same colours, they are pressed to obtain a 25 score.
+//!    same colours, they are pressed to obtain a 25 score.
 //! 4. If the first one is a non-red brick and the second one is a non-red brick, and they do not
-//! have the same colours, then the first one is ejected, and the second one is accepted into the
-//! press platform.
+//!    have the same colours, then the first one is ejected, and the second one is accepted into the
+//!    press platform.
 //! 5. If the first one is a non-red brick and the second one is a red brick, then the first one is
-//! ejected, and the second one is accepted into the press platform, assuming there can be a
-//! red/red chance.
+//!    ejected, and the second one is accepted into the press platform, assuming there can be a
+//!    red/red chance.
 
 use alloc::boxed::Box;
 use core::marker::PhantomData;
@@ -192,7 +192,6 @@ where
             }
             (colour, _) => {
                 log::info!("Ejecting brick {:?}", colour);
-                return;
             }
         }
     }

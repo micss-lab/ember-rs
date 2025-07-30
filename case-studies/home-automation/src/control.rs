@@ -101,10 +101,10 @@ impl CyclicBehaviour for Receiver {
             };
 
             if ontology == dht22::ontology::Dht22Ontology::name() {
-                let measurement = Dht22Ontology::decode_message(message).unwrap();
+                let measurement = Dht22Ontology::decode_message(message);
                 self.handle_dht22_measurement(measurement, ctx);
             } else if ontology == pir::ontology::PirOntology::name() {
-                let message = PirOntology::decode_message(message).unwrap();
+                let message = PirOntology::decode_message(message);
                 self.handle_pir_message(message, ctx);
             }
         }

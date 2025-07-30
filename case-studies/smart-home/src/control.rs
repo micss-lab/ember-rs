@@ -70,7 +70,7 @@ impl TickerBehaviour for MoistureReceiver {
             return;
         };
 
-        state.moisture = MoistureOntology::decode_message(message).unwrap().0;
+        state.moisture = MoistureOntology::decode_message(message).0;
     }
 
     fn is_finished(&self) -> bool {
@@ -96,7 +96,7 @@ impl TickerBehaviour for LightLevelReceiver {
             ctx.block_behaviour();
             return;
         };
-        state.light_level = LightOntology::decode_message(message).unwrap().0;
+        state.light_level = LightOntology::decode_message(message).0;
     }
 
     fn is_finished(&self) -> bool {
@@ -122,7 +122,7 @@ impl TickerBehaviour for TemperatureReceiver {
             ctx.block_behaviour();
             return;
         };
-        state.temperature = TempOntology::decode_message(message).unwrap().0;
+        state.temperature = TempOntology::decode_message(message).0;
     }
 
     fn is_finished(&self) -> bool {
@@ -148,9 +148,7 @@ impl TickerBehaviour for PumpStateReceiver {
             ctx.block_behaviour();
             return;
         };
-        state.pump_active = PumpOntology::decode_message::<PumpStatus>(message)
-            .unwrap()
-            .active;
+        state.pump_active = PumpOntology::decode_message::<PumpStatus>(message).active;
     }
 
     fn is_finished(&self) -> bool {
@@ -212,9 +210,7 @@ impl TickerBehaviour for HumanDetectedReceiver {
             ctx.block_behaviour();
             return;
         };
-        state.human_home = PirOntology::decode_message(message)
-            .unwrap()
-            .object_detected;
+        state.human_home = PirOntology::decode_message(message).object_detected;
     }
 
     fn is_finished(&self) -> bool {
@@ -249,7 +245,7 @@ impl TickerBehaviour for FanStateReceiver {
             return;
         };
         log::debug!("Receiving state from fan");
-        state.fan_active = match FanOntology::decode_message(message).unwrap() {
+        state.fan_active = match FanOntology::decode_message(message) {
             FanState::On => true,
             FanState::Off => false,
         };
@@ -309,7 +305,7 @@ impl TickerBehaviour for DoorLockActionReceiver {
             ctx.block_behaviour();
             return;
         };
-        state.door_locked = DoorLockOntology::decode_message(message).unwrap().locked();
+        state.door_locked = DoorLockOntology::decode_message(message).locked();
     }
 
     fn is_finished(&self) -> bool {
@@ -357,7 +353,7 @@ impl TickerBehaviour for Trunk {
     }
 
     fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
-        while let Some(_) = ctx.receive_message(None) {}
+        while ctx.receive_message(None).is_some() {}
     }
 
     fn is_finished(&self) -> bool {
