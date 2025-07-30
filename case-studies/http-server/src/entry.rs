@@ -35,6 +35,106 @@ static mut SOCKET_STORE: [SocketStorage; SOCKET_COUNT] = [SocketStorage::EMPTY; 
 
 static mut WIFI_INIT: OnceCell<EspWifiController> = OnceCell::new();
 
+mod routes {
+    use alloc::format;
+    use alloc::string::{String, ToString};
+
+    use httparse::Request;
+
+    #[derive(Default)]
+    pub struct State {
+        led1: LedState,
+        led2: LedState,
+    }
+
+    #[derive(Default)]
+    enum LedState {
+        On,
+        #[default]
+        Off,
+    }
+
+    impl core::fmt::Display for LedState {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            write!(
+                f,
+                "{}",
+                match self {
+                    Self::On => "on",
+                    Self::Off => "off",
+                }
+            )
+        }
+    }
+
+    impl LedState {
+        fn toggle(&mut self) {
+            *self = match self {
+                Self::On => Self::Off,
+                Self::Off => Self::On,
+            }
+        }
+    }
+
+    fn index(state: &State) -> String {
+        format!(
+            r#"
+                <!DOCTYPE html><html>
+                  <head>
+                    <title>ESP32 Web Server Demo</title>
+                    <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <style>
+                      html {{ font-family: sans-serif; text-align: center; }}
+                      body {{ display: inline-flex; flex-direction: column; }}
+                      h1 {{ margin-bottom: 1.2em; }}
+                      h2 {{ margin: 0; }}
+                      div {{ display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: auto auto; grid-auto-flow: column; grid-gap: 1em; }}
+                      .btn {{ background-color: #5B5; border: none; color: #fff; padding: 0.5em 1em; font-size: 2em; text-decoration: none }}
+                      .btn.off {{ background-color: #333; }}
+                    </style>
+                  </head>
+
+                  <body>
+                    <h1>ESP32 Web Server</h1>
+
+                    <div>
+                      <h2>LED 1</h2>
+                      <a href="/toggle/1" class="btn {}">{}</a>
+                      <h2>LED 2</h2>
+                      <a href="/toggle/2" class="btn {}">{}</a>
+                    </div>
+                  </body>
+                </html>
+            "#,
+            state.led1,
+            state.led1.to_string().to_uppercase(),
+            state.led2,
+            state.led2.to_string().to_uppercase(),
+        )
+    }
+
+    fn not_found(method: &str, path: &str) -> String {
+        format!("Not found: path `{}`, method: `{}`", path, method)
+    }
+
+    pub fn handle_request(req: Request, state: &mut State) -> (u16, String) {
+        match (req.method.unwrap_or("GET"), req.path.unwrap_or("/")) {
+            ("GET", "/") => (200, index(state)),
+            ("GET", path) if path.starts_with("/toggle/") => {
+                let (_, led) = path.split_once("/toggle/").unwrap();
+                match led.parse() {
+                    Ok(1) => state.led1.toggle(),
+                    Ok(2) => state.led2.toggle(),
+                    Ok(idx) => return (400, format!("Unknown led index {idx}")),
+                    Err(err) => return (400, format!("Invalid led index {led}: {}", err)),
+                }
+                (200, index(state))
+            }
+            (method, path) => (404, not_found(method, path)),
+        }
+    }
+}
+
 pub(crate) fn main() {
     // Set newline mode to linux line endings.
     esp_println::print!("\x1b[20h");
@@ -74,7 +174,12 @@ pub(crate) fn main() {
     connect_to_access_point(&mut controller, &mut stack);
 
     log::info!("Starting http server on port {}", HTTP_PORT);
-    let server = http::Server::new(stack, HTTP_PORT);
+    let server = http::Server::new(
+        stack,
+        HTTP_PORT,
+        routes::handle_request,
+        routes::State::default(),
+    );
     Container::default()
         .with_agent(Agent::new("server", ()).with_behaviour(server))
         .start()
