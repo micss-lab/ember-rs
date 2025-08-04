@@ -1,6 +1,10 @@
+use core::ptr::addr_of_mut;
+
 use alloc::borrow::Cow;
 
+use blocking_network_stack::Socket;
 use esp_hal::gpio::{Input, Output};
+use esp_wifi::wifi::{WifiDevice, WifiStaDevice};
 use home_automation::{
     fan::{
         ontology::{FanAction, FanMessage, FanOntology},
@@ -11,7 +15,7 @@ use home_automation::{
 };
 use no_std_framework_core::{
     acl::message::MessageFilter,
-    behaviour::{Context, TickerBehaviour},
+    behaviour::{Context, CyclicBehaviour, TickerBehaviour},
     Agent,
 };
 use plant_monitoring::{
@@ -21,6 +25,11 @@ use plant_monitoring::{
 };
 
 use super::{temp::ontology::TempOntology, utils::wrap_message};
+
+static mut RX_BUFFER: &mut [u8] = &mut [0u8; 1024];
+static mut TX_BUFFER: &mut [u8] = &mut [0u8; 2048];
+
+mod http;
 
 pub fn control_agent(
     pump_switch: Input<'static>,
@@ -36,11 +45,12 @@ pub fn control_agent(
         .with_behaviour(DoorLockActionReceiver)
         .with_behaviour(FanStateReceiver::new(fan_active_led))
         .with_behaviour(FanControl)
-        .with_behaviour(DataPrinter)
+        // .with_behaviour(DataPrinter)
+        .with_behaviour(HttpServer::new(super::HTTP_SERVER_PORT))
         .with_behaviour(Trunk)
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct HomeData {
     moisture: f32,
     light_level: f32,
@@ -313,6 +323,7 @@ impl TickerBehaviour for DoorLockActionReceiver {
     }
 }
 
+#[allow(unused)]
 struct DataPrinter;
 
 impl TickerBehaviour for DataPrinter {
@@ -329,11 +340,83 @@ impl TickerBehaviour for DataPrinter {
         log::debug!("Home sensor data:");
         log::debug!("Moisture: {}", state.moisture);
         log::debug!("Light level: {}", state.light_level);
+        log::debug!("Temperature: {}", state.temperature);
         log::debug!("Pump active: {}", state.pump_active);
         log::debug!("Human home: {}", state.human_home);
         log::debug!("Door locked: {}", state.door_locked);
         log::debug!("Fan active: {}", state.fan_active);
         log::debug!("-------------------------------------");
+    }
+
+    fn is_finished(&self) -> bool {
+        false
+    }
+}
+
+struct HttpServer {
+    port: u16,
+    current_socket: Option<Socket<'static, 'static, 'static, WifiDevice<'static, WifiStaDevice>>>,
+}
+
+impl HttpServer {
+    fn new(http_port: u16) -> Self {
+        log::trace!("started http server");
+        Self {
+            port: http_port,
+            current_socket: None,
+        }
+    }
+}
+
+impl CyclicBehaviour for HttpServer {
+    type AgentState = HomeData;
+
+    type Event = ();
+
+    fn action(&mut self, _: &mut Context<Self::Event>, state: &mut Self::AgentState) {
+        use embedded_io::{Read, Write};
+
+        let mut socket = self.current_socket.take().unwrap_or_else(|| {
+            log::trace!("Waiting for socket");
+            let mut socket = unsafe { crate::WIFI_STACK.get() }
+                .unwrap()
+                .get_socket(unsafe { &mut *addr_of_mut!(RX_BUFFER) }, unsafe {
+                    &mut *addr_of_mut!(TX_BUFFER)
+                });
+            socket.listen_unblocking(self.port).unwrap();
+            socket
+        });
+
+        if !socket.is_connected() {
+            socket.work();
+            self.current_socket = Some(socket);
+            return;
+        }
+
+        log::trace!("Incoming connection.");
+
+        let mut buf = [0u8; 4096];
+
+        if socket.read(&mut buf).is_err() {
+            return;
+        }
+
+        let mut headers = [httparse::EMPTY_HEADER; 16];
+        let mut req = httparse::Request::new(&mut headers);
+        if let Err(err) = req.parse(&buf) {
+            log::error!("Error parsing incoming request: {}", err);
+            socket.close();
+            return;
+        };
+
+        log::debug!("Incoming request: {:?}", req);
+
+        let (status, body) = http::handle_request(req, state);
+        http::write_response(&mut socket, status, body);
+
+        log::trace!("Closing socket.");
+        let _ = socket.flush();
+        socket.close();
     }
 
     fn is_finished(&self) -> bool {

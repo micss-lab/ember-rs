@@ -130,7 +130,7 @@ checksum = "5c8214115b7bf84099f1309324e63141d4c5d7cc26862f97a0a857dbefe165bd"
 [[package]]
 name = "blocking-network-stack"
 version = "0.1.0"
-source = "git+https://github.com/exellentcoin26/blocking-network-stack.git#11a2476fd13d11a5d982116ddcbda5ae457cf764"
+source = "git+https://github.com/exellentcoin26/blocking-network-stack.git#1557c8ff6369846b5fdb913fff8a1de88a74016b"
 dependencies = [
  "embedded-io 0.6.1",
  "heapless 0.8.0",
@@ -268,17 +268,23 @@ dependencies = [
 name = "case-study-smart-home"
 version = "0.1.0"
 dependencies = [
+ "blocking-network-stack",
  "case-study-home-automation",
  "case-study-plant-monitoring",
+ "critical-section",
+ "embedded-io 0.6.1",
  "esp-alloc",
  "esp-backtrace",
  "esp-hal",
  "esp-hal-embassy",
  "esp-println",
+ "esp-wifi",
+ "httparse",
  "log",
  "no-std-framework-core",
  "postcard",
  "serde",
+ "smoltcp",
 ]
 
 [[package]]
