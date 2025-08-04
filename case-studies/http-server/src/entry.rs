@@ -4,7 +4,13 @@ use core::cell::OnceCell;
 use esp_backtrace as _;
 
 use blocking_network_stack::Stack;
-use esp_hal::{clock::CpuClock, delay::Delay, rng::Rng, timer::timg::TimerGroup};
+use esp_hal::{
+    clock::CpuClock,
+    delay::Delay,
+    gpio::{Level, Output},
+    rng::Rng,
+    timer::timg::TimerGroup,
+};
 use esp_wifi::{
     wifi::{WifiController, WifiDevice, WifiStaDevice},
     EspWifiController,
@@ -39,29 +45,34 @@ mod routes {
     use alloc::format;
     use alloc::string::{String, ToString};
 
+    use esp_hal::gpio::{Level, Output};
     use httparse::Request;
+    use no_std_framework_core::behaviour::Context;
 
-    #[derive(Default)]
     pub struct State {
         led1: LedState,
         led2: LedState,
     }
 
-    #[derive(Default)]
-    enum LedState {
-        On,
-        #[default]
-        Off,
+    impl State {
+        pub fn new(led1: Output<'static>, led2: Output<'static>) -> Self {
+            Self {
+                led1: LedState(led1),
+                led2: LedState(led2),
+            }
+        }
     }
+
+    struct LedState(Output<'static>);
 
     impl core::fmt::Display for LedState {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             write!(
                 f,
                 "{}",
-                match self {
-                    Self::On => "on",
-                    Self::Off => "off",
+                match self.0.output_level() {
+                    Level::High => "on",
+                    Level::Low => "off",
                 }
             )
         }
@@ -69,10 +80,7 @@ mod routes {
 
     impl LedState {
         fn toggle(&mut self) {
-            *self = match self {
-                Self::On => Self::Off,
-                Self::Off => Self::On,
-            }
+            self.0.toggle();
         }
     }
 
@@ -117,7 +125,7 @@ mod routes {
         format!("Not found: path `{}`, method: `{}`", path, method)
     }
 
-    pub fn handle_request(req: Request, state: &mut State) -> (u16, String) {
+    pub fn handle_request(req: Request, _: &mut Context<()>, state: &mut State) -> (u16, String) {
         match (req.method.unwrap_or("GET"), req.path.unwrap_or("/")) {
             ("GET", "/") => (200, index(state)),
             ("GET", path) if path.starts_with("/toggle/") => {
@@ -150,6 +158,9 @@ pub(crate) fn main() {
     });
     let mut rng = Rng::new(peripherals.RNG);
 
+    let led1 = Output::new(peripherals.GPIO2, Level::Low);
+    let led2 = Output::new(peripherals.GPIO21, Level::Low);
+
     log::trace!("Initializing wifi device.");
     let timg0 = TimerGroup::new(peripherals.TIMG0);
     unsafe {
@@ -174,14 +185,9 @@ pub(crate) fn main() {
     connect_to_access_point(&mut controller, &mut stack);
 
     log::info!("Starting http server on port {}", HTTP_PORT);
-    let server = http::Server::new(
-        stack,
-        HTTP_PORT,
-        routes::handle_request,
-        routes::State::default(),
-    );
+    let server = http::Server::<_, _, routes::State>::new(stack, HTTP_PORT, routes::handle_request);
     Container::default()
-        .with_agent(Agent::new("server", ()).with_behaviour(server))
+        .with_agent(Agent::new("server", routes::State::new(led1, led2)).with_behaviour(server))
         .start()
         .unwrap()
 }

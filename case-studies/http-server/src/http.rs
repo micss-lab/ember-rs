@@ -1,3 +1,5 @@
+use core::marker::PhantomData;
+
 use alloc::format;
 use alloc::string::String;
 
@@ -15,19 +17,21 @@ where
     stack: Stack<'static, D>,
     port: u16,
     handle_request: H,
-    state: S,
+    _state: PhantomData<S>,
 }
 
 impl<D, H, S> Server<D, H, S>
 where
     D: Device,
+    // Signature added here for better compiler errors.
+    H: FnOnce(Request, &mut Context<()>, &mut S) -> (u16, String) + Clone,
 {
-    pub fn new(stack: Stack<'static, D>, port: u16, handle_request: H, state: S) -> Self {
+    pub fn new(stack: Stack<'static, D>, port: u16, handle_request: H) -> Self {
         Self {
             stack,
             port,
             handle_request,
-            state,
+            _state: PhantomData,
         }
     }
 }
@@ -35,13 +39,13 @@ where
 impl<D, H, S> CyclicBehaviour for Server<D, H, S>
 where
     D: Device,
-    H: FnOnce(Request, &mut S) -> (u16, String) + Clone,
+    H: FnOnce(Request, &mut Context<()>, &mut S) -> (u16, String) + Clone,
 {
-    type AgentState = ();
+    type AgentState = S;
 
     type Event = ();
 
-    fn action(&mut self, _: &mut Context<Self::Event>, _: &mut Self::AgentState) {
+    fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) {
         use embedded_io::Read;
 
         let mut rx_buffer = [0u8; 1024];
@@ -56,7 +60,9 @@ where
 
         let mut buf = [0u8; 1024];
 
-        socket.read(&mut buf).expect("failed to read from socket");
+        if socket.read(&mut buf).is_err() {
+            return;
+        }
 
         let mut headers = [httparse::EMPTY_HEADER; 16];
         let mut req = httparse::Request::new(&mut headers);
@@ -66,11 +72,13 @@ where
 
         log::debug!("Incoming request: {:?}", req);
 
-        let (status, body) = self.handle_request.clone()(req, &mut self.state);
-        write_response(&mut socket, status, body);
+        let (status, body) = self.handle_request.clone()(req, ctx, state);
+        if let Err(err) = write_response(&mut socket, status, body) {
+            log::warn!("failed to send response: {:?}", err);
+        }
 
         log::trace!("Closing socket.");
-        socket.flush().expect("failed to flush socket");
+        let _ = socket.flush();
         socket.close();
     }
 
@@ -79,20 +87,20 @@ where
     }
 }
 
-fn write_response(mut stream: impl Write, status: u16, body: String) {
+fn write_response<W>(mut stream: W, status: u16, body: String) -> Result<(), W::Error>
+where
+    W: Write,
+{
     let content_len = body.len();
 
-    stream.write_all(b"HTTP/1.1 ").unwrap();
-    stream
-        .write_all(format!("{} {}\r\n", status, status_code_to_reason(status)).as_bytes())
-        .unwrap();
+    stream.write_all(b"HTTP/1.1 ")?;
+    stream.write_all(format!("{} {}\r\n", status, status_code_to_reason(status)).as_bytes())?;
     if content_len != 0 {
-        stream
-            .write_all(format!("Content-Length: {}", content_len).as_bytes())
-            .unwrap();
+        stream.write_all(format!("Content-Length: {}", content_len).as_bytes())?;
     }
-    stream.write_all(b"\r\n\r\n").unwrap();
-    stream.write_all(body.as_bytes()).unwrap();
+    stream.write_all(b"\r\n\r\n")?;
+    stream.write_all(body.as_bytes())?;
+    Ok(())
 }
 
 fn status_code_to_reason(code: u16) -> &'static str {
