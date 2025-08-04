@@ -1,44 +1,47 @@
-use core::marker::PhantomData;
+use core::{marker::PhantomData, ptr::addr_of_mut};
 
 use alloc::format;
 use alloc::string::String;
 
-use blocking_network_stack::Stack;
+use blocking_network_stack::Socket;
 
 use embedded_io::Write;
+use esp_wifi::wifi::{WifiDevice, WifiStaDevice};
 use httparse::Request;
 use no_std_framework_core::behaviour::{Context, CyclicBehaviour};
 use smoltcp::phy::Device;
 
-pub struct Server<D, H, S>
+static mut RX_BUFFER: &mut [u8] = &mut [0u8; 1024];
+static mut TX_BUFFER: &mut [u8] = &mut [0u8; 2048];
+
+pub struct Server<H, S, D>
 where
-    D: Device,
+    D: Device + 'static,
 {
-    stack: Stack<'static, D>,
     port: u16,
     handle_request: H,
+    current_socket: Option<Socket<'static, 'static, 'static, D>>,
     _state: PhantomData<S>,
 }
 
-impl<D, H, S> Server<D, H, S>
+impl<H, S, D> Server<H, S, D>
 where
-    D: Device,
+    D: Device + 'static,
     // Signature added here for better compiler errors.
     H: FnOnce(Request, &mut Context<()>, &mut S) -> (u16, String) + Clone,
 {
-    pub fn new(stack: Stack<'static, D>, port: u16, handle_request: H) -> Self {
+    pub fn new(port: u16, handle_request: H) -> Self {
         Self {
-            stack,
             port,
             handle_request,
+            current_socket: None,
             _state: PhantomData,
         }
     }
 }
 
-impl<D, H, S> CyclicBehaviour for Server<D, H, S>
+impl<H, S> CyclicBehaviour for Server<H, S, WifiDevice<'static, WifiStaDevice>>
 where
-    D: Device,
     H: FnOnce(Request, &mut Context<()>, &mut S) -> (u16, String) + Clone,
 {
     type AgentState = S;
@@ -48,11 +51,19 @@ where
     fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) {
         use embedded_io::Read;
 
-        let mut rx_buffer = [0u8; 1024];
-        let mut tx_buffer = [0u8; 2048];
-        let mut socket = self.stack.get_socket(&mut rx_buffer, &mut tx_buffer);
-        if let Err(err) = socket.listen(self.port) {
-            log::error!("Error listening for incoming connection: {:?}", err);
+        let mut socket = self.current_socket.take().unwrap_or_else(|| {
+            let mut socket = unsafe { crate::WIFI_STACK.get_mut() }
+                .unwrap()
+                .get_socket(unsafe { &mut *addr_of_mut!(RX_BUFFER) }, unsafe {
+                    &mut *addr_of_mut!(TX_BUFFER)
+                });
+            socket.listen_unblocking(self.port).unwrap();
+            socket
+        });
+
+        if !socket.is_connected() {
+            socket.work();
+            self.current_socket = Some(socket);
             return;
         }
 
@@ -78,8 +89,11 @@ where
         }
 
         log::trace!("Closing socket.");
-        let _ = socket.flush();
+        if let Err(err) = socket.flush() {
+            log::error!("Error closing socket: {:?}", err);
+        }
         socket.close();
+        log::debug!("Successfully sent response and closed socket.");
     }
 
     fn is_finished(&self) -> bool {

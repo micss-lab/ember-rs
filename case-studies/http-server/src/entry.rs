@@ -184,8 +184,12 @@ pub(crate) fn main() {
     log::trace!("Connecting to access point.");
     connect_to_access_point(&mut controller, &mut stack);
 
+    unsafe {
+        case_study_http_server::WIFI_STACK.set(stack).ok();
+    }
+
     log::info!("Starting http server on port {}", HTTP_PORT);
-    let server = http::Server::<_, _, routes::State>::new(stack, HTTP_PORT, routes::handle_request);
+    let server = http::Server::new(HTTP_PORT, routes::handle_request);
     Container::default()
         .with_agent(Agent::new("server", routes::State::new(led1, led2)).with_behaviour(server))
         .start()
