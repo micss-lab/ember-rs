@@ -21,10 +21,6 @@ impl MessageStore {
         filter: Option<Cow<'_, MessageFilter>>,
     ) -> Option<Message> {
         use crate::acl::message::MessageKind;
-        log::trace!(
-            "Trying to find a message matching the filter among {} messages",
-            self.messages.len()
-        );
         let filter = filter.unwrap_or_else(|| Cow::Owned(MessageFilter::all()));
         self.messages
             .iter()
