@@ -3,7 +3,7 @@ use esp_wifi::esp_now;
 
 use crate::acc::{Acc, Channels};
 use crate::acl::message::MessageEnvelope;
-use crate::adt::Adt;
+use crate::adt::{Adt, AgentReference, LocalAgentReference};
 
 pub(super) struct Mts<'c> {
     channels: Channels<'c>,
@@ -22,8 +22,10 @@ impl Mts<'_> {
         } else {
             for t in envelope.to.iter() {
                 if t.is_local() {
-                    match adt.get_mut(t) {
-                        Some(i) => i.inbox.push(envelope.clone()),
+                    match adt.get_mut(t.local_name()) {
+                        Some(AgentReference::Local(LocalAgentReference { inbox })) => {
+                            inbox.push(envelope.clone())
+                        }
                         None => {
                             log::error!(
                                 "Failed to send message to agent `{}`: local agent not registered with the ams",

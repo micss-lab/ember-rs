@@ -30,8 +30,6 @@ pub trait AgentLike {
     fn update(&mut self, context: &mut ContainerContext) -> bool;
 
     fn get_name(&self) -> Cow<str>;
-
-    fn get_aid(&self) -> Aid;
 }
 
 impl Container<'_> {
@@ -45,8 +43,10 @@ impl Container<'_> {
     }
 
     fn poll_associated_agents(&mut self) -> Result<(), Box<dyn core::error::Error>> {
-        let mut context =
-            ContainerContext::new(self.messages_for_agent(&Aid::ams()).unwrap_or_default());
+        let mut context = ContainerContext::new(
+            self.messages_for_agent(&Aid::ams().local_name())
+                .unwrap_or_default(),
+        );
         self.ams.update(&mut context);
         self.ams.perform_platform_actions(&mut self.ladt);
         Ok(())
@@ -63,7 +63,7 @@ impl Container<'_> {
             self.poll_associated_agents()?;
 
             let mut context = ContainerContext::new(
-                self.messages_for_agent(&agent.get_aid())
+                self.messages_for_agent(&agent.get_name())
                     .unwrap_or_default(),
             );
 
@@ -74,7 +74,7 @@ impl Container<'_> {
                 self.mts.send_message(message, &mut self.ladt);
             }
 
-            self.return_unhandled_messages(&agent.get_aid(), context.message_inbox);
+            self.return_unhandled_messages(&agent.get_name(), context.message_inbox);
 
             if context.should_stop {
                 return Ok(true);
@@ -93,20 +93,20 @@ impl Container<'_> {
         Ok(false)
     }
 
-    fn messages_for_agent(&mut self, aid: &Aid) -> Option<Vec<MessageEnvelope>> {
+    fn messages_for_agent(&mut self, agent_name: impl AsRef<str>) -> Option<Vec<MessageEnvelope>> {
         Some(
-            core::mem::take(&mut self.ladt.get_mut(aid)?.inbox)
+            core::mem::take(&mut self.ladt.get_local_mut(agent_name.as_ref())?.inbox)
                 .into_iter()
                 .collect(),
         )
     }
 
-    fn return_unhandled_messages(&mut self, aid: &Aid, messages: MessageStore) {
+    fn return_unhandled_messages(&mut self, agent_name: impl AsRef<str>, messages: MessageStore) {
         if messages.is_empty() {
             return;
         }
         self.ladt
-            .get_mut(aid)
+            .get_local_mut(agent_name.as_ref())
             .expect("agent returning messages should be in ladt")
             .inbox
             .extend(messages)

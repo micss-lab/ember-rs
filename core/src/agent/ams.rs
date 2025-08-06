@@ -1,9 +1,10 @@
 use alloc::borrow::Cow;
 use alloc::collections::vec_deque::VecDeque;
+use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use crate::acl::message::{MessageFilter, Performative};
-use crate::adt::{Adt, AgentReference};
+use crate::adt::{Adt, AgentReference, LocalAgentReference};
 use crate::behaviour::parallel::{FinishStrategy, ParallelBehaviourQueue};
 use crate::behaviour::{CyclicBehaviour, OneShotBehaviour};
 use crate::container::AgentLike;
@@ -45,10 +46,6 @@ impl AgentLike for AmsAgent {
 
     fn get_name(&self) -> Cow<str> {
         Cow::Borrowed("ams")
-    }
-
-    fn get_aid(&self) -> Aid {
-        Aid::ams()
     }
 }
 
@@ -94,11 +91,17 @@ impl AmsAgent {
                 return;
             }
         };
-        log::trace!("Trying to registering agent `{}`.", aid);
-        match adt.entry(aid.clone()) {
+        if !aid.is_local() {
+            log::error!("Cannot register agent that is not local to the ams.");
+        }
+        let name = aid.local_name().to_string();
+        log::trace!("Trying to registering agent `{}`.", name);
+        match adt.entry(name.clone()) {
             Entry::Vacant(entry) => {
-                entry.insert(AgentReference { inbox: Vec::new() });
-                log::info!("Agent `{}` successfully registered.", aid);
+                entry.insert(AgentReference::Local(LocalAgentReference {
+                    inbox: Vec::new(),
+                }));
+                log::info!("Agent `{}` successfully registered.", &name);
             }
             Entry::Occupied(_) => {
                 log::error!(
