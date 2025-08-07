@@ -1,5 +1,6 @@
 use alloc::rc::Rc;
 use core::cell::RefCell;
+use macaddr::MacAddr6;
 
 use esp_backtrace as _;
 use esp_hal_embassy as _;
@@ -11,11 +12,15 @@ use esp_hal::{
     rng::Rng,
     timer::timg::TimerGroup,
 };
-use no_std_framework_core::Container;
+use no_std_framework_core::{Aid, Container};
 
 use home_automation::fan;
 
-use crate::{control, discovery, temp, wifi};
+use crate::{
+    control,
+    discovery::{self, System},
+    temp, wifi,
+};
 
 const HEAP_SIZE: usize = 72 * 1024;
 
@@ -69,7 +74,7 @@ pub fn main() {
     wifi::connect_to_access_point(&mut controller);
 
     // Discover services running on the same network.
-    let discovery_info = discovery::DiscoveryInfo::default().discover(
+    let discovery_info = discovery::DiscoveryInfo::discover(
         &mut esp_now_sender,
         &mut esp_now_receiver,
         &mut esp_now_manager,
@@ -80,16 +85,24 @@ pub fn main() {
 
     let mut adc_config = AdcConfig::new();
 
-    let pump_switch = Input::new(peripherals.GPIO13, Pull::Up);
-    let fan_active_led = Output::new(peripherals.GPIO2, Level::Low);
-    let temperature_sensor = adc_config.enable_pin(peripherals.GPIO15, Attenuation::Attenuation6dB);
+    let pump_switch = Input::new(peripherals.GPIO5, Pull::Up);
+    let fan_active_led = Output::new(peripherals.GPIO18, Level::Low);
+    let temperature_sensor = adc_config.enable_pin(peripherals.GPIO34, Attenuation::Attenuation6dB);
 
-    let adc = Rc::new(RefCell::new(Adc::new(peripherals.ADC2, adc_config)));
+    let adc = Rc::new(RefCell::new(Adc::new(peripherals.ADC1, adc_config)));
 
     Container::default()
         .with_agent(temp::temperature_agent(temperature_sensor, adc.clone()))
         .with_agent(fan::fan_agent())
         .with_agent(control::control_agent(pump_switch, fan_active_led))
+        .with_agent_proxy(
+            "pump",
+            Aid::general(
+                "pump",
+                MacAddr6::from(discovery_info[&System::PlantMonitoring]),
+            ),
+        )
+        .with_espnow(Some(esp_now_sender), Some(esp_now_receiver))
         .start()
         .unwrap()
 }

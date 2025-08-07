@@ -8,11 +8,15 @@ use esp_hal::{
     timer::timg::TimerGroup,
     uart::UartRx,
 };
-use no_std_framework_core::Container;
+use macaddr::MacAddr6;
+use no_std_framework_core::{Aid, Container};
 
-use home_automation::{lock, pir};
+use home_automation::{lock /* , pir */};
 
-use crate::{discovery, wifi};
+use crate::{
+    discovery::{self, System},
+    wifi,
+};
 
 const HEAP_SIZE: usize = 72 * 1024;
 
@@ -68,7 +72,7 @@ pub fn main() {
     wifi::connect_to_access_point(&mut controller);
 
     // Discover services running on the same network.
-    let discovery_info = discovery::DiscoveryInfo::default().discover(
+    let discovery_info = discovery::DiscoveryInfo::discover(
         &mut esp_now_sender,
         &mut esp_now_receiver,
         &mut esp_now_manager,
@@ -79,7 +83,7 @@ pub fn main() {
 
     // Home automation.
     let unlock_door_switch = Input::new(peripherals.GPIO22, Pull::Up);
-    let pir_sensor = Input::new(peripherals.GPIO18, Pull::Up);
+    // let pir_sensor = Input::new(peripherals.GPIO18, Pull::Up);
 
     let serial_input = UartRx::new(peripherals.UART1, peripherals.GPIO3).unwrap();
 
@@ -89,8 +93,16 @@ pub fn main() {
             unlock_door_switch,
             serial_input,
         ))
-        .with_agent(pir::pir_agent(pir_sensor))
+        // .with_agent(pir::pir_agent(pir_sensor))
+        .with_agent_proxy(
+            "control",
+            Aid::general(
+                "control",
+                MacAddr6::from(discovery_info[&System::CenterControl]),
+            ),
+        )
         // .with_agent(control::control_agent(pump_switch, fan_active_led))
+        .with_espnow(Some(esp_now_sender), Some(esp_now_receiver))
         .start()
         .unwrap()
 }

@@ -45,7 +45,7 @@ pub fn control_agent(
         .with_behaviour(DoorLockActionReceiver)
         .with_behaviour(FanStateReceiver::new(fan_active_led))
         .with_behaviour(FanControl)
-        // .with_behaviour(DataPrinter)
+        .with_behaviour(DataPrinter)
         .with_behaviour(HttpServer::new(super::HTTP_SERVER_PORT))
         .with_behaviour(Trunk)
 }
@@ -380,8 +380,8 @@ impl CyclicBehaviour for HttpServer {
             log::trace!("Waiting for socket");
             let mut socket = unsafe { crate::WIFI_STACK.get() }
                 .unwrap()
-                .get_socket(unsafe { &mut *addr_of_mut!(RX_BUFFER) }, unsafe {
-                    &mut *addr_of_mut!(TX_BUFFER)
+                .get_socket(unsafe { *addr_of_mut!(RX_BUFFER) }, unsafe {
+                    *addr_of_mut!(TX_BUFFER)
                 });
             socket.listen_unblocking(self.port).unwrap();
             socket
@@ -432,7 +432,7 @@ impl TickerBehaviour for Trunk {
     type Event = ();
 
     fn interval(&self) -> core::time::Duration {
-        core::time::Duration::from_secs(3)
+        core::time::Duration::from_secs(1)
     }
 
     fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {

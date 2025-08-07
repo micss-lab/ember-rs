@@ -1,3 +1,5 @@
+use core::ops::Deref;
+
 use alloc::{
     borrow::Cow,
     collections::{btree_set::BTreeSet, BTreeMap},
@@ -7,7 +9,7 @@ use esp_wifi::esp_now::{EspNowManager, EspNowReceiver, EspNowSender, PeerInfo};
 use macaddr::MacAddr6;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiscoveryInfo(BTreeMap<System, [u8; 6]>);
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -25,23 +27,27 @@ struct SystemInfo<'a> {
 }
 
 impl DiscoveryInfo {
+    fn new() -> Self {
+        Self(BTreeMap::default())
+    }
+
     pub fn discover(
-        &mut self,
         sender: &mut EspNowSender,
         receiver: &mut EspNowReceiver,
         manager: &mut EspNowManager,
         system: System,
-    ) {
+    ) -> Self {
+        let mut this = Self::new();
         let mut last_broadcast = esp_hal::time::now();
         let mut others_complete = BTreeSet::new();
 
-        while !self.complete() || others_complete.len() < 2 {
+        while !this.complete() || others_complete.len() < 2 {
             if (esp_hal::time::now() - last_broadcast).to_secs() >= 3 {
                 last_broadcast = esp_hal::time::now();
-                broadcast(&mut *sender, system, self);
+                broadcast(&mut *sender, system, &this);
                 log::debug!(
                     "complete: {}, others: {}",
-                    self.complete(),
+                    this.complete(),
                     others_complete.len()
                 );
             }
@@ -52,24 +58,26 @@ impl DiscoveryInfo {
             let mac = message.info.src_address;
             let info = postcard::from_bytes::<SystemInfo>(message.data())
                 .expect("failed to deserialize system info");
-            self.set(info.system, mac);
+            this.set(info.system, mac);
             if info.complete {
                 others_complete.insert(info.system);
             }
-            self.update(&info.info);
+            this.update(&info.info);
         }
 
         let delay = Delay::new();
         let mut extra_count = 2;
         while extra_count != 0 {
-            broadcast(sender, system, self);
+            broadcast(sender, system, &this);
             extra_count -= 1;
             delay.delay_millis(3000);
         }
 
-        self.0.values().for_each(|p| {
+        this.0.values().for_each(|p| {
             let _ = manager.add_peer(peer_info(*p)).ok();
         });
+
+        this
     }
 
     fn complete(&self) -> bool {
@@ -126,5 +134,13 @@ fn peer_info(mac: [u8; 6]) -> PeerInfo {
         lmk: None,
         channel: None,
         encrypt: false,
+    }
+}
+
+impl Deref for DiscoveryInfo {
+    type Target = BTreeMap<System, [u8; 6]>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }

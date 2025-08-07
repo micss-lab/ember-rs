@@ -380,8 +380,8 @@ impl CyclicBehaviour for HttpServer {
             log::trace!("Waiting for socket");
             let mut socket = unsafe { crate::WIFI_STACK.get() }
                 .unwrap()
-                .get_socket(unsafe { &mut *addr_of_mut!(RX_BUFFER) }, unsafe {
-                    &mut *addr_of_mut!(TX_BUFFER)
+                .get_socket(unsafe { *addr_of_mut!(RX_BUFFER) }, unsafe {
+                    *addr_of_mut!(TX_BUFFER)
                 });
             socket.listen_unblocking(self.port).unwrap();
             socket

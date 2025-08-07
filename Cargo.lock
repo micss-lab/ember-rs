@@ -288,6 +288,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "case-study-smart-home-distributed"
+version = "0.1.0"
+dependencies = [
+ "blocking-network-stack",
+ "case-study-home-automation",
+ "case-study-plant-monitoring",
+ "critical-section",
+ "embedded-io 0.6.1",
+ "esp-alloc",
+ "esp-backtrace",
+ "esp-hal",
+ "esp-hal-embassy",
+ "esp-println",
+ "esp-wifi",
+ "httparse",
+ "log",
+ "macaddr",
+ "no-std-framework-core",
+ "postcard",
+ "serde",
+ "smoltcp",
+]
+
+[[package]]
 name = "cbindgen"
 version = "0.27.0"
 source = "git+https://github.com/exellentcoin26/cbindgen.git#e5d6c0c7c2d136c0aaca66349c1332dcd2c40798"

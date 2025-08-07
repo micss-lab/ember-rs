@@ -11,4 +11,5 @@ members = [
     "case-studies/ntp-server",
     "case-studies/plant-monitoring",
     "case-studies/smart-home",
+    "case-studies/smart-home-distributed",
 ]

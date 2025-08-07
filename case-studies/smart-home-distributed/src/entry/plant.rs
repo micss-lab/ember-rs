@@ -1,5 +1,6 @@
 use alloc::rc::Rc;
 use core::cell::RefCell;
+use macaddr::MacAddr6;
 
 use esp_backtrace as _;
 use esp_hal_embassy as _;
@@ -11,11 +12,14 @@ use esp_hal::{
     rng::Rng,
     timer::timg::TimerGroup,
 };
-use no_std_framework_core::Container;
+use no_std_framework_core::{Aid, Container};
 
 use plant_monitoring::{light, moist, pump};
 
-use crate::{discovery, wifi};
+use crate::{
+    discovery::{self, System},
+    wifi,
+};
 
 const HEAP_SIZE: usize = 72 * 1024;
 
@@ -72,7 +76,7 @@ pub fn main() {
     wifi::connect_to_access_point(&mut controller);
 
     // Discover services running on the same network.
-    let discovery_info = discovery::DiscoveryInfo::default().discover(
+    let discovery_info = discovery::DiscoveryInfo::discover(
         &mut esp_now_sender,
         &mut esp_now_receiver,
         &mut esp_now_manager,
@@ -84,18 +88,26 @@ pub fn main() {
     let mut adc_config = AdcConfig::new();
 
     // Plant monitoring system.
-    let ldr_sensor = adc_config.enable_pin(peripherals.GPIO26, Attenuation::Attenuation6dB);
-    let potentiometer = adc_config.enable_pin(peripherals.GPIO27, Attenuation::Attenuation6dB);
-    let low_light_led = Output::new(peripherals.GPIO14, Level::Low);
-    let pump_active_led = Output::new(peripherals.GPIO12, Level::Low);
+    let ldr_sensor = adc_config.enable_pin(peripherals.GPIO33, Attenuation::Attenuation6dB);
+    let potentiometer = adc_config.enable_pin(peripherals.GPIO32, Attenuation::Attenuation6dB);
+    let low_light_led = Output::new(peripherals.GPIO26, Level::Low);
+    let pump_active_led = Output::new(peripherals.GPIO25, Level::Low);
 
-    let adc = Rc::new(RefCell::new(Adc::new(peripherals.ADC2, adc_config)));
+    let adc = Rc::new(RefCell::new(Adc::new(peripherals.ADC1, adc_config)));
 
     Container::default()
         .with_agent(moist::moisture_agent(potentiometer, adc.clone()))
         .with_agent(light::light_agent(ldr_sensor, adc.clone(), low_light_led))
         .with_agent(pump::pump_agent(pump_active_led))
+        .with_agent_proxy(
+            "control",
+            Aid::general(
+                "control",
+                MacAddr6::from(discovery_info[&System::CenterControl]),
+            ),
+        )
         // .with_agent(control::control_agent(pump_switch, fan_active_led))
+        .with_espnow(Some(esp_now_sender), Some(esp_now_receiver))
         .start()
         .unwrap()
 }
