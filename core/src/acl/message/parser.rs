@@ -1,3 +1,5 @@
+// TODO: Expand parsing support for acl messages.
+
 use alloc::string::ToString;
 use alloc::vec;
 
@@ -14,12 +16,14 @@ enum MessageField {
     Receiver(Receiver),
     Language(BString),
     Content(BString),
+    Ontology(BString),
 }
 
 #[derive(Default)]
 struct MessageBuilder {
     receiver: Option<Receiver>,
     language: Option<BString>,
+    ontology: Option<BString>,
     content: Option<BString>,
 }
 
@@ -28,6 +32,7 @@ impl MessageBuilder {
         let Some(receiver) = self.receiver else {
             return Err("receiver");
         };
+        let ontology = self.ontology.map(|o| o.to_str_lossy().to_string());
         let Some(content) = self.content else {
             return Err("content");
         };
@@ -37,7 +42,11 @@ impl MessageBuilder {
                 log::error!("failed to parse content as sl0: {}", e);
                 "content"
             })?),
-            Some(b"bytes") => Content::Bytes(content.to_vec()),
+            // TODO: Fix this when properly supporting sending bytes.
+            Some(b"bytes") => Content::Bytes(hex::decode(content).map_err(|_| {
+                log::error!("failed to parse bytes content from hex");
+                "bytes-content"
+            })?),
             None => Content::Other {
                 kind: None,
                 content: content.to_string(),
@@ -50,7 +59,7 @@ impl MessageBuilder {
             sender: None,
             receiver,
             reply_to: None,
-            ontology: None,
+            ontology,
             content,
         })
     }
@@ -72,6 +81,13 @@ impl MessageBuilder {
     fn set_content(&mut self, content: BString) -> Result<()> {
         if self.content.replace(content).is_some() {
             return Err("set_content");
+        }
+        Ok(())
+    }
+
+    fn set_ontology(&mut self, ontology: BString) -> Result<()> {
+        if self.ontology.replace(ontology).is_some() {
+            return Err("set_ontology");
         }
         Ok(())
     }
@@ -120,6 +136,7 @@ peg::parser! {
                 match field {
                     MessageField::Receiver(r) => builder.set_receiver(r)?,
                     MessageField::Language(l) => builder.set_language(l)?,
+                    MessageField::Ontology(o) => builder.set_ontology(o)?,
                     MessageField::Content(c) => builder.set_content(c)?,
                 }
             }
@@ -132,10 +149,11 @@ peg::parser! {
         rule message_field() -> MessageField
             = ":receiver" _ r:receiver() { MessageField::Receiver(r) }
             / ":language" _ l:word() { MessageField::Language(l) }
+            / ":ontology" _ o:word() { MessageField::Ontology(o) }
             / ":content" _ c:string() { MessageField::Content(c)}
 
         rule receiver() -> Receiver
-            = &"(agent-identifier" aid:agent_identifier() { Receiver::Single(aid)}
+            = aid:agent_identifier() { Receiver::Single(aid)}
 
         rule agent_identifier() -> Aid
             = lbrace() _ "agent-identifier" _ fs:(aid_field() ** _) _ rbrace()

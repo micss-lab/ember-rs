@@ -45,7 +45,7 @@ impl Container<'_> {
 
     fn poll_associated_agents(&mut self) -> Result<(), Box<dyn core::error::Error>> {
         let mut context = ContainerContext::new(
-            self.messages_for_agent(&Aid::ams().local_name())
+            self.messages_for_agent(Aid::ams().local_name())
                 .unwrap_or_default(),
         );
         self.ams.update(&mut context);
@@ -64,7 +64,7 @@ impl Container<'_> {
             self.poll_associated_agents()?;
 
             let mut context = ContainerContext::new(
-                self.messages_for_agent(&agent.get_name())
+                self.messages_for_agent(agent.get_name())
                     .unwrap_or_default(),
             );
 
@@ -75,7 +75,7 @@ impl Container<'_> {
                 self.mts.send_message(message, &mut self.ladt);
             }
 
-            self.return_unhandled_messages(&agent.get_name(), context.message_inbox);
+            self.return_unhandled_messages(agent.get_name(), context.message_inbox);
 
             if context.should_stop {
                 return Ok(true);

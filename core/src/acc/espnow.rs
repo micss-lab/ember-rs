@@ -6,6 +6,7 @@ use alloc::vec::Vec;
 
 use esp_wifi::esp_now::{EspNowReceiver as Receiver, EspNowSender as Sender};
 use macaddr::MacAddr6;
+use serde::de::Unexpected;
 use serde::ser::SerializeStruct;
 
 use crate::acl::message::{AclRepresentation, Message, MessageEnvelope, MessageKind};
@@ -47,7 +48,13 @@ impl<'c> Acc for EspNowChannel<'c> {
     fn receive(&mut self) -> Option<MessageEnvelope> {
         let message = self.receiver.as_mut().and_then(|r| r.receive())?;
         let envelope = postcard::from_bytes::<EspNowMessageDe>(message.data())
-            .expect("failed to deserialize data into envelope")
+            .inspect_err(|_| {
+                log::trace!("Skipping unparsable message.");
+            })
+            // Assume that if the message could not be parsed, it was not meant for the agent
+            // communication system. In the distributed smart home study, devices locate eachother
+            // by broadcasting their service. This message would give an error in this case.
+            .ok()?
             .into_envelope();
         Some(envelope)
     }
@@ -107,7 +114,7 @@ impl<'de> serde::Deserialize<'de> for EspNowMessageDe {
             type Value = EspNowMessageDe;
 
             fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
-                formatter.write_str("struct envelope")
+                formatter.write_str("struct message")
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -188,7 +195,7 @@ impl<'de> serde::Deserialize<'de> for EspNowContentDe {
             {
                 Ok(EspNowContentDe {
                     message: Message::try_from_bytes(v)
-                        .expect("failed to parse content as acl message"),
+                        .map_err(|_| E::invalid_value(Unexpected::Bytes(v), &self))?,
                 })
             }
         }
@@ -214,11 +221,9 @@ fn aid_to_mac(aid: &Aid) -> [u8; 6] {
     use crate::agent::AgentPlatform::*;
     let mac = match aid.platform() {
         Local => panic!("espnow channel does not support sending messages to localhost"),
-        Public(p) => {
-            log::debug!("Destination mac: `{}`", p);
-            p.parse::<MacAddr6>()
-                .expect("failed to parse destination platform as mac address")
-        }
+        Public(p) => p
+            .parse::<MacAddr6>()
+            .expect("failed to parse destination platform as mac address"),
     };
     mac.into_array()
 }

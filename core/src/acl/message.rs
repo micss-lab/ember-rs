@@ -158,8 +158,11 @@ impl core::fmt::Display for Message {
 
 impl Message {
     pub(crate) fn try_from_bytes(bytes: impl AsRef<BStr>) -> Result<Self, ()> {
-        self::parser::messsage::message(&crate::util::parsing::BStr::from(bytes.as_ref()))
-            .map_err(|e| log::error!("error parsing acl message: {}", e))
+        let bytes = bytes.as_ref();
+        self::parser::messsage::message(&crate::util::parsing::BStr::from(bytes)).map_err(|e| {
+            log::error!("error parsing acl message: {}", e);
+            log::debug!("{}", bytes);
+        })
     }
 }
 
@@ -246,7 +249,9 @@ impl serde::Serialize for Message {
             }
             Content::Bytes(b) => {
                 message.serialize_field("language", "bytes")?;
-                message.serialize_field("content", b.as_slice())?;
+                // TODO: Encode as regular bytes when parsing support for acl messages is expanded.
+                message
+                    .serialize_field("content", &format!("\"{}\"", hex::encode(b.as_slice())))?;
             }
             Content::Other { kind, content } => {
                 if let Some(kind) = kind {
@@ -255,6 +260,7 @@ impl serde::Serialize for Message {
                 message.serialize_field("content", &format!("\"{}\"", content))?;
             }
         }
+        message.serialize_field("ontology", &self.ontology)?;
         message.end()
     }
 }
