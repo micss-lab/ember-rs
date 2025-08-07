@@ -6,10 +6,12 @@ use core::ops::{Deref, DerefMut};
 use crate::acl::message::MessageEnvelope;
 use crate::agent::AmsAgent;
 use crate::container::AgentLike;
+use crate::Aid;
 
 #[derive(Debug, Clone)]
 pub(crate) enum AgentReference {
     Local(LocalAgentReference),
+    Proxy(Aid),
 }
 
 #[derive(Debug, Clone)]

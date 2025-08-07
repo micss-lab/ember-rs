@@ -1,13 +1,14 @@
 use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;
+use alloc::string::ToString;
 use alloc::vec::Vec;
 
 #[cfg(feature = "acc-espnow")]
 use esp_wifi::esp_now;
 
 use crate::acl::message::MessageEnvelope;
-use crate::adt::Adt;
+use crate::adt::{Adt, AgentReference};
 use crate::agent::{Agent, Aid, AmsAgent};
 use crate::context::{ContainerContext, MessageStore};
 
@@ -119,6 +120,22 @@ impl Container<'_> {
 
     pub fn add_agent<S: 'static, E: 'static>(&mut self, agent: Agent<S, E>) {
         self.agents.push_back(Box::new(agent));
+    }
+
+    pub fn with_agent_proxy(mut self, local_name: impl ToString, agent_proxy: Aid) -> Self {
+        self.add_agent_proxy(local_name, agent_proxy);
+        self
+    }
+
+    pub fn add_agent_proxy(&mut self, local_name: impl ToString, agent_proxy: Aid) {
+        let local_name = local_name.to_string();
+        if self
+            .ladt
+            .insert(local_name.clone(), AgentReference::Proxy(agent_proxy))
+            .is_some()
+        {
+            log::error!("Agent(-proxy) with name {} exists.", local_name)
+        }
     }
 }
 
