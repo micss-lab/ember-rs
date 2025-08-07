@@ -107,10 +107,6 @@ impl<S: 'static, E: 'static> AgentLike for Agent<S, E> {
     fn get_name(&self) -> Cow<str> {
         Cow::from(&self.name)
     }
-
-    fn get_aid(&self) -> Aid {
-        Aid::local(self.get_name())
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]

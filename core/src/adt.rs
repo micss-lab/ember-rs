@@ -1,21 +1,29 @@
 use alloc::collections::btree_map::BTreeMap;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::ops::{Deref, DerefMut};
 
 use crate::acl::message::MessageEnvelope;
-use crate::agent::{Aid, AmsAgent};
+use crate::agent::AmsAgent;
 use crate::container::AgentLike;
+use crate::Aid;
 
 #[derive(Debug, Clone)]
-pub(crate) struct AgentReference {
+pub(crate) enum AgentReference {
+    Local(LocalAgentReference),
+    Proxy(Aid),
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct LocalAgentReference {
     pub(crate) inbox: Vec<MessageEnvelope>,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Adt(BTreeMap<Aid, AgentReference>);
+pub(crate) struct Adt(BTreeMap<String, AgentReference>);
 
 impl Deref for Adt {
-    type Target = BTreeMap<Aid, AgentReference>;
+    type Target = BTreeMap<String, AgentReference>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -25,9 +33,19 @@ impl Deref for Adt {
 impl Adt {
     pub(super) fn new(ams: &AmsAgent) -> Self {
         Self(BTreeMap::from([(
-            ams.get_aid(),
-            AgentReference { inbox: Vec::new() },
+            ams.get_name().to_string(),
+            AgentReference::Local(LocalAgentReference { inbox: Vec::new() }),
         )]))
+    }
+
+    pub(crate) fn get_local_mut(
+        &mut self,
+        agent_name: impl AsRef<str>,
+    ) -> Option<&mut LocalAgentReference> {
+        let AgentReference::Local(local) = self.get_mut(agent_name.as_ref())? else {
+            panic!("agent {} is not local", agent_name.as_ref());
+        };
+        Some(local)
     }
 }
 

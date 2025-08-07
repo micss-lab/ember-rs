@@ -1,9 +1,11 @@
+use alloc::collections::BTreeSet;
+
 #[cfg(feature = "acc-espnow")]
 use esp_wifi::esp_now;
 
 use crate::acc::{Acc, Channels};
 use crate::acl::message::MessageEnvelope;
-use crate::adt::Adt;
+use crate::adt::{Adt, AgentReference, LocalAgentReference};
 
 pub(super) struct Mts<'c> {
     channels: Channels<'c>,
@@ -21,17 +23,36 @@ impl Mts<'_> {
             log::error!("Cannot send a message with no receivers");
         } else {
             for t in envelope.to.iter() {
-                if t.is_local() {
-                    match adt.get_mut(t) {
-                        Some(i) => i.inbox.push(envelope.clone()),
+                // Resolve any possible proxies. Error on looping proxies.
+                let (mut resolved, mut visited) = (t.clone(), BTreeSet::new());
+
+                if let Some(inbox) = loop {
+                    if !resolved.is_local() {
+                        break None;
+                    }
+
+                    match adt.get_mut(resolved.local_name()) {
+                        Some(AgentReference::Local(LocalAgentReference { inbox })) => {
+                            break Some(inbox)
+                        }
+                        Some(AgentReference::Proxy(proxy)) => {
+                            if !visited.insert(proxy.clone()) {
+                                log::error!("Proxy loop detected. Message cannot be sent.");
+                                return;
+                            }
+                            resolved = proxy.clone();
+                        }
                         None => {
                             log::error!(
                                 "Failed to send message to agent `{}`: local agent not registered with the ams",
                                 t
                             );
+                            return;
                         }
                     }
-                } else if self.channels.send(t, envelope.clone()).is_err() {
+                } {
+                    inbox.push(envelope.clone());
+                } else if self.channels.send(&resolved, envelope.clone()).is_err() {
                     log::error!("Failed to send message to agent `{}`.", t);
                 }
             }
