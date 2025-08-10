@@ -172,7 +172,7 @@ checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
 name = "case-study-colour-combinations"
 version = "0.1.0"
 dependencies = [
- "esp-alloc 0.5.0",
+ "esp-alloc",
  "esp-backtrace",
  "esp-hal",
  "esp-hal-embassy",
@@ -189,12 +189,13 @@ dependencies = [
  "chrono",
  "embassy-time-driver",
  "embedded-io 0.6.1",
- "esp-alloc 0.5.0",
+ "esp-alloc",
  "esp-backtrace",
  "esp-hal",
  "esp-hal-embassy",
  "esp-println",
  "log",
+ "nb 1.1.0",
  "no-std-framework-core",
  "postcard",
  "serde",
@@ -206,7 +207,7 @@ version = "0.1.0"
 dependencies = [
  "blocking-network-stack",
  "embedded-io 0.6.1",
- "esp-alloc 0.5.0",
+ "esp-alloc",
  "esp-backtrace",
  "esp-hal",
  "esp-println",
@@ -225,7 +226,7 @@ dependencies = [
  "chrono",
  "embassy-time-driver",
  "embedded-io 0.6.1",
- "esp-alloc 0.5.0",
+ "esp-alloc",
  "esp-backtrace",
  "esp-hal",
  "esp-hal-embassy",
@@ -246,13 +247,14 @@ dependencies = [
  "chrono",
  "embassy-time-driver",
  "embedded-io 0.6.1",
- "esp-alloc 0.5.0",
+ "esp-alloc",
  "esp-backtrace",
  "esp-hal",
  "esp-hal-embassy",
  "esp-println",
  "libm",
  "log",
+ "nb 1.1.0",
  "no-std-framework-core",
  "postcard",
  "serde",
@@ -267,7 +269,7 @@ dependencies = [
  "case-study-plant-monitoring",
  "critical-section",
  "embedded-io 0.6.1",
- "esp-alloc 0.5.0",
+ "esp-alloc",
  "esp-backtrace",
  "esp-hal",
  "esp-hal-embassy",
@@ -275,6 +277,7 @@ dependencies = [
  "esp-wifi",
  "httparse",
  "log",
+ "nb 1.1.0",
  "no-std-framework-core",
  "postcard",
  "serde",
@@ -290,7 +293,7 @@ dependencies = [
  "case-study-plant-monitoring",
  "critical-section",
  "embedded-io 0.6.1",
- "esp-alloc 0.5.0",
+ "esp-alloc",
  "esp-backtrace",
  "esp-hal",
  "esp-hal-embassy",
@@ -299,6 +302,7 @@ dependencies = [
  "httparse",
  "log",
  "macaddr",
+ "nb 1.1.0",
  "no-std-framework-core",
  "postcard",
  "serde",
@@ -743,17 +747,6 @@ dependencies = [
 
 [[package]]
 name = "esp-alloc"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5162b6e9cd99cc974ec2742da3cf8433e7332853ae10fec922d174ff20fa4c5f"
-dependencies = [
- "critical-section",
- "enumset",
- "linked_list_allocator",
-]
-
-[[package]]
-name = "esp-alloc"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "408c0d4c7f51efb256af18641047b0d83b58a485be9edf5a559da796abef0b63"
@@ -940,7 +933,7 @@ dependencies = [
  "embedded-io 0.6.1",
  "embedded-io-async",
  "enumset",
- "esp-alloc 0.6.0",
+ "esp-alloc",
  "esp-build 0.2.0",
  "esp-config",
  "esp-hal",
@@ -1379,7 +1372,7 @@ dependencies = [
  "cfg-if",
  "critical-section",
  "embassy-time-driver",
- "esp-alloc 0.5.0",
+ "esp-alloc",
  "esp-println",
  "esp32 0.37.0",
  "fugit",
@@ -1420,7 +1413,7 @@ version = "0.1.0"
 dependencies = [
  "critical-section",
  "env_logger",
- "esp-alloc 0.5.0",
+ "esp-alloc",
  "esp-backtrace",
  "esp-hal",
  "esp-hal-embassy",

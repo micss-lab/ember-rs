@@ -6,8 +6,8 @@ use esp_hal::{
     gpio::Output,
 };
 use no_std_framework_core::{
-    behaviour::{Context, TickerBehaviour},
     Agent,
+    behaviour::{Context, TickerBehaviour},
 };
 use ontology::LightLevel;
 
@@ -60,8 +60,8 @@ impl ThresholdConfig for LightState {
 
 pub mod ontology {
     use no_std_framework_core::{
-        acl::message::{Content, Message, Performative, Receiver},
         Aid,
+        acl::message::{Content, Message, Performative, Receiver},
     };
     use serde::{Deserialize, Serialize};
 
@@ -122,13 +122,11 @@ where
     }
 
     fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) {
-        let adc_reading = loop {
-            match self.adc.borrow_mut().read_oneshot(&mut self.pin) {
-                Ok(r) => break r,
-                Err(esp_hal::prelude::nb::Error::WouldBlock) => continue,
-                Err(err) => panic!("failed to read analog sensor: {:?}", err),
-            }
+        let adc_reading = match nb::block!(self.adc.borrow_mut().read_oneshot(&mut self.pin)) {
+            Ok(r) => r,
+            Err(err) => panic!("failed to read analog sensor: {:?}", err),
         };
+
         let lux = adc_to_lux(adc_reading);
         state.lux = lux;
         ctx.send_message(wrap_message(LightLevel(lux).into_message()));

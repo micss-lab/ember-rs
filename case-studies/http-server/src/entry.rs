@@ -1,5 +1,5 @@
 use alloc::collections::BTreeSet;
-use core::cell::OnceCell;
+use core::{cell::OnceCell, ptr::addr_of_mut};
 
 use esp_backtrace as _;
 
@@ -12,8 +12,8 @@ use esp_hal::{
     timer::timg::TimerGroup,
 };
 use esp_wifi::{
-    wifi::{WifiController, WifiDevice, WifiStaDevice},
     EspWifiController,
+    wifi::{WifiController, WifiDevice, WifiStaDevice},
 };
 use no_std_framework_core::{Agent, Container};
 use smoltcp::{
@@ -163,16 +163,15 @@ pub(crate) fn main() {
 
     log::trace!("Initializing wifi device.");
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    unsafe {
-        WIFI_INIT
-            .set(
-                esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK)
-                    .expect("failed to initialize wifi control."),
-            )
-            .unwrap();
-    }
+    unsafe { &mut *addr_of_mut!(WIFI_INIT) }
+        .set(
+            esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK)
+                .expect("failed to initialize wifi control."),
+        )
+        .unwrap();
+
     let (wifi_device, mut controller) = esp_wifi::wifi::new_with_mode(
-        unsafe { WIFI_INIT.get() }.unwrap(),
+        unsafe { &mut *addr_of_mut!(WIFI_INIT) }.get().unwrap(),
         peripherals.WIFI,
         esp_wifi::wifi::WifiStaDevice,
     )
@@ -184,9 +183,9 @@ pub(crate) fn main() {
     log::trace!("Connecting to access point.");
     connect_to_access_point(&mut controller, &mut stack);
 
-    unsafe {
-        case_study_http_server::WIFI_STACK.set(stack).ok();
-    }
+    unsafe { &mut *addr_of_mut!(case_study_http_server::WIFI_STACK) }
+        .set(stack)
+        .ok();
 
     log::info!("Starting http server on port {}", HTTP_PORT);
     let server = http::Server::new(HTTP_PORT, routes::handle_request);

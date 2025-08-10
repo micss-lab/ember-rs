@@ -8,12 +8,13 @@ bstr = { version = "1.12.0", default-features = false }
 chrono = { version = "0.4.41", default-features = false, features = ["alloc"] }
 embassy-time-driver = "0.2.0"
 embedded-io = "0.6.1"
-esp-alloc = "0.5.0"
+esp-alloc = "0.6.0"
 esp-backtrace = { version = "0.14.2", default-features = false, features = ["esp32", "println", "panic-handler"] }
 esp-hal = { version = "0.23.1", features = ["esp32", "unstable"] }
 esp-hal-embassy = { version = "0.6.0", features = ["esp32"] }
 esp-println = { version = "0.12.0", features = ["esp32", "log"] }
 log = "0.4.27"
+nb = "1.1.0"
 no-std-framework-core = { path = "../../core" }
 postcard = { version = "1.1.2", default-features = false }
 serde = { version = "1.0.219", default-features = false, features = ["derive"] }

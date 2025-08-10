@@ -48,7 +48,7 @@ pub mod ontology {
         }
 
         pub fn decode_sl_message<T: AgentActionCodec>(message: Message) -> T {
-            if !message.ontology.is_some_and(|o| o == Self::name()) {
+            if message.ontology.is_none_or(|o| o != Self::name()) {
                 panic!("message has incorrect ontology");
             }
             let Content::Sl(content) = message.content else {

@@ -7,16 +7,16 @@ use esp_hal::gpio::{Input, Output};
 use esp_wifi::wifi::{WifiDevice, WifiStaDevice};
 use home_automation::{
     fan::{
-        ontology::{FanAction, FanMessage, FanOntology},
         FanState,
+        ontology::{FanAction, FanMessage, FanOntology},
     },
     lock::ontology::DoorLockOntology,
     pir::ontology::PirOntology,
 };
 use no_std_framework_core::{
+    Agent,
     acl::message::MessageFilter,
     behaviour::{Context, CyclicBehaviour, TickerBehaviour},
-    Agent,
 };
 use plant_monitoring::{
     light::ontology::LightOntology,
@@ -378,7 +378,8 @@ impl CyclicBehaviour for HttpServer {
 
         let mut socket = self.current_socket.take().unwrap_or_else(|| {
             log::trace!("Waiting for socket");
-            let mut socket = unsafe { crate::WIFI_STACK.get() }
+            let mut socket = unsafe { &mut *addr_of_mut!(crate::WIFI_STACK) }
+                .get()
                 .unwrap()
                 .get_socket(unsafe { *addr_of_mut!(RX_BUFFER) }, unsafe {
                     *addr_of_mut!(TX_BUFFER)

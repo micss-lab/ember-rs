@@ -4,8 +4,8 @@ use ontology::Temperature;
 
 use esp_hal::analog::adc::{Adc, AdcChannel, AdcPin, RegisterAccess};
 use no_std_framework_core::{
-    behaviour::{Context, TickerBehaviour},
     Agent,
+    behaviour::{Context, TickerBehaviour},
 };
 
 use super::utils::wrap_message;
@@ -19,8 +19,8 @@ pub fn temperature_agent<P: AdcChannel + 'static, ADCI: RegisterAccess + 'static
 
 pub mod ontology {
     use no_std_framework_core::{
-        acl::message::{Content, Message, Performative, Receiver},
         Aid,
+        acl::message::{Content, Message, Performative, Receiver},
     };
     use serde::{Deserialize, Serialize};
 
@@ -81,12 +81,9 @@ where
     }
 
     fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
-        let adc_reading = loop {
-            match self.adc.borrow_mut().read_oneshot(&mut self.sensor) {
-                Ok(r) => break r,
-                Err(esp_hal::prelude::nb::Error::WouldBlock) => continue,
-                Err(err) => panic!("failed to read analog sensor: {:?}", err),
-            }
+        let adc_reading = match nb::block!(self.adc.borrow_mut().read_oneshot(&mut self.sensor)) {
+            Ok(r) => r,
+            Err(err) => panic!("failed to read analog sensor: {:?}", err),
         };
         let temperature = adc_to_temperature(adc_reading);
         ctx.send_message(wrap_message(Temperature(temperature).into_message()));

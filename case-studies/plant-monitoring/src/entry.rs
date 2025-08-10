@@ -90,9 +90,8 @@ pub fn main() {
 
     let mut adc_config = AdcConfig::new();
 
-    let ldr_sensor_pin = adc_config.enable_pin(peripherals.GPIO26, Attenuation::Attenuation11dB);
-    let potentiometer_sensor_pin =
-        adc_config.enable_pin(peripherals.GPIO27, Attenuation::Attenuation11dB);
+    let ldr_sensor_pin = adc_config.enable_pin(peripherals.GPIO26, Attenuation::_11dB);
+    let potentiometer_sensor_pin = adc_config.enable_pin(peripherals.GPIO27, Attenuation::_11dB);
     let light_alert_pin = Output::new(peripherals.GPIO4, Level::Low);
     let pump_light = Output::new(peripherals.GPIO17, Level::Low);
     let user_switch = Input::new(peripherals.GPIO15, Pull::Up);

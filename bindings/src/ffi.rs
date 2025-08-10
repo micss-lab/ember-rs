@@ -18,7 +18,7 @@ macro_rules! non_null {
 /// cbindgen:ignore
 mod util {
     use alloc::string::{String, ToString};
-    use core::ffi::{c_char, CStr};
+    use core::ffi::{CStr, c_char};
 
     pub(super) fn new<T>(value: T) -> *mut T {
         use alloc::boxed::Box;
@@ -27,27 +27,27 @@ mod util {
 
     pub(super) unsafe fn from_raw<T>(pointer: *mut T) -> T {
         use alloc::boxed::Box;
-        *Box::from_raw(pointer)
+        *unsafe { Box::from_raw(pointer) }
     }
 
     pub(super) unsafe fn ref_from_raw<'a, T>(pointer: *mut T) -> &'a mut T {
-        &mut *pointer
+        unsafe { &mut *pointer }
     }
 
     pub(super) unsafe fn drop_raw<T>(pointer: *mut T) {
         use alloc::boxed::Box;
-        drop(Box::from_raw(pointer));
+        drop(unsafe { Box::from_raw(pointer) });
     }
 
     pub(super) unsafe fn string_from_raw(string: *const c_char) -> String {
-        let string = CStr::from_ptr(string);
+        let string = unsafe { CStr::from_ptr(string) };
         String::from_utf8_lossy(string.to_bytes()).to_string()
     }
 }
 
 #[cfg(target_os = "none")]
 mod esp {
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn initialize_allocator() {
         crate::esp::initialize_allocator();
     }
@@ -63,12 +63,12 @@ mod event {
         inner: *mut c_void,
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     extern "C" fn event_new(event: *mut c_void) -> *mut Event {
         new(Event { inner: event })
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     extern "C" fn event_free(event: *mut Event) {
         non_null_or_bail!(event, "attempted to free event null-pointer");
         unsafe { drop_raw(event) }
@@ -85,12 +85,12 @@ mod agent_state {
         inner: *mut c_void,
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     extern "C" fn agent_state_new(agent_state: *mut c_void) -> *mut AgentState {
         new(AgentState { inner: agent_state })
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     extern "C" fn agent_state_free(agent_state: *mut AgentState) {
         non_null_or_bail!(agent_state, "attempted to free agent state null-pointer");
         unsafe { drop_raw(agent_state) }
@@ -112,19 +112,19 @@ mod container {
     ///
     /// The ownership of the instance is transferred to the caller. Make sure to free the memory
     /// with the accompanying [`container_free`].
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn container_new() -> *mut Container<'static> {
         log::trace!("Creating new container");
         new(Container::default())
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn container_free(container: *mut Container) {
         non_null_or_bail!(container, "attemted to free container null-pointer");
         unsafe { drop_raw(container) }
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn container_add_agent(
         container: *mut Container,
         agent: *mut Agent<AgentState, Event>,
@@ -135,7 +135,7 @@ mod container {
         unsafe { (*container).add_agent(agent) };
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn container_start(container: *mut Container) -> i32 {
         non_null!(container, "got container null-pointer");
         let result = unsafe { from_raw(container) }.start();
@@ -151,7 +151,7 @@ mod container {
         should_stop: bool,
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn container_poll(container: *mut Container<'_>) -> ContainerPollResult {
         non_null!(container, "got container null-pointer");
         let container = unsafe { ref_from_raw(container) };
@@ -177,7 +177,7 @@ mod agent {
     use super::event::Event;
     use super::util::{drop_raw, from_raw, new, ref_from_raw, string_from_raw};
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn agent_new(
         name: *const c_char,
         agent_state: *mut AgentState,
@@ -188,14 +188,14 @@ mod agent {
         new(Agent::new(name, agent_state))
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn agent_free(agent: *mut Agent<AgentState, Event>) {
         non_null_or_bail!(agent, "attemted to free agent null-pointer");
         unsafe { drop_raw(agent) }
     }
 
     // TODO: Add more behaviours here.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn agent_add_behaviour_oneshot(
         agent: *mut Agent<AgentState, Event>,
         oneshot: *mut OneShotBehaviour,
@@ -207,7 +207,7 @@ mod agent {
         agent.add_behaviour(behaviour);
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn agent_add_behaviour_cyclic(
         agent: *mut Agent<AgentState, Event>,
         cyclic: *mut CyclicBehaviour,
@@ -219,7 +219,7 @@ mod agent {
         agent.add_behaviour(behaviour);
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn agent_add_behaviour_ticker(
         agent: *mut Agent<AgentState, Event>,
         ticker: *mut TickerBehaviour,
@@ -231,7 +231,7 @@ mod agent {
         agent.add_behaviour(behaviour);
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn agent_add_behaviour_sequential(
         agent: *mut Agent<AgentState, Event>,
         sequential: *mut SequentialBehaviour,
@@ -252,7 +252,7 @@ mod context {
 
     // No `new` or `free` needed as this is a mutable borrow from rust.
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn context_emit_event(context: *mut Context<Event>, event: *mut Event) {
         non_null!(context, "got a context null-pointer");
         non_null!(event, "got a event null-pointer");
@@ -261,21 +261,21 @@ mod context {
         context.emit_event(event);
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn context_stop_container(context: *mut Context<Event>) {
         non_null!(context, "got a context null-pointer");
         let context = unsafe { ref_from_raw(context) };
         context.stop_container();
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn context_remove_agent(context: *mut Context<Event>) {
         non_null!(context, "got a context null-pointer");
         let context = unsafe { ref_from_raw(context) };
         context.remove_agent();
     }
 
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn context_block_behaviour(context: *mut Context<Event>) {
         non_null!(context, "got a context null-pointer");
         let context = unsafe { ref_from_raw(context) };
@@ -310,8 +310,8 @@ mod behaviour {
                 Context, OneShotBehaviour as OneShotBehaviourTrait,
             };
 
-            use super::{drop_raw, new};
             use super::{AgentState, Event};
+            use super::{drop_raw, new};
 
             pub struct OneShotBehaviour {
                 /// Type value defined by the user implementing the trait.
@@ -334,7 +334,7 @@ mod behaviour {
                 }
             }
 
-            #[no_mangle]
+            #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_oneshot_new(
                 inner: *mut c_void,
                 action: extern "C" fn(*mut c_void, *mut Context<Event>, *mut AgentState),
@@ -342,7 +342,7 @@ mod behaviour {
                 new(OneShotBehaviour { inner, action })
             }
 
-            #[no_mangle]
+            #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_oneshot_free(oneshot: *mut OneShotBehaviour) {
                 non_null_or_bail!(oneshot, "attemted to free oneshot behaviour null-pointer");
                 unsafe { drop_raw(oneshot) };
@@ -357,8 +357,8 @@ mod behaviour {
                 Context, CyclicBehaviour as CyclicBehaviourTrait,
             };
 
-            use super::{drop_raw, new};
             use super::{AgentState, Event};
+            use super::{drop_raw, new};
 
             pub struct CyclicBehaviour {
                 /// Type value defined by the user implementing the trait.
@@ -387,7 +387,7 @@ mod behaviour {
                 }
             }
 
-            #[no_mangle]
+            #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_cyclic_new(
                 inner: *mut c_void,
                 action: extern "C" fn(*mut c_void, *mut Context<Event>, *mut AgentState),
@@ -400,7 +400,7 @@ mod behaviour {
                 })
             }
 
-            #[no_mangle]
+            #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_cyclic_free(cyclic: *mut CyclicBehaviour) {
                 non_null_or_bail!(cyclic, "attemted to free cyclic behaviour null-pointer");
                 unsafe { drop_raw(cyclic) };
@@ -416,8 +416,8 @@ mod behaviour {
                 Context, TickerBehaviour as TickerBehaviourTrait,
             };
 
-            use super::{drop_raw, new};
             use super::{AgentState, Event};
+            use super::{drop_raw, new};
 
             pub struct TickerBehaviour {
                 /// Type value defined by the user implementing the trait.
@@ -452,7 +452,7 @@ mod behaviour {
                 }
             }
 
-            #[no_mangle]
+            #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_ticker_new(
                 inner: *mut c_void,
                 interval: extern "C" fn(*mut c_void) -> u64,
@@ -467,7 +467,7 @@ mod behaviour {
                 })
             }
 
-            #[no_mangle]
+            #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_ticker_free(ticker: *mut TickerBehaviour) {
                 non_null_or_bail!(ticker, "attemted to free ticker behaviour null-pointer");
                 unsafe { drop_raw(ticker) };
@@ -490,8 +490,8 @@ mod behaviour {
 
             use super::sequential::SequentialBehaviour;
             use super::simple::{CyclicBehaviour, OneShotBehaviour, TickerBehaviour};
-            use super::{drop_raw, from_raw, new, ref_from_raw};
             use super::{AgentState, Event};
+            use super::{drop_raw, from_raw, new, ref_from_raw};
 
             pub struct BehaviourVec(
                 Vec<Box<dyn Behaviour<AgentState = AgentState, Event = Event>>>,
@@ -520,12 +520,12 @@ mod behaviour {
                 }
             }
 
-            #[no_mangle]
+            #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_vec_new() -> *mut BehaviourVec {
                 new(BehaviourVec::new())
             }
 
-            #[no_mangle]
+            #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_vec_add_behaviour_oneshot(
                 queue: *mut BehaviourVec,
                 oneshot: *mut OneShotBehaviour,
@@ -537,7 +537,7 @@ mod behaviour {
                 queue.add_behaviour(behaviour);
             }
 
-            #[no_mangle]
+            #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_vec_add_behaviour_cyclic(
                 queue: *mut BehaviourVec,
                 cyclic: *mut CyclicBehaviour,
@@ -549,7 +549,7 @@ mod behaviour {
                 queue.add_behaviour(behaviour);
             }
 
-            #[no_mangle]
+            #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_vec_add_behaviour_ticker(
                 queue: *mut BehaviourVec,
                 ticker: *mut TickerBehaviour,
@@ -561,7 +561,7 @@ mod behaviour {
                 queue.add_behaviour(behaviour);
             }
 
-            #[no_mangle]
+            #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_vec_add_behaviour_sequential(
                 queue: *mut BehaviourVec,
                 sequential: *mut SequentialBehaviour,
@@ -573,7 +573,7 @@ mod behaviour {
                 queue.add_behaviour(behaviour);
             }
 
-            #[no_mangle]
+            #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_vec_free(queue: *mut BehaviourVec) {
                 non_null_or_bail!(
                     queue,
@@ -590,13 +590,13 @@ mod behaviour {
             use core::ptr;
 
             use no_std_framework_core::behaviour::{
-                sequential::SequentialBehaviour as SequentialBehaviourTrait, Behaviour,
-                ComplexBehaviour, Context,
+                Behaviour, ComplexBehaviour, Context,
+                sequential::SequentialBehaviour as SequentialBehaviourTrait,
             };
 
             use super::array::BehaviourVec;
-            use super::{drop_raw, from_raw, new};
             use super::{AgentState, Event};
+            use super::{drop_raw, from_raw, new};
 
             pub struct SequentialBehaviour {
                 /// Type value defined by the user implementing the trait.
@@ -652,7 +652,7 @@ mod behaviour {
                 }
             }
 
-            #[no_mangle]
+            #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_sequential_new(
                 inner: *mut c_void,
                 initial_behaviours: *mut BehaviourVec,
@@ -673,7 +673,7 @@ mod behaviour {
                 })
             }
 
-            #[no_mangle]
+            #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_sequential_free(sequential: *mut SequentialBehaviour) {
                 non_null_or_bail!(
                     sequential,
@@ -693,9 +693,9 @@ mod logging {
     ///
     /// Values less or equal to 0 disable logging. Values from 1 to 5 (and up) set respectively the levels;
     /// error, warn, info, debug, trace.
-    #[no_mangle]
+    #[unsafe(no_mangle)]
     pub extern "C" fn initialize_logging(level: c_char) {
-        crate::log::initialize_logging(match level.max(0) as u8 {
+        crate::log::initialize_logging(match level {
             0 => LevelFilter::Off,
             1 => LevelFilter::Error,
             2 => LevelFilter::Warn,
