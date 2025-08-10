@@ -42,3 +42,6 @@ acc-http = [
     "dep:multipart",
 ]
 acc-espnow = ["dep:esp-wifi", "dep:postcard", "dep:bytes", "dep:macaddr"]
+
+[lints.clippy]
+uninlined_format_args = { level = "allow" }

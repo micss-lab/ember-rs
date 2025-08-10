@@ -1,7 +1,7 @@
 use alloc::string::String;
 use core::fmt::Write;
 
-use serde::{ser, Serialize};
+use serde::{Serialize, ser};
 
 struct StringSerializer(String);
 
@@ -36,7 +36,7 @@ impl ser::Error for Error {
     }
 }
 
-impl<'a> ser::Serializer for &'a mut StringSerializer {
+impl ser::Serializer for &mut StringSerializer {
     type Ok = ();
     type Error = Error;
 
@@ -220,7 +220,7 @@ impl<'a> ser::Serializer for &'a mut StringSerializer {
     }
 }
 
-impl<'a> ser::SerializeSeq for &'a mut StringSerializer {
+impl ser::SerializeSeq for &mut StringSerializer {
     type Ok = ();
     type Error = Error;
 
@@ -238,7 +238,7 @@ impl<'a> ser::SerializeSeq for &'a mut StringSerializer {
     }
 }
 
-impl<'a> ser::SerializeTuple for &'a mut StringSerializer {
+impl ser::SerializeTuple for &mut StringSerializer {
     type Ok = ();
     type Error = Error;
 
@@ -254,7 +254,7 @@ impl<'a> ser::SerializeTuple for &'a mut StringSerializer {
     }
 }
 
-impl<'a> ser::SerializeTupleStruct for &'a mut StringSerializer {
+impl ser::SerializeTupleStruct for &mut StringSerializer {
     type Ok = ();
     type Error = Error;
 
@@ -270,7 +270,7 @@ impl<'a> ser::SerializeTupleStruct for &'a mut StringSerializer {
     }
 }
 
-impl<'a> ser::SerializeTupleVariant for &'a mut StringSerializer {
+impl ser::SerializeTupleVariant for &mut StringSerializer {
     type Ok = ();
     type Error = Error;
 
@@ -286,7 +286,7 @@ impl<'a> ser::SerializeTupleVariant for &'a mut StringSerializer {
     }
 }
 
-impl<'a> ser::SerializeMap for &'a mut StringSerializer {
+impl ser::SerializeMap for &mut StringSerializer {
     type Ok = ();
     type Error = Error;
 
@@ -312,7 +312,7 @@ impl<'a> ser::SerializeMap for &'a mut StringSerializer {
     }
 }
 
-impl<'a> ser::SerializeStruct for &'a mut StringSerializer {
+impl ser::SerializeStruct for &mut StringSerializer {
     type Ok = ();
     type Error = Error;
 
@@ -332,7 +332,7 @@ impl<'a> ser::SerializeStruct for &'a mut StringSerializer {
     }
 }
 
-impl<'a> ser::SerializeStructVariant for &'a mut StringSerializer {
+impl ser::SerializeStructVariant for &mut StringSerializer {
     type Ok = ();
     type Error = Error;
 

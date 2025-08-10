@@ -29,7 +29,7 @@ pub enum DecodeAsOntologyError {
 
 impl ManagementOntology {
     pub(crate) fn decode_message(message: Message) -> Result<ActionKind, DecodeAsOntologyError> {
-        if !message.ontology.is_some_and(|o| o == Self::name()) {
+        if message.ontology.is_none_or(|o| o != Self::name()) {
             return Err(DecodeAsOntologyError::UnexpectedOntology);
         }
         let Content::Sl(content) = message.content else {

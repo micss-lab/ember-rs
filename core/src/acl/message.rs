@@ -157,6 +157,7 @@ impl core::fmt::Display for Message {
 }
 
 impl Message {
+    #[allow(unused)]
     pub(crate) fn try_from_bytes(bytes: impl AsRef<BStr>) -> Result<Self, ()> {
         let bytes = bytes.as_ref();
         self::parser::messsage::message(&crate::util::parsing::BStr::from(bytes)).map_err(|e| {
