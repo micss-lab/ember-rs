@@ -82,7 +82,7 @@ impl CyclicBehaviour for MetricsReceiver {
             return;
         };
         let metrics = Metrics::from(message.content);
-        log::info!("Received metrics: {:?}", metrics);
+        log::info!("Received metrics: {metrics:?}");
     }
 
     fn is_finished(&self) -> bool {

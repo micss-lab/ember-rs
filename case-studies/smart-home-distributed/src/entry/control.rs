@@ -1,5 +1,5 @@
 use alloc::rc::Rc;
-use core::cell::RefCell;
+use core::{cell::RefCell, ptr::addr_of_mut};
 use macaddr::MacAddr6;
 
 use esp_backtrace as _;
@@ -43,25 +43,28 @@ pub fn main() {
 
     log::trace!("Initializing wifi device.");
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    unsafe {
-        crate::WIFI_INIT
-            .set(
-                esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK)
-                    .expect("failed to initialize wifi control."),
-            )
-            .unwrap();
-    }
+    unsafe { &mut *addr_of_mut!(crate::WIFI_INIT) }
+        .set(
+            esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK)
+                .expect("failed to initialize wifi control."),
+        )
+        .unwrap();
+
     let (wifi_device, esp_now_create_token) =
         esp_wifi::esp_now::enable_esp_now_with_wifi(peripherals.WIFI);
     let (wifi_device, mut controller) = esp_wifi::wifi::new_with_mode(
-        unsafe { crate::WIFI_INIT.get() }.unwrap(),
+        unsafe { &mut *addr_of_mut!(crate::WIFI_INIT) }
+            .get()
+            .unwrap(),
         wifi_device,
         esp_wifi::wifi::WifiStaDevice,
     )
     .expect("failed to initialize wifi device");
     let (mut esp_now_manager, mut esp_now_sender, mut esp_now_receiver) =
         esp_wifi::esp_now::EspNow::new_with_wifi(
-            unsafe { crate::WIFI_INIT.get() }.unwrap(),
+            unsafe { &mut *addr_of_mut!(crate::WIFI_INIT) }
+                .get()
+                .unwrap(),
             esp_now_create_token,
         )
         .expect("failed to initialize esp-now")
@@ -87,7 +90,7 @@ pub fn main() {
 
     let pump_switch = Input::new(peripherals.GPIO5, Pull::Up);
     let fan_active_led = Output::new(peripherals.GPIO18, Level::Low);
-    let temperature_sensor = adc_config.enable_pin(peripherals.GPIO34, Attenuation::Attenuation6dB);
+    let temperature_sensor = adc_config.enable_pin(peripherals.GPIO34, Attenuation::_6dB);
 
     let adc = Rc::new(RefCell::new(Adc::new(peripherals.ADC1, adc_config)));
 

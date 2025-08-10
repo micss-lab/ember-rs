@@ -1,7 +1,7 @@
 [package]
 name = "no-std-framework-bindings"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 [lib]
 name = "framework_core"
@@ -30,13 +30,13 @@ no-std-framework-core = { path = "../core" }
 
 [target.'cfg(target_os = "none")'.dependencies]
 critical-section = { version = "1.2.0", features = ["restore-state-u32"] }
-embassy-time-driver = "0.1.0"
-esp-alloc = "0.5.0"
+embassy-time-driver = "0.2.0"
+esp-alloc = "0.6.0"
 esp-println = { version = "0.12.0", default-features = false, features = ["log", "esp32", "auto"] }
 esp32 = "0.37.0"
 fugit = "0.3.7"
 portable-atomic = { version = "1.9.0", default-features = false }
-xtensa-lx = { version = "0.9.0" }
+xtensa-lx = "0.12.0"
 
 [build-dependencies]
 cbindgen = { version = "0.27.0", git = "https://github.com/exellentcoin26/cbindgen.git" }

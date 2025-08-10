@@ -9,6 +9,7 @@ setup_example!();
 use alloc::boxed::Box;
 use alloc::string::String;
 use core::cell::Cell;
+use core::ptr::addr_of_mut;
 
 use no_std_framework_core::behaviour::{
     Behaviour, BehaviourId, ComplexBehaviour, Context, CyclicBehaviour, IntoBehaviour,
@@ -65,12 +66,12 @@ fn manager() -> Agent<(), ()> {
         fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
             log::trace!("Waiting for acknowledgement.");
 
-            let Some(message) = (unsafe { MANAGER_MESSAGE.take() }) else {
+            let Some(message) = unsafe { &mut *addr_of_mut!(MANAGER_MESSAGE) }.take() else {
                 return;
             };
 
             let ManagerMessage::Acknowledge = message else {
-                panic!("Received unexpected message: {:?}", message);
+                panic!("Received unexpected message: {message:?}");
             };
             ctx.emit_event(FsmEvent::Trigger(ManagerTrigger::AcknowledgementReceived));
         }
@@ -95,12 +96,12 @@ fn manager() -> Agent<(), ()> {
         }
 
         fn action(&mut self, _: &mut Context<Self::Event>, _: &mut Self::AgentState) {
-            let Some(message) = (unsafe { MANAGER_MESSAGE.take() }) else {
+            let Some(message) = unsafe { &mut *addr_of_mut!(MANAGER_MESSAGE) }.take() else {
                 return;
             };
 
             let ManagerMessage::Finished = message else {
-                panic!("Received unexpected message: {:?}", message);
+                panic!("Received unexpected message: {message:?}");
             };
 
             self.received = true;
@@ -177,7 +178,7 @@ fn worker() -> Agent<(), ()> {
 
         fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
             log::trace!("Waiting for task from manager");
-            let Some(message) = (unsafe { WORKER_MESSAGE.take() }) else {
+            let Some(message) = unsafe { &mut *addr_of_mut!(WORKER_MESSAGE) }.take() else {
                 return;
             };
             unsafe {
@@ -215,7 +216,10 @@ fn worker() -> Agent<(), ()> {
 
         fn action(&self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
             log::info!("Performing task by printing given message");
-            log::info!("message: {}", unsafe { CURRENT_TASK.take() }.unwrap());
+            log::info!(
+                "message: {}",
+                unsafe { &mut *addr_of_mut!(CURRENT_TASK) }.take().unwrap()
+            );
             ctx.emit_event(FsmEvent::Trigger(WorkerTrigger::PerformedTask));
         }
     }

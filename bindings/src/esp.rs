@@ -33,11 +33,11 @@ mod critical_section {
 
     unsafe impl critical_section::Impl for CriticalSection {
         unsafe fn acquire() -> critical_section::RawRestoreState {
-            CRITICAL_SECTION.acquire()
+            unsafe { CRITICAL_SECTION.acquire() }
         }
 
         unsafe fn release(token: critical_section::RawRestoreState) {
-            CRITICAL_SECTION.release(token);
+            unsafe { CRITICAL_SECTION.release(token) };
         }
     }
 
@@ -121,19 +121,20 @@ mod critical_section {
         /// - Each release call must be paired with an acquire call.
         unsafe fn release(&self, token: critical_section::RawRestoreState) {
             if token & REENTRY_FLAG == 0 {
-                self.inner.unlock();
-
-                single_core::reenable_interrupts(token);
+                unsafe {
+                    self.inner.unlock();
+                    single_core::reenable_interrupts(token);
+                }
             }
         }
     }
 
     mod single_core {
-        use core::sync::atomic::{compiler_fence, Ordering};
+        use core::sync::atomic::{Ordering, compiler_fence};
 
         pub unsafe fn disable_interrupts() -> critical_section::RawRestoreState {
             let token: critical_section::RawRestoreState;
-            core::arch::asm!("rsil {0}, 5", out(reg) token);
+            unsafe { core::arch::asm!("rsil {0}, 5", out(reg) token) };
 
             // Ensure no subsequent memory accesses are reordered to before interrupts are
             // disabled.
@@ -150,7 +151,7 @@ mod critical_section {
             // Reserved bits in the PS register, these must be written as 0.
             const RESERVED_MASK: u32 = 0b1111_1111_1111_1000_1111_0000_0000_0000;
             debug_assert!(token & RESERVED_MASK == 0);
-            core::arch::asm!("wsr.ps {0}", "rsync", in(reg) token)
+            unsafe { core::arch::asm!("wsr.ps {0}", "rsync", in(reg) token) };
         }
     }
 
@@ -268,20 +269,7 @@ mod embassy_time_driver_impl {
             super::time::now().ticks()
         }
 
-        unsafe fn allocate_alarm(&self) -> Option<embassy_time_driver::AlarmHandle> {
-            unimplemented!()
-        }
-
-        fn set_alarm_callback(
-            &self,
-            _: embassy_time_driver::AlarmHandle,
-            _: fn(*mut ()),
-            _: *mut (),
-        ) {
-            unimplemented!()
-        }
-
-        fn set_alarm(&self, _: embassy_time_driver::AlarmHandle, _: u64) -> bool {
+        fn schedule_wake(&self, _at: u64, _waker: &core::task::Waker) {
             unimplemented!()
         }
     }

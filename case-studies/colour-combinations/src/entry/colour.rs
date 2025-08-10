@@ -69,7 +69,7 @@ impl<I> ColourCombinatorState<I> {
     }
 
     fn made_combination(&mut self, c1: Colour, c2: Colour) {
-        log::info!("Making combination between {:?} and {:?}.", c1, c2);
+        log::info!("Making combination between {c1:?} and {c2:?}.");
 
         let val = match (c1, c2) {
             (Colour::Red, Colour::Red) => 100,
@@ -191,7 +191,7 @@ where
                 ctx.emit_event(FsmEvent::Trigger(colour))
             }
             (colour, _) => {
-                log::info!("Ejecting brick {:?}", colour);
+                log::info!("Ejecting brick {colour:?}");
             }
         }
     }
@@ -224,7 +224,7 @@ where
             break match state.next_window()? {
                 (Colour::Red, _) => Some(Colour::Red),
                 (c, Some(Colour::Red)) => {
-                    log::info!("Ejecting brick: {:?}", c);
+                    log::info!("Ejecting brick: {c:?}");
                     continue;
                 }
                 (c, _) => Some(c),

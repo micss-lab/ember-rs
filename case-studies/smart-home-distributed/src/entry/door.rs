@@ -1,3 +1,5 @@
+use core::ptr::addr_of_mut;
+
 use esp_backtrace as _;
 use esp_hal_embassy as _;
 
@@ -41,25 +43,28 @@ pub fn main() {
 
     log::trace!("Initializing wifi device.");
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    unsafe {
-        crate::WIFI_INIT
-            .set(
-                esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK)
-                    .expect("failed to initialize wifi control."),
-            )
-            .unwrap();
-    }
+    unsafe { &mut *addr_of_mut!(crate::WIFI_INIT) }
+        .set(
+            esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK)
+                .expect("failed to initialize wifi control."),
+        )
+        .unwrap();
+
     let (wifi_device, esp_now_create_token) =
         esp_wifi::esp_now::enable_esp_now_with_wifi(peripherals.WIFI);
     let (wifi_device, mut controller) = esp_wifi::wifi::new_with_mode(
-        unsafe { crate::WIFI_INIT.get() }.unwrap(),
+        unsafe { &mut *addr_of_mut!(crate::WIFI_INIT) }
+            .get()
+            .unwrap(),
         wifi_device,
         esp_wifi::wifi::WifiStaDevice,
     )
     .expect("failed to initialize wifi device");
     let (mut esp_now_manager, mut esp_now_sender, mut esp_now_receiver) =
         esp_wifi::esp_now::EspNow::new_with_wifi(
-            unsafe { crate::WIFI_INIT.get() }.unwrap(),
+            unsafe { &mut *addr_of_mut!(crate::WIFI_INIT) }
+                .get()
+                .unwrap(),
             esp_now_create_token,
         )
         .expect("failed to initialize esp-now")
@@ -85,7 +90,7 @@ pub fn main() {
     let unlock_door_switch = Input::new(peripherals.GPIO22, Pull::Up);
     // let pir_sensor = Input::new(peripherals.GPIO18, Pull::Up);
 
-    let serial_input = UartRx::new(peripherals.UART1, peripherals.GPIO3).unwrap();
+    let serial_input = UartRx::new(peripherals.UART1, Default::default()).unwrap();
 
     Container::default()
         .with_agent(lock::lock_agent(

@@ -1,3 +1,5 @@
+use core::ptr::addr_of_mut;
+
 use alloc::{boxed::Box, collections::BTreeSet};
 
 use blocking_network_stack::Stack;
@@ -49,17 +51,16 @@ pub fn create_network_stack(
         )
     };
 
-    unsafe {
-        crate::WIFI_STACK.set(Stack::new(
+    unsafe { &mut *addr_of_mut!(crate::WIFI_STACK) }
+        .set(Stack::new(
             iface,
             wifi,
             sockets,
             || esp_hal::time::now().duration_since_epoch().to_millis(),
             random,
         ))
-    }
-    .ok()
-    .expect("cannot create stack more than once");
+        .ok()
+        .expect("cannot create stack more than once");
 }
 
 pub fn connect_to_access_point(controller: &mut WifiController) {
@@ -136,7 +137,8 @@ pub fn connect_to_access_point(controller: &mut WifiController) {
     }
 
     log::trace!("Waiting for an ip address.");
-    let stack = unsafe { crate::WIFI_STACK.get_mut() }
+    let stack = unsafe { &mut *addr_of_mut!(crate::WIFI_STACK) }
+        .get_mut()
         .expect("wifi stack should be created before calling this function");
     loop {
         stack.work();

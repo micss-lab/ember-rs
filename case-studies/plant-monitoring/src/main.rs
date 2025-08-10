@@ -13,7 +13,7 @@ fn main() {
 mod entry;
 
 #[cfg(target_os = "none")]
-#[esp_hal::entry]
+#[esp_hal::main]
 fn main() -> ! {
     entry::main();
     panic!("End of program.")

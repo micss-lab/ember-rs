@@ -75,7 +75,7 @@ pub fn main() {
         config
     });
 
-    let uart_rx = UartRx::new(peripherals.UART1, peripherals.GPIO3).unwrap();
+    let uart_rx = UartRx::new(peripherals.UART1, Default::default()).unwrap();
     let unlock_button = Input::new(peripherals.GPIO22, Pull::Up);
     let pir_pin = Input::new(peripherals.GPIO18, Pull::None);
 

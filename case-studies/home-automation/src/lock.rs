@@ -1,24 +1,17 @@
-use esp_hal::{
-    gpio::{Input, InputPin},
-    uart::UartRx,
-    Blocking,
-};
+use esp_hal::{Blocking, gpio::Input, uart::UartRx};
 use no_std_framework_core::{
-    behaviour::{Context, CyclicBehaviour, TickerBehaviour},
     Agent,
+    behaviour::{Context, CyclicBehaviour, TickerBehaviour},
 };
 use ontology::DoorLockAction;
 
 use crate::util::wrap_message;
 
-pub fn lock_agent<P>(
+pub fn lock_agent(
     password: &'static [u8],
-    button: Input<'static, P>,
+    button: Input<'static>,
     serial_rx: UartRx<'static, Blocking>,
-) -> Agent<LockState, ()>
-where
-    P: InputPin,
-{
+) -> Agent<LockState, ()> {
     Agent::new("lock", LockState::new(password, serial_rx))
         .with_behaviour(UnlockButton::new(button))
         .with_behaviour(AutoLock)
@@ -47,12 +40,15 @@ impl LockState {
         let mut password = [0u8; 25];
         let mut read_chars = 0;
         loop {
-            let byte = match self.serial_rx.read_byte() {
-                Ok(b) => {
-                    log::debug!("byte: {}", b);
+            let mut buf = [0u8; 1];
+            let byte = match self.serial_rx.read_buffered_bytes(&mut buf) {
+                Ok(0) => continue,
+                Ok(1) => {
+                    let b = buf[0];
+                    log::debug!("byte: {b}");
                     b
                 }
-                Err(esp_hal::prelude::nb::Error::WouldBlock) => continue,
+                Ok(_) => unreachable!("cannot read more bytes than size of buffer"),
                 Err(e) => panic!("failed to read from console: {:?}", e),
             };
 
@@ -72,7 +68,7 @@ impl LockState {
             log::info!("Password correct, unlocking!");
             self.locked = false;
         } else {
-            log::debug!("password: {:?}", password);
+            log::debug!("password: {password:?}");
             log::debug!("set password: {:?}", self.password);
             log::info!("Incorrect password, door remains locked.");
         }
@@ -85,8 +81,8 @@ impl LockState {
 
 pub mod ontology {
     use no_std_framework_core::{
-        acl::message::{Content, Message, Performative, Receiver},
         Aid,
+        acl::message::{Content, Message, Performative, Receiver},
     };
     use serde::{Deserialize, Serialize};
 
@@ -132,13 +128,13 @@ pub mod ontology {
     }
 }
 
-struct UnlockButton<P: 'static> {
-    button: Input<'static, P>,
+struct UnlockButton {
+    button: Input<'static>,
     was_pressed: bool,
 }
 
-impl<P: 'static> UnlockButton<P> {
-    fn new(button: Input<'static, P>) -> Self {
+impl UnlockButton {
+    fn new(button: Input<'static>) -> Self {
         Self {
             button,
             was_pressed: false,
@@ -146,10 +142,7 @@ impl<P: 'static> UnlockButton<P> {
     }
 }
 
-impl<P> CyclicBehaviour for UnlockButton<P>
-where
-    P: InputPin,
-{
+impl CyclicBehaviour for UnlockButton {
     type AgentState = LockState;
 
     type Event = ();

@@ -52,7 +52,8 @@ where
         use embedded_io::Read;
 
         let mut socket = self.current_socket.take().unwrap_or_else(|| {
-            let mut socket = unsafe { crate::WIFI_STACK.get_mut() }
+            let mut socket = unsafe { &mut *addr_of_mut!(crate::WIFI_STACK) }
+                .get_mut()
                 .unwrap()
                 .get_socket(unsafe { *addr_of_mut!(RX_BUFFER) }, unsafe {
                     *addr_of_mut!(TX_BUFFER)
@@ -78,19 +79,19 @@ where
         let mut headers = [httparse::EMPTY_HEADER; 16];
         let mut req = httparse::Request::new(&mut headers);
         if let Err(err) = req.parse(&buf) {
-            log::error!("Error parsing incoming request: {}", err);
+            log::error!("Error parsing incoming request: {err}");
         };
 
-        log::debug!("Incoming request: {:?}", req);
+        log::debug!("Incoming request: {req:?}");
 
         let (status, body) = self.handle_request.clone()(req, ctx, state);
         if let Err(err) = write_response(&mut socket, status, body) {
-            log::warn!("failed to send response: {:?}", err);
+            log::warn!("failed to send response: {err:?}");
         }
 
         log::trace!("Closing socket.");
         if let Err(err) = socket.flush() {
-            log::error!("Error closing socket: {:?}", err);
+            log::error!("Error closing socket: {err:?}");
         }
         socket.close();
         log::debug!("Successfully sent response and closed socket.");
@@ -110,7 +111,7 @@ where
     stream.write_all(b"HTTP/1.1 ")?;
     stream.write_all(format!("{} {}\r\n", status, status_code_to_reason(status)).as_bytes())?;
     if content_len != 0 {
-        stream.write_all(format!("Content-Length: {}", content_len).as_bytes())?;
+        stream.write_all(format!("Content-Length: {content_len}").as_bytes())?;
     }
     stream.write_all(b"\r\n\r\n")?;
     stream.write_all(body.as_bytes())?;

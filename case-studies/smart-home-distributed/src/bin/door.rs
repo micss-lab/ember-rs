@@ -10,7 +10,7 @@ fn main() {
 }
 
 #[cfg(target_os = "none")]
-#[esp_hal::entry]
+#[esp_hal::main]
 fn main() -> ! {
     case_study_smart_home_distributed::entry::door::main();
     panic!("End of program.")

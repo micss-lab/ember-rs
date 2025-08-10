@@ -1,5 +1,5 @@
 use alloc::collections::BTreeSet;
-use core::cell::OnceCell;
+use core::{cell::OnceCell, ptr::addr_of_mut};
 
 use esp_backtrace as _;
 use esp_hal_embassy as _;
@@ -7,8 +7,8 @@ use esp_hal_embassy as _;
 use blocking_network_stack::Stack;
 use esp_hal::{clock::CpuClock, delay::Delay, rng::Rng, timer::timg::TimerGroup};
 use esp_wifi::{
-    wifi::{WifiController, WifiDevice, WifiStaDevice},
     EspWifiController,
+    wifi::{WifiController, WifiDevice, WifiStaDevice},
 };
 use no_std_framework_core::{Agent, Container};
 use smoltcp::{
@@ -51,16 +51,14 @@ pub(crate) fn main() {
 
     log::trace!("Initializing wifi device.");
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    unsafe {
-        WIFI_INIT
-            .set(
-                esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK)
-                    .expect("failed to initialize wifi control."),
-            )
-            .unwrap();
-    }
+    unsafe { &mut *addr_of_mut!(WIFI_INIT) }
+        .set(
+            esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK)
+                .expect("failed to initialize wifi control."),
+        )
+        .unwrap();
     let (wifi_device, mut controller) = esp_wifi::wifi::new_with_mode(
-        unsafe { WIFI_INIT.get() }.unwrap(),
+        unsafe { &mut *addr_of_mut!(WIFI_INIT) }.get().unwrap(),
         peripherals.WIFI,
         esp_wifi::wifi::WifiStaDevice,
     )

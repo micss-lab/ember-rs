@@ -15,7 +15,6 @@ mod setup_example {
             #[cfg(target_os = "none")]
             mod esp_imports {
                 pub(super) use esp_backtrace as _;
-                pub(super) use esp_hal::prelude::*;
                 pub(super) use esp_hal_embassy as _;
                 pub(super) use esp_println::print;
 
@@ -26,7 +25,7 @@ mod setup_example {
             use esp_imports::*;
 
             #[cfg(target_os = "none")]
-            #[entry]
+            #[esp_hal::main]
             fn main() -> ! {
                 // Set newline mode to linux line endings.
                 print!("\x1b[20h");

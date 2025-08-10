@@ -1,9 +1,12 @@
 use alloc::{collections::BTreeSet, rc::Rc};
 use blocking_network_stack::Stack;
-use core::cell::{OnceCell, RefCell};
+use core::{
+    cell::{OnceCell, RefCell},
+    ptr::addr_of_mut,
+};
 use esp_wifi::{
-    wifi::{WifiController, WifiDevice, WifiStaDevice},
     EspWifiController,
+    wifi::{WifiController, WifiDevice, WifiStaDevice},
 };
 use smoltcp::{
     iface::{Interface, SocketSet, SocketStorage},
@@ -64,16 +67,15 @@ pub fn main() {
 
     log::trace!("Initializing wifi device.");
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    unsafe {
-        WIFI_INIT
-            .set(
-                esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK)
-                    .expect("failed to initialize wifi control."),
-            )
-            .unwrap();
-    }
+    unsafe { &mut *addr_of_mut!(WIFI_INIT) }
+        .set(
+            esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK)
+                .expect("failed to initialize wifi control."),
+        )
+        .unwrap();
+
     let (wifi_device, mut controller) = esp_wifi::wifi::new_with_mode(
-        unsafe { WIFI_INIT.get() }.unwrap(),
+        unsafe { &mut *addr_of_mut!(WIFI_INIT) }.get().unwrap(),
         peripherals.WIFI,
         esp_wifi::wifi::WifiStaDevice,
     )
@@ -85,15 +87,15 @@ pub fn main() {
     log::trace!("Connecting to access point.");
     connect_to_access_point(&mut controller, &mut stack);
 
-    unsafe {
-        case_study_smart_home::WIFI_STACK.set(stack).ok();
-    }
+    unsafe { &mut *addr_of_mut!(case_study_smart_home::WIFI_STACK) }
+        .set(stack)
+        .ok();
 
     let mut adc_config = AdcConfig::new();
 
     // Plant monitoring system.
-    let ldr_sensor = adc_config.enable_pin(peripherals.GPIO26, Attenuation::Attenuation6dB);
-    let potentiometer = adc_config.enable_pin(peripherals.GPIO27, Attenuation::Attenuation6dB);
+    let ldr_sensor = adc_config.enable_pin(peripherals.GPIO26, Attenuation::_6dB);
+    let potentiometer = adc_config.enable_pin(peripherals.GPIO27, Attenuation::_6dB);
     let pump_switch = Input::new(peripherals.GPIO13, Pull::Up);
     let low_light_led = Output::new(peripherals.GPIO14, Level::Low);
     let pump_active_led = Output::new(peripherals.GPIO12, Level::Low);
@@ -103,11 +105,11 @@ pub fn main() {
     let pir_sensor = Input::new(peripherals.GPIO18, Pull::Up);
     let fan_active_led = Output::new(peripherals.GPIO2, Level::Low);
 
-    let temperature_sensor = adc_config.enable_pin(peripherals.GPIO15, Attenuation::Attenuation6dB);
+    let temperature_sensor = adc_config.enable_pin(peripherals.GPIO15, Attenuation::_6dB);
 
     let adc = Rc::new(RefCell::new(Adc::new(peripherals.ADC2, adc_config)));
 
-    let serial_input = UartRx::new(peripherals.UART1, peripherals.GPIO3).unwrap();
+    let serial_input = UartRx::new(peripherals.UART1, Default::default()).unwrap();
 
     Container::default()
         .with_agent(moist::moisture_agent(potentiometer, adc.clone()))

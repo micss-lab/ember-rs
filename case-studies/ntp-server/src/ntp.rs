@@ -142,14 +142,14 @@ fn core_to_smoltcp_wire(addr: core::net::IpAddr) -> smoltcp::wire::IpAddress {
 
 fn smoltcp_wire_to_core(addr: smoltcp::wire::IpAddress) -> core::net::IpAddr {
     use core::net::Ipv4Addr;
-    use smoltcp::wire::{IpAddress as SmoltcpIpAddr, Ipv4Address as SmoltcpIpv4Addr};
+    use smoltcp::wire::IpAddress as SmoltcpIpAddr;
 
     match addr {
-        SmoltcpIpAddr::Ipv4(SmoltcpIpv4Addr([a, b, c, d])) => Ipv4Addr::new(a, b, c, d).into(),
+        SmoltcpIpAddr::Ipv4(addr) => Ipv4Addr::from(addr.octets()).into(),
     }
 }
 
-fn await_future<F>(mut fut: F) -> F::Output
+fn await_future<F>(fut: F) -> F::Output
 where
     F: core::future::Future,
 {
