@@ -7,8 +7,9 @@ edition = "2024"
 bstr = { version = "1.12", default-features = false, features = ["alloc"] }
 chrono = { version = "0.4", default-features = false, features = ["alloc", "serde"] }
 critical-section = "1.2"
+fugit = "0.3"
+hex = { version = "0.4", default-features = false, features = ["alloc", "serde"] }
 libm = "0.2"
 log = { version = "0.4", default-features = false, features = ["serde"] }
 peg = { version = "0.8", default-features = false, git = "https://github.com/kevinmehall/rust-peg.git" }
 serde = { version = "1.0", default-features = false, features = ["alloc"] }
-hex = { version = "0.4", default-features = false, features = ["alloc", "serde"] }
