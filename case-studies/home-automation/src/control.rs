@@ -1,4 +1,4 @@
-use no_std_framework_core::{
+use ember_core::{
     acl::{
         codec::AgentActionCodec,
         message::{self, Message, Performative},

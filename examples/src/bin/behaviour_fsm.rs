@@ -1,8 +1,8 @@
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
 
-use no_std_framework_core::behaviour::fsm::{Fsm, FsmBehaviour, FsmEvent};
-use no_std_framework_examples::setup_example;
+use ember::behaviour::fsm::{Fsm, FsmBehaviour, FsmEvent};
+use ember_examples::setup_example;
 
 setup_example!();
 
@@ -11,11 +11,11 @@ use alloc::string::String;
 use core::cell::Cell;
 use core::ptr::addr_of_mut;
 
-use no_std_framework_core::behaviour::{
+use ember::behaviour::{
     Behaviour, BehaviourId, ComplexBehaviour, Context, CyclicBehaviour, IntoBehaviour,
     OneShotBehaviour, TickerBehaviour,
 };
-use no_std_framework_core::{Agent, Container};
+use ember::{Agent, Container};
 
 static mut WORKER_MESSAGE: Option<WorkerMessage> = None;
 static mut MANAGER_MESSAGE: Option<ManagerMessage> = None;

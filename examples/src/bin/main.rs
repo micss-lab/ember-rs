@@ -1,11 +1,11 @@
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
 
-use no_std_framework_examples::setup_example;
+use ember_examples::setup_example;
 
 setup_example!();
 
-use no_std_framework_core::{
+use ember::{
     behaviour::{Context, OneShotBehaviour},
     Agent, Container,
 };

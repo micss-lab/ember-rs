@@ -5,12 +5,10 @@
 use alloc::format;
 use core::str::FromStr;
 
-use no_std_framework_core::acl::message::{
-    Content, Message, MessageEnvelope, Performative, Receiver,
-};
-use no_std_framework_core::behaviour::{Context, CyclicBehaviour, TickerBehaviour};
-use no_std_framework_core::{Agent, Aid, Container};
-use no_std_framework_examples::setup_example;
+use ember::behaviour::{Context, CyclicBehaviour, TickerBehaviour};
+use ember::message::{Content, Message, MessageEnvelope, Performative, Receiver};
+use ember::{Agent, Aid, Container};
+use ember_examples::setup_example;
 
 setup_example!();
 

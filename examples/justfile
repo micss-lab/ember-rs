@@ -1,8 +1,0 @@
-default:
-    just --list
-
-run-local EXAMPLE:
-    cargo run-local --bin {{EXAMPLE}}
-
-run-esp EXAMPLE:
-    cargo run-esp --bin {{EXAMPLE}}

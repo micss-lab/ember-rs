@@ -1,4 +1,4 @@
-use no_std_framework_core::{
+use ember_core::{
     behaviour::{Context, TickerBehaviour},
     Agent,
 };
@@ -15,7 +15,7 @@ pub fn fan_agent() -> Agent<FanState, ()> {
 pub mod ontology {
     use alloc::{string::String, vec::Vec};
 
-    use no_std_framework_core::{
+    use ember_core::{
         acl::{
             codec::{AgentActionCodec, ConceptCodec, ConstantCodec, DecodeError},
             message::{Content, Message, Performative, Receiver},
@@ -70,7 +70,7 @@ pub mod ontology {
     impl AgentActionCodec for FanMessage {
         fn from_agent_action(
             agent_action: AgentAction,
-        ) -> Result<Self, no_std_framework_core::acl::codec::DecodeError> {
+        ) -> Result<Self, ember_core::acl::codec::DecodeError> {
             let action: FanAction = ConceptCodec::from_term(agent_action.action)?;
 
             Ok(FanMessage { action })
@@ -87,7 +87,7 @@ pub mod ontology {
     impl ConceptCodec for FanAction {
         fn from_concept(
             concept: Concept,
-        ) -> Result<Self, no_std_framework_core::acl::codec::DecodeError> {
+        ) -> Result<Self, ember_core::acl::codec::DecodeError> {
             if !concept.parameters.is_empty() {
                 return Err(DecodeError::InvalidLength(concept.parameters.len()));
             }

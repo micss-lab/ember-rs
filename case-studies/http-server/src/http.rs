@@ -8,7 +8,7 @@ use blocking_network_stack::Socket;
 use embedded_io::Write;
 use esp_wifi::wifi::{WifiDevice, WifiStaDevice};
 use httparse::Request;
-use no_std_framework_core::behaviour::{Context, CyclicBehaviour};
+use ember_core::behaviour::{Context, CyclicBehaviour};
 use smoltcp::phy::Device;
 
 static mut RX_BUFFER: &mut [u8] = &mut [0u8; 1024];

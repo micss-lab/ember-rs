@@ -10,7 +10,7 @@ use esp_wifi::{
     EspWifiController,
     wifi::{WifiController, WifiDevice, WifiStaDevice},
 };
-use no_std_framework_core::{Agent, Container};
+use ember_core::{Agent, Container};
 use smoltcp::{
     iface::{Interface, SocketSet, SocketStorage},
     phy::Device,

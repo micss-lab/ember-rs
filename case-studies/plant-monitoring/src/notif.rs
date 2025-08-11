@@ -1,7 +1,7 @@
 use alloc::borrow::Cow;
 use core::marker::PhantomData;
 
-use no_std_framework_core::behaviour::{
+use ember_core::behaviour::{
     fsm::{Fsm, FsmBehaviour, FsmEvent},
     ComplexBehaviour, Context, CyclicBehaviour,
 };

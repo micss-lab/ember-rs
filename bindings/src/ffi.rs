@@ -98,7 +98,7 @@ mod agent_state {
 }
 
 mod container {
-    use no_std_framework_core::{Agent, Container};
+    use ember::{Agent, Container};
 
     use crate::ffi::util::{drop_raw, ref_from_raw};
 
@@ -169,7 +169,7 @@ mod container {
 mod agent {
     use core::ffi::c_char;
 
-    use no_std_framework_core::Agent;
+    use ember::Agent;
 
     use super::agent_state::AgentState;
     use super::behaviour::complex::SequentialBehaviour;
@@ -245,7 +245,7 @@ mod agent {
 }
 
 mod context {
-    use no_std_framework_core::behaviour::Context;
+    use ember::behaviour::Context;
 
     use super::event::Event;
     use super::util::{from_raw, ref_from_raw};
@@ -306,9 +306,7 @@ mod behaviour {
             use core::ffi::c_void;
             use core::ptr;
 
-            use no_std_framework_core::behaviour::{
-                Context, OneShotBehaviour as OneShotBehaviourTrait,
-            };
+            use ember::behaviour::{Context, OneShotBehaviour as OneShotBehaviourTrait};
 
             use super::{AgentState, Event};
             use super::{drop_raw, new};
@@ -353,9 +351,7 @@ mod behaviour {
             use core::ffi::c_void;
             use core::ptr;
 
-            use no_std_framework_core::behaviour::{
-                Context, CyclicBehaviour as CyclicBehaviourTrait,
-            };
+            use ember::behaviour::{Context, CyclicBehaviour as CyclicBehaviourTrait};
 
             use super::{AgentState, Event};
             use super::{drop_raw, new};
@@ -412,9 +408,7 @@ mod behaviour {
             use core::ptr;
             use core::time::Duration;
 
-            use no_std_framework_core::behaviour::{
-                Context, TickerBehaviour as TickerBehaviourTrait,
-            };
+            use ember::behaviour::{Context, TickerBehaviour as TickerBehaviourTrait};
 
             use super::{AgentState, Event};
             use super::{drop_raw, new};
@@ -486,7 +480,7 @@ mod behaviour {
             use alloc::boxed::Box;
             use alloc::vec::Vec;
 
-            use no_std_framework_core::behaviour::{Behaviour, IntoBehaviour};
+            use ember::behaviour::{Behaviour, IntoBehaviour};
 
             use super::sequential::SequentialBehaviour;
             use super::simple::{CyclicBehaviour, OneShotBehaviour, TickerBehaviour};
@@ -589,7 +583,7 @@ mod behaviour {
             use core::ffi::c_void;
             use core::ptr;
 
-            use no_std_framework_core::behaviour::{
+            use ember::behaviour::{
                 Behaviour, ComplexBehaviour, Context,
                 sequential::SequentialBehaviour as SequentialBehaviourTrait,
             };
@@ -623,7 +617,7 @@ mod behaviour {
 
                 fn after_child_action(
                     &mut self,
-                    ctx: &mut no_std_framework_core::behaviour::Context<Self::Event>,
+                    ctx: &mut ember::behaviour::Context<Self::Event>,
                     agent_state: &mut Self::AgentState,
                 ) {
                     (self.after_child_action)(

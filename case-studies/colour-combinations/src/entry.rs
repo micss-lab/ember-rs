@@ -3,7 +3,7 @@ use esp_backtrace as _;
 use esp_hal_embassy as _;
 
 use esp_hal::clock::CpuClock;
-use no_std_framework_core::Container;
+use ember_core::Container;
 
 const HEAP_SIZE: usize = 72 * 1024;
 

@@ -1,0 +1,55 @@
+[package]
+name = "ember-acc"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ember-core = { workspace = true }
+
+cfg-if = "1.0"
+log = "0.4"
+
+bstr = { version = "1.12", default-features = false, features = ["alloc", "serde"], optional = true }
+bytes = { version = "1.10", default-features = false, features = ["serde"], optional = true }
+chrono = { version = "0.4", default-features = false, features = ["alloc", "serde"], optional = true }
+serde = { version = "1.0", default-features = false, features = ["alloc"], optional = true }
+hex = { version = "0.4", default-features = false, features = ["alloc"], optional = true }
+
+multipart = { git = "https://github.com/exellentcoin26/multipart-rs.git", features = ["server", "tiny_http"], optional = true }
+rand = { version = "0.9", optional = true }
+tiny_http = { version = "0.12", optional = true }
+ureq = { version = "3.0", default-features = false, optional = true }
+serde_bencode = { version = "0.2", optional = true }
+
+esp-hal = { version = "0.23", features = ["unstable"], optional = true }
+esp-wifi = { version = "0.12", features = ["esp32", "esp-now"], optional = true }
+macaddr = { version = "1.0", default-features = false, features = ["serde"], optional = true }
+postcard = { version = "1.1", default-features = false, features = ["alloc"], optional = true }
+
+[features]
+std = []
+http = [
+    "std",
+
+    "dep:bstr",
+    "dep:bytes",
+    "dep:chrono",
+    "dep:hex",
+    "dep:multipart",
+    "dep:rand",
+    "dep:serde",
+    "dep:serde_bencode",
+    "dep:tiny_http",
+    "dep:ureq",
+]
+espnow = [
+    "dep:chrono",
+    "dep:esp-hal",
+    "dep:esp-wifi",
+    "dep:macaddr",
+    "dep:postcard",
+    "dep:serde",
+]
+
+[lints.clippy]
+uninlined_format_args = { level = "allow" }

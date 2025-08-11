@@ -167,18 +167,21 @@ name = "bytes"
 version = "1.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "case-study-colour-combinations"
 version = "0.1.0"
 dependencies = [
+ "ember",
  "esp-alloc",
  "esp-backtrace",
  "esp-hal",
  "esp-hal-embassy",
  "esp-println",
  "log",
- "no-std-framework-core",
 ]
 
 [[package]]
@@ -189,6 +192,7 @@ dependencies = [
  "chrono",
  "embassy-time-driver",
  "embedded-io 0.6.1",
+ "ember",
  "esp-alloc",
  "esp-backtrace",
  "esp-hal",
@@ -196,7 +200,6 @@ dependencies = [
  "esp-println",
  "log",
  "nb 1.1.0",
- "no-std-framework-core",
  "postcard",
  "serde",
 ]
@@ -207,6 +210,7 @@ version = "0.1.0"
 dependencies = [
  "blocking-network-stack",
  "embedded-io 0.6.1",
+ "ember",
  "esp-alloc",
  "esp-backtrace",
  "esp-hal",
@@ -214,7 +218,6 @@ dependencies = [
  "esp-wifi",
  "httparse",
  "log",
- "no-std-framework-core",
  "smoltcp",
 ]
 
@@ -226,6 +229,7 @@ dependencies = [
  "chrono",
  "embassy-time-driver",
  "embedded-io 0.6.1",
+ "ember",
  "esp-alloc",
  "esp-backtrace",
  "esp-hal",
@@ -234,7 +238,6 @@ dependencies = [
  "esp-wifi",
  "futures",
  "log",
- "no-std-framework-core",
  "smoltcp",
  "sntpc",
 ]
@@ -247,6 +250,7 @@ dependencies = [
  "chrono",
  "embassy-time-driver",
  "embedded-io 0.6.1",
+ "ember",
  "esp-alloc",
  "esp-backtrace",
  "esp-hal",
@@ -255,7 +259,6 @@ dependencies = [
  "libm",
  "log",
  "nb 1.1.0",
- "no-std-framework-core",
  "postcard",
  "serde",
 ]
@@ -269,6 +272,7 @@ dependencies = [
  "case-study-plant-monitoring",
  "critical-section",
  "embedded-io 0.6.1",
+ "ember",
  "esp-alloc",
  "esp-backtrace",
  "esp-hal",
@@ -278,7 +282,6 @@ dependencies = [
  "httparse",
  "log",
  "nb 1.1.0",
- "no-std-framework-core",
  "postcard",
  "serde",
  "smoltcp",
@@ -293,6 +296,7 @@ dependencies = [
  "case-study-plant-monitoring",
  "critical-section",
  "embedded-io 0.6.1",
+ "ember",
  "esp-alloc",
  "esp-backtrace",
  "esp-hal",
@@ -303,7 +307,6 @@ dependencies = [
  "log",
  "macaddr",
  "nb 1.1.0",
- "no-std-framework-core",
  "postcard",
  "serde",
  "smoltcp",
@@ -340,6 +343,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c469d952047f47f91b68d1cba3f10d63c11d73e4636f24f08daf0278abf01c4d"
 dependencies = [
  "num-traits",
+ "serde",
 ]
 
 [[package]]
@@ -671,6 +675,88 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1763775e2323b7d5f0aa6090657f5e21cfa02ede71f5dc40eead06d64dcd15cc"
 dependencies = [
  "embedded-storage",
+]
+
+[[package]]
+name = "ember"
+version = "0.1.0"
+dependencies = [
+ "ember-acc",
+ "ember-core",
+ "log",
+]
+
+[[package]]
+name = "ember-acc"
+version = "0.1.0"
+dependencies = [
+ "bstr",
+ "bytes",
+ "cfg-if",
+ "chrono",
+ "ember-core",
+ "esp-hal",
+ "esp-wifi",
+ "hex",
+ "log",
+ "macaddr",
+ "multipart",
+ "postcard",
+ "rand 0.9.1",
+ "serde",
+ "serde_bencode",
+ "tiny_http",
+ "ureq",
+]
+
+[[package]]
+name = "ember-bindings"
+version = "0.1.0"
+dependencies = [
+ "cbindgen",
+ "cfg-if",
+ "critical-section",
+ "embassy-time-driver",
+ "ember",
+ "esp-alloc",
+ "esp-println",
+ "esp32 0.37.0",
+ "fugit",
+ "log",
+ "portable-atomic",
+ "xtensa-lx 0.12.0",
+]
+
+[[package]]
+name = "ember-core"
+version = "0.1.0"
+dependencies = [
+ "bstr",
+ "chrono",
+ "critical-section",
+ "fugit",
+ "hex",
+ "libm",
+ "log",
+ "peg",
+ "serde",
+]
+
+[[package]]
+name = "ember-examples"
+version = "0.1.0"
+dependencies = [
+ "critical-section",
+ "ember",
+ "env_logger",
+ "esp-alloc",
+ "esp-backtrace",
+ "esp-hal",
+ "esp-hal-embassy",
+ "esp-println",
+ "esp-wifi",
+ "hex",
+ "log",
 ]
 
 [[package]]
@@ -1156,6 +1242,9 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "http"
@@ -1299,12 +1388,18 @@ name = "log"
 version = "0.4.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "macaddr"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baee0bbc17ce759db233beb01648088061bf678383130602a298e6998eedb2d8"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "managed"
@@ -1365,66 +1460,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d5439c4ad607c3c23abf66de8c8bf57ba8adcd1f129e699851a6e43935d339d"
 
 [[package]]
-name = "no-std-framework-bindings"
-version = "0.1.0"
-dependencies = [
- "cbindgen",
- "cfg-if",
- "critical-section",
- "embassy-time-driver",
- "esp-alloc",
- "esp-println",
- "esp32 0.37.0",
- "fugit",
- "log",
- "no-std-framework-core",
- "portable-atomic",
- "xtensa-lx 0.12.0",
-]
-
-[[package]]
-name = "no-std-framework-core"
-version = "0.1.0"
-dependencies = [
- "bstr",
- "bytes",
- "cfg-if",
- "chrono",
- "critical-section",
- "embassy-time",
- "esp-wifi",
- "hex",
- "libm",
- "log",
- "macaddr",
- "multipart",
- "peg",
- "postcard",
- "rand 0.9.1",
- "serde",
- "serde_bencode",
- "tiny_http",
- "ureq",
-]
-
-[[package]]
-name = "no-std-framework-examples"
-version = "0.1.0"
-dependencies = [
- "critical-section",
- "env_logger",
- "esp-alloc",
- "esp-backtrace",
- "esp-hal",
- "esp-hal-embassy",
- "esp-println",
- "esp-wifi",
- "hex",
- "log",
- "no-std-framework-core",
-]
-
-[[package]]
 name = "num-derive"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1459,7 +1494,7 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 [[package]]
 name = "peg"
 version = "0.8.5"
-source = "git+https://github.com/exellentcoin26/rust-peg.git#1b34a19adaf1185914d8000b140d43fade3fd0af"
+source = "git+https://github.com/kevinmehall/rust-peg.git#8367f693e5bc1631acc3b90fc21a5fc7f29aecba"
 dependencies = [
  "peg-macros",
  "peg-runtime",
@@ -1468,7 +1503,7 @@ dependencies = [
 [[package]]
 name = "peg-macros"
 version = "0.8.5"
-source = "git+https://github.com/exellentcoin26/rust-peg.git#1b34a19adaf1185914d8000b140d43fade3fd0af"
+source = "git+https://github.com/kevinmehall/rust-peg.git#8367f693e5bc1631acc3b90fc21a5fc7f29aecba"
 dependencies = [
  "peg-runtime",
  "proc-macro2",
@@ -1478,7 +1513,7 @@ dependencies = [
 [[package]]
 name = "peg-runtime"
 version = "0.8.5"
-source = "git+https://github.com/exellentcoin26/rust-peg.git#1b34a19adaf1185914d8000b140d43fade3fd0af"
+source = "git+https://github.com/kevinmehall/rust-peg.git#8367f693e5bc1631acc3b90fc21a5fc7f29aecba"
 
 [[package]]
 name = "percent-encoding"

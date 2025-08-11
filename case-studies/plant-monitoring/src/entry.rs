@@ -22,7 +22,7 @@ use esp_hal::{
     clock::CpuClock,
     gpio::{Input, Level, Output, Pull},
 };
-use no_std_framework_core::Container;
+use ember_core::Container;
 
 use case_study_plant_monitoring::{
     control, light, moist, pump,

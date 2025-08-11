@@ -12,7 +12,7 @@ use esp_hal::{
     rng::Rng,
     timer::timg::TimerGroup,
 };
-use no_std_framework_core::{Aid, Container};
+use ember_core::{Aid, Container};
 
 use plant_monitoring::{light, moist, pump};
 

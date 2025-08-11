@@ -1,12 +1,12 @@
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
 
-use no_std_framework_examples::setup_example;
+use ember_examples::setup_example;
 
 setup_example!();
 
-use no_std_framework_core::behaviour::{Context, OneShotBehaviour};
-use no_std_framework_core::{Agent, Container};
+use ember::behaviour::{Context, OneShotBehaviour};
+use ember::{Agent, Container};
 
 struct HelloWorld;
 

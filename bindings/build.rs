@@ -15,7 +15,7 @@ fn main() {
         namespace: Some(String::from("framework::__ffi")),
         parse: ParseConfig {
             parse_deps: true,
-            include: Some(Vec::from(["no-std-framework-core".into()])),
+            include: Some(Vec::from(["ember-core".into()])),
             ..Default::default()
         },
         no_includes: true,

@@ -16,7 +16,7 @@ esp-println = { version = "0.12.0", features = ["esp32", "log"] }
 esp-wifi = { version = "0.12.0", features = ["esp32", "wifi", "smoltcp"] }
 futures = { version = "0.3.31", default-features = false }
 log = "0.4.27"
-no-std-framework-core = { path = "../../core" }
+ember = { workspace = true }
 smoltcp = { version = "0.12.0", default-features = false, features = ["proto-ipv4"] }
 sntpc = { version = "0.5.2", default-features = false, features = ["log"] }
 

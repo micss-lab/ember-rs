@@ -15,7 +15,7 @@ use esp_wifi::{
     EspWifiController,
     wifi::{WifiController, WifiDevice, WifiStaDevice},
 };
-use no_std_framework_core::{Agent, Container};
+use ember_core::{Agent, Container};
 use smoltcp::{
     iface::{Interface, SocketSet, SocketStorage},
     phy::Device,
@@ -47,7 +47,7 @@ mod routes {
 
     use esp_hal::gpio::{Level, Output};
     use httparse::Request;
-    use no_std_framework_core::behaviour::Context;
+    use ember_core::behaviour::Context;
 
     pub struct State {
         led1: LedState,
