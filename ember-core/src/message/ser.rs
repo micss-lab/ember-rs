@@ -1,8 +1,6 @@
-use alloc::format;
-use alloc::string::ToString;
-
 use crate::message::Content;
-use crate::message::{Message, Receiver};
+use crate::message::{Message, OtherLanguage, Receiver};
+use alloc::format;
 
 impl serde::Serialize for Message {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -29,7 +27,7 @@ impl serde::Serialize for Message {
             }
             Content::Other { kind, content } => {
                 if let Some(kind) = kind {
-                    message.serialize_field("language", &kind.to_string())?;
+                    message.serialize_field("language", kind)?;
                 }
                 message.serialize_field("content", &format!("\"{content}\""))?;
             }
@@ -56,5 +54,18 @@ impl serde::Serialize for Receiver {
                 rs.end()
             }
         }
+    }
+}
+
+impl serde::Serialize for OtherLanguage {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(match self {
+            OtherLanguage::Ccl => "fipa-ccl",
+            OtherLanguage::Kif => "fipa-kif",
+            OtherLanguage::Rdf => "fipa-rdf",
+        })
     }
 }

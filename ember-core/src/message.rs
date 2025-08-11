@@ -6,11 +6,11 @@ use core::str::FromStr;
 
 use chrono::{DateTime, Utc};
 
-
 use crate::agent::aid::Aid;
 
 pub mod content;
 pub mod filter;
+pub mod repr;
 
 mod ser;
 
@@ -122,37 +122,27 @@ pub enum OtherLanguage {
     Rdf,
 }
 
-impl core::fmt::Display for OtherLanguage {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        use OtherLanguage::*;
-        f.write_str(match self {
-            Ccl => "fipa-ccl",
-            Kif => "fipa-kif",
-            Rdf => "fipa-rdf",
-        })
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AclRepresentation {
     BitEfficient,
 }
 
-// impl core::fmt::Display for Message {
-//     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-//         f.write_str(&ser::to_string(&self))
-//     }
-// }
+// TODO: Remove the need for these by using serialize directly.
+mod todo {
+    use super::Message;
 
-impl Message {
-    // #[allow(unused)]
-    // pub(crate) fn try_from_bytes(bytes: impl AsRef<BStr>) -> Result<Self, ()> {
-    //     let bytes = bytes.as_ref();
-    //     self::parser::messsage::message(&crate::util::parsing::BStr::from(bytes)).map_err(|e| {
-    //         log::error!("error parsing acl message: {}", e);
-    //         log::debug!("{}", bytes);
-    //     })
-    // }
+    impl core::fmt::Display for Message {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            f.write_str(&super::repr::human::to_string(&self))
+        }
+    }
+
+    impl Message {
+        #[allow(unused)]
+        pub fn try_from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, ()> {
+            super::repr::human::try_from_bytes(bytes)
+        }
+    }
 }
 
 impl Performative {
