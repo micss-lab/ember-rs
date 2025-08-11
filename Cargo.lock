@@ -734,6 +734,7 @@ dependencies = [
  "bstr",
  "chrono",
  "critical-section",
+ "fugit",
  "hex",
  "libm",
  "log",

@@ -8,7 +8,6 @@ pub use ember_core as core;
 
 pub use ember_core::agent::aid::Aid;
 pub use ember_core::behaviour;
-pub use ember_core::context;
 pub use ember_core::message;
 
 pub use self::agent::Agent;

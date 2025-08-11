@@ -8,11 +8,11 @@ setup_example!();
 use alloc::boxed::Box;
 use core::time::Duration;
 
-use ember_core::behaviour::sequential::SequentialBehaviour;
-use ember_core::behaviour::{
+use ember::behaviour::sequential::SequentialBehaviour;
+use ember::behaviour::{
     Behaviour, ComplexBehaviour, Context, IntoBehaviour, OneShotBehaviour, TickerBehaviour,
 };
-use ember_core::{Agent, Container};
+use ember::{Agent, Container};
 
 struct SensorInit;
 

@@ -19,12 +19,14 @@ log = "0.4.22"
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
 
 [target.'cfg(not(target_os = "none"))'.dependencies]
-ember = { workspace = true }
+ember = { workspace = true, features = ["acc-http"] }
+
 env_logger = "0.11.8"
 critical-section = { version = "1.2.0", features = ["std"] }
 
 [target.'cfg(target_os = "none")'.dependencies]
-ember = { workspace = true }
+ember = { workspace = true, features = ["acc-espnow"] }
+
 esp-alloc = "0.6.0"
 esp-println = { version = "0.12.0", features = ["esp32", "log"] }
 esp-backtrace = { version = "0.14.2", default-features = false, features = [

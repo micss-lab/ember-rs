@@ -6,11 +6,9 @@
 use alloc::format;
 use core::str::FromStr;
 
-use ember_core::acl::message::{
-    Content, Message, MessageEnvelope, Performative, Receiver,
-};
-use ember_core::behaviour::{Context, CyclicBehaviour, TickerBehaviour};
-use ember_core::{Agent, Aid, Container};
+use ember::behaviour::{Context, CyclicBehaviour, TickerBehaviour};
+use ember::message::{Content, Message, MessageEnvelope, Performative, Receiver};
+use ember::{Agent, Aid, Container};
 use ember_examples::setup_example;
 
 setup_example!();

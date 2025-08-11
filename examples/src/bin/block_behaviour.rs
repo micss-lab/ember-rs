@@ -5,8 +5,8 @@ use ember_examples::setup_example;
 
 setup_example!();
 
-use ember_core::behaviour::{Context, CyclicBehaviour, OneShotBehaviour};
-use ember_core::{Agent, Container};
+use ember::behaviour::{Context, CyclicBehaviour, OneShotBehaviour};
+use ember::{Agent, Container};
 
 struct InformationPrinter;
 

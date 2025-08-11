@@ -5,7 +5,7 @@ use ember_examples::setup_example;
 
 setup_example!();
 
-use ember_core::{
+use ember::{
     behaviour::{Context, OneShotBehaviour},
     Agent, Container,
 };
