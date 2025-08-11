@@ -1,5 +1,3 @@
-extern crate std;
-
 use std::collections::BTreeMap;
 use std::format;
 use std::string::{String, ToString};
@@ -11,8 +9,8 @@ use multipart::server::{Multipart, ReadEntry, ReadEntryResult};
 use serde::ser::SerializeStruct;
 use tiny_http::Server;
 
-use crate::acl::message::{AclRepresentation, Message, MessageEnvelope, MessageKind};
-use crate::agent::Aid;
+use ember_core::agent::aid::Aid;
+use ember_core::message::{AclRepresentation, Message, MessageEnvelope, MessageKind};
 
 use super::Acc;
 
@@ -228,7 +226,7 @@ impl HttpEnvelopeDe {
             date: chrono::DateTime::<chrono::Utc>::MIN_UTC.into(),
             acl_representation: AclRepresentation::BitEfficient,
             parameters: BTreeMap::new(),
-            message: MessageKind::Structured(message),
+            message: MessageKind::Parsed(message),
         }
     }
 }
@@ -272,7 +270,7 @@ fn encode_message(message: MessageEnvelope, boundary: &[u8; 16]) -> Bytes {
 
     // Message Body.
     match message.message {
-        MessageKind::Structured(m) => body.put_slice(m.to_string().as_bytes()),
+        MessageKind::Parsed(m) => body.put_slice(m.to_string().as_bytes()),
     }
     body.put_slice(b"\r\n");
     body.put_slice(b"\r\n");
@@ -288,7 +286,7 @@ fn encode_message(message: MessageEnvelope, boundary: &[u8; 16]) -> Bytes {
 }
 
 fn aid_to_url(aid: &Aid) -> String {
-    use crate::agent::AgentPlatform::*;
+    use ember_core::agent::aid::AgentPlatform::*;
     let host = match aid.platform() {
         Local => "localhost",
         Public(h) => h,

@@ -5,6 +5,7 @@ members = [
     "core",
     "examples",
 
+    "ember-acc",
     "ember-core",
 
     "case-studies/colour-combinations",

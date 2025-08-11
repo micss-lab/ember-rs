@@ -167,6 +167,9 @@ name = "bytes"
 version = "1.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d71b6127be86fdcfddb610f7182ac57211d4b18a3e9c82eb2d17662f2227ad6a"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "case-study-colour-combinations"
@@ -672,6 +675,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1763775e2323b7d5f0aa6090657f5e21cfa02ede71f5dc40eead06d64dcd15cc"
 dependencies = [
  "embedded-storage",
+]
+
+[[package]]
+name = "ember-acc"
+version = "0.1.0"
+dependencies = [
+ "bstr",
+ "bytes",
+ "cfg-if",
+ "chrono",
+ "ember-core",
+ "esp-hal",
+ "esp-wifi",
+ "hex",
+ "log",
+ "macaddr",
+ "multipart",
+ "postcard",
+ "rand 0.9.1",
+ "serde",
+ "serde_bencode",
+ "tiny_http",
+ "ureq",
 ]
 
 [[package]]
@@ -1326,6 +1352,9 @@ name = "macaddr"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baee0bbc17ce759db233beb01648088061bf678383130602a298e6998eedb2d8"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "managed"

@@ -27,12 +27,6 @@ pub struct Container<'c> {
     mts: Mts<'c>,
 }
 
-pub trait AgentLike {
-    fn update(&mut self, context: &mut ContainerContext) -> bool;
-
-    fn get_name(&self) -> Cow<str>;
-}
-
 impl Container<'_> {
     pub fn start(mut self) -> Result<(), Box<dyn core::error::Error>> {
         loop {

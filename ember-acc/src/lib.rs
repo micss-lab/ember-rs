@@ -1,44 +1,48 @@
+#![no_std]
+
+extern crate alloc;
+#[cfg(feature = "std")]
+extern crate std;
+
 use core::marker::PhantomData;
 
-use crate::{acl::message::MessageEnvelope, Aid};
+use ember_core::agent::aid::Aid;
+use ember_core::message::MessageEnvelope;
 
-#[cfg(feature = "acc-espnow")]
-use self::espnow::{EspNowChannel, EspNowReceiver, EspNowSender};
-#[cfg(feature = "acc-http")]
-use self::http::HttpChannel;
+#[cfg(feature = "espnow")]
+use self::espnow::*;
+#[cfg(feature = "http")]
+use self::http::*;
 
-#[cfg(feature = "acc-espnow")]
+#[cfg(feature = "espnow")]
 mod espnow;
-#[cfg(feature = "acc-http")]
+#[cfg(feature = "http")]
 mod http;
 
-pub(crate) trait Acc {
+pub trait Acc {
     fn send(&mut self, aid: &Aid, message: MessageEnvelope) -> Result<(), ()>;
 
     fn receive(&mut self) -> Option<MessageEnvelope>;
 }
 
-pub(crate) struct Channels<'c> {
-    #[cfg(feature = "acc-http")]
+#[derive(Default)]
+pub struct Channels<'c> {
+    #[cfg(feature = "http")]
     http: Option<HttpChannel>,
-    #[cfg(feature = "acc-espnow")]
+    #[cfg(feature = "espnow")]
     espnow: Option<EspNowChannel<'c>>,
     _lifetime: PhantomData<&'c ()>,
 }
 
 impl Channels<'_> {
-    pub(crate) fn new() -> Self {
-        Self {
-            #[cfg(feature = "acc-http")]
-            http: None,
-            #[cfg(feature = "acc-espnow")]
-            espnow: None,
-            _lifetime: PhantomData,
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
+}
 
-    #[cfg(feature = "acc-http")]
-    pub(crate) fn enable_http(&mut self, port: u16) {
+impl Channels<'_> {
+    #[cfg(feature = "http")]
+    pub fn enable_http(&mut self, port: u16) {
         if self.http.is_some() {
             log::warn!("Http already enabled. Nothing changed.");
             return;
@@ -48,8 +52,8 @@ impl Channels<'_> {
 }
 
 impl<'c> Channels<'c> {
-    #[cfg(feature = "acc-espnow")]
-    pub(crate) fn enable_espnow(
+    #[cfg(feature = "espnow")]
+    pub fn enable_espnow(
         &mut self,
         sender: Option<EspNowSender<'c>>,
         receiver: Option<EspNowReceiver<'c>>,
@@ -65,11 +69,11 @@ impl<'c> Channels<'c> {
 impl Acc for Channels<'_> {
     fn send(&mut self, address: &Aid, message: MessageEnvelope) -> Result<(), ()> {
         cfg_if::cfg_if! {
-            if #[cfg(feature = "acc-http")] {
+            if #[cfg(feature = "http")] {
                 self.http
                     .as_mut()
                     .map_or(Err(()), |http| http.send(address, message))
-            } else if #[cfg(feature = "acc-espnow")] {
+            } else if #[cfg(feature = "espnow")] {
                 self.espnow.as_mut().map_or(Err(()), |espnow| espnow.send(address, message))
             } else {
                 let _ = (address, message);
@@ -80,9 +84,9 @@ impl Acc for Channels<'_> {
 
     fn receive(&mut self) -> Option<MessageEnvelope> {
         cfg_if::cfg_if! {
-            if #[cfg(feature = "acc-http")] {
+            if #[cfg(feature = "http")] {
                 self.http.as_mut()?.receive()
-            } else if #[cfg(feature = "acc-espnow")] {
+            } else if #[cfg(feature = "espnow")] {
                 self.espnow.as_mut()?.receive()
             } else {
                 None

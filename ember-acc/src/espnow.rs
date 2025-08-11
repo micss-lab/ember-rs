@@ -9,10 +9,10 @@ use macaddr::MacAddr6;
 use serde::de::Unexpected;
 use serde::ser::SerializeStruct;
 
-use crate::acl::message::{AclRepresentation, Message, MessageEnvelope, MessageKind};
-use crate::agent::Aid;
+use ember_core::agent::aid::Aid;
+use ember_core::message::{AclRepresentation, Message, MessageEnvelope, MessageKind};
 
-use super::Acc;
+use crate::Acc;
 
 pub(super) struct EspNowChannel<'c> {
     sender: Option<Sender<'c>>,
@@ -83,7 +83,7 @@ impl serde::Serialize for EspNowMessageSer<'_> {
         let mut message = serializer.serialize_struct("message", 2)?;
         message.serialize_field("envelope", &EspNowEnvelopeSer(self.0))?;
         match &self.0.message {
-            MessageKind::Structured(m) => {
+            MessageKind::Parsed(m) => {
                 message.serialize_field("content", m.to_string().as_bytes())?
             }
         }
@@ -212,13 +212,13 @@ impl EspNowMessageDe {
             date: chrono::DateTime::<chrono::Utc>::MIN_UTC.into(),
             acl_representation: AclRepresentation::BitEfficient,
             parameters: BTreeMap::new(),
-            message: MessageKind::Structured(self.content.message),
+            message: MessageKind::Parsed(self.content.message),
         }
     }
 }
 
 fn aid_to_mac(aid: &Aid) -> [u8; 6] {
-    use crate::agent::AgentPlatform::*;
+    use ember_core::agent::aid::AgentPlatform::*;
     let mac = match aid.platform() {
         Local => panic!("espnow channel does not support sending messages to localhost"),
         Public(p) => p
