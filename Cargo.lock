@@ -340,6 +340,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c469d952047f47f91b68d1cba3f10d63c11d73e4636f24f08daf0278abf01c4d"
 dependencies = [
  "num-traits",
+ "serde",
 ]
 
 [[package]]
@@ -671,6 +672,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1763775e2323b7d5f0aa6090657f5e21cfa02ede71f5dc40eead06d64dcd15cc"
 dependencies = [
  "embedded-storage",
+]
+
+[[package]]
+name = "ember-core"
+version = "0.1.0"
+dependencies = [
+ "bstr",
+ "chrono",
+ "critical-section",
+ "hex",
+ "libm",
+ "log",
+ "peg 0.8.5 (git+https://github.com/kevinmehall/rust-peg.git)",
+ "serde",
 ]
 
 [[package]]
@@ -1156,6 +1171,9 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "http"
@@ -1299,6 +1317,9 @@ name = "log"
 version = "0.4.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "macaddr"
@@ -1398,7 +1419,7 @@ dependencies = [
  "log",
  "macaddr",
  "multipart",
- "peg",
+ "peg 0.8.5 (git+https://github.com/exellentcoin26/rust-peg.git)",
  "postcard",
  "rand 0.9.1",
  "serde",
@@ -1461,8 +1482,17 @@ name = "peg"
 version = "0.8.5"
 source = "git+https://github.com/exellentcoin26/rust-peg.git#1b34a19adaf1185914d8000b140d43fade3fd0af"
 dependencies = [
- "peg-macros",
- "peg-runtime",
+ "peg-macros 0.8.5 (git+https://github.com/exellentcoin26/rust-peg.git)",
+ "peg-runtime 0.8.5 (git+https://github.com/exellentcoin26/rust-peg.git)",
+]
+
+[[package]]
+name = "peg"
+version = "0.8.5"
+source = "git+https://github.com/kevinmehall/rust-peg.git#8367f693e5bc1631acc3b90fc21a5fc7f29aecba"
+dependencies = [
+ "peg-macros 0.8.5 (git+https://github.com/kevinmehall/rust-peg.git)",
+ "peg-runtime 0.8.5 (git+https://github.com/kevinmehall/rust-peg.git)",
 ]
 
 [[package]]
@@ -1470,7 +1500,17 @@ name = "peg-macros"
 version = "0.8.5"
 source = "git+https://github.com/exellentcoin26/rust-peg.git#1b34a19adaf1185914d8000b140d43fade3fd0af"
 dependencies = [
- "peg-runtime",
+ "peg-runtime 0.8.5 (git+https://github.com/exellentcoin26/rust-peg.git)",
+ "proc-macro2",
+ "quote",
+]
+
+[[package]]
+name = "peg-macros"
+version = "0.8.5"
+source = "git+https://github.com/kevinmehall/rust-peg.git#8367f693e5bc1631acc3b90fc21a5fc7f29aecba"
+dependencies = [
+ "peg-runtime 0.8.5 (git+https://github.com/kevinmehall/rust-peg.git)",
  "proc-macro2",
  "quote",
 ]
@@ -1479,6 +1519,11 @@ dependencies = [
 name = "peg-runtime"
 version = "0.8.5"
 source = "git+https://github.com/exellentcoin26/rust-peg.git#1b34a19adaf1185914d8000b140d43fade3fd0af"
+
+[[package]]
+name = "peg-runtime"
+version = "0.8.5"
+source = "git+https://github.com/kevinmehall/rust-peg.git#8367f693e5bc1631acc3b90fc21a5fc7f29aecba"
 
 [[package]]
 name = "percent-encoding"

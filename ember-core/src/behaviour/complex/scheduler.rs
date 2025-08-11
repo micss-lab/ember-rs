@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 
 use super::{Behaviour, BehaviourId, Context};
 
-pub(crate) trait BehaviourScheduler<S: 'static, E: 'static> {
+pub trait BehaviourScheduler<S: 'static, E: 'static> {
     fn next(&mut self) -> Option<Box<dyn Behaviour<AgentState = S, Event = E>>>;
 
     fn reschedule(&mut self, behaviour: Box<dyn Behaviour<AgentState = S, Event = E>>);

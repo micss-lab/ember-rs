@@ -1,14 +1,10 @@
 use alloc::boxed::Box;
 
-pub use self::complex::{fsm, parallel, sequential, ComplexBehaviour};
-pub use self::simple::{CyclicBehaviour, OneShotBehaviour, TickerBehaviour};
-
-pub use crate::context::Context;
-
+use crate::context::Context;
 use crate::util::sync::AtomicU32;
 
-pub(crate) mod complex;
-mod simple;
+pub mod complex;
+pub mod simple;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]

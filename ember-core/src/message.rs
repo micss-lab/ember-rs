@@ -1,46 +1,18 @@
-pub use self::filter::MessageFilter;
-
 use alloc::collections::{BTreeMap, BTreeSet};
-use alloc::format;
-use alloc::string::{String, ToString};
+use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::str::FromStr;
 
-use bstr::BStr;
 use chrono::{DateTime, Utc};
 
-use serde::ser::{SerializeSeq, SerializeStruct};
 
-use crate::acl::ser;
-use crate::agent::Aid;
+use crate::agent::aid::Aid;
 
-use super::sl;
+pub mod content;
+pub mod filter;
 
-mod filter;
-mod parser;
-
-// type Encoding = String;
-
-type Ontology = String;
-
-// type Protocol = String;
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Message {
-    pub performative: Performative,
-    pub sender: Option<Aid>,
-    pub receiver: Receiver,
-    pub reply_to: Option<Aid>,
-    pub ontology: Option<Ontology>,
-    pub content: Content,
-    // TODO: Implement these.
-    // protocol: Option<Protocol>,
-    // conversation_id: Option<String>,
-    // reply_with: Option<String>,
-    // in_reply_to: Option<String>,
-    // reply_by: Option<String>,
-}
+mod ser;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct MessageEnvelope {
@@ -52,6 +24,22 @@ pub struct MessageEnvelope {
     pub message: MessageKind,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Message {
+    pub performative: Performative,
+    pub sender: Option<Aid>,
+    pub receiver: Receiver,
+    pub reply_to: Option<Aid>,
+    pub ontology: Option<String>,
+    pub content: Content,
+    // TODO: Implement these.
+    // protocol: Option<Protocol>,
+    // conversation_id: Option<String>,
+    // reply_with: Option<String>,
+    // in_reply_to: Option<String>,
+    // reply_by: Option<String>,
+}
+
 impl MessageEnvelope {
     pub fn new(to: Aid, message: Message) -> Self {
         Self {
@@ -60,7 +48,7 @@ impl MessageEnvelope {
             date: DateTime::<Utc>::MIN_UTC.into(),
             acl_representation: AclRepresentation::BitEfficient,
             parameters: BTreeMap::new(),
-            message: MessageKind::Structured(message),
+            message: MessageKind::Parsed(message),
         }
     }
 }
@@ -106,7 +94,7 @@ pub enum Performative {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Content {
-    Sl(sl::Content),
+    Structured(self::content::Content),
     Bytes(Vec<u8>),
     Other {
         kind: Option<OtherLanguage>,
@@ -114,15 +102,15 @@ pub enum Content {
     },
 }
 
-impl From<sl::Content> for Content {
-    fn from(content: sl::Content) -> Self {
-        Self::Sl(content)
+impl From<self::content::Content> for Content {
+    fn from(content: self::content::Content) -> Self {
+        Self::Structured(content)
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MessageKind {
-    Structured(Message),
+    Parsed(Message),
     // TODO: Support this.
     // Bytes(bstr::BString),
 }
@@ -150,21 +138,21 @@ pub enum AclRepresentation {
     BitEfficient,
 }
 
-impl core::fmt::Display for Message {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str(&ser::to_string(&self))
-    }
-}
+// impl core::fmt::Display for Message {
+//     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+//         f.write_str(&ser::to_string(&self))
+//     }
+// }
 
 impl Message {
-    #[allow(unused)]
-    pub(crate) fn try_from_bytes(bytes: impl AsRef<BStr>) -> Result<Self, ()> {
-        let bytes = bytes.as_ref();
-        self::parser::messsage::message(&crate::util::parsing::BStr::from(bytes)).map_err(|e| {
-            log::error!("error parsing acl message: {}", e);
-            log::debug!("{}", bytes);
-        })
-    }
+    // #[allow(unused)]
+    // pub(crate) fn try_from_bytes(bytes: impl AsRef<BStr>) -> Result<Self, ()> {
+    //     let bytes = bytes.as_ref();
+    //     self::parser::messsage::message(&crate::util::parsing::BStr::from(bytes)).map_err(|e| {
+    //         log::error!("error parsing acl message: {}", e);
+    //         log::debug!("{}", bytes);
+    //     })
+    // }
 }
 
 impl Performative {
@@ -231,55 +219,5 @@ impl FromStr for Performative {
             "unknown" => Unknown,
             _ => return Err(()),
         })
-    }
-}
-
-impl serde::Serialize for Message {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        // TODO: Add other fields here.
-        let mut message = serializer.serialize_struct(self.performative.as_str(), 3)?;
-        // message.serialize_field("sender", &self.sender)?;
-        message.serialize_field("receiver", &self.receiver)?;
-        match &self.content {
-            Content::Sl(sl) => {
-                message.serialize_field("lanuage", "fipa-sl0")?;
-                message.serialize_field("content", &format!("\"{}\"", sl))?;
-            }
-            Content::Bytes(b) => {
-                message.serialize_field("language", "bytes")?;
-                // TODO: Encode as regular bytes when parsing support for acl messages is expanded.
-                message
-                    .serialize_field("content", &format!("\"{}\"", hex::encode(b.as_slice())))?;
-            }
-            Content::Other { kind, content } => {
-                if let Some(kind) = kind {
-                    message.serialize_field("language", &kind.to_string())?;
-                }
-                message.serialize_field("content", &format!("\"{}\"", content))?;
-            }
-        }
-        message.serialize_field("ontology", &self.ontology)?;
-        message.end()
-    }
-}
-
-impl serde::Serialize for Receiver {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        match self {
-            Receiver::Single(r) => r.serialize(serializer),
-            Receiver::Multiple(receivers) => {
-                let mut rs = serializer.serialize_seq(Some(receivers.len()))?;
-                for r in receivers {
-                    rs.serialize_element(r)?;
-                }
-                rs.end()
-            }
-        }
     }
 }

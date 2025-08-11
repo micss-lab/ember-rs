@@ -1,10 +1,11 @@
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
 
-use crate::acl::message::{Message, MessageEnvelope, MessageFilter};
 use crate::behaviour::BehaviourId;
+use crate::message::filter::MessageFilter;
+use crate::message::{Message, MessageEnvelope};
 
-pub(crate) use self::messsage_store::MessageStore;
+pub use self::messsage_store::MessageStore;
 
 mod messsage_store;
 
@@ -15,11 +16,11 @@ pub struct Context<E> {
 }
 
 #[derive(Default)]
-pub(crate) struct ContainerContext {
-    pub(crate) should_stop: bool,
-    pub(crate) message_outbox: Vec<MessageEnvelope>,
-    pub(crate) message_inbox: MessageStore,
-    pub(crate) new_messages: bool,
+pub struct ContainerContext {
+    pub should_stop: bool,
+    pub message_outbox: Vec<MessageEnvelope>,
+    pub message_inbox: MessageStore,
+    pub new_messages: bool,
 }
 
 #[derive(Default)]

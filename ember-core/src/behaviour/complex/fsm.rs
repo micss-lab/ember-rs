@@ -4,8 +4,8 @@ use alloc::collections::{BTreeMap, BTreeSet};
 use super::blocked::BlockTracker;
 use super::scheduler::BehaviourScheduler;
 use super::{
-    get_id, Behaviour, BehaviourId, ComplexBehaviour, ComplexBehaviourImpl, Context, IntoBehaviour,
-    ScheduledComplexBehaviour,
+    Behaviour, BehaviourId, ComplexBehaviour, ComplexBehaviourImpl, Context, IntoBehaviour,
+    ScheduledComplexBehaviour, get_id,
 };
 
 pub trait FsmBehaviour: ComplexBehaviour {

@@ -1,9 +1,10 @@
 use alloc::{borrow::Cow, collections::vec_deque::VecDeque};
 
-use crate::acl::message::{Message, MessageEnvelope, MessageFilter};
+use crate::message::filter::MessageFilter;
+use crate::message::{Message, MessageEnvelope};
 
 #[derive(Default, Debug, Clone)]
-pub(crate) struct MessageStore {
+pub struct MessageStore {
     messages: VecDeque<MessageEnvelope>,
 }
 
@@ -20,12 +21,12 @@ impl MessageStore {
         &mut self,
         filter: Option<Cow<'_, MessageFilter>>,
     ) -> Option<Message> {
-        use crate::acl::message::MessageKind;
+        use crate::message::MessageKind;
         let filter = filter.unwrap_or_else(|| Cow::Owned(MessageFilter::all()));
         self.messages
             .iter()
             .map(|m| match m.message {
-                MessageKind::Structured(ref m) => m,
+                MessageKind::Parsed(ref m) => m,
             })
             .position(|m| filter.matches(m))
             .map(|p| {
@@ -34,7 +35,7 @@ impl MessageStore {
                     .expect("message should be in the list")
             })
             .map(|m| match m.message {
-                MessageKind::Structured(m) => m,
+                MessageKind::Parsed(m) => m,
             })
     }
 

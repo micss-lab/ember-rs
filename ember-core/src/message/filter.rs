@@ -1,7 +1,8 @@
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::ops::Not;
 
-use super::{Message, Ontology, Performative};
+use crate::message::{Message, Performative};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MessageFilter {
@@ -27,7 +28,7 @@ pub enum FilterLiteral {
     /// Matches with everything.
     All,
     /// Ontology name to match against.
-    Ontology(Ontology),
+    Ontology(String),
     /// Performative to match against.
     Performative(Performative),
 }
@@ -54,10 +55,10 @@ impl MessageFilter {
         }
     }
 
-    pub fn ontology(ontology: Ontology) -> MessageFilter {
+    pub fn ontology(ontology: impl ToString) -> MessageFilter {
         MessageFilter::Literal {
             negated: false,
-            kind: FilterLiteral::Ontology(ontology),
+            kind: FilterLiteral::Ontology(ontology.to_string()),
         }
     }
 }

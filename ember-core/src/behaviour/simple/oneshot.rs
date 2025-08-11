@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 
-use super::{get_id, Behaviour, BehaviourId, Context, IntoBehaviour};
+use crate::behaviour::{Behaviour, BehaviourId, IntoBehaviour, get_id};
+use crate::context::Context;
 
 pub trait OneShotBehaviour {
     type AgentState;

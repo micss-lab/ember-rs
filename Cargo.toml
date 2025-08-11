@@ -5,6 +5,8 @@ members = [
     "core",
     "examples",
 
+    "ember-core",
+
     "case-studies/colour-combinations",
     "case-studies/home-automation",
     "case-studies/http-server",
@@ -13,3 +15,6 @@ members = [
     "case-studies/smart-home",
     "case-studies/smart-home-distributed",
 ]
+
+[workspace.dependencies]
+ember-core = { path = "./ember-core" }

@@ -4,8 +4,8 @@ use alloc::collections::vec_deque::VecDeque;
 use super::blocked::BlockTracker;
 use super::scheduler::BehaviourScheduler;
 use super::{
-    get_id, Behaviour, BehaviourId, ComplexBehaviour, ComplexBehaviourImpl, Context, IntoBehaviour,
-    ScheduledComplexBehaviour,
+    Behaviour, BehaviourId, ComplexBehaviour, ComplexBehaviourImpl, Context, IntoBehaviour,
+    ScheduledComplexBehaviour, get_id,
 };
 
 pub trait SequentialBehaviour: ComplexBehaviour {
@@ -16,7 +16,7 @@ pub trait SequentialBehaviour: ComplexBehaviour {
     >;
 }
 
-struct SequentialBehaviourQueue<S, E> {
+pub struct SequentialBehaviourQueue<S, E> {
     blocked: BlockTracker,
     behaviours: VecDeque<Box<dyn Behaviour<AgentState = S, Event = E>>>,
 }

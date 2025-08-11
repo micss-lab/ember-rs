@@ -9,11 +9,7 @@ pub use self::agent::{Agent, Aid};
 pub use self::container::Container;
 
 pub mod acc;
-pub mod acl;
 mod adt;
 mod agent;
-pub mod behaviour;
 mod container;
-mod context;
 mod fipa;
-mod util;

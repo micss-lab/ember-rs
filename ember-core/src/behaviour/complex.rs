@@ -1,12 +1,14 @@
-use self::scheduler::BehaviourScheduler;
-use super::{get_id, Behaviour, BehaviourId, Context, IntoBehaviour};
+use crate::behaviour::{Behaviour, BehaviourId, IntoBehaviour, get_id};
+use crate::context::Context;
 
+use self::scheduler::BehaviourScheduler;
+
+pub mod blocked;
 pub mod fsm;
 pub mod parallel;
-pub mod sequential;
 
-mod blocked;
-pub(crate) mod scheduler;
+pub mod scheduler;
+pub mod sequential;
 
 pub trait ComplexBehaviour {
     type Event;

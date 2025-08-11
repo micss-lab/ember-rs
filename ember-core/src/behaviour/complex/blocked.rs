@@ -3,7 +3,7 @@ use alloc::collections::BTreeSet;
 use super::BehaviourId;
 
 #[derive(Debug, Default)]
-pub(super) struct BlockTracker {
+pub struct BlockTracker {
     ids: BTreeSet<BehaviourId>,
     // TODO: Optimize this to a bitset the length of `ids`.
     blocked_ids: BTreeSet<BehaviourId>,

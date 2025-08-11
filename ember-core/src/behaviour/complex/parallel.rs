@@ -4,8 +4,8 @@ use alloc::collections::{BTreeSet, VecDeque};
 use super::blocked::BlockTracker;
 use super::scheduler::BehaviourScheduler;
 use super::{
-    get_id, Behaviour, BehaviourId, ComplexBehaviour, ComplexBehaviourImpl, Context, IntoBehaviour,
-    ScheduledComplexBehaviour,
+    Behaviour, BehaviourId, ComplexBehaviour, ComplexBehaviourImpl, Context, IntoBehaviour,
+    ScheduledComplexBehaviour, get_id,
 };
 
 pub trait ParallelBehaviour: ComplexBehaviour {
@@ -18,7 +18,7 @@ pub trait ParallelBehaviour: ComplexBehaviour {
     >;
 }
 
-pub(crate) struct ParallelBehaviourQueue<S, E> {
+pub struct ParallelBehaviourQueue<S, E> {
     blocked: BlockTracker,
     behaviours: VecDeque<Box<dyn Behaviour<AgentState = S, Event = E>>>,
     finished: usize,
@@ -47,7 +47,7 @@ impl<S: 'static, E: 'static> ParallelBehaviourQueue<S, E> {
         }
     }
 
-    pub(crate) fn new_empty(strategy: FinishStrategy) -> Self {
+    pub fn new_empty(strategy: FinishStrategy) -> Self {
         Self {
             blocked: BlockTracker::default(),
             behaviours: VecDeque::default(),
@@ -56,7 +56,7 @@ impl<S: 'static, E: 'static> ParallelBehaviourQueue<S, E> {
         }
     }
 
-    pub(crate) fn with_behaviour<K>(
+    pub fn with_behaviour<K>(
         mut self,
         behaviour: impl IntoBehaviour<K, AgentState = S, Event = E>,
     ) -> Self {
@@ -64,7 +64,7 @@ impl<S: 'static, E: 'static> ParallelBehaviourQueue<S, E> {
         self
     }
 
-    pub(crate) fn add_behaviour<K>(
+    pub fn add_behaviour<K>(
         &mut self,
         behaviour: impl IntoBehaviour<K, AgentState = S, Event = E>,
     ) {
