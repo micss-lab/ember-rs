@@ -1,5 +1,5 @@
 use esp_hal::gpio::Input;
-use no_std_framework_core::{
+use ember_core::{
     behaviour::{Context, TickerBehaviour},
     Agent,
 };
@@ -12,7 +12,7 @@ pub fn pir_agent(sensor: Input<'static>) -> Agent<(), ()> {
 }
 
 pub mod ontology {
-    use no_std_framework_core::{
+    use ember_core::{
         acl::message::{Content, Message, Performative, Receiver},
         Aid,
     };

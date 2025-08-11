@@ -13,7 +13,7 @@ use home_automation::{
     lock::ontology::DoorLockOntology,
     pir::ontology::PirOntology,
 };
-use no_std_framework_core::{
+use ember_core::{
     Agent,
     acl::message::MessageFilter,
     behaviour::{Context, CyclicBehaviour, TickerBehaviour},

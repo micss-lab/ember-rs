@@ -1,12 +1,12 @@
 [workspace]
 resolver = "2"
 members = [
-    "bindings",
-    "core",
-    "examples",
-
+    "ember",
     "ember-acc",
     "ember-core",
+
+    "bindings",
+    "examples",
 
     "case-studies/colour-combinations",
     "case-studies/home-automation",
@@ -18,4 +18,6 @@ members = [
 ]
 
 [workspace.dependencies]
+ember = { path = "./ember" }
+ember-acc = { path = "./ember-acc" }
 ember-core = { path = "./ember-core" }

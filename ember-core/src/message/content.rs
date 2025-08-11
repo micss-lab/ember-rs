@@ -5,6 +5,7 @@ use core::marker::PhantomData;
 
 use chrono::{DateTime, FixedOffset};
 
+pub mod codec;
 pub mod lang;
 
 /// List of expressions to form the content of an ACL message.

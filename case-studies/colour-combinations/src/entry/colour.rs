@@ -30,7 +30,7 @@
 use alloc::boxed::Box;
 use core::marker::PhantomData;
 
-use no_std_framework_core::{
+use ember_core::{
     behaviour::{
         fsm::{Fsm, FsmBehaviour, FsmEvent},
         Behaviour, BehaviourId, ComplexBehaviour, Context, CyclicBehaviour, IntoBehaviour,

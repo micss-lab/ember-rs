@@ -18,7 +18,7 @@ mod setup_example {
                 pub(super) use esp_hal_embassy as _;
                 pub(super) use esp_println::print;
 
-                pub(super) use no_std_framework_examples::esp;
+                pub(super) use ember_examples::esp;
             }
 
             #[cfg(target_os = "none")]
@@ -39,7 +39,7 @@ mod setup_example {
 
             #[cfg(not(target_os = "none"))]
             fn main() {
-                use no_std_framework_examples::local;
+                use ember_examples::local;
                 local::init_logger(log::LevelFilter::Trace);
 
                 example();

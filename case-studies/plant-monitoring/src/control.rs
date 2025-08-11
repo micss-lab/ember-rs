@@ -1,6 +1,6 @@
 use alloc::borrow::Cow;
 use esp_hal::gpio::Input;
-use no_std_framework_core::{
+use ember_core::{
     acl::message::MessageFilter,
     behaviour::{Context, CyclicBehaviour, TickerBehaviour},
     Agent,

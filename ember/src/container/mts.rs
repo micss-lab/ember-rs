@@ -3,8 +3,9 @@ use alloc::collections::BTreeSet;
 #[cfg(feature = "acc-espnow")]
 use esp_wifi::esp_now;
 
-use crate::acc::{Acc, Channels};
-use crate::acl::message::MessageEnvelope;
+use ember_acc::{Acc, Channels};
+use ember_core::message::MessageEnvelope;
+
 use crate::adt::{Adt, AgentReference, LocalAgentReference};
 
 pub(super) struct Mts<'c> {
@@ -33,7 +34,7 @@ impl Mts<'_> {
 
                     match adt.get_mut(resolved.local_name()) {
                         Some(AgentReference::Local(LocalAgentReference { inbox })) => {
-                            break Some(inbox)
+                            break Some(inbox);
                         }
                         Some(AgentReference::Proxy(proxy)) => {
                             if !visited.insert(proxy.clone()) {
@@ -44,8 +45,7 @@ impl Mts<'_> {
                         }
                         None => {
                             log::error!(
-                                "Failed to send message to agent `{}`: local agent not registered with the ams",
-                                t
+                                "Failed to send message to agent `{t}`: local agent not registered with the ams"
                             );
                             return;
                         }
@@ -53,7 +53,7 @@ impl Mts<'_> {
                 } {
                     inbox.push(envelope.clone());
                 } else if self.channels.send(&resolved, envelope.clone()).is_err() {
-                    log::error!("Failed to send message to agent `{}`.", t);
+                    log::error!("Failed to send message to agent `{t}`.");
                 }
             }
         }

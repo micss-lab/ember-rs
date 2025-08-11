@@ -3,15 +3,17 @@ use alloc::collections::vec_deque::VecDeque;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use crate::acl::message::{MessageFilter, Performative};
-use crate::adt::{Adt, AgentReference, LocalAgentReference};
-use crate::behaviour::parallel::{FinishStrategy, ParallelBehaviourQueue};
-use crate::behaviour::{CyclicBehaviour, OneShotBehaviour};
-use crate::container::AgentLike;
-use crate::context::{ContainerContext, Context};
-use crate::fipa::{ActionKind, AmsAgentDescription, ManagementOntology};
+use ember_core::agent::Agent as AgentTrait;
+use ember_core::agent::aid::Aid;
+use ember_core::behaviour::complex::parallel::{FinishStrategy, ParallelBehaviourQueue};
+use ember_core::behaviour::simple::cyclic::CyclicBehaviour;
+use ember_core::behaviour::simple::oneshot::OneShotBehaviour;
+use ember_core::context::{ContainerContext, Context};
+use ember_core::message::Performative;
+use ember_core::message::filter::MessageFilter;
 
-use super::Aid;
+use crate::adt::{Adt, AgentReference, LocalAgentReference};
+use crate::fipa::{ActionKind, AmsAgentDescription, ManagementOntology};
 
 pub(crate) struct AmsAgent {
     /// Inner agent on which ams behaviours will be stored.
@@ -20,9 +22,9 @@ pub(crate) struct AmsAgent {
     actions: VecDeque<ActionKind>,
 }
 
-impl AgentLike for AmsAgent {
+impl AgentTrait for AmsAgent {
     fn update(&mut self, ctx: &mut ContainerContext) -> bool {
-        use crate::behaviour::complex::scheduler::BehaviourScheduler;
+        use ember_core::behaviour::complex::scheduler::BehaviourScheduler;
 
         // log::trace!("Ticking ams agent");
 
@@ -83,7 +85,7 @@ impl AmsAgent {
         let aid: Aid = match agent.name.map(|n| n.parse()) {
             Some(Ok(aid)) => aid,
             Some(Err(e)) => {
-                log::error!("Cannot register agent: {}", e);
+                log::error!("Cannot register agent: {e}");
                 return;
             }
             None => {
@@ -95,7 +97,7 @@ impl AmsAgent {
             log::error!("Cannot register agent that is not local to the ams.");
         }
         let name = aid.local_name().to_string();
-        log::trace!("Trying to registering agent `{}`.", name);
+        log::trace!("Trying to registering agent `{name}`.");
         match adt.entry(name.clone()) {
             Entry::Vacant(entry) => {
                 entry.insert(AgentReference::Local(LocalAgentReference {
@@ -105,8 +107,7 @@ impl AmsAgent {
             }
             Entry::Occupied(_) => {
                 log::error!(
-                    "Cannot register agent `{}` as it is already registered.",
-                    aid
+                    "Cannot register agent `{aid}` as it is already registered."
                 );
             }
         }
@@ -134,7 +135,7 @@ impl FipaAgentManagementBehaviour {
         Self {
             filter: MessageFilter::and([
                 MessageFilter::performative(Performative::Request),
-                MessageFilter::ontology(ManagementOntology::name().into()),
+                MessageFilter::ontology(ManagementOntology::name()),
             ]),
         }
     }
@@ -154,7 +155,7 @@ impl CyclicBehaviour for FipaAgentManagementBehaviour {
         let action_kind = match ManagementOntology::decode_message(message) {
             Ok(k) => k,
             Err(e) => {
-                log::error!("Could not decode message: {:?}", e);
+                log::error!("Could not decode message: {e:?}");
                 todo!()
             }
         };

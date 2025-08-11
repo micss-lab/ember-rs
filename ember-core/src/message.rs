@@ -8,6 +8,8 @@ use chrono::{DateTime, Utc};
 
 use crate::agent::aid::Aid;
 
+pub use self::filter::MessageFilter;
+
 pub mod content;
 pub mod filter;
 pub mod repr;

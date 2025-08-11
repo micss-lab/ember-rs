@@ -2,11 +2,13 @@ use alloc::borrow::Cow;
 use alloc::format;
 use alloc::string::{String, ToString};
 
-use crate::acl::message::{Message, MessageEnvelope, Performative};
-use crate::behaviour::parallel::{FinishStrategy, ParallelBehaviourQueue};
-use crate::behaviour::{BehaviourId, IntoBehaviour};
-use crate::container::AgentLike;
-use crate::context::{ContainerContext, Context};
+use ember_core::agent::Agent as AgentTrait;
+use ember_core::agent::aid::Aid;
+use ember_core::behaviour::complex::parallel::{FinishStrategy, ParallelBehaviourQueue};
+use ember_core::behaviour::{BehaviourId, IntoBehaviour};
+use ember_core::context::{ContainerContext, Context};
+use ember_core::message::{Message, MessageEnvelope, Performative};
+
 use crate::fipa::{self, AmsAgentDescription, RegisterAction};
 
 pub(crate) use self::ams::AmsAgent;
@@ -58,11 +60,11 @@ impl<S: 'static, E: 'static> Agent<S, E> {
     }
 }
 
-impl<S: 'static, E: 'static> AgentLike for Agent<S, E> {
+impl<S: 'static, E: 'static> AgentTrait for Agent<S, E> {
     fn update(&mut self, ctx: &mut ContainerContext) -> bool {
-        use crate::acl::codec::AgentActionCodec;
-        use crate::behaviour::complex::scheduler::BehaviourScheduler;
         use ExecutionState::*;
+        use ember_core::behaviour::complex::scheduler::BehaviourScheduler;
+        use ember_core::message::content::codec::AgentActionCodec;
 
         // log::trace!("Ticking agent `{}`", self.name);
 

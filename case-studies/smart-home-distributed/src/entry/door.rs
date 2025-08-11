@@ -11,7 +11,7 @@ use esp_hal::{
     uart::UartRx,
 };
 use macaddr::MacAddr6;
-use no_std_framework_core::{Aid, Container};
+use ember_core::{Aid, Container};
 
 use home_automation::{lock /* , pir */};
 

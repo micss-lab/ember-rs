@@ -1,5 +1,5 @@
 use esp_hal::gpio::Output;
-use no_std_framework_core::{
+use ember_core::{
     behaviour::{Context, CyclicBehaviour},
     Agent,
 };
@@ -19,7 +19,7 @@ pub struct PumpState {
 }
 
 pub mod ontology {
-    use no_std_framework_core::{
+    use ember_core::{
         acl::message::{Content, Message, Performative, Receiver},
         Aid,
     };

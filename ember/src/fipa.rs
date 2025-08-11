@@ -2,9 +2,9 @@ use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use crate::acl::codec::{AgentActionCodec, ConceptCodec, ConstantCodec, DecodeError};
-use crate::acl::message::{Content, Message};
-use crate::acl::sl::{AgentAction, Concept, ConceptParameters, Term};
+use ember_core::message::content::codec::*;
+use ember_core::message::content::{AgentAction, Concept, ConceptParameters, Term};
+use ember_core::message::{Content, Message};
 
 pub struct ManagementOntology;
 
@@ -32,7 +32,7 @@ impl ManagementOntology {
         if message.ontology.is_none_or(|o| o != Self::name()) {
             return Err(DecodeAsOntologyError::UnexpectedOntology);
         }
-        let Content::Sl(content) = message.content else {
+        let Content::Structured(content) = message.content else {
             return Err(DecodeAsOntologyError::UnexpectedLanguage);
         };
         let mut agent_action: AgentAction =

@@ -10,14 +10,14 @@ pub struct MessageStore {
 
 impl MessageStore {
     /// Create a new store from an existing one by moving all the messages.
-    pub(super) fn take(&mut self) -> Self {
+    pub fn take(&mut self) -> Self {
         Self {
             messages: core::mem::take(&mut self.messages),
         }
     }
 
     /// Find the first message that matches the filter and remove it from the store.
-    pub(super) fn find_and_take_as_message(
+    pub fn find_and_take_as_message(
         &mut self,
         filter: Option<Cow<'_, MessageFilter>>,
     ) -> Option<Message> {
@@ -39,7 +39,7 @@ impl MessageStore {
             })
     }
 
-    pub(crate) fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.messages.is_empty()
     }
 }

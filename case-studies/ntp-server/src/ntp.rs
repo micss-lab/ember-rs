@@ -1,7 +1,7 @@
 use core::cell::RefCell;
 
 use blocking_network_stack::{Stack, UdpSocket};
-use no_std_framework_core::behaviour::{Context, TickerBehaviour};
+use ember_core::behaviour::{Context, TickerBehaviour};
 use smoltcp::phy::Device;
 use sntpc::{NtpContext, NtpTimestampGenerator, NtpUdpSocket};
 

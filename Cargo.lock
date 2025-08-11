@@ -175,13 +175,13 @@ dependencies = [
 name = "case-study-colour-combinations"
 version = "0.1.0"
 dependencies = [
+ "ember",
  "esp-alloc",
  "esp-backtrace",
  "esp-hal",
  "esp-hal-embassy",
  "esp-println",
  "log",
- "no-std-framework-core",
 ]
 
 [[package]]
@@ -192,6 +192,7 @@ dependencies = [
  "chrono",
  "embassy-time-driver",
  "embedded-io 0.6.1",
+ "ember",
  "esp-alloc",
  "esp-backtrace",
  "esp-hal",
@@ -199,7 +200,6 @@ dependencies = [
  "esp-println",
  "log",
  "nb 1.1.0",
- "no-std-framework-core",
  "postcard",
  "serde",
 ]
@@ -210,6 +210,7 @@ version = "0.1.0"
 dependencies = [
  "blocking-network-stack",
  "embedded-io 0.6.1",
+ "ember",
  "esp-alloc",
  "esp-backtrace",
  "esp-hal",
@@ -217,7 +218,6 @@ dependencies = [
  "esp-wifi",
  "httparse",
  "log",
- "no-std-framework-core",
  "smoltcp",
 ]
 
@@ -229,6 +229,7 @@ dependencies = [
  "chrono",
  "embassy-time-driver",
  "embedded-io 0.6.1",
+ "ember",
  "esp-alloc",
  "esp-backtrace",
  "esp-hal",
@@ -237,7 +238,6 @@ dependencies = [
  "esp-wifi",
  "futures",
  "log",
- "no-std-framework-core",
  "smoltcp",
  "sntpc",
 ]
@@ -250,6 +250,7 @@ dependencies = [
  "chrono",
  "embassy-time-driver",
  "embedded-io 0.6.1",
+ "ember",
  "esp-alloc",
  "esp-backtrace",
  "esp-hal",
@@ -258,7 +259,6 @@ dependencies = [
  "libm",
  "log",
  "nb 1.1.0",
- "no-std-framework-core",
  "postcard",
  "serde",
 ]
@@ -272,6 +272,7 @@ dependencies = [
  "case-study-plant-monitoring",
  "critical-section",
  "embedded-io 0.6.1",
+ "ember",
  "esp-alloc",
  "esp-backtrace",
  "esp-hal",
@@ -281,7 +282,6 @@ dependencies = [
  "httparse",
  "log",
  "nb 1.1.0",
- "no-std-framework-core",
  "postcard",
  "serde",
  "smoltcp",
@@ -296,6 +296,7 @@ dependencies = [
  "case-study-plant-monitoring",
  "critical-section",
  "embedded-io 0.6.1",
+ "ember",
  "esp-alloc",
  "esp-backtrace",
  "esp-hal",
@@ -306,7 +307,6 @@ dependencies = [
  "log",
  "macaddr",
  "nb 1.1.0",
- "no-std-framework-core",
  "postcard",
  "serde",
  "smoltcp",
@@ -678,6 +678,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ember"
+version = "0.1.0"
+dependencies = [
+ "ember-acc",
+ "ember-core",
+ "log",
+]
+
+[[package]]
 name = "ember-acc"
 version = "0.1.0"
 dependencies = [
@@ -701,6 +710,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "ember-bindings"
+version = "0.1.0"
+dependencies = [
+ "cbindgen",
+ "cfg-if",
+ "critical-section",
+ "embassy-time-driver",
+ "ember",
+ "esp-alloc",
+ "esp-println",
+ "esp32 0.37.0",
+ "fugit",
+ "log",
+ "portable-atomic",
+ "xtensa-lx 0.12.0",
+]
+
+[[package]]
 name = "ember-core"
 version = "0.1.0"
 dependencies = [
@@ -710,8 +737,25 @@ dependencies = [
  "hex",
  "libm",
  "log",
- "peg 0.8.5 (git+https://github.com/kevinmehall/rust-peg.git)",
+ "peg",
  "serde",
+]
+
+[[package]]
+name = "ember-examples"
+version = "0.1.0"
+dependencies = [
+ "critical-section",
+ "ember",
+ "env_logger",
+ "esp-alloc",
+ "esp-backtrace",
+ "esp-hal",
+ "esp-hal-embassy",
+ "esp-println",
+ "esp-wifi",
+ "hex",
+ "log",
 ]
 
 [[package]]
@@ -1415,66 +1459,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d5439c4ad607c3c23abf66de8c8bf57ba8adcd1f129e699851a6e43935d339d"
 
 [[package]]
-name = "no-std-framework-bindings"
-version = "0.1.0"
-dependencies = [
- "cbindgen",
- "cfg-if",
- "critical-section",
- "embassy-time-driver",
- "esp-alloc",
- "esp-println",
- "esp32 0.37.0",
- "fugit",
- "log",
- "no-std-framework-core",
- "portable-atomic",
- "xtensa-lx 0.12.0",
-]
-
-[[package]]
-name = "no-std-framework-core"
-version = "0.1.0"
-dependencies = [
- "bstr",
- "bytes",
- "cfg-if",
- "chrono",
- "critical-section",
- "embassy-time",
- "esp-wifi",
- "hex",
- "libm",
- "log",
- "macaddr",
- "multipart",
- "peg 0.8.5 (git+https://github.com/exellentcoin26/rust-peg.git)",
- "postcard",
- "rand 0.9.1",
- "serde",
- "serde_bencode",
- "tiny_http",
- "ureq",
-]
-
-[[package]]
-name = "no-std-framework-examples"
-version = "0.1.0"
-dependencies = [
- "critical-section",
- "env_logger",
- "esp-alloc",
- "esp-backtrace",
- "esp-hal",
- "esp-hal-embassy",
- "esp-println",
- "esp-wifi",
- "hex",
- "log",
- "no-std-framework-core",
-]
-
-[[package]]
 name = "num-derive"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1509,29 +1493,10 @@ checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 [[package]]
 name = "peg"
 version = "0.8.5"
-source = "git+https://github.com/exellentcoin26/rust-peg.git#1b34a19adaf1185914d8000b140d43fade3fd0af"
-dependencies = [
- "peg-macros 0.8.5 (git+https://github.com/exellentcoin26/rust-peg.git)",
- "peg-runtime 0.8.5 (git+https://github.com/exellentcoin26/rust-peg.git)",
-]
-
-[[package]]
-name = "peg"
-version = "0.8.5"
 source = "git+https://github.com/kevinmehall/rust-peg.git#8367f693e5bc1631acc3b90fc21a5fc7f29aecba"
 dependencies = [
- "peg-macros 0.8.5 (git+https://github.com/kevinmehall/rust-peg.git)",
- "peg-runtime 0.8.5 (git+https://github.com/kevinmehall/rust-peg.git)",
-]
-
-[[package]]
-name = "peg-macros"
-version = "0.8.5"
-source = "git+https://github.com/exellentcoin26/rust-peg.git#1b34a19adaf1185914d8000b140d43fade3fd0af"
-dependencies = [
- "peg-runtime 0.8.5 (git+https://github.com/exellentcoin26/rust-peg.git)",
- "proc-macro2",
- "quote",
+ "peg-macros",
+ "peg-runtime",
 ]
 
 [[package]]
@@ -1539,15 +1504,10 @@ name = "peg-macros"
 version = "0.8.5"
 source = "git+https://github.com/kevinmehall/rust-peg.git#8367f693e5bc1631acc3b90fc21a5fc7f29aecba"
 dependencies = [
- "peg-runtime 0.8.5 (git+https://github.com/kevinmehall/rust-peg.git)",
+ "peg-runtime",
  "proc-macro2",
  "quote",
 ]
-
-[[package]]
-name = "peg-runtime"
-version = "0.8.5"
-source = "git+https://github.com/exellentcoin26/rust-peg.git#1b34a19adaf1185914d8000b140d43fade3fd0af"
 
 [[package]]
 name = "peg-runtime"

@@ -1,5 +1,5 @@
 use esp_hal::{Blocking, gpio::Input, uart::UartRx};
-use no_std_framework_core::{
+use ember_core::{
     Agent,
     behaviour::{Context, CyclicBehaviour, TickerBehaviour},
 };
@@ -80,7 +80,7 @@ impl LockState {
 }
 
 pub mod ontology {
-    use no_std_framework_core::{
+    use ember_core::{
         Aid,
         acl::message::{Content, Message, Performative, Receiver},
     };

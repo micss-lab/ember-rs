@@ -1,18 +1,18 @@
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
 
-use no_std_framework_examples::setup_example;
+use ember_examples::setup_example;
 
 setup_example!();
 
 use alloc::boxed::Box;
 use core::time::Duration;
 
-use no_std_framework_core::behaviour::sequential::SequentialBehaviour;
-use no_std_framework_core::behaviour::{
+use ember_core::behaviour::sequential::SequentialBehaviour;
+use ember_core::behaviour::{
     Behaviour, ComplexBehaviour, Context, IntoBehaviour, OneShotBehaviour, TickerBehaviour,
 };
-use no_std_framework_core::{Agent, Container};
+use ember_core::{Agent, Container};
 
 struct SensorInit;
 

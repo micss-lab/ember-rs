@@ -1,0 +1,15 @@
+[package]
+name = "ember"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ember-core = { workspace = true }
+ember-acc = { workspace = true }
+
+log = { version = "0.4", default-features = false }
+
+[features]
+std = []
+acc-espnow = ["ember-acc/espnow"]
+acc-http = ["std", "ember-acc/http"]

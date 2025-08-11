@@ -1,12 +1,12 @@
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
 
-use no_std_framework_examples::setup_example;
+use ember_examples::setup_example;
 
 setup_example!();
 
-use no_std_framework_core::behaviour::{Context, CyclicBehaviour, OneShotBehaviour};
-use no_std_framework_core::{Agent, Container};
+use ember_core::behaviour::{Context, CyclicBehaviour, OneShotBehaviour};
+use ember_core::{Agent, Container};
 
 const MESSAGE_AMOUNT: usize = 10;
 

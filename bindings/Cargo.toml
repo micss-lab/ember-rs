@@ -1,5 +1,5 @@
 [package]
-name = "no-std-framework-bindings"
+name = "ember-bindings"
 version = "0.1.0"
 edition = "2024"
 
@@ -23,10 +23,11 @@ codegen-units = 16
 rpath = false
 
 [dependencies]
+ember = { workspace = true }
+
 cfg-if = "1.0.0"
 critical-section = "1.2.0"
 log = "0.4.22"
-no-std-framework-core = { path = "../core" }
 
 [target.'cfg(target_os = "none")'.dependencies]
 critical-section = { version = "1.2.0", features = ["restore-state-u32"] }

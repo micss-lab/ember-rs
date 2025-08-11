@@ -3,10 +3,10 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::ops::{Deref, DerefMut};
 
-use crate::acl::message::MessageEnvelope;
 use crate::agent::AmsAgent;
-use crate::container::AgentLike;
-use crate::Aid;
+use ember_core::agent::Agent;
+use ember_core::agent::aid::Aid;
+use ember_core::message::MessageEnvelope;
 
 #[derive(Debug, Clone)]
 pub(crate) enum AgentReference {

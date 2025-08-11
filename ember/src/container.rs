@@ -1,4 +1,3 @@
-use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 use alloc::string::ToString;
@@ -7,10 +6,14 @@ use alloc::vec::Vec;
 #[cfg(feature = "acc-espnow")]
 use esp_wifi::esp_now;
 
-use crate::acl::message::MessageEnvelope;
+use ember_core::context::{ContainerContext, MessageStore};
+use ember_core::message::MessageEnvelope;
+
+use ember_core::agent::Agent;
+use ember_core::agent::aid::Aid;
+
 use crate::adt::{Adt, AgentReference};
-use crate::agent::{Agent, Aid, AmsAgent};
-use crate::context::{ContainerContext, MessageStore};
+use crate::agent::AmsAgent;
 
 use self::mts::Mts;
 
@@ -18,7 +21,7 @@ mod mts;
 
 pub struct Container<'c> {
     /// Agents managed by this container.
-    agents: VecDeque<Box<dyn AgentLike>>,
+    agents: VecDeque<Box<dyn Agent>>,
     /// Ams agent managing this cotainers.
     ams: AmsAgent,
     /// Register of agents running on this platform.
@@ -107,12 +110,12 @@ impl Container<'_> {
             .extend(messages)
     }
 
-    pub fn with_agent<S: 'static, E: 'static>(mut self, agent: Agent<S, E>) -> Self {
+    pub fn with_agent(mut self, agent: impl Agent + 'static) -> Self {
         self.add_agent(agent);
         self
     }
 
-    pub fn add_agent<S: 'static, E: 'static>(&mut self, agent: Agent<S, E>) {
+    pub fn add_agent(&mut self, agent: impl Agent + 'static) {
         self.agents.push_back(Box::new(agent));
     }
 
@@ -128,7 +131,7 @@ impl Container<'_> {
             .insert(local_name.clone(), AgentReference::Proxy(agent_proxy))
             .is_some()
         {
-            log::error!("Agent(-proxy) with name {} exists.", local_name)
+            log::error!("Agent(-proxy) with name {local_name} exists.")
         }
     }
 }

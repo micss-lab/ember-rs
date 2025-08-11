@@ -27,7 +27,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
     uart::UartRx,
 };
-use no_std_framework_core::Container;
+use ember_core::Container;
 
 use home_automation::{fan, lock, pir};
 use plant_monitoring::{light, moist, pump};

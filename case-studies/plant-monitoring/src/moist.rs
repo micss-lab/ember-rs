@@ -2,7 +2,7 @@ use core::cell::RefCell;
 
 use alloc::{borrow::Cow, rc::Rc};
 use esp_hal::analog::adc::{Adc, AdcChannel, AdcPin, RegisterAccess};
-use no_std_framework_core::{
+use ember_core::{
     Agent,
     behaviour::{Context, TickerBehaviour},
 };
@@ -54,7 +54,7 @@ impl ThresholdConfig for MoistureState {
 }
 
 pub mod ontology {
-    use no_std_framework_core::{
+    use ember_core::{
         Aid,
         acl::message::{Content, Message, Performative, Receiver},
     };

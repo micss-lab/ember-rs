@@ -1,3 +1,10 @@
+pub use self::complex::fsm;
+pub use self::complex::parallel;
+pub use self::complex::sequential;
+pub use self::simple::cyclic::CyclicBehaviour;
+pub use self::simple::oneshot::OneShotBehaviour;
+pub use self::simple::ticker::TickerBehaviour;
+
 use alloc::boxed::Box;
 
 use crate::context::Context;

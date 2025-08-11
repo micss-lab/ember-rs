@@ -10,9 +10,9 @@ pub use self::messsage_store::MessageStore;
 mod messsage_store;
 
 pub struct Context<E> {
-    pub(crate) container: ContainerContext,
-    pub(crate) agent: AgentContext,
-    pub(crate) local: LocalContext<E>,
+    pub container: ContainerContext,
+    pub agent: AgentContext,
+    pub local: LocalContext<E>,
 }
 
 #[derive(Default)]
@@ -24,15 +24,15 @@ pub struct ContainerContext {
 }
 
 #[derive(Default)]
-pub(crate) struct AgentContext {
-    pub(crate) should_remove: bool,
+pub struct AgentContext {
+    pub should_remove: bool,
 }
 
-pub(crate) struct LocalContext<E> {
-    pub(crate) events: Vec<E>,
-    pub(crate) removed_behaviours: Vec<BehaviourId>,
-    pub(crate) block: bool,
-    pub(crate) reset: bool,
+pub struct LocalContext<E> {
+    pub events: Vec<E>,
+    pub removed_behaviours: Vec<BehaviourId>,
+    pub block: bool,
+    pub reset: bool,
 }
 
 impl<E> Default for LocalContext<E> {
@@ -47,17 +47,6 @@ impl<E> Default for LocalContext<E> {
 }
 
 impl<E: 'static> Context<E> {
-    pub(crate) fn new_using_container(container_ctx: &mut ContainerContext) -> Self {
-        Self {
-            container: ContainerContext::new(container_ctx.message_inbox.take()),
-            ..Default::default()
-        }
-    }
-
-    pub(crate) fn from_upper<E2>(upper: &mut Context<E2>) -> Self {
-        Self::new_using_container(&mut upper.container)
-    }
-
     pub fn emit_event(&mut self, event: E) {
         self.local.events.push(event);
     }
@@ -93,8 +82,21 @@ impl<E: 'static> Context<E> {
     }
 }
 
+impl<E: 'static> Context<E> {
+    pub fn new_using_container(container_ctx: &mut ContainerContext) -> Self {
+        Self {
+            container: ContainerContext::new(container_ctx.message_inbox.take()),
+            ..Default::default()
+        }
+    }
+
+    pub fn from_upper<E2>(upper: &mut Context<E2>) -> Self {
+        Self::new_using_container(&mut upper.container)
+    }
+}
+
 impl<E> Context<E> {
-    pub(crate) fn merge<E2>(
+    pub fn merge<E2>(
         &mut self,
         Context {
             container,
@@ -108,7 +110,7 @@ impl<E> Context<E> {
 }
 
 impl ContainerContext {
-    pub(crate) fn new(messages: impl Into<MessageStore>) -> Self {
+    pub fn new(messages: impl Into<MessageStore>) -> Self {
         let messages = messages.into();
         let new_messages = !messages.is_empty();
         Self {
@@ -118,7 +120,7 @@ impl ContainerContext {
         }
     }
 
-    pub(crate) fn merge(
+    pub fn merge(
         &mut self,
         Self {
             should_stop,
@@ -141,7 +143,7 @@ impl ContainerContext {
         self.new_messages = new_messages;
     }
 
-    pub(crate) fn send_message(&mut self, message: MessageEnvelope) {
+    pub fn send_message(&mut self, message: MessageEnvelope) {
         self.message_outbox.push(message)
     }
 }

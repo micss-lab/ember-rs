@@ -5,7 +5,7 @@ use esp_hal::{
     analog::adc::{Adc, AdcChannel, AdcPin, RegisterAccess},
     gpio::Output,
 };
-use no_std_framework_core::{
+use ember_core::{
     Agent,
     behaviour::{Context, TickerBehaviour},
 };
@@ -59,7 +59,7 @@ impl ThresholdConfig for LightState {
 }
 
 pub mod ontology {
-    use no_std_framework_core::{
+    use ember_core::{
         Aid,
         acl::message::{Content, Message, Performative, Receiver},
     };
