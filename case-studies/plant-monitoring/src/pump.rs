@@ -1,8 +1,8 @@
-use esp_hal::gpio::Output;
 use ember::{
-    behaviour::{Context, CyclicBehaviour},
     Agent,
+    behaviour::{Context, CyclicBehaviour},
 };
+use esp_hal::gpio::Output;
 use ontology::{PumpAction, PumpStatus};
 
 use super::util::wrap_message;
@@ -20,8 +20,8 @@ pub struct PumpState {
 
 pub mod ontology {
     use ember::{
-        message::{Content, Message, Performative, Receiver},
         Aid,
+        message::{Content, Message, Performative, Receiver},
     };
     use serde::{Deserialize, Serialize};
 

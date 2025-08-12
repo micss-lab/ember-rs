@@ -106,9 +106,7 @@ impl AmsAgent {
                 log::info!("Agent `{}` successfully registered.", &name);
             }
             Entry::Occupied(_) => {
-                log::error!(
-                    "Cannot register agent `{aid}` as it is already registered."
-                );
+                log::error!("Cannot register agent `{aid}` as it is already registered.");
             }
         }
     }

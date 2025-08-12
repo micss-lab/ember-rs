@@ -7,8 +7,8 @@ use core::cell::OnceCell;
 
 use blocking_network_stack::Stack;
 use esp_wifi::{
-    wifi::{WifiDevice, WifiStaDevice},
     EspWifiController,
+    wifi::{WifiDevice, WifiStaDevice},
 };
 use smoltcp::iface::SocketStorage;
 

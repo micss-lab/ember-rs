@@ -2,7 +2,7 @@ use core::ops::Deref;
 
 use alloc::{
     borrow::Cow,
-    collections::{btree_set::BTreeSet, BTreeMap},
+    collections::{BTreeMap, btree_set::BTreeSet},
 };
 use esp_hal::delay::Delay;
 use esp_wifi::esp_now::{EspNowManager, EspNowReceiver, EspNowSender, PeerInfo};

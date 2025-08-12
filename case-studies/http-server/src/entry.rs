@@ -4,6 +4,7 @@ use core::{cell::OnceCell, ptr::addr_of_mut};
 use esp_backtrace as _;
 
 use blocking_network_stack::Stack;
+use ember::{Agent, Container};
 use esp_hal::{
     clock::CpuClock,
     delay::Delay,
@@ -15,7 +16,6 @@ use esp_wifi::{
     EspWifiController,
     wifi::{WifiController, WifiDevice, WifiStaDevice},
 };
-use ember::{Agent, Container};
 use smoltcp::{
     iface::{Interface, SocketSet, SocketStorage},
     phy::Device,
@@ -45,9 +45,9 @@ mod routes {
     use alloc::format;
     use alloc::string::{String, ToString};
 
+    use ember::behaviour::Context;
     use esp_hal::gpio::{Level, Output};
     use httparse::Request;
-    use ember::behaviour::Context;
 
     pub struct State {
         led1: LedState,

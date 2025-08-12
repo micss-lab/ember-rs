@@ -2,11 +2,11 @@ use alloc::rc::Rc;
 use core::cell::RefCell;
 use ontology::Temperature;
 
-use esp_hal::analog::adc::{Adc, AdcChannel, AdcPin, RegisterAccess};
 use ember::{
     Agent,
     behaviour::{Context, TickerBehaviour},
 };
+use esp_hal::analog::adc::{Adc, AdcChannel, AdcPin, RegisterAccess};
 
 use super::utils::wrap_message;
 

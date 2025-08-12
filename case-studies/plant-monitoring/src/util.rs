@@ -1,8 +1,8 @@
 use alloc::boxed::Box;
 
 use ember::{
-    message::{Message, MessageEnvelope, Receiver},
     behaviour::{Behaviour, BehaviourId, IntoBehaviour},
+    message::{Message, MessageEnvelope, Receiver},
 };
 
 pub fn wrap_message(m: Message) -> MessageEnvelope {

@@ -19,7 +19,9 @@ impl OneShotBehaviour for InformationPrinter {
 
     fn action(&self, _: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         log::info!("This agent has two behaviours.");
-        log::info!("One will print infinitely, the other will stop the first after {MESSAGE_AMOUNT} iterations.")
+        log::info!(
+            "One will print infinitely, the other will stop the first after {MESSAGE_AMOUNT} iterations."
+        )
     }
 }
 

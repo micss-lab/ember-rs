@@ -2,8 +2,8 @@ use alloc::borrow::Cow;
 use core::marker::PhantomData;
 
 use ember::behaviour::{
-    fsm::{Fsm, FsmBehaviour, FsmEvent},
     ComplexBehaviour, Context, CyclicBehaviour,
+    fsm::{Fsm, FsmBehaviour, FsmEvent},
 };
 
 use super::util::behaviour_with_id;

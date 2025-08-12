@@ -6,8 +6,8 @@ use ember_examples::setup_example;
 setup_example!();
 
 use ember::{
-    behaviour::{Context, OneShotBehaviour},
     Agent, Container,
+    behaviour::{Context, OneShotBehaviour},
 };
 
 struct Stopper;

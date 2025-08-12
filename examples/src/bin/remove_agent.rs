@@ -19,7 +19,9 @@ impl OneShotBehaviour for InformationPrinter {
 
     fn action(&self, _: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         log::info!("This agent has one behaviour.");
-        log::info!("It will seemingly print for an infinite amount of time, though it removes the agent after {MESSAGE_AMOUNT} of messages");
+        log::info!(
+            "It will seemingly print for an infinite amount of time, though it removes the agent after {MESSAGE_AMOUNT} of messages"
+        );
     }
 }
 

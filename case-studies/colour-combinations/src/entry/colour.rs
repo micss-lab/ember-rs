@@ -31,12 +31,12 @@ use alloc::boxed::Box;
 use core::marker::PhantomData;
 
 use ember::{
+    Agent,
     behaviour::{
-        fsm::{Fsm, FsmBehaviour, FsmEvent},
         Behaviour, BehaviourId, ComplexBehaviour, Context, CyclicBehaviour, IntoBehaviour,
         OneShotBehaviour,
+        fsm::{Fsm, FsmBehaviour, FsmEvent},
     },
-    Agent,
 };
 
 pub fn colour_agent(

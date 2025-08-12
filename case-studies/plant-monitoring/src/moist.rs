@@ -1,11 +1,11 @@
 use core::cell::RefCell;
 
 use alloc::{borrow::Cow, rc::Rc};
-use esp_hal::analog::adc::{Adc, AdcChannel, AdcPin, RegisterAccess};
 use ember::{
     Agent,
     behaviour::{Context, TickerBehaviour},
 };
+use esp_hal::analog::adc::{Adc, AdcChannel, AdcPin, RegisterAccess};
 use ontology::MoisturePercent;
 
 use super::{

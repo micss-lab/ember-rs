@@ -1,7 +1,7 @@
 use ember::{
-    message::{Message, Performative, Receiver},
-    behaviour::{Context, TickerBehaviour},
     Agent, Aid,
+    behaviour::{Context, TickerBehaviour},
+    message::{Message, Performative, Receiver},
 };
 use serde::{Deserialize, Serialize};
 
