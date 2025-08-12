@@ -1,9 +1,8 @@
 use colour::Colour;
 use esp_backtrace as _;
-use esp_hal_embassy as _;
 
-use esp_hal::clock::CpuClock;
 use ember::Container;
+use esp_hal::clock::CpuClock;
 
 const HEAP_SIZE: usize = 72 * 1024;
 

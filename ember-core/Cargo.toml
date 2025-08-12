@@ -4,10 +4,11 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+ember-time = { workspace = true }
+
 bstr = { version = "1.12", default-features = false, features = ["alloc"] }
 chrono = { version = "0.4", default-features = false, features = ["alloc", "serde"] }
 critical-section = "1.2"
-fugit = "0.3"
 hex = { version = "0.4", default-features = false, features = ["alloc", "serde"] }
 libm = "0.2"
 log = { version = "0.4", default-features = false, features = ["serde"] }

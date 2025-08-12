@@ -3,8 +3,8 @@ use core::{cell::RefCell, ptr::addr_of_mut};
 use macaddr::MacAddr6;
 
 use esp_backtrace as _;
-use esp_hal_embassy as _;
 
+use ember::{Aid, Container};
 use esp_hal::{
     analog::adc::{Adc, AdcConfig, Attenuation},
     clock::CpuClock,
@@ -12,7 +12,6 @@ use esp_hal::{
     rng::Rng,
     timer::timg::TimerGroup,
 };
-use ember::{Aid, Container};
 
 use home_automation::fan;
 

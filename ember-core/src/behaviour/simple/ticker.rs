@@ -1,8 +1,9 @@
 use alloc::boxed::Box;
 
+use ember_time::{Duration, Instant, now};
+
 use crate::behaviour::{Behaviour, BehaviourId, IntoBehaviour, get_id};
 use crate::context::Context;
-use crate::time::{Duration, Instant, from_core_duration, now};
 
 pub trait TickerBehaviour {
     type AgentState;
@@ -83,4 +84,8 @@ where
             last_tick: None,
         })
     }
+}
+
+fn from_core_duration(d: core::time::Duration) -> Duration {
+    Duration::from_ticks(libm::round(d.as_secs_f64() * ember_time::TICK_HZ as f64) as u64)
 }

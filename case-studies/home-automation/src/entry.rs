@@ -1,12 +1,11 @@
 use esp_backtrace as _;
-use esp_hal_embassy as _;
 
+use ember::Container;
 use esp_hal::{
     clock::CpuClock,
     gpio::{Input, Pull},
     uart::UartRx,
 };
-use ember::Container;
 
 use case_study_home_automation::{
     control,

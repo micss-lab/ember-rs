@@ -15,14 +15,13 @@ use alloc::rc::Rc;
 use core::cell::RefCell;
 
 use esp_backtrace as _;
-use esp_hal_embassy as _;
 
+use ember::Container;
 use esp_hal::{
     analog::adc::{Adc, AdcConfig, Attenuation},
     clock::CpuClock,
     gpio::{Input, Level, Output, Pull},
 };
-use ember::Container;
 
 use case_study_plant_monitoring::{
     control, light, moist, pump,

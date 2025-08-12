@@ -2,15 +2,14 @@ use alloc::collections::BTreeSet;
 use core::{cell::OnceCell, ptr::addr_of_mut};
 
 use esp_backtrace as _;
-use esp_hal_embassy as _;
 
 use blocking_network_stack::Stack;
+use ember::{Agent, Container};
 use esp_hal::{clock::CpuClock, delay::Delay, rng::Rng, timer::timg::TimerGroup};
 use esp_wifi::{
     EspWifiController,
     wifi::{WifiController, WifiDevice, WifiStaDevice},
 };
-use ember::{Agent, Container};
 use smoltcp::{
     iface::{Interface, SocketSet, SocketStorage},
     phy::Device,

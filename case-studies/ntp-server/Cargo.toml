@@ -6,17 +6,15 @@ edition = "2024"
 [target.'cfg(target_os = "none")'.dependencies]
 blocking-network-stack = { git = "https://github.com/exellentcoin26/blocking-network-stack.git", default-features = false, features = ["udp", "ipv4", "dhcpv4"] }
 chrono = { version = "0.4.41", default-features = false, features = ["alloc"] }
-embassy-time-driver = "0.2.0"
 embedded-io = "0.6.1"
 esp-alloc = "0.6.0"
 esp-backtrace = { version = "0.14.2", default-features = false, features = ["esp32", "println", "panic-handler"] }
 esp-hal = { version = "0.23.1", features = ["esp32", "unstable"] }
-esp-hal-embassy = { version = "0.6.0", features = ["esp32"] }
 esp-println = { version = "0.12.0", features = ["esp32", "log"] }
 esp-wifi = { version = "0.12.0", features = ["esp32", "wifi", "smoltcp"] }
 futures = { version = "0.3.31", default-features = false }
 log = "0.4.27"
-ember = { workspace = true }
+ember = { workspace = true, features = ["esp32"] }
 smoltcp = { version = "0.12.0", default-features = false, features = ["proto-ipv4"] }
 sntpc = { version = "0.5.2", default-features = false, features = ["log"] }
 

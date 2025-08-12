@@ -1,8 +1,8 @@
 use core::ptr::addr_of_mut;
 
 use esp_backtrace as _;
-use esp_hal_embassy as _;
 
+use ember::{Aid, Container};
 use esp_hal::{
     clock::CpuClock,
     gpio::{Input, Pull},
@@ -11,7 +11,6 @@ use esp_hal::{
     uart::UartRx,
 };
 use macaddr::MacAddr6;
-use ember::{Aid, Container};
 
 use home_automation::{lock /* , pir */};
 

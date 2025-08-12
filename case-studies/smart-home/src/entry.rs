@@ -16,8 +16,8 @@ use smoltcp::{
 };
 
 use esp_backtrace as _;
-use esp_hal_embassy as _;
 
+use ember::Container;
 use esp_hal::{
     analog::adc::{Adc, AdcConfig, Attenuation},
     clock::CpuClock,
@@ -27,7 +27,6 @@ use esp_hal::{
     timer::timg::TimerGroup,
     uart::UartRx,
 };
-use ember::Container;
 
 use home_automation::{fan, lock, pir};
 use plant_monitoring::{light, moist, pump};

@@ -15,7 +15,6 @@ mod setup_example {
             #[cfg(target_os = "none")]
             mod esp_imports {
                 pub(super) use esp_backtrace as _;
-                pub(super) use esp_hal_embassy as _;
                 pub(super) use esp_println::print;
 
                 pub(super) use ember_examples::esp;
