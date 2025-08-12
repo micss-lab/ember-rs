@@ -1,10 +1,7 @@
-use ember_core::{
-    acl::{
-        codec::AgentActionCodec,
-        message::{self, Message, Performative},
-    },
-    behaviour::{Context, CyclicBehaviour},
+use ember::{
     Agent, Aid,
+    behaviour::{Context, CyclicBehaviour},
+    message::{self, Message, Performative, content::codec::AgentActionCodec},
 };
 
 use crate::{
@@ -82,7 +79,7 @@ impl Receiver {
             receiver: message::Receiver::Single(Aid::local("fan")),
             reply_to: None,
             ontology: Some(fan::ontology::FanOntology::name().into()),
-            content: message::Content::Sl(AgentActionCodec::into_content(FanMessage {
+            content: message::Content::Structured(AgentActionCodec::into_content(FanMessage {
                 action: FanAction::Toggle,
             })),
         }))

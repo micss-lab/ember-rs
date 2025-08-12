@@ -1,9 +1,9 @@
 use alloc::format;
 
-use ember_core::{
-    acl::message::{Message, Performative, Receiver},
-    behaviour::{Context, TickerBehaviour},
+use ember::{
     Agent, Aid,
+    behaviour::{Context, TickerBehaviour},
+    message::{Message, Performative, Receiver},
 };
 
 use super::util::wrap_message;
@@ -13,7 +13,7 @@ pub fn dht22_agent(measurements: impl IntoIterator<Item = Measurement> + 'static
 }
 
 pub mod ontology {
-    use ember_core::acl::message::{Content, Message};
+    use ember::message::{Content, Message};
 
     use super::Measurement;
 
@@ -57,7 +57,7 @@ impl core::str::FromStr for Measurement {
 
 impl Measurement {
     fn into_message(self) -> Message {
-        use ember_core::acl::message::Content;
+        use ember::message::Content;
 
         Message {
             performative: Performative::Inform,

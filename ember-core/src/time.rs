@@ -10,7 +10,7 @@ pub(crate) fn now() -> Instant {
 }
 
 pub(crate) fn from_core_duration(d: core::time::Duration) -> Duration {
-    Duration::from_ticks((d.as_secs_f64() * TICK_HZ as f64).round() as u64)
+    Duration::from_ticks(libm::round(d.as_secs_f64() * TICK_HZ as f64) as u64)
 }
 
 pub trait Driver: Send + Sync + 'static {

@@ -1,8 +1,8 @@
-use esp_hal::gpio::Input;
-use ember_core::{
-    behaviour::{Context, TickerBehaviour},
+use ember::{
     Agent,
+    behaviour::{Context, TickerBehaviour},
 };
+use esp_hal::gpio::Input;
 use ontology::PirMessage;
 
 use super::util::wrap_message;
@@ -12,9 +12,9 @@ pub fn pir_agent(sensor: Input<'static>) -> Agent<(), ()> {
 }
 
 pub mod ontology {
-    use ember_core::{
-        acl::message::{Content, Message, Performative, Receiver},
+    use ember::{
         Aid,
+        message::{Content, Message, Performative, Receiver},
     };
     use serde::{Deserialize, Serialize};
 

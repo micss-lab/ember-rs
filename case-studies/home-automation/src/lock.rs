@@ -1,8 +1,8 @@
-use esp_hal::{Blocking, gpio::Input, uart::UartRx};
-use ember_core::{
+use ember::{
     Agent,
     behaviour::{Context, CyclicBehaviour, TickerBehaviour},
 };
+use esp_hal::{Blocking, gpio::Input, uart::UartRx};
 use ontology::DoorLockAction;
 
 use crate::util::wrap_message;
@@ -80,9 +80,9 @@ impl LockState {
 }
 
 pub mod ontology {
-    use ember_core::{
+    use ember::{
         Aid,
-        acl::message::{Content, Message, Performative, Receiver},
+        message::{Content, Message, Performative, Receiver},
     };
     use serde::{Deserialize, Serialize};
 

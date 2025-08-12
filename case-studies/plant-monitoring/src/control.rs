@@ -1,10 +1,10 @@
 use alloc::borrow::Cow;
-use esp_hal::gpio::Input;
-use ember_core::{
-    acl::message::MessageFilter,
-    behaviour::{Context, CyclicBehaviour, TickerBehaviour},
+use ember::{
     Agent,
+    behaviour::{Context, CyclicBehaviour, TickerBehaviour},
+    message::MessageFilter,
 };
+use esp_hal::gpio::Input;
 
 use super::{
     light, moist,
@@ -153,25 +153,25 @@ impl CyclicBehaviour for Receiver {
 
 fn temp_ontology_message_filter() -> Option<Cow<'static, MessageFilter>> {
     Some(Cow::Owned(MessageFilter::ontology(
-        temp::ontology::TempOntology::name().into(),
+        temp::ontology::TempOntology::name(),
     )))
 }
 
 fn moisture_ontology_message_filter() -> Option<Cow<'static, MessageFilter>> {
     Some(Cow::Owned(MessageFilter::ontology(
-        moist::ontology::MoistureOntology::name().into(),
+        moist::ontology::MoistureOntology::name(),
     )))
 }
 
 fn light_ontology_message_filter() -> Option<Cow<'static, MessageFilter>> {
     Some(Cow::Owned(MessageFilter::ontology(
-        light::ontology::LightOntology::name().into(),
+        light::ontology::LightOntology::name(),
     )))
 }
 
 fn pump_ontology_message_filter() -> Option<Cow<'static, MessageFilter>> {
     Some(Cow::Owned(MessageFilter::ontology(
-        pump::ontology::PumpOntology::name().into(),
+        pump::ontology::PumpOntology::name(),
     )))
 }
 

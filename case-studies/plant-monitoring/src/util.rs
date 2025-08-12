@@ -1,7 +1,7 @@
 use alloc::boxed::Box;
 
-use ember_core::{
-    acl::message::{Message, MessageEnvelope, Receiver},
+use ember::{
+    message::{Message, MessageEnvelope, Receiver},
     behaviour::{Behaviour, BehaviourId, IntoBehaviour},
 };
 

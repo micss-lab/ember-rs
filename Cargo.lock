@@ -683,6 +683,7 @@ version = "0.1.0"
 dependencies = [
  "ember-acc",
  "ember-core",
+ "esp-wifi",
  "log",
 ]
 

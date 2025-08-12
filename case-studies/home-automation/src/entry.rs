@@ -6,7 +6,7 @@ use esp_hal::{
     gpio::{Input, Pull},
     uart::UartRx,
 };
-use ember_core::Container;
+use ember::Container;
 
 use case_study_home_automation::{
     control,

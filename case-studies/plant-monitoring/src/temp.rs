@@ -1,5 +1,5 @@
-use ember_core::{
-    acl::message::{Message, Performative, Receiver},
+use ember::{
+    message::{Message, Performative, Receiver},
     behaviour::{Context, TickerBehaviour},
     Agent, Aid,
 };
@@ -14,7 +14,7 @@ pub fn temperature_agent(
 }
 
 pub mod ontology {
-    use ember_core::acl::message::{Content, Message};
+    use ember::message::{Content, Message};
 
     use super::Measurement;
 
@@ -42,7 +42,7 @@ pub struct Measurement {
 
 impl Measurement {
     fn into_message(self) -> Message {
-        use ember_core::acl::message::Content;
+        use ember::message::Content;
 
         Message {
             performative: Performative::Inform,

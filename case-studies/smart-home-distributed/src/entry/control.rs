@@ -12,7 +12,7 @@ use esp_hal::{
     rng::Rng,
     timer::timg::TimerGroup,
 };
-use ember_core::{Aid, Container};
+use ember::{Aid, Container};
 
 use home_automation::fan;
 

@@ -1,5 +1,5 @@
 use esp_hal::gpio::Output;
-use ember_core::{
+use ember::{
     behaviour::{Context, CyclicBehaviour},
     Agent,
 };
@@ -19,8 +19,8 @@ pub struct PumpState {
 }
 
 pub mod ontology {
-    use ember_core::{
-        acl::message::{Content, Message, Performative, Receiver},
+    use ember::{
+        message::{Content, Message, Performative, Receiver},
         Aid,
     };
     use serde::{Deserialize, Serialize};

@@ -3,7 +3,7 @@ use core::cell::RefCell;
 use ontology::Temperature;
 
 use esp_hal::analog::adc::{Adc, AdcChannel, AdcPin, RegisterAccess};
-use ember_core::{
+use ember::{
     Agent,
     behaviour::{Context, TickerBehaviour},
 };
@@ -18,9 +18,9 @@ pub fn temperature_agent<P: AdcChannel + 'static, ADCI: RegisterAccess + 'static
 }
 
 pub mod ontology {
-    use ember_core::{
+    use ember::{
         Aid,
-        acl::message::{Content, Message, Performative, Receiver},
+        message::{Content, Message, Performative, Receiver},
     };
     use serde::{Deserialize, Serialize};
 

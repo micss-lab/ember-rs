@@ -9,7 +9,9 @@ ember-acc = { workspace = true }
 
 log = { version = "0.4", default-features = false }
 
+esp-wifi = { version = "0.12", features = ["esp-now"], optional = true }
+
 [features]
 std = []
-acc-espnow = ["ember-acc/espnow"]
+acc-espnow = ["ember-acc/espnow", "dep:esp-wifi"]
 acc-http = ["std", "ember-acc/http"]

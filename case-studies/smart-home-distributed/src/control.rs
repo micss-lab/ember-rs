@@ -3,6 +3,11 @@ use core::ptr::addr_of_mut;
 use alloc::borrow::Cow;
 
 use blocking_network_stack::Socket;
+use ember::{
+    Agent,
+    behaviour::{Context, CyclicBehaviour, TickerBehaviour},
+    message::MessageFilter,
+};
 use esp_hal::gpio::{Input, Output};
 use esp_wifi::wifi::{WifiDevice, WifiStaDevice};
 use home_automation::{
@@ -12,11 +17,6 @@ use home_automation::{
     },
     lock::ontology::DoorLockOntology,
     pir::ontology::PirOntology,
-};
-use ember_core::{
-    Agent,
-    acl::message::MessageFilter,
-    behaviour::{Context, CyclicBehaviour, TickerBehaviour},
 };
 use plant_monitoring::{
     light::ontology::LightOntology,
@@ -74,7 +74,7 @@ impl TickerBehaviour for MoistureReceiver {
 
     fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) {
         let Some(message) = ctx.receive_message(Some(Cow::Owned(MessageFilter::ontology(
-            MoistureOntology::name().into(),
+            MoistureOntology::name(),
         )))) else {
             ctx.block_behaviour();
             return;
@@ -101,7 +101,7 @@ impl TickerBehaviour for LightLevelReceiver {
 
     fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) {
         let Some(message) = ctx.receive_message(Some(Cow::Owned(MessageFilter::ontology(
-            LightOntology::name().into(),
+            LightOntology::name(),
         )))) else {
             ctx.block_behaviour();
             return;
@@ -127,7 +127,7 @@ impl TickerBehaviour for TemperatureReceiver {
 
     fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) {
         let Some(message) = ctx.receive_message(Some(Cow::Owned(MessageFilter::ontology(
-            TempOntology::name().into(),
+            TempOntology::name(),
         )))) else {
             ctx.block_behaviour();
             return;
@@ -153,7 +153,7 @@ impl TickerBehaviour for PumpStateReceiver {
 
     fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) {
         let Some(message) = ctx.receive_message(Some(Cow::Owned(MessageFilter::ontology(
-            PumpOntology::name().into(),
+            PumpOntology::name(),
         )))) else {
             ctx.block_behaviour();
             return;
@@ -215,7 +215,7 @@ impl TickerBehaviour for HumanDetectedReceiver {
 
     fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) {
         let Some(message) = ctx.receive_message(Some(Cow::Owned(MessageFilter::ontology(
-            PirOntology::name().into(),
+            PirOntology::name(),
         )))) else {
             ctx.block_behaviour();
             return;
@@ -249,7 +249,7 @@ impl TickerBehaviour for FanStateReceiver {
 
     fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) {
         let Some(message) = ctx.receive_message(Some(Cow::Owned(MessageFilter::ontology(
-            FanOntology::name().into(),
+            FanOntology::name(),
         )))) else {
             ctx.block_behaviour();
             return;
@@ -310,7 +310,7 @@ impl TickerBehaviour for DoorLockActionReceiver {
 
     fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) {
         let Some(message) = ctx.receive_message(Some(Cow::Owned(MessageFilter::ontology(
-            DoorLockOntology::name().into(),
+            DoorLockOntology::name(),
         )))) else {
             ctx.block_behaviour();
             return;

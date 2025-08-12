@@ -1,6 +1,6 @@
-use ember_core::{
-    behaviour::{Context, TickerBehaviour},
+use ember::{
     Agent,
+    behaviour::{Context, TickerBehaviour},
 };
 
 use self::ontology::FanAction;
@@ -15,13 +15,15 @@ pub fn fan_agent() -> Agent<FanState, ()> {
 pub mod ontology {
     use alloc::{string::String, vec::Vec};
 
-    use ember_core::{
-        acl::{
-            codec::{AgentActionCodec, ConceptCodec, ConstantCodec, DecodeError},
-            message::{Content, Message, Performative, Receiver},
-            sl::{AgentAction, Concept, ConceptParameters},
-        },
+    use ember::{
         Aid,
+        message::{
+            Content, Message, Performative, Receiver,
+            content::{
+                AgentAction, Concept, ConceptParameters,
+                codec::{AgentActionCodec, ConceptCodec, ConstantCodec, DecodeError},
+            },
+        },
     };
     use serde::{Deserialize, Serialize};
 
@@ -51,7 +53,7 @@ pub mod ontology {
             if message.ontology.is_none_or(|o| o != Self::name()) {
                 panic!("message has incorrect ontology");
             }
-            let Content::Sl(content) = message.content else {
+            let Content::Structured(content) = message.content else {
                 panic!("received incorrect content type");
             };
 
@@ -70,7 +72,7 @@ pub mod ontology {
     impl AgentActionCodec for FanMessage {
         fn from_agent_action(
             agent_action: AgentAction,
-        ) -> Result<Self, ember_core::acl::codec::DecodeError> {
+        ) -> Result<Self, ember::message::content::codec::DecodeError> {
             let action: FanAction = ConceptCodec::from_term(agent_action.action)?;
 
             Ok(FanMessage { action })
@@ -87,7 +89,7 @@ pub mod ontology {
     impl ConceptCodec for FanAction {
         fn from_concept(
             concept: Concept,
-        ) -> Result<Self, ember_core::acl::codec::DecodeError> {
+        ) -> Result<Self, ember::message::content::codec::DecodeError> {
             if !concept.parameters.is_empty() {
                 return Err(DecodeError::InvalidLength(concept.parameters.len()));
             }
@@ -116,7 +118,7 @@ pub mod ontology {
                 receiver: Receiver::Single(Aid::local("fan")),
                 reply_to: None,
                 ontology: Some(FanOntology::name().into()),
-                content: Content::Sl(self.into_content()),
+                content: Content::Structured(self.into_content()),
             }
         }
     }
