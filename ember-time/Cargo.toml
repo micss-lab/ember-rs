@@ -1,0 +1,13 @@
+[package]
+name = "ember-time"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+fugit = "0.3"
+
+esp-hal = { version = "0.23.1", default-features = false, optional = true }
+
+[features]
+std = []
+esp32 = ["esp-hal/esp32", "dep:esp-hal"]

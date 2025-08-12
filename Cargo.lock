@@ -761,6 +761,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ember-time"
+version = "0.1.0"
+dependencies = [
+ "esp-hal",
+ "fugit",
+]
+
+[[package]]
 name = "enum-as-inner"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
