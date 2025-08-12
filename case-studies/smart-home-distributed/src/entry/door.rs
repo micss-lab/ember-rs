@@ -89,7 +89,9 @@ pub fn main() {
     let unlock_door_switch = Input::new(peripherals.GPIO22, Pull::Up);
     // let pir_sensor = Input::new(peripherals.GPIO18, Pull::Up);
 
-    let serial_input = UartRx::new(peripherals.UART1, Default::default()).unwrap();
+    let serial_input = UartRx::new(peripherals.UART0, Default::default())
+        .unwrap()
+        .with_rx(peripherals.GPIO3);
 
     Container::default()
         .with_agent(lock::lock_agent(
