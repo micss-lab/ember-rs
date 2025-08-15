@@ -41,6 +41,31 @@ where
     ) -> Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::Event>>;
 }
 
+pub trait IntoBehaviourWithId<Kind>: IntoBehaviour<Kind>
+where
+    Self: Sized,
+    Self::AgentState: 'static,
+    Self::Event: 'static,
+{
+    fn into_behaviour_with_id(
+        self,
+    ) -> (
+        BehaviourId,
+        Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::Event>>,
+    ) {
+        let behaviour = self.into_behaviour();
+        (behaviour.id(), behaviour)
+    }
+}
+
+impl<K, B> IntoBehaviourWithId<K> for B
+where
+    B: IntoBehaviour<K>,
+    B::Event: 'static,
+    B::AgentState: 'static,
+{
+}
+
 // This way the user can convert the behaviour to a boxed one by themselves and still pass it to
 // functions expecting and "IntoBehaviour" impl.
 #[doc(hidden)]
