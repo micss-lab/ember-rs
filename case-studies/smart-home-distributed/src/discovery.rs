@@ -19,7 +19,7 @@ pub enum System {
     CenterControl,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct SystemInfo<'a> {
     system: System,
     info: Cow<'a, DiscoveryInfo>,
@@ -58,6 +58,7 @@ impl DiscoveryInfo {
             let mac = message.info.src_address;
             let info = postcard::from_bytes::<SystemInfo>(message.data())
                 .expect("failed to deserialize system info");
+            log::debug!("Receiving info: {:?}", info);
             this.set(info.system, mac);
             if info.complete {
                 others_complete.insert(info.system);
