@@ -7,7 +7,7 @@ use ontology::PirMessage;
 
 use super::util::wrap_message;
 
-pub fn pir_agent(sensor: Input<'static>) -> Agent<(), ()> {
+pub fn pir_agent(sensor: Input<'static>) -> Agent<'static, (), ()> {
     Agent::new("pir", ()).with_behaviour(Pir::new(sensor))
 }
 

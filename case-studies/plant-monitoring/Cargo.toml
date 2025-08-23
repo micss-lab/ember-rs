@@ -15,5 +15,5 @@ esp-println = { version = "0.12.0", features = ["esp32", "log"] }
 libm = "0.2"
 log = "0.4.27"
 nb = "1.1.0"
-postcard = { version = "1.1.2", default-features = false }
+postcard = { version = "1.1.2", default-features = false, features = ["alloc"] }
 serde = { version = "1.0.219", default-features = false, features = ["derive"] }

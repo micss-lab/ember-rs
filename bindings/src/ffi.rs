@@ -127,7 +127,7 @@ mod container {
     #[unsafe(no_mangle)]
     pub extern "C" fn container_add_agent(
         container: *mut Container,
-        agent: *mut Agent<AgentState, Event>,
+        agent: *mut Agent<'static, AgentState, Event>,
     ) {
         non_null!(container, "got container null-pointer");
         non_null!(agent, "got agent null-pointer");
@@ -181,7 +181,7 @@ mod agent {
     pub extern "C" fn agent_new(
         name: *const c_char,
         agent_state: *mut AgentState,
-    ) -> *mut Agent<AgentState, Event> {
+    ) -> *mut Agent<'static, AgentState, Event> {
         let name = unsafe { string_from_raw(name) };
         non_null!(agent_state, "got agent state null-pointer");
         let agent_state = unsafe { from_raw(agent_state) };
@@ -233,7 +233,7 @@ mod agent {
 
     #[unsafe(no_mangle)]
     pub extern "C" fn agent_add_behaviour_sequential(
-        agent: *mut Agent<AgentState, Event>,
+        agent: *mut Agent<'static, AgentState, Event>,
         sequential: *mut SequentialBehaviour,
     ) {
         non_null!(agent, "got agent null-pointer");
@@ -498,7 +498,7 @@ mod behaviour {
 
                 fn add_behaviour<K>(
                     &mut self,
-                    behaviour: impl IntoBehaviour<K, AgentState = AgentState, Event = Event>,
+                    behaviour: impl IntoBehaviour<'static, K, AgentState = AgentState, Event = Event>,
                 ) {
                     self.0.push(behaviour.into_behaviour());
                 }
@@ -628,7 +628,7 @@ mod behaviour {
                 }
             }
 
-            impl SequentialBehaviourTrait for SequentialBehaviour {
+            impl SequentialBehaviourTrait<'static> for SequentialBehaviour {
                 fn initial_behaviours(
                     &self,
                 ) -> impl IntoIterator<

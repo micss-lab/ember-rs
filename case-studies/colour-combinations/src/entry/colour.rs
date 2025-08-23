@@ -27,21 +27,19 @@
 //!    ejected, and the second one is accepted into the press platform, assuming there can be a
 //!    red/red chance.
 
-use alloc::boxed::Box;
 use core::marker::PhantomData;
 
 use ember::{
     Agent,
     behaviour::{
-        Behaviour, BehaviourId, ComplexBehaviour, Context, CyclicBehaviour, IntoBehaviour,
-        OneShotBehaviour,
+        ComplexBehaviour, Context, CyclicBehaviour, IntoBehaviourWithId, OneShotBehaviour,
         fsm::{Fsm, FsmBehaviour, FsmEvent},
     },
 };
 
 pub fn colour_agent(
     sequence: impl IntoIterator<Item = Colour> + 'static,
-) -> Agent<ColourCombinatorState<impl Iterator<Item = Colour>>, ()> {
+) -> Agent<'static, ColourCombinatorState<impl Iterator<Item = Colour>>, ()> {
     Agent::new("colour", ColourCombinatorState::new(sequence.into_iter()))
         .with_behaviour(ColourCombinator::default())
 }
@@ -121,17 +119,17 @@ impl<I> ComplexBehaviour for ColourCombinator<I> {
     type AgentState = ColourCombinatorState<I>;
 }
 
-impl<I> FsmBehaviour for ColourCombinator<I>
+impl<I> FsmBehaviour<'static> for ColourCombinator<I>
 where
     I: Iterator<Item = Colour> + 'static,
 {
     type TransitionTrigger = Colour;
 
-    fn fsm(&self) -> Fsm<Self::AgentState, Self::TransitionTrigger, Self::ChildEvent> {
-        let (empty_id, empty) = behaviour_with_id(Empty::default());
-        let (red_id, red) = behaviour_with_id(Red::default());
-        let (blue_id, blue) = behaviour_with_id(Blue::default());
-        let (green_id, green) = behaviour_with_id(Green::default());
+    fn fsm(&self) -> Fsm<'static, Self::AgentState, Self::TransitionTrigger, Self::ChildEvent> {
+        let (empty_id, empty) = Empty::default().into_behaviour_with_id();
+        let (red_id, red) = Red::default().into_behaviour_with_id();
+        let (blue_id, blue) = Blue::default().into_behaviour_with_id();
+        let (green_id, green) = Green::default().into_behaviour_with_id();
 
         Fsm::builder()
             .with_behaviour(empty, true)
@@ -294,11 +292,4 @@ where
 
         state.made_combination(Colour::Blue, colour);
     }
-}
-
-fn behaviour_with_id<K, A: 'static, E: 'static>(
-    behaviour: impl IntoBehaviour<K, AgentState = A, Event = E>,
-) -> (BehaviourId, Box<dyn Behaviour<AgentState = A, Event = E>>) {
-    let behaviour = behaviour.into_behaviour();
-    (behaviour.id(), behaviour)
 }

@@ -16,7 +16,7 @@ use super::{
 pub fn moisture_agent<P: AdcChannel + 'static, ADCI: RegisterAccess>(
     potentiometer_sensor_pin: AdcPin<P, ADCI>,
     adc: Rc<RefCell<Adc<'static, ADCI>>>,
-) -> Agent<MoistureState, ()> {
+) -> Agent<'static, MoistureState, ()> {
     Agent::new("moisture", MoistureState::default())
         .with_behaviour(PotentiometerSensor::new(potentiometer_sensor_pin, adc))
         .with_behaviour(ThresholdNotification::new())

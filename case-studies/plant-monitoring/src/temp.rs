@@ -9,7 +9,7 @@ use super::util::wrap_message;
 
 pub fn temperature_agent(
     measurements: impl IntoIterator<Item = Measurement> + 'static,
-) -> Agent<(), ()> {
+) -> Agent<'static, (), ()> {
     Agent::new("temperature", ()).with_behaviour(Sensor::new(measurements.into_iter()))
 }
 

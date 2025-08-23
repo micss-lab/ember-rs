@@ -20,7 +20,7 @@ pub fn light_agent<P: AdcChannel + 'static, ADCI: RegisterAccess>(
     ldr_sensor_pin: AdcPin<P, ADCI>,
     adc: Rc<RefCell<Adc<'static, ADCI>>>,
     light_alert_pin: Output<'static>,
-) -> Agent<LightState, ()> {
+) -> Agent<'static, LightState, ()> {
     Agent::new("ldr", LightState::default())
         .with_behaviour(LdrSensor::new(ldr_sensor_pin, adc))
         .with_behaviour(LightAlert(light_alert_pin))
