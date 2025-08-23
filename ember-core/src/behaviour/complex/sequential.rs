@@ -8,22 +8,25 @@ use super::{
     ScheduledComplexBehaviour, get_id,
 };
 
-pub trait SequentialBehaviour: ComplexBehaviour {
+pub trait SequentialBehaviour<'a>: ComplexBehaviour
+where
+    Self: 'a,
+{
     fn initial_behaviours(
         &self,
     ) -> impl IntoIterator<
-        Item = Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::ChildEvent>>,
+        Item = Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::ChildEvent> + 'a>,
     >;
 }
 
-pub struct SequentialBehaviourQueue<S, E> {
+pub struct SequentialBehaviourQueue<'a, S, E> {
     blocked: BlockTracker,
-    behaviours: VecDeque<Box<dyn Behaviour<AgentState = S, Event = E>>>,
+    behaviours: VecDeque<Box<dyn Behaviour<AgentState = S, Event = E> + 'a>>,
 }
 
-impl<S: 'static, E: 'static> SequentialBehaviourQueue<S, E> {
+impl<'a, S, E> SequentialBehaviourQueue<'a, S, E> {
     pub fn new<K>(
-        behaviours: impl IntoIterator<Item = impl IntoBehaviour<K, AgentState = S, Event = E>>,
+        behaviours: impl IntoIterator<Item = impl IntoBehaviour<'a, K, AgentState = S, Event = E>>,
     ) -> Self {
         let behaviours: VecDeque<_> = behaviours.into_iter().map(|b| b.into_behaviour()).collect();
         let blocked = BlockTracker::new(behaviours.iter().map(|b| b.id()));
@@ -34,8 +37,8 @@ impl<S: 'static, E: 'static> SequentialBehaviourQueue<S, E> {
     }
 }
 
-impl<S: 'static, E: 'static> BehaviourScheduler<S, E> for SequentialBehaviourQueue<S, E> {
-    fn next(&mut self) -> Option<Box<dyn Behaviour<AgentState = S, Event = E>>> {
+impl<'a, S, E> BehaviourScheduler<'a, S, E> for SequentialBehaviourQueue<'a, S, E> {
+    fn next(&mut self) -> Option<Box<dyn Behaviour<AgentState = S, Event = E> + 'a>> {
         let behaviour = self.behaviours.pop_front()?;
         let id = behaviour.id();
         if self
@@ -50,7 +53,7 @@ impl<S: 'static, E: 'static> BehaviourScheduler<S, E> for SequentialBehaviourQue
         Some(behaviour)
     }
 
-    fn reschedule(&mut self, behaviour: Box<dyn Behaviour<AgentState = S, Event = E>>) {
+    fn reschedule(&mut self, behaviour: Box<dyn Behaviour<AgentState = S, Event = E> + 'a>) {
         self.blocked.register(behaviour.id());
         self.behaviours.push_front(behaviour);
     }
@@ -75,12 +78,12 @@ impl<S: 'static, E: 'static> BehaviourScheduler<S, E> for SequentialBehaviourQue
     }
 }
 
-struct SequentialBehaviourImpl<S: SequentialBehaviour> {
+struct SequentialBehaviourImpl<'a, S: SequentialBehaviour<'a>> {
     user_impl: S,
-    queue: SequentialBehaviourQueue<S::AgentState, S::ChildEvent>,
+    queue: SequentialBehaviourQueue<'a, S::AgentState, S::ChildEvent>,
 }
 
-impl<S: SequentialBehaviour> ComplexBehaviour for SequentialBehaviourImpl<S> {
+impl<'a, S: SequentialBehaviour<'a>> ComplexBehaviour for SequentialBehaviourImpl<'a, S> {
     type AgentState = S::AgentState;
 
     type Event = S::Event;
@@ -100,12 +103,12 @@ impl<S: SequentialBehaviour> ComplexBehaviour for SequentialBehaviourImpl<S> {
     }
 }
 
-impl<S: SequentialBehaviour> ScheduledComplexBehaviour for SequentialBehaviourImpl<S>
-where
-    Self::AgentState: 'static,
-    Self::ChildEvent: 'static,
+impl<'a, S: SequentialBehaviour<'a>> ScheduledComplexBehaviour<'a>
+    for SequentialBehaviourImpl<'a, S>
 {
-    fn scheduler(&mut self) -> &mut impl BehaviourScheduler<Self::AgentState, Self::ChildEvent> {
+    fn scheduler(
+        &mut self,
+    ) -> &mut impl BehaviourScheduler<'a, Self::AgentState, Self::ChildEvent> {
         &mut self.queue
     }
 }
@@ -113,9 +116,9 @@ where
 #[doc(hidden)]
 pub struct Sequential;
 
-impl<S: 'static, T: 'static, E: 'static> IntoBehaviour<Sequential> for T
+impl<'a, T, S, E> IntoBehaviour<'a, Sequential> for T
 where
-    T: SequentialBehaviour<AgentState = S, Event = E>,
+    T: SequentialBehaviour<'a, AgentState = S, Event = E>,
 {
     type AgentState = S;
 
@@ -123,7 +126,7 @@ where
 
     fn into_behaviour(
         self,
-    ) -> Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::Event>> {
+    ) -> Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::Event> + 'a> {
         let queue = SequentialBehaviourQueue::new(self.initial_behaviours());
         Box::new(ComplexBehaviourImpl {
             id: get_id(),

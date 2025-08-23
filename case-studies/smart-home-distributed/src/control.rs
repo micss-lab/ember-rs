@@ -34,7 +34,7 @@ mod http;
 pub fn control_agent(
     pump_switch: Input<'static>,
     fan_active_led: Output<'static>,
-) -> Agent<HomeData, ()> {
+) -> Agent<'static, HomeData, ()> {
     Agent::new("control", HomeData::default())
         .with_behaviour(MoistureReceiver)
         .with_behaviour(LightLevelReceiver)

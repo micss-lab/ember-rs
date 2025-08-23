@@ -13,7 +13,7 @@ use super::utils::wrap_message;
 pub fn temperature_agent<P: AdcChannel + 'static, ADCI: RegisterAccess + 'static>(
     sensor: AdcPin<P, ADCI>,
     adc: Rc<RefCell<Adc<'static, ADCI>>>,
-) -> Agent<(), ()> {
+) -> Agent<'static, (), ()> {
     Agent::new("temp", ()).with_behaviour(Sensor::new(sensor, adc))
 }
 

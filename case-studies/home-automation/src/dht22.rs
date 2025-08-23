@@ -8,7 +8,9 @@ use ember::{
 
 use super::util::wrap_message;
 
-pub fn dht22_agent(measurements: impl IntoIterator<Item = Measurement> + 'static) -> Agent<(), ()> {
+pub fn dht22_agent(
+    measurements: impl IntoIterator<Item = Measurement> + 'static,
+) -> Agent<'static, (), ()> {
     Agent::new("dht22", ()).with_behaviour(Sensor::new(measurements.into_iter()))
 }
 

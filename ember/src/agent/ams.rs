@@ -17,7 +17,7 @@ use crate::fipa::{ActionKind, AmsAgentDescription, ManagementOntology};
 
 pub(crate) struct AmsAgent {
     /// Inner agent on which ams behaviours will be stored.
-    behaviours: ParallelBehaviourQueue<(), ActionKind>,
+    behaviours: ParallelBehaviourQueue<'static, (), ActionKind>,
     /// Queue of actions to be performed using the hosting platform.
     actions: VecDeque<ActionKind>,
 }

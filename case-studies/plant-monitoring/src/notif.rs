@@ -2,11 +2,9 @@ use alloc::borrow::Cow;
 use core::marker::PhantomData;
 
 use ember::behaviour::{
-    ComplexBehaviour, Context, CyclicBehaviour,
+    ComplexBehaviour, Context, CyclicBehaviour, IntoBehaviourWithId,
     fsm::{Fsm, FsmBehaviour, FsmEvent},
 };
-
-use super::util::behaviour_with_id;
 
 pub struct ThresholdNotification<A>(PhantomData<A>);
 
@@ -43,16 +41,16 @@ impl<A> ComplexBehaviour for ThresholdNotification<A> {
     type AgentState = A;
 }
 
-impl<A> FsmBehaviour for ThresholdNotification<A>
+impl<A> FsmBehaviour<'static> for ThresholdNotification<A>
 where
     A: ThresholdConfig + 'static,
 {
     type TransitionTrigger = ThresholdEvent;
 
-    fn fsm(&self) -> Fsm<Self::AgentState, Self::TransitionTrigger, Self::ChildEvent> {
-        let (high_id, high) = behaviour_with_id(High(PhantomData));
-        let (low_id, low) = behaviour_with_id(Low(PhantomData));
-        let (normal_id, normal) = behaviour_with_id(Normal(PhantomData));
+    fn fsm(&self) -> Fsm<'static, Self::AgentState, Self::TransitionTrigger, Self::ChildEvent> {
+        let (high_id, high) = High(PhantomData).into_behaviour_with_id();
+        let (low_id, low) = Low(PhantomData).into_behaviour_with_id();
+        let (normal_id, normal) = Normal(PhantomData).into_behaviour_with_id();
 
         Fsm::builder()
             .with_behaviour(high, false)

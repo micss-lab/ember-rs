@@ -7,7 +7,7 @@ use ontology::{PumpAction, PumpStatus};
 
 use super::util::wrap_message;
 
-pub fn pump_agent(pump_light: Output<'static>) -> Agent<PumpState, ()> {
+pub fn pump_agent(pump_light: Output<'static>) -> Agent<'static, PumpState, ()> {
     Agent::new("pump", PumpState::default())
         .with_behaviour(PumpInteractions)
         .with_behaviour(PumpLight(pump_light))

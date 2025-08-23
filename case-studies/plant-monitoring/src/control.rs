@@ -16,7 +16,7 @@ use super::{
     util::wrap_message,
 };
 
-pub fn control_agent(user_switch: Input<'static>) -> Agent<ControlState, ()> {
+pub fn control_agent(user_switch: Input<'static>) -> Agent<'static, ControlState, ()> {
     Agent::new("control", ControlState::default())
         .with_behaviour(Receiver)
         .with_behaviour(PumpControl::new(user_switch))
