@@ -26,9 +26,9 @@ struct TickerBehaviourImpl<T: TickerBehaviour> {
     last_tick: Option<Instant>,
 }
 
-impl<T, S, E: 'static> Behaviour for TickerBehaviourImpl<T>
+impl<T, S, E> Behaviour for TickerBehaviourImpl<T>
 where
-    T: TickerBehaviour<AgentState = S, Event = E> + 'static,
+    T: TickerBehaviour<AgentState = S, Event = E>,
 {
     type AgentState = S;
 
@@ -65,9 +65,9 @@ where
 #[doc(hidden)]
 pub struct Ticker;
 
-impl<T, S, E: 'static> IntoBehaviour<Ticker> for T
+impl<'a, T, S, E> IntoBehaviour<'a, Ticker> for T
 where
-    T: TickerBehaviour<AgentState = S, Event = E> + 'static,
+    T: TickerBehaviour<AgentState = S, Event = E> + 'a,
 {
     type AgentState = S;
 
@@ -75,7 +75,7 @@ where
 
     fn into_behaviour(
         self,
-    ) -> Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::Event>> {
+    ) -> Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::Event> + 'a> {
         let interval = self.interval();
         Box::new(TickerBehaviourImpl {
             id: get_id(),

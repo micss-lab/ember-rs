@@ -3,12 +3,12 @@ use crate::context::Context;
 
 use self::scheduler::BehaviourScheduler;
 
-pub mod blocked;
 pub mod fsm;
 pub mod parallel;
-
-pub mod scheduler;
 pub mod sequential;
+
+pub mod blocked;
+pub mod scheduler;
 
 pub trait ComplexBehaviour {
     type Event;
@@ -33,12 +33,9 @@ pub trait ComplexBehaviour {
     fn reset(&mut self) {}
 }
 
-trait ScheduledComplexBehaviour: ComplexBehaviour
-where
-    Self::AgentState: 'static,
-    Self::ChildEvent: 'static,
-{
-    fn scheduler(&mut self) -> &mut impl BehaviourScheduler<Self::AgentState, Self::ChildEvent>;
+trait ScheduledComplexBehaviour<'a>: ComplexBehaviour {
+    fn scheduler(&mut self)
+    -> &mut impl BehaviourScheduler<'a, Self::AgentState, Self::ChildEvent>;
 }
 
 struct ComplexBehaviourImpl<I> {
@@ -46,9 +43,9 @@ struct ComplexBehaviourImpl<I> {
     inner: I,
 }
 
-impl<I, S: 'static, E: 'static, CE: 'static> Behaviour for ComplexBehaviourImpl<I>
+impl<'a, I, S, E, CE> Behaviour for ComplexBehaviourImpl<I>
 where
-    I: ScheduledComplexBehaviour<AgentState = S, Event = E, ChildEvent = CE> + 'static,
+    I: ScheduledComplexBehaviour<'a, AgentState = S, Event = E, ChildEvent = CE>,
 {
     type Event = E;
 

@@ -8,10 +8,13 @@ use super::{
     ScheduledComplexBehaviour, get_id,
 };
 
-pub trait FsmBehaviour: ComplexBehaviour {
+pub trait FsmBehaviour<'a>: ComplexBehaviour
+where
+    Self: 'a,
+{
     type TransitionTrigger;
 
-    fn fsm(&self) -> Fsm<Self::AgentState, Self::TransitionTrigger, Self::ChildEvent>;
+    fn fsm(&self) -> Fsm<'a, Self::AgentState, Self::TransitionTrigger, Self::ChildEvent>;
 }
 
 pub enum FsmEvent<T, E> {
@@ -26,22 +29,24 @@ enum Trigger<T> {
     Default,
 }
 
-pub struct Fsm<S, T, E> {
+pub struct Fsm<'a, S, T, E> {
     blocked: BlockTracker,
     current: BehaviourId,
     final_states: BTreeSet<BehaviourId>,
     transitions: BTreeMap<BehaviourId, BTreeMap<Trigger<T>, BehaviourId>>,
-    behaviours: BTreeMap<BehaviourId, Box<dyn Behaviour<AgentState = S, Event = FsmEvent<T, E>>>>,
+    behaviours:
+        BTreeMap<BehaviourId, Box<dyn Behaviour<AgentState = S, Event = FsmEvent<T, E>> + 'a>>,
     can_finish: bool,
 }
 
-pub struct FsmBuilder<S, T, E> {
+pub struct FsmBuilder<'a, S, T, E> {
     final_states: BTreeSet<BehaviourId>,
     transitions: BTreeMap<BehaviourId, BTreeMap<Trigger<T>, BehaviourId>>,
-    behaviours: BTreeMap<BehaviourId, Box<dyn Behaviour<AgentState = S, Event = FsmEvent<T, E>>>>,
+    behaviours:
+        BTreeMap<BehaviourId, Box<dyn Behaviour<AgentState = S, Event = FsmEvent<T, E>> + 'a>>,
 }
 
-impl<S, T, E> Default for FsmBuilder<S, T, E> {
+impl<S, T, E> Default for FsmBuilder<'_, S, T, E> {
     fn default() -> Self {
         Self {
             final_states: BTreeSet::default(),
@@ -51,29 +56,29 @@ impl<S, T, E> Default for FsmBuilder<S, T, E> {
     }
 }
 
-impl<S, T, E> Fsm<S, T, E> {
-    pub fn builder() -> FsmBuilder<S, T, E> {
+impl<'a, S, T, E> Fsm<'a, S, T, E> {
+    pub fn builder() -> FsmBuilder<'a, S, T, E> {
         FsmBuilder::new()
     }
 }
 
-impl<S, T: Ord, E> Fsm<S, T, E> {
+impl<S, T: Ord, E> Fsm<'_, S, T, E> {
     fn handle_trigger(&mut self, trigger: Trigger<T>) -> Option<BehaviourId> {
         self.current = *self.transitions.get(&self.current)?.get(&trigger)?;
         Some(self.current)
     }
 }
 
-impl<S, T, E> FsmBuilder<S, T, E> {
+impl<S, T, E> FsmBuilder<'_, S, T, E> {
     pub fn new() -> Self {
         Self::default()
     }
 }
 
-impl<S: 'static, T: 'static, E: 'static> FsmBuilder<S, T, E> {
+impl<'a, S, T, E> FsmBuilder<'a, S, T, E> {
     pub fn with_behaviour<K>(
         mut self,
-        behaviour: impl IntoBehaviour<K, AgentState = S, Event = FsmEvent<T, E>>,
+        behaviour: impl IntoBehaviour<'a, K, AgentState = S, Event = FsmEvent<T, E>>,
         is_final: bool,
     ) -> Self {
         let behaviour = behaviour.into_behaviour();
@@ -86,7 +91,7 @@ impl<S: 'static, T: 'static, E: 'static> FsmBuilder<S, T, E> {
     }
 }
 
-impl<S, T, E> FsmBuilder<S, T, E>
+impl<S, T, E> FsmBuilder<'_, S, T, E>
 where
     T: Ord,
 {
@@ -104,10 +109,10 @@ where
     }
 }
 
-impl<S, T, E> FsmBuilder<S, T, E> {
+impl<'a, S, T, E> FsmBuilder<'a, S, T, E> {
     /// Validates the currently configured [`FsmBuilder`] and returns the fsm based behaviour scheduler.
     // TODO: Return a proper error enum here.
-    pub fn try_build(self, start_behaviour: BehaviourId) -> Result<Fsm<S, T, E>, &'static str> {
+    pub fn try_build(self, start_behaviour: BehaviourId) -> Result<Fsm<'a, S, T, E>, &'static str> {
         let Self {
             final_states,
             transitions,
@@ -140,11 +145,11 @@ impl<S, T, E> FsmBuilder<S, T, E> {
     }
 }
 
-impl<S: 'static, T: 'static, E: 'static> BehaviourScheduler<S, FsmEvent<T, E>> for Fsm<S, T, E>
+impl<'a, S, T, E> BehaviourScheduler<'a, S, FsmEvent<T, E>> for Fsm<'a, S, T, E>
 where
     T: Ord,
 {
-    fn next(&mut self) -> Option<Box<dyn Behaviour<AgentState = S, Event = FsmEvent<T, E>>>> {
+    fn next(&mut self) -> Option<Box<dyn Behaviour<AgentState = S, Event = FsmEvent<T, E>> + 'a>> {
         let behaviour = self
             .behaviours
             .remove(&self.current)
@@ -164,7 +169,7 @@ where
 
     fn reschedule(
         &mut self,
-        behaviour: Box<dyn Behaviour<AgentState = S, Event = FsmEvent<T, E>>>,
+        behaviour: Box<dyn Behaviour<AgentState = S, Event = FsmEvent<T, E>> + 'a>,
     ) {
         let id = behaviour.id();
         self.blocked.register(id);
@@ -176,7 +181,7 @@ where
 
     fn reschedule_finished(
         &mut self,
-        mut behaviour: Box<dyn Behaviour<AgentState = S, Event = FsmEvent<T, E>>>,
+        mut behaviour: Box<dyn Behaviour<AgentState = S, Event = FsmEvent<T, E>> + 'a>,
     ) {
         behaviour.reset();
         let id = behaviour.id();
@@ -212,12 +217,12 @@ where
     }
 }
 
-struct FsmBehaviourImpl<F: FsmBehaviour> {
+struct FsmBehaviourImpl<'a, F: FsmBehaviour<'a>> {
     user_impl: F,
-    fsm: Fsm<F::AgentState, F::TransitionTrigger, F::ChildEvent>,
+    fsm: Fsm<'a, F::AgentState, F::TransitionTrigger, F::ChildEvent>,
 }
 
-impl<F: FsmBehaviour> ComplexBehaviour for FsmBehaviourImpl<F>
+impl<'a, F: FsmBehaviour<'a>> ComplexBehaviour for FsmBehaviourImpl<'a, F>
 where
     F::TransitionTrigger: Ord,
 {
@@ -251,14 +256,14 @@ where
     }
 }
 
-impl<F> ScheduledComplexBehaviour for FsmBehaviourImpl<F>
+impl<'a, F> ScheduledComplexBehaviour<'a> for FsmBehaviourImpl<'a, F>
 where
-    F: FsmBehaviour,
-    F::AgentState: 'static,
-    F::ChildEvent: 'static,
-    F::TransitionTrigger: 'static + Ord,
+    F: FsmBehaviour<'a>,
+    F::TransitionTrigger: Ord,
 {
-    fn scheduler(&mut self) -> &mut impl BehaviourScheduler<Self::AgentState, Self::ChildEvent> {
+    fn scheduler(
+        &mut self,
+    ) -> &mut impl BehaviourScheduler<'a, Self::AgentState, Self::ChildEvent> {
         &mut self.fsm
     }
 }
@@ -266,9 +271,9 @@ where
 #[doc(hidden)]
 pub struct FsmKind;
 
-impl<S: 'static, T: 'static, E: 'static> IntoBehaviour<FsmKind> for T
+impl<'a, S, T, E> IntoBehaviour<'a, FsmKind> for T
 where
-    T: FsmBehaviour<AgentState = S, Event = E>,
+    T: FsmBehaviour<'a, AgentState = S, Event = E>,
     T::TransitionTrigger: Ord,
 {
     type AgentState = S;
@@ -277,7 +282,7 @@ where
 
     fn into_behaviour(
         self,
-    ) -> Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::Event>> {
+    ) -> Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::Event> + 'a> {
         let fsm = self.fsm();
         Box::new(ComplexBehaviourImpl {
             id: get_id(),
