@@ -1,12 +1,10 @@
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
 
-use alloc::boxed::Box;
 use ember::{
     Agent, Container,
     behaviour::{
-        Behaviour, BehaviourId, ComplexBehaviour, Context, IntoBehaviour, IntoBehaviourWithId,
-        TickerBehaviour,
+        ComplexBehaviour, Context, IntoBehaviour, IntoBehaviourWithId, TickerBehaviour,
         fsm::{Fsm, FsmBehaviour, FsmEvent},
     },
 };
@@ -24,10 +22,10 @@ impl ComplexBehaviour for TrafficLight {
     type AgentState = ();
 }
 
-impl FsmBehaviour for TrafficLight {
+impl FsmBehaviour<'static> for TrafficLight {
     type TransitionTrigger = Switch;
 
-    fn fsm(&self) -> Fsm<Self::AgentState, Self::TransitionTrigger, Self::ChildEvent> {
+    fn fsm(&self) -> Fsm<'static, Self::AgentState, Self::TransitionTrigger, Self::ChildEvent> {
         let red_light = RedLight::default().into_behaviour();
         let orange_light = OrangeLight::default().into_behaviour();
         let (begin_state, green_light) = GreenLight::default().into_behaviour_with_id();

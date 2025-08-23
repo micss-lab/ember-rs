@@ -77,7 +77,7 @@ impl ComplexBehaviour for MotorMovements {
     type ChildEvent = ();
 }
 
-impl SequentialBehaviour for MotorMovements {
+impl SequentialBehaviour<'static> for MotorMovements {
     fn initial_behaviours(
         &self,
     ) -> impl IntoIterator<

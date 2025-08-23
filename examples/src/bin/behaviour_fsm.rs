@@ -6,14 +6,13 @@ use ember_examples::setup_example;
 
 setup_example!();
 
-use alloc::boxed::Box;
 use alloc::string::String;
 use core::cell::Cell;
 use core::ptr::addr_of_mut;
 
 use ember::behaviour::{
-    Behaviour, BehaviourId, ComplexBehaviour, Context, CyclicBehaviour, IntoBehaviour,
-    OneShotBehaviour, TickerBehaviour,
+    ComplexBehaviour, Context, CyclicBehaviour, IntoBehaviourWithId, OneShotBehaviour,
+    TickerBehaviour,
 };
 use ember::{Agent, Container};
 
@@ -31,7 +30,7 @@ enum ManagerMessage {
     Finished,
 }
 
-fn manager() -> Agent<(), ()> {
+fn manager() -> Agent<'static, (), ()> {
     #[derive(PartialEq, Eq, PartialOrd, Ord)]
     enum ManagerTrigger {
         TaskSent,
@@ -124,14 +123,14 @@ fn manager() -> Agent<(), ()> {
         type ChildEvent = ();
     }
 
-    impl FsmBehaviour for ManagerBehaviour {
+    impl FsmBehaviour<'_> for ManagerBehaviour {
         type TransitionTrigger = ManagerTrigger;
 
-        fn fsm(&self) -> Fsm<Self::AgentState, Self::TransitionTrigger, Self::ChildEvent> {
+        fn fsm(&self) -> Fsm<'static, Self::AgentState, Self::TransitionTrigger, Self::ChildEvent> {
             let send_worker_task =
-                behaviour_with_id(SendWworkerTask(Cell::new("Print this message".into())));
-            let receive_acknowledgement = behaviour_with_id(ReceiveAcknowledgement);
-            let receive_finish = behaviour_with_id(ReceiveFinish::default());
+                SendWworkerTask(Cell::new("Print this message".into())).into_behaviour_with_id();
+            let receive_acknowledgement = ReceiveAcknowledgement.into_behaviour_with_id();
+            let receive_finish = ReceiveFinish::default().into_behaviour_with_id();
 
             Fsm::builder()
                 .with_behaviour(send_worker_task.1, false)
@@ -155,7 +154,7 @@ fn manager() -> Agent<(), ()> {
     Agent::new("manager", ()).with_behaviour(ManagerBehaviour)
 }
 
-fn worker() -> Agent<(), ()> {
+fn worker() -> Agent<'static, (), ()> {
     static mut CURRENT_TASK: Option<String> = None;
 
     #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -249,14 +248,14 @@ fn worker() -> Agent<(), ()> {
         type ChildEvent = ();
     }
 
-    impl FsmBehaviour for WorkerBehaviour {
+    impl FsmBehaviour<'static> for WorkerBehaviour {
         type TransitionTrigger = WorkerTrigger;
 
-        fn fsm(&self) -> Fsm<Self::AgentState, Self::TransitionTrigger, Self::ChildEvent> {
-            let receive_task = behaviour_with_id(ReceiveTask);
-            let send_acknowledgement = behaviour_with_id(SendAcknowledgement);
-            let perform_task = behaviour_with_id(PerformTask);
-            let send_finished = behaviour_with_id(SendFinishedMessage);
+        fn fsm(&self) -> Fsm<'static, Self::AgentState, Self::TransitionTrigger, Self::ChildEvent> {
+            let receive_task = ReceiveTask.into_behaviour_with_id();
+            let send_acknowledgement = SendAcknowledgement.into_behaviour_with_id();
+            let perform_task = PerformTask.into_behaviour_with_id();
+            let send_finished = SendFinishedMessage.into_behaviour_with_id();
 
             Fsm::builder()
                 .with_behaviour(receive_task.1, false)
@@ -291,11 +290,4 @@ fn example() {
         .with_agent(manager())
         .with_agent(worker());
     container.start().unwrap();
-}
-
-fn behaviour_with_id<K, S: 'static, E: 'static>(
-    behaviour: impl IntoBehaviour<K, AgentState = S, Event = E>,
-) -> (BehaviourId, Box<dyn Behaviour<AgentState = S, Event = E>>) {
-    let behaviour = behaviour.into_behaviour();
-    (behaviour.id(), behaviour)
 }
