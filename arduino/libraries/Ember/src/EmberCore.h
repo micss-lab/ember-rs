@@ -3,9 +3,9 @@
 
 #include "inttypes.h"
 
-namespace framework::__ffi {
+namespace ember::__ffi {
 
-template<typename E = void>
+template<typename S = void, typename E = void>
 struct Agent;
 
 struct BehaviourVec;
@@ -27,6 +27,10 @@ struct Event {
   void *inner;
 };
 
+struct AgentState {
+  void *inner;
+};
+
 struct ContainerPollResult {
   int32_t status;
   bool should_stop;
@@ -40,6 +44,10 @@ Event *event_new(void *event);
 
 void event_free(Event *event);
 
+AgentState *agent_state_new(void *agent_state);
+
+void agent_state_free(AgentState *agent_state);
+
 /**
  * Creates a new container instance.
  *
@@ -52,23 +60,24 @@ Container *container_new();
 
 void container_free(Container *container);
 
-void container_add_agent(Container *container, Agent<Event> *agent);
+void container_add_agent(Container *container, Agent<AgentState, Event> *agent);
 
 int32_t container_start(Container *container);
 
 ContainerPollResult container_poll(Container *container);
 
-Agent<Event> *agent_new(const char *name);
+Agent<AgentState, Event> *agent_new(const char *name, AgentState *agent_state);
 
-void agent_free(Agent<Event> *agent);
+void agent_free(Agent<AgentState, Event> *agent);
 
-void agent_add_behaviour_oneshot(Agent<Event> *agent, OneShotBehaviour *oneshot);
+void agent_add_behaviour_oneshot(Agent<AgentState, Event> *agent, OneShotBehaviour *oneshot);
 
-void agent_add_behaviour_cyclic(Agent<Event> *agent, CyclicBehaviour *cyclic);
+void agent_add_behaviour_cyclic(Agent<AgentState, Event> *agent, CyclicBehaviour *cyclic);
 
-void agent_add_behaviour_ticker(Agent<Event> *agent, TickerBehaviour *ticker);
+void agent_add_behaviour_ticker(Agent<AgentState, Event> *agent, TickerBehaviour *ticker);
 
-void agent_add_behaviour_sequential(Agent<Event> *agent, SequentialBehaviour *sequential);
+void agent_add_behaviour_sequential(Agent<AgentState, Event> *agent,
+                                    SequentialBehaviour *sequential);
 
 void context_emit_event(Context<Event> *context, Event *event);
 
@@ -78,19 +87,21 @@ void context_remove_agent(Context<Event> *context);
 
 void context_block_behaviour(Context<Event> *context);
 
-OneShotBehaviour *behaviour_oneshot_new(void *inner, void (*action)(void*, Context<Event>*));
+OneShotBehaviour *behaviour_oneshot_new(void *inner, void (*action)(void*,
+                                                                    Context<Event>*,
+                                                                    AgentState*));
 
 void behaviour_oneshot_free(OneShotBehaviour *oneshot);
 
 CyclicBehaviour *behaviour_cyclic_new(void *inner,
-                                      void (*action)(void*, Context<Event>*),
+                                      void (*action)(void*, Context<Event>*, AgentState*),
                                       bool (*is_finished)(void*));
 
 void behaviour_cyclic_free(CyclicBehaviour *cyclic);
 
 TickerBehaviour *behaviour_ticker_new(void *inner,
                                       uint64_t (*interval)(void*),
-                                      void (*action)(void*, Context<Event>*),
+                                      void (*action)(void*, Context<Event>*, AgentState*),
                                       bool (*is_finished)(void*));
 
 void behaviour_ticker_free(TickerBehaviour *ticker);
@@ -110,7 +121,9 @@ void behaviour_vec_free(BehaviourVec *queue);
 SequentialBehaviour *behaviour_sequential_new(void *inner,
                                               BehaviourVec *initial_behaviours,
                                               void (*handle_child_event)(void*, Event*),
-                                              void (*after_child_action)(void*, Context<Event>*));
+                                              void (*after_child_action)(void*,
+                                                                         Context<Event>*,
+                                                                         AgentState*));
 
 void behaviour_sequential_free(SequentialBehaviour *sequential);
 
@@ -124,6 +137,6 @@ void initialize_logging(char level);
 
 }  // extern "C"
 
-}  // namespace framework::__ffi
+}  // namespace ember::__ffi
 
 #endif  // FRAMEWORK_CORE_H

@@ -12,10 +12,10 @@ fn main() {
         .to_string();
 
     let config = Config {
-        namespace: Some(String::from("framework::__ffi")),
+        namespace: Some(String::from("ember::__ffi")),
         parse: ParseConfig {
             parse_deps: true,
-            include: Some(Vec::from(["ember-core".into()])),
+            include: Some(Vec::from(["ember".into(), "ember-core".into()])),
             ..Default::default()
         },
         no_includes: true,

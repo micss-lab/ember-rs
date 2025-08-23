@@ -152,7 +152,7 @@ mod container {
     }
 
     #[unsafe(no_mangle)]
-    pub extern "C" fn container_poll(container: *mut Container<'_>) -> ContainerPollResult {
+    pub extern "C" fn container_poll(container: *mut Container) -> ContainerPollResult {
         non_null!(container, "got container null-pointer");
         let container = unsafe { ref_from_raw(container) };
         let (should_stop, status) = match container.poll() {
@@ -521,59 +521,59 @@ mod behaviour {
 
             #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_vec_add_behaviour_oneshot(
-                queue: *mut BehaviourVec,
+                behaviour_vec: *mut BehaviourVec,
                 oneshot: *mut OneShotBehaviour,
             ) {
-                non_null!(queue, "got sequential queue null-pointer");
+                non_null!(behaviour_vec, "got sequential behaviour vec null-pointer");
                 non_null!(oneshot, "got oneshot behaviour null-pointer");
-                let queue = unsafe { ref_from_raw(queue) };
+                let behaviour_vec = unsafe { ref_from_raw(behaviour_vec) };
                 let behaviour = unsafe { from_raw(oneshot) };
-                queue.add_behaviour(behaviour);
+                behaviour_vec.add_behaviour(behaviour);
             }
 
             #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_vec_add_behaviour_cyclic(
-                queue: *mut BehaviourVec,
+                behaviour_vec: *mut BehaviourVec,
                 cyclic: *mut CyclicBehaviour,
             ) {
-                non_null!(queue, "got sequential queue null-pointer");
+                non_null!(behaviour_vec, "got sequential behaviour vec null-pointer");
                 non_null!(cyclic, "got cyclic behaviour null-pointer");
-                let queue = unsafe { ref_from_raw(queue) };
+                let behaviour_vec = unsafe { ref_from_raw(behaviour_vec) };
                 let behaviour = unsafe { from_raw(cyclic) };
-                queue.add_behaviour(behaviour);
+                behaviour_vec.add_behaviour(behaviour);
             }
 
             #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_vec_add_behaviour_ticker(
-                queue: *mut BehaviourVec,
+                behaviour_vec: *mut BehaviourVec,
                 ticker: *mut TickerBehaviour,
             ) {
-                non_null!(queue, "got sequential queue null-pointer");
+                non_null!(behaviour_vec, "got sequential behaviour vec null-pointer");
                 non_null!(ticker, "got ticker behaviour null-pointer");
-                let queue = unsafe { ref_from_raw(queue) };
+                let behaviour_vec = unsafe { ref_from_raw(behaviour_vec) };
                 let behaviour = unsafe { from_raw(ticker) };
-                queue.add_behaviour(behaviour);
+                behaviour_vec.add_behaviour(behaviour);
             }
 
             #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_vec_add_behaviour_sequential(
-                queue: *mut BehaviourVec,
+                behaviour_vec: *mut BehaviourVec,
                 sequential: *mut SequentialBehaviour,
             ) {
-                non_null!(queue, "got sequential queue null-pointer");
+                non_null!(behaviour_vec, "got sequential behaviour vec null-pointer");
                 non_null!(sequential, "got sequential behaviour null-pointer");
-                let queue = unsafe { ref_from_raw(queue) };
+                let behaviour_vec = unsafe { ref_from_raw(behaviour_vec) };
                 let behaviour = unsafe { from_raw(sequential) };
-                queue.add_behaviour(behaviour);
+                behaviour_vec.add_behaviour(behaviour);
             }
 
             #[unsafe(no_mangle)]
-            pub extern "C" fn behaviour_vec_free(queue: *mut BehaviourVec) {
+            pub extern "C" fn behaviour_vec_free(behaviour_vec: *mut BehaviourVec) {
                 non_null_or_bail!(
-                    queue,
-                    "attemted to free sequential behaviour queue null-pointer"
+                    behaviour_vec,
+                    "attemted to free sequential behaviour behaviour vec null-pointer"
                 );
-                unsafe { drop_raw(queue) };
+                unsafe { drop_raw(behaviour_vec) };
             }
         }
 

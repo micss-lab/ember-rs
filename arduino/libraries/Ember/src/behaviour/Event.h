@@ -1,13 +1,12 @@
-#ifndef FRAMEWORK_BEHAVIOUR_EVENT_H
-#define FRAMEWORK_BEHAVIOUR_EVENT_H
+#ifndef EMBER_BEHAVIOUR_EVENT_H
+#define EMBER_BEHAVIOUR_EVENT_H
 
 #include <memory>
 
-#include "FrameworkCore.h"
-
+#include "../EmberCore.h"
 #include "../Object.h"
 
-namespace framework {
+namespace ember {
 
 namespace behaviour {
 
@@ -45,6 +44,6 @@ Event<E>::Event(__ffi::Event* event):
 
 } // namespace behaviour
 
-} // namespace framework
+} // namespace ember
 
-#endif // FRAMEWORK_BEHAVIOUR_EVENT_H
+#endif // EMBER_BEHAVIOUR_EVENT_H

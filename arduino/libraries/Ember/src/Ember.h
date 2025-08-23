@@ -1,21 +1,24 @@
-#ifndef FRAMEWORK_H
-#define FRAMEWORK_H
+#ifndef EMBER_H
+#define EMBER_H
 
 #include <inttypes.h>
 
-#include "FrameworkCore.h"
+#include "EmberCore.h"
 
 #include "Agent.h"
 #include "Container.h"
+#include "Unit.h"
 
 #include "behaviour/Event.h"
 #include "behaviour/Context.h"
+#include "behaviour/Behaviour.h"
 #include "behaviour/OneShotBehaviour.h"
 #include "behaviour/CyclicBehaviour.h"
 #include "behaviour/TickerBehaviour.h"
 #include "behaviour/SequentialBehaviour.h"
 
-namespace framework {
+
+namespace ember {
 
 namespace logging {
     enum class LogLevel {
@@ -30,7 +33,7 @@ namespace logging {
 
 static bool INITIALIZED = false;
 /**
- * Sets up the frameworks required resources such as the logger and the allocator.
+ * Sets up the embers required resources such as the logger and the allocator.
  */
 static void initialize(logging::LogLevel level) {
     if (INITIALIZED) {
@@ -41,6 +44,6 @@ static void initialize(logging::LogLevel level) {
     INITIALIZED = true;
 };
 
-} // namespace framework
+} // namespace ember
 
-#endif // FRAMEWORK_H
+#endif // EMBER_H

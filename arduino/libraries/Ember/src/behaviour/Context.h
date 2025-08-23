@@ -1,11 +1,11 @@
-#ifndef FRAMEWORK_BEHAVIOUR_CONTEXT_H
-#define FRAMEWORK_BEHAVIOUR_CONTEXT_H
+#ifndef EMBER_BEHAVIOUR_CONTEXT_H
+#define EMBER_BEHAVIOUR_CONTEXT_H
 
-#include "../FrameworkCore.h"
+#include "../EmberCore.h"
 
 #include "Event.h"
 
-namespace framework {
+namespace ember {
 
 namespace behaviour {
 
@@ -54,6 +54,6 @@ void Context<E>::block_behaviour() {
 
 } // namespace behaviour
 
-} // namespace framework
+} // namespace ember
 
-#endif // FRAMEWORK_BEHAVIOUR_CONTEXT_H
+#endif // EMBER_BEHAVIOUR_CONTEXT_H

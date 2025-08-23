@@ -1,25 +1,25 @@
-#include <Framework.h>
+#include <Ember.h>
 
 #include <utility>
 #include <iostream>
 #include <memory>
 
-using namespace framework::behaviour;
+using namespace ember::behaviour;
 
 class HelloWorld: 
     public OneShotBehaviour<> {
   public:
-    virtual void action(Context<>& context) const override {
+    virtual void action(Context<>& context, ember::Unit& agent_state) const override {
       Serial.println("Hello, World!");
       Serial.println("My friends will send messages to their parent to calculate a value.");
     }
 };
 
 class Incrementor:
-    public CyclicBehaviour<char> {
+    public CyclicBehaviour<ember::Unit, char> {
   public:
-    virtual void action(Context<char>& context) override {
-        context.message_parent(Message(std::make_unique<char>(this->count)));
+    virtual void action(Context<char>& context, ember::Unit& agent_state) override {
+        context.emit_event(Event(std::make_unique<char>(this->count)));
         --this->count;
     }
     virtual bool is_finished() const override {
@@ -30,23 +30,23 @@ class Incrementor:
 };
 
 class SomethingSequential:
-    public SequentialBehaviour<void, char> {
+    public SequentialBehaviour<ember::Unit, void, char> {
   public:
     SomethingSequential():
-     SequentialBehaviour<void, char>(
+     SequentialBehaviour<ember::Unit, void, char>(
        SomethingSequential::initial_behaviours()
      ) {}
 
-    static SequentialBehaviourQueue<char> initial_behaviours() {
-      SequentialBehaviourQueue<char> queue;
-      // queue.add_behaviour(std::make_unique<HelloWorld>());
-      queue.add_behaviour(std::make_unique<Incrementor>());
-      queue.add_behaviour(std::make_unique<Incrementor>());
-      return queue;
+    static BehaviourVec<ember::Unit, char> initial_behaviours() {
+      BehaviourVec<ember::Unit, char> vec;
+      // vec.add_behaviour(std::make_unique<HelloWorld>());
+      vec.add_behaviour(std::make_unique<Incrementor>());
+      vec.add_behaviour(std::make_unique<Incrementor>());
+      return vec;
     }
 
-    void handle_child_message(Message<char>&& message) {
-      char value = *(message.value());
+    void handle_child_message(Event<char>&& event) {
+      char value = *(event.value());
 
       Serial.print("Receiving child message: ");
       Serial.println((unsigned int) value);
@@ -62,22 +62,22 @@ class SomethingSequential:
     unsigned int count{0};
 };
 
-std::unique_ptr<framework::Container> container;
+std::unique_ptr<ember::Container> container;
 
 void setup() {
   Serial.begin(115200);
   Serial.println("Running example `message_parent`");
 
-  // Initialize the frameworks required resources.
-  framework::initialize(framework::logging::LogLevel::Debug);
-  // framework::__ffi::initialize_logging(5);
-  /* framework::__ffi::initialize_allocator(); */
+  // Initialize the embers required resources.
+  ember::initialize(ember::logging::LogLevel::Debug);
+  // ember::__ffi::initialize_logging(5);
+  /* ember::__ffi::initialize_allocator(); */
 
   // Create the main container instance.
-  container = std::make_unique<framework::Container>();
-  /* framework::__ffi::Container* container = framework::__ffi::container_new(); */
+  container = std::make_unique<ember::Container>();
+  /* ember::__ffi::Container* container = ember::__ffi::container_new(); */
 
-  framework::Agent hello_world_agent = framework::Agent("hello-world-agent");
+  ember::Agent<> hello_world_agent("hello-world-agent", ember::Unit());
   hello_world_agent.add_behaviour(std::make_unique<HelloWorld>());
   hello_world_agent.add_behaviour(std::make_unique<SomethingSequential>());
 
@@ -87,7 +87,7 @@ void setup() {
 }
 
 void loop() {
-  framework::Container::PollResult result = container->poll();
+  ember::Container::PollResult result = container->poll();
   if (result.should_stop) {
     Serial.println(
       (result.status == 0) ? "Finished executing." : "Container exited with an error!"
