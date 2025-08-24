@@ -16,7 +16,7 @@ use super::{
     util::wrap_message,
 };
 
-pub fn control_agent(user_switch: Input<'static>) -> Agent<'static, ControlState, ()> {
+pub fn control_agent(user_switch: Input) -> Agent<'_, ControlState, ()> {
     Agent::new("control", ControlState::default())
         .with_behaviour(Receiver)
         .with_behaviour(PumpControl::new(user_switch))
@@ -71,17 +71,17 @@ impl ControlState {
     }
 }
 
-struct PumpControl {
-    user_switch: Input<'static>,
+struct PumpControl<'d> {
+    user_switch: Input<'d>,
 }
 
-impl PumpControl {
-    fn new(user_switch: Input<'static>) -> Self {
+impl<'d> PumpControl<'d> {
+    fn new(user_switch: Input<'d>) -> Self {
         Self { user_switch }
     }
 }
 
-impl TickerBehaviour for PumpControl {
+impl TickerBehaviour for PumpControl<'_> {
     type AgentState = ControlState;
 
     type Event = ();

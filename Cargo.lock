@@ -262,6 +262,7 @@ version = "0.1.0"
 dependencies = [
  "blocking-network-stack",
  "case-study-home-automation",
+ "case-study-http-server",
  "case-study-plant-monitoring",
  "critical-section",
  "embedded-io 0.6.1",
@@ -285,6 +286,7 @@ version = "0.1.0"
 dependencies = [
  "blocking-network-stack",
  "case-study-home-automation",
+ "case-study-http-server",
  "case-study-plant-monitoring",
  "critical-section",
  "embedded-io 0.6.1",

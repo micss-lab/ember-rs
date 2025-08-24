@@ -1,5 +1,3 @@
-use core::ptr::addr_of_mut;
-
 use alloc::{boxed::Box, collections::BTreeSet};
 
 use blocking_network_stack::Stack;
@@ -7,15 +5,16 @@ use esp_hal::delay::Delay;
 use esp_wifi::wifi::{WifiController, WifiDevice, WifiStaDevice};
 use smoltcp::{
     iface::{Interface, SocketSet},
+    phy::Device,
     socket::dhcpv4,
     wire::DhcpOption,
 };
 
-pub fn create_network_stack(
-    mut wifi: WifiDevice<'static, WifiStaDevice>,
+pub fn create_network_stack<'d>(
+    mut wifi: WifiDevice<'d, WifiStaDevice>,
     random: u32,
     hostname: &'static [u8],
-) {
+) -> Stack<'static, WifiDevice<'d, WifiStaDevice>> {
     let mut sockets = SocketSet::new(unsafe { &mut crate::SOCKET_STORE[..] });
 
     let dhcp_socket = {
@@ -51,19 +50,19 @@ pub fn create_network_stack(
         )
     };
 
-    unsafe { &mut *addr_of_mut!(crate::WIFI_STACK) }
-        .set(Stack::new(
-            iface,
-            wifi,
-            sockets,
-            || esp_hal::time::now().duration_since_epoch().to_millis(),
-            random,
-        ))
-        .ok()
-        .expect("cannot create stack more than once");
+    Stack::new(
+        iface,
+        wifi,
+        sockets,
+        || esp_hal::time::now().duration_since_epoch().to_millis(),
+        random,
+    )
 }
 
-pub fn connect_to_access_point(controller: &mut WifiController) {
+pub fn connect_to_access_point<D: Device>(
+    stack: &Stack<'static, D>,
+    controller: &mut WifiController,
+) {
     use esp_wifi::wifi::{AuthMethod, ClientConfiguration, Configuration};
 
     let ssid = crate::SSID.unwrap_or("Wokwi-GUEST");
@@ -137,9 +136,6 @@ pub fn connect_to_access_point(controller: &mut WifiController) {
     }
 
     log::trace!("Waiting for an ip address.");
-    let stack = unsafe { &mut *addr_of_mut!(crate::WIFI_STACK) }
-        .get_mut()
-        .expect("wifi stack should be created before calling this function");
     loop {
         stack.work();
 

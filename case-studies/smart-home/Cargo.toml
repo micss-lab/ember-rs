@@ -22,6 +22,7 @@ smoltcp = { version = "0.12.0", default-features = false, features = ["proto-ipv
 
 home-automation = { package = "case-study-home-automation", path = "../home-automation" }
 plant-monitoring = { package = "case-study-plant-monitoring", path = "../plant-monitoring" }
+http-server = { package = "case-study-http-server", path = "../http-server" }
 
 [lints.clippy]
 uninlined_format_args = { level = "allow" }

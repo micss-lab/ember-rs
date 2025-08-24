@@ -3,46 +3,53 @@ use core::{marker::PhantomData, ptr::addr_of_mut};
 use alloc::format;
 use alloc::string::String;
 
-use blocking_network_stack::Socket;
+use blocking_network_stack::{Socket, Stack};
 
 use embedded_io::Write;
 use ember::behaviour::{Context, CyclicBehaviour};
-use esp_wifi::wifi::{WifiDevice, WifiStaDevice};
 use httparse::Request;
 use smoltcp::phy::Device;
 
-static mut RX_BUFFER: &mut [u8] = &mut [0u8; 1024];
-static mut TX_BUFFER: &mut [u8] = &mut [0u8; 2048];
+use crate::{RX_BUFFER_SIZE, TX_BUFFER_SIZE};
 
-pub struct Server<H, S, D>
+static mut RX_BUFFER: &mut [u8] = &mut [0u8; RX_BUFFER_SIZE];
+static mut TX_BUFFER: &mut [u8] = &mut [0u8; TX_BUFFER_SIZE];
+
+pub struct Server<'s, 'a, H, S, D>
 where
-    D: Device + 'static,
+    D: Device,
+    'a: 's,
 {
     port: u16,
     handle_request: H,
-    current_socket: Option<Socket<'static, 'static, 'static, D>>,
+    stack: &'s Stack<'a, D>,
+    current_socket: Option<Socket<'s, 'a, 'static, D>>,
     _state: PhantomData<S>,
 }
 
-impl<H, S, D> Server<H, S, D>
+impl<'s, 'a, H, S, D> Server<'s, 'a, H, S, D>
 where
-    D: Device + 'static,
     // Signature added here for better compiler errors.
     H: FnOnce(Request, &mut Context<()>, &mut S) -> (u16, String) + Clone,
+    D: Device,
+    'a: 's,
 {
-    pub fn new(port: u16, handle_request: H) -> Self {
+    pub fn new(port: u16, handle_request: H, stack: &'s Stack<'a, D>) -> Self {
         Self {
             port,
             handle_request,
+            stack,
             current_socket: None,
             _state: PhantomData,
         }
     }
 }
 
-impl<H, S> CyclicBehaviour for Server<H, S, WifiDevice<'static, WifiStaDevice>>
+impl<'s, 'a, H, S, D> CyclicBehaviour for Server<'s, 'a, H, S, D>
 where
     H: FnOnce(Request, &mut Context<()>, &mut S) -> (u16, String) + Clone,
+    D: Device,
+    'a: 's,
 {
     type AgentState = S;
 
@@ -51,16 +58,18 @@ where
     fn action(&mut self, ctx: &mut Context<Self::Event>, state: &mut Self::AgentState) {
         use embedded_io::Read;
 
-        let mut socket = self.current_socket.take().unwrap_or_else(|| {
-            let mut socket = unsafe { &mut *addr_of_mut!(crate::WIFI_STACK) }
-                .get_mut()
-                .unwrap()
-                .get_socket(unsafe { *addr_of_mut!(RX_BUFFER) }, unsafe {
-                    *addr_of_mut!(TX_BUFFER)
-                });
-            socket.listen_unblocking(self.port).unwrap();
-            socket
-        });
+        let mut socket = match self.current_socket.take() {
+            Some(s) => s,
+            None => {
+                let mut socket = self
+                    .stack
+                    .get_socket(unsafe { &mut *addr_of_mut!(RX_BUFFER) }, unsafe {
+                        &mut *addr_of_mut!(TX_BUFFER)
+                    });
+                socket.listen_unblocking(self.port).unwrap();
+                socket
+            }
+        };
 
         if !socket.is_connected() {
             socket.work();

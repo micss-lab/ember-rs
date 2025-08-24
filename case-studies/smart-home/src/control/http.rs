@@ -1,8 +1,7 @@
 use alloc::format;
 use alloc::string::String;
-use core::ops::DerefMut;
+use ember::behaviour::Context;
 
-use embedded_io::Write;
 use httparse::Request;
 
 use super::HomeData;
@@ -70,33 +69,9 @@ fn not_found(method: &str, path: &str) -> String {
     format!("Not found: path `{}`, method: `{}`", path, method)
 }
 
-pub fn handle_request(req: Request, state: impl DerefMut<Target = HomeData>) -> (u16, String) {
+pub fn handle_request(req: Request, _: &mut Context<()>, state: &mut HomeData) -> (u16, String) {
     match (req.method.unwrap_or("GET"), req.path.unwrap_or("/")) {
-        ("GET", "/") => (200, index(&state)),
+        ("GET", "/") => (200, index(state)),
         (method, path) => (404, not_found(method, path)),
-    }
-}
-
-pub fn write_response(mut stream: impl Write, status: u16, body: String) {
-    let content_len = body.len();
-
-    stream.write_all(b"HTTP/1.1 ").unwrap();
-    stream
-        .write_all(format!("{} {}\r\n", status, status_code_to_reason(status)).as_bytes())
-        .unwrap();
-    if content_len != 0 {
-        stream
-            .write_all(format!("Content-Length: {}", content_len).as_bytes())
-            .unwrap();
-    }
-    stream.write_all(b"\r\n\r\n").unwrap();
-    stream.write_all(body.as_bytes()).unwrap();
-}
-
-fn status_code_to_reason(code: u16) -> &'static str {
-    match code {
-        200 => "OK",
-        404 => "Not Found",
-        _ => panic!("Status code `{}` not handled", code),
     }
 }

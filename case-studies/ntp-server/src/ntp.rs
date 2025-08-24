@@ -7,23 +7,23 @@ use sntpc::{NtpContext, NtpTimestampGenerator, NtpUdpSocket};
 
 use super::wrapper::W;
 
-pub struct Server<D>
+pub struct Server<'s, D>
 where
     D: Device,
 {
-    stack: Stack<'static, D>,
+    stack: &'s Stack<'static, D>,
 }
 
-impl<D> Server<D>
+impl<'s, D> Server<'s, D>
 where
     D: Device,
 {
-    pub fn new(stack: Stack<'static, D>) -> Self {
+    pub fn new(stack: &'s Stack<'static, D>) -> Self {
         Self { stack }
     }
 }
 
-impl<D> TickerBehaviour for Server<D>
+impl<'s, D> TickerBehaviour for Server<'s, D>
 where
     D: Device,
 {

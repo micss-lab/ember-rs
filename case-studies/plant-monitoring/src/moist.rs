@@ -13,10 +13,10 @@ use super::{
     util::wrap_message,
 };
 
-pub fn moisture_agent<P: AdcChannel + 'static, ADCI: RegisterAccess>(
+pub fn moisture_agent<'d, P: AdcChannel + 'd, ADCI: RegisterAccess>(
     potentiometer_sensor_pin: AdcPin<P, ADCI>,
-    adc: Rc<RefCell<Adc<'static, ADCI>>>,
-) -> Agent<'static, MoistureState, ()> {
+    adc: Rc<RefCell<Adc<'d, ADCI>>>,
+) -> Agent<'d, MoistureState, ()> {
     Agent::new("moisture", MoistureState::default())
         .with_behaviour(PotentiometerSensor::new(potentiometer_sensor_pin, adc))
         .with_behaviour(ThresholdNotification::new())
@@ -92,18 +92,18 @@ pub mod ontology {
     }
 }
 
-struct PotentiometerSensor<P, ADCI: 'static> {
+struct PotentiometerSensor<'d, P, ADCI> {
     pin: AdcPin<P, ADCI>,
-    adc: Rc<RefCell<Adc<'static, ADCI>>>,
+    adc: Rc<RefCell<Adc<'d, ADCI>>>,
 }
 
-impl<P, ADCI> PotentiometerSensor<P, ADCI> {
-    fn new(pin: AdcPin<P, ADCI>, adc: Rc<RefCell<Adc<'static, ADCI>>>) -> Self {
+impl<'d, P, ADCI> PotentiometerSensor<'d, P, ADCI> {
+    fn new(pin: AdcPin<P, ADCI>, adc: Rc<RefCell<Adc<'d, ADCI>>>) -> Self {
         Self { pin, adc }
     }
 }
 
-impl<P, ADCI> TickerBehaviour for PotentiometerSensor<P, ADCI>
+impl<P, ADCI> TickerBehaviour for PotentiometerSensor<'_, P, ADCI>
 where
     P: AdcChannel,
     ADCI: RegisterAccess,

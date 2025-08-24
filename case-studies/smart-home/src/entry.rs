@@ -1,13 +1,7 @@
 use alloc::{collections::BTreeSet, rc::Rc};
 use blocking_network_stack::Stack;
-use core::{
-    cell::{OnceCell, RefCell},
-    ptr::addr_of_mut,
-};
-use esp_wifi::{
-    EspWifiController,
-    wifi::{WifiController, WifiDevice, WifiStaDevice},
-};
+use core::cell::RefCell;
+use esp_wifi::wifi::{WifiController, WifiDevice, WifiStaDevice};
 use smoltcp::{
     iface::{Interface, SocketSet, SocketStorage},
     phy::Device,
@@ -45,8 +39,6 @@ const WIFI_AP_SCAN_COUNT: u32 = 3;
 const SOCKET_COUNT: usize = 10;
 static mut SOCKET_STORE: [SocketStorage; SOCKET_COUNT] = [SocketStorage::EMPTY; SOCKET_COUNT];
 
-static mut WIFI_INIT: OnceCell<EspWifiController> = OnceCell::new();
-
 const LOCK_PASSWORD: &[u8] = b"1234";
 
 pub fn main() {
@@ -66,29 +58,18 @@ pub fn main() {
 
     log::trace!("Initializing wifi device.");
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    unsafe { &mut *addr_of_mut!(WIFI_INIT) }
-        .set(
-            esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK)
-                .expect("failed to initialize wifi control."),
-        )
-        .unwrap();
+    let wifi_init = esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK)
+        .expect("failed to initialize wifi control.");
 
-    let (wifi_device, mut controller) = esp_wifi::wifi::new_with_mode(
-        unsafe { &mut *addr_of_mut!(WIFI_INIT) }.get().unwrap(),
-        peripherals.WIFI,
-        esp_wifi::wifi::WifiStaDevice,
-    )
-    .expect("failed to initialize wifi device");
+    let (wifi_device, mut controller) =
+        esp_wifi::wifi::new_with_mode(&wifi_init, peripherals.WIFI, esp_wifi::wifi::WifiStaDevice)
+            .expect("failed to initialize wifi device");
 
     log::trace!("Setting up network stack.");
     let mut stack = create_network_stack(wifi_device, rng.random());
 
     log::trace!("Connecting to access point.");
     connect_to_access_point(&mut controller, &mut stack);
-
-    unsafe { &mut *addr_of_mut!(case_study_smart_home::WIFI_STACK) }
-        .set(stack)
-        .ok();
 
     let mut adc_config = AdcConfig::new();
 
@@ -122,7 +103,7 @@ pub fn main() {
         ))
         .with_agent(fan::fan_agent())
         .with_agent(pir::pir_agent(pir_sensor))
-        .with_agent(control::control_agent(pump_switch, fan_active_led))
+        .with_agent(control::control_agent(&stack, pump_switch, fan_active_led))
         .start()
         .unwrap()
 }

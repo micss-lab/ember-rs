@@ -10,10 +10,10 @@ use esp_hal::analog::adc::{Adc, AdcChannel, AdcPin, RegisterAccess};
 
 use super::utils::wrap_message;
 
-pub fn temperature_agent<P: AdcChannel + 'static, ADCI: RegisterAccess + 'static>(
+pub fn temperature_agent<'d, P: AdcChannel + 'd, ADCI: RegisterAccess>(
     sensor: AdcPin<P, ADCI>,
-    adc: Rc<RefCell<Adc<'static, ADCI>>>,
-) -> Agent<'static, (), ()> {
+    adc: Rc<RefCell<Adc<'d, ADCI>>>,
+) -> Agent<'d, (), ()> {
     Agent::new("temp", ()).with_behaviour(Sensor::new(sensor, adc))
 }
 
@@ -56,18 +56,18 @@ pub mod ontology {
     }
 }
 
-struct Sensor<P, ADCI: 'static> {
+struct Sensor<'d, P, ADCI> {
     sensor: AdcPin<P, ADCI>,
-    adc: Rc<RefCell<Adc<'static, ADCI>>>,
+    adc: Rc<RefCell<Adc<'d, ADCI>>>,
 }
 
-impl<P, ADCI: 'static> Sensor<P, ADCI> {
-    fn new(sensor: AdcPin<P, ADCI>, adc: Rc<RefCell<Adc<'static, ADCI>>>) -> Self {
+impl<'d, P, ADCI> Sensor<'d, P, ADCI> {
+    fn new(sensor: AdcPin<P, ADCI>, adc: Rc<RefCell<Adc<'d, ADCI>>>) -> Self {
         Self { sensor, adc }
     }
 }
 
-impl<P, ADCI: 'static> TickerBehaviour for Sensor<P, ADCI>
+impl<P, ADCI> TickerBehaviour for Sensor<'_, P, ADCI>
 where
     P: AdcChannel,
     ADCI: RegisterAccess,

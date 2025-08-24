@@ -7,7 +7,7 @@ use ontology::{PumpAction, PumpStatus};
 
 use super::util::wrap_message;
 
-pub fn pump_agent(pump_light: Output<'static>) -> Agent<'static, PumpState, ()> {
+pub fn pump_agent(pump_light: Output) -> Agent<'_, PumpState, ()> {
     Agent::new("pump", PumpState::default())
         .with_behaviour(PumpInteractions)
         .with_behaviour(PumpLight(pump_light))
@@ -125,9 +125,9 @@ impl CyclicBehaviour for PumpInteractions {
     }
 }
 
-struct PumpLight(Output<'static>);
+struct PumpLight<'d>(Output<'d>);
 
-impl CyclicBehaviour for PumpLight {
+impl CyclicBehaviour for PumpLight<'_> {
     type AgentState = PumpState;
 
     type Event = ();

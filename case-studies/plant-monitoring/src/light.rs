@@ -16,11 +16,11 @@ use super::{
     util::wrap_message,
 };
 
-pub fn light_agent<P: AdcChannel + 'static, ADCI: RegisterAccess>(
+pub fn light_agent<'d, P: AdcChannel + 'd, ADCI: RegisterAccess>(
     ldr_sensor_pin: AdcPin<P, ADCI>,
-    adc: Rc<RefCell<Adc<'static, ADCI>>>,
-    light_alert_pin: Output<'static>,
-) -> Agent<'static, LightState, ()> {
+    adc: Rc<RefCell<Adc<'d, ADCI>>>,
+    light_alert_pin: Output<'d>,
+) -> Agent<'d, LightState, ()> {
     Agent::new("ldr", LightState::default())
         .with_behaviour(LdrSensor::new(ldr_sensor_pin, adc))
         .with_behaviour(LightAlert(light_alert_pin))
@@ -97,18 +97,18 @@ pub mod ontology {
     }
 }
 
-struct LdrSensor<P, ADCI: 'static> {
+struct LdrSensor<'d, P, ADCI> {
     pin: AdcPin<P, ADCI>,
-    adc: Rc<RefCell<Adc<'static, ADCI>>>,
+    adc: Rc<RefCell<Adc<'d, ADCI>>>,
 }
 
-impl<P, ADCI> LdrSensor<P, ADCI> {
-    fn new(pin: AdcPin<P, ADCI>, adc: Rc<RefCell<Adc<'static, ADCI>>>) -> Self {
+impl<'d, P, ADCI> LdrSensor<'d, P, ADCI> {
+    fn new(pin: AdcPin<P, ADCI>, adc: Rc<RefCell<Adc<'d, ADCI>>>) -> Self {
         Self { pin, adc }
     }
 }
 
-impl<P, ADCI> TickerBehaviour for LdrSensor<P, ADCI>
+impl<'d, P, ADCI> TickerBehaviour for LdrSensor<'d, P, ADCI>
 where
     P: AdcChannel,
     ADCI: RegisterAccess,
@@ -137,9 +137,9 @@ where
     }
 }
 
-struct LightAlert(Output<'static>);
+struct LightAlert<'d>(Output<'d>);
 
-impl TickerBehaviour for LightAlert {
+impl TickerBehaviour for LightAlert<'_> {
     type AgentState = LightState;
 
     type Event = ();
