@@ -128,12 +128,18 @@ impl Container<'_, '_> {
 }
 
 impl<'a> Container<'a, '_> {
-    pub fn with_agent(mut self, agent: impl Agent + 'a) -> Self {
+    pub fn with_agent<'b>(mut self, agent: impl Agent + 'b) -> Self
+    where
+        'b: 'a,
+    {
         self.add_agent(agent);
         self
     }
 
-    pub fn add_agent(&mut self, agent: impl Agent + 'a) {
+    pub fn add_agent<'b>(&mut self, agent: impl Agent + 'b)
+    where
+        'b: 'a,
+    {
         self.agents.push_back(Box::new(agent));
     }
 }
