@@ -19,9 +19,9 @@ use self::mts::Mts;
 
 mod mts;
 
-pub struct Container<'c> {
+pub struct Container<'a, 'c> {
     /// Agents managed by this container.
-    agents: VecDeque<Box<dyn Agent>>,
+    agents: VecDeque<Box<dyn Agent + 'a>>,
     /// Ams agent managing this cotainers.
     ams: AmsAgent,
     /// Register of agents running on this platform.
@@ -30,7 +30,7 @@ pub struct Container<'c> {
     mts: Mts<'c>,
 }
 
-impl Container<'_> {
+impl Container<'_, '_> {
     pub fn start(mut self) -> Result<(), Box<dyn core::error::Error>> {
         loop {
             let should_stop = self.poll()?;
@@ -110,15 +110,6 @@ impl Container<'_> {
             .extend(messages)
     }
 
-    pub fn with_agent(mut self, agent: impl Agent + 'static) -> Self {
-        self.add_agent(agent);
-        self
-    }
-
-    pub fn add_agent(&mut self, agent: impl Agent + 'static) {
-        self.agents.push_back(Box::new(agent));
-    }
-
     pub fn with_agent_proxy(mut self, local_name: impl ToString, agent_proxy: Aid) -> Self {
         self.add_agent_proxy(local_name, agent_proxy);
         self
@@ -136,7 +127,18 @@ impl Container<'_> {
     }
 }
 
-impl Container<'_> {
+impl<'a> Container<'a, '_> {
+    pub fn with_agent(mut self, agent: impl Agent + 'a) -> Self {
+        self.add_agent(agent);
+        self
+    }
+
+    pub fn add_agent(&mut self, agent: impl Agent + 'a) {
+        self.agents.push_back(Box::new(agent));
+    }
+}
+
+impl Container<'_, '_> {
     #[cfg(feature = "acc-http")]
     pub fn with_http(mut self, port: u16) -> Self {
         self.mts.enable_http(port);
@@ -144,7 +146,7 @@ impl Container<'_> {
     }
 }
 
-impl<'c> Container<'c> {
+impl<'c> Container<'_, 'c> {
     #[cfg(feature = "acc-espnow")]
     pub fn with_espnow(
         mut self,
@@ -156,7 +158,7 @@ impl<'c> Container<'c> {
     }
 }
 
-impl Default for Container<'_> {
+impl Default for Container<'_, '_> {
     fn default() -> Self {
         let ams = AmsAgent::new();
         let ladt = Adt::new(&ams);

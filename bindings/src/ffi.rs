@@ -113,7 +113,7 @@ mod container {
     /// The ownership of the instance is transferred to the caller. Make sure to free the memory
     /// with the accompanying [`container_free`].
     #[unsafe(no_mangle)]
-    pub extern "C" fn container_new() -> *mut Container<'static> {
+    pub extern "C" fn container_new() -> *mut Container<'static, 'static> {
         log::trace!("Creating new container");
         new(Container::default())
     }
