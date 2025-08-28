@@ -37,9 +37,9 @@ use ember::{
     },
 };
 
-pub fn colour_agent(
-    sequence: impl IntoIterator<Item = Colour> + 'static,
-) -> Agent<'static, ColourCombinatorState<impl Iterator<Item = Colour>>, ()> {
+pub fn colour_agent<'i>(
+    sequence: impl IntoIterator<Item = Colour> + 'i,
+) -> Agent<'i, ColourCombinatorState<impl Iterator<Item = Colour>>, ()> {
     Agent::new("colour", ColourCombinatorState::new(sequence.into_iter()))
         .with_behaviour(ColourCombinator::default())
 }
@@ -119,13 +119,13 @@ impl<I> ComplexBehaviour for ColourCombinator<I> {
     type AgentState = ColourCombinatorState<I>;
 }
 
-impl<I> FsmBehaviour<'static> for ColourCombinator<I>
+impl<'i, I> FsmBehaviour<'i> for ColourCombinator<I>
 where
-    I: Iterator<Item = Colour> + 'static,
+    I: Iterator<Item = Colour> + 'i,
 {
     type TransitionTrigger = Colour;
 
-    fn fsm(&self) -> Fsm<'static, Self::AgentState, Self::TransitionTrigger, Self::ChildEvent> {
+    fn fsm(&self) -> Fsm<'i, Self::AgentState, Self::TransitionTrigger, Self::ChildEvent> {
         let (empty_id, empty) = Empty::default().into_behaviour_with_id();
         let (red_id, red) = Red::default().into_behaviour_with_id();
         let (blue_id, blue) = Blue::default().into_behaviour_with_id();
