@@ -16,7 +16,7 @@ use crate::{
 
 use super::{dht22, pir::ontology::PirMessage};
 
-pub fn control_agent() -> Agent<(), ()> {
+pub fn control_agent() -> Agent<'static, (), ()> {
     Agent::new("control", ()).with_behaviour(Receiver::new())
 }
 

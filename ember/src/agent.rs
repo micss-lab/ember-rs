@@ -24,14 +24,14 @@ enum ExecutionState {
     // Transit,
 }
 
-pub struct Agent<S, E> {
+pub struct Agent<'a, S, E> {
     pub(crate) name: String,
-    behaviours: ParallelBehaviourQueue<S, E>,
+    behaviours: ParallelBehaviourQueue<'a, S, E>,
     execution_state: ExecutionState,
     state: S,
 }
 
-impl<S: 'static, E: 'static> Agent<S, E> {
+impl<S, E> Agent<'_, S, E> {
     pub fn new(name: impl ToString, state: S) -> Self {
         Self {
             name: name.to_string(),
@@ -40,19 +40,27 @@ impl<S: 'static, E: 'static> Agent<S, E> {
             state,
         }
     }
+}
 
-    pub fn with_behaviour<K>(
+impl<'a, S, E> Agent<'a, S, E> {
+    pub fn with_behaviour<'b, K>(
         mut self,
-        behaviour: impl IntoBehaviour<K, AgentState = S, Event = E>,
-    ) -> Self {
+        behaviour: impl IntoBehaviour<'b, K, AgentState = S, Event = E>,
+    ) -> Self
+    where
+        'b: 'a,
+    {
         self.add_behaviour(behaviour);
         self
     }
 
-    pub fn add_behaviour<K>(
+    pub fn add_behaviour<'b, K>(
         &mut self,
-        behaviour: impl IntoBehaviour<K, AgentState = S, Event = E>,
-    ) -> BehaviourId {
+        behaviour: impl IntoBehaviour<'b, K, AgentState = S, Event = E>,
+    ) -> BehaviourId
+    where
+        'b: 'a,
+    {
         let behaviour = behaviour.into_behaviour();
         let id = behaviour.id();
         self.behaviours.add_behaviour(behaviour);
@@ -60,7 +68,7 @@ impl<S: 'static, E: 'static> Agent<S, E> {
     }
 }
 
-impl<S: 'static, E: 'static> AgentTrait for Agent<S, E> {
+impl<S, E> AgentTrait for Agent<'_, S, E> {
     fn update(&mut self, ctx: &mut ContainerContext) -> bool {
         use ExecutionState::*;
         use ember_core::behaviour::complex::scheduler::BehaviourScheduler;

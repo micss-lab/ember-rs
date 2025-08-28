@@ -1,15 +1,12 @@
-use core::ptr::addr_of_mut;
-
 use alloc::borrow::Cow;
 
-use blocking_network_stack::Socket;
+use blocking_network_stack::Stack;
 use ember::{
     Agent,
-    behaviour::{Context, CyclicBehaviour, TickerBehaviour},
+    behaviour::{Context, TickerBehaviour},
     message::MessageFilter,
 };
 use esp_hal::gpio::{Input, Output};
-use esp_wifi::wifi::{WifiDevice, WifiStaDevice};
 use home_automation::{
     fan::{
         FanState,
@@ -18,23 +15,23 @@ use home_automation::{
     lock::ontology::DoorLockOntology,
     pir::ontology::PirOntology,
 };
+use http_server::http::Server;
 use plant_monitoring::{
     light::ontology::LightOntology,
     moist::ontology::MoistureOntology,
     pump::ontology::{PumpAction, PumpOntology, PumpStatus},
 };
+use smoltcp::phy::Device;
 
 use super::{temp::ontology::TempOntology, utils::wrap_message};
 
-static mut RX_BUFFER: &mut [u8] = &mut [0u8; 1024];
-static mut TX_BUFFER: &mut [u8] = &mut [0u8; 2048];
-
 mod http;
 
-pub fn control_agent(
-    pump_switch: Input<'static>,
-    fan_active_led: Output<'static>,
-) -> Agent<HomeData, ()> {
+pub fn control_agent<'a, D: Device>(
+    stack: &'a Stack<'static, D>,
+    pump_switch: Input<'a>,
+    fan_active_led: Output<'a>,
+) -> Agent<'a, HomeData, ()> {
     Agent::new("control", HomeData::default())
         .with_behaviour(MoistureReceiver)
         .with_behaviour(LightLevelReceiver)
@@ -46,7 +43,11 @@ pub fn control_agent(
         .with_behaviour(FanStateReceiver::new(fan_active_led))
         .with_behaviour(FanControl)
         .with_behaviour(DataPrinter)
-        .with_behaviour(HttpServer::new(super::HTTP_SERVER_PORT))
+        .with_behaviour(Server::new(
+            super::HTTP_SERVER_PORT,
+            http::handle_request,
+            stack,
+        ))
         .with_behaviour(Trunk)
 }
 
@@ -166,17 +167,17 @@ impl TickerBehaviour for PumpStateReceiver {
     }
 }
 
-struct PumpControl {
-    pump_switch: Input<'static>,
+struct PumpControl<'d> {
+    pump_switch: Input<'d>,
 }
 
-impl PumpControl {
-    fn new(pump_switch: Input<'static>) -> Self {
+impl<'d> PumpControl<'d> {
+    fn new(pump_switch: Input<'d>) -> Self {
         Self { pump_switch }
     }
 }
 
-impl TickerBehaviour for PumpControl {
+impl TickerBehaviour for PumpControl<'_> {
     type AgentState = HomeData;
 
     type Event = ();
@@ -228,17 +229,17 @@ impl TickerBehaviour for HumanDetectedReceiver {
     }
 }
 
-struct FanStateReceiver {
-    fan_active_led: Output<'static>,
+struct FanStateReceiver<'d> {
+    fan_active_led: Output<'d>,
 }
 
-impl FanStateReceiver {
-    fn new(fan_active_led: Output<'static>) -> Self {
+impl<'d> FanStateReceiver<'d> {
+    fn new(fan_active_led: Output<'d>) -> Self {
         Self { fan_active_led }
     }
 }
 
-impl TickerBehaviour for FanStateReceiver {
+impl TickerBehaviour for FanStateReceiver<'_> {
     type AgentState = HomeData;
 
     type Event = ();
@@ -346,78 +347,6 @@ impl TickerBehaviour for DataPrinter {
         log::debug!("Door locked: {}", state.door_locked);
         log::debug!("Fan active: {}", state.fan_active);
         log::debug!("-------------------------------------");
-    }
-
-    fn is_finished(&self) -> bool {
-        false
-    }
-}
-
-struct HttpServer {
-    port: u16,
-    current_socket: Option<Socket<'static, 'static, 'static, WifiDevice<'static, WifiStaDevice>>>,
-}
-
-impl HttpServer {
-    fn new(http_port: u16) -> Self {
-        log::trace!("started http server");
-        Self {
-            port: http_port,
-            current_socket: None,
-        }
-    }
-}
-
-impl CyclicBehaviour for HttpServer {
-    type AgentState = HomeData;
-
-    type Event = ();
-
-    fn action(&mut self, _: &mut Context<Self::Event>, state: &mut Self::AgentState) {
-        use embedded_io::{Read, Write};
-
-        let mut socket = self.current_socket.take().unwrap_or_else(|| {
-            log::trace!("Waiting for socket");
-            let mut socket = unsafe { &mut *addr_of_mut!(crate::WIFI_STACK) }
-                .get()
-                .unwrap()
-                .get_socket(unsafe { *addr_of_mut!(RX_BUFFER) }, unsafe {
-                    *addr_of_mut!(TX_BUFFER)
-                });
-            socket.listen_unblocking(self.port).unwrap();
-            socket
-        });
-
-        if !socket.is_connected() {
-            socket.work();
-            self.current_socket = Some(socket);
-            return;
-        }
-
-        log::trace!("Incoming connection.");
-
-        let mut buf = [0u8; 4096];
-
-        if socket.read(&mut buf).is_err() {
-            return;
-        }
-
-        let mut headers = [httparse::EMPTY_HEADER; 16];
-        let mut req = httparse::Request::new(&mut headers);
-        if let Err(err) = req.parse(&buf) {
-            log::error!("Error parsing incoming request: {}", err);
-            socket.close();
-            return;
-        };
-
-        log::debug!("Incoming request: {:?}", req);
-
-        let (status, body) = http::handle_request(req, state);
-        http::write_response(&mut socket, status, body);
-
-        log::trace!("Closing socket.");
-        let _ = socket.flush();
-        socket.close();
     }
 
     fn is_finished(&self) -> bool {

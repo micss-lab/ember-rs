@@ -8,19 +8,22 @@ use super::{
     ScheduledComplexBehaviour, get_id,
 };
 
-pub trait ParallelBehaviour: ComplexBehaviour {
+pub trait ParallelBehaviour<'a>: ComplexBehaviour
+where
+    Self: 'a,
+{
     fn finish_strategy(&self) -> FinishStrategy;
 
     fn initial_behaviours(
         &self,
     ) -> impl IntoIterator<
-        Item = Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::ChildEvent>>,
+        Item = Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::ChildEvent> + 'a>,
     >;
 }
 
-pub struct ParallelBehaviourQueue<S, E> {
+pub struct ParallelBehaviourQueue<'a, S, E> {
     blocked: BlockTracker,
-    behaviours: VecDeque<Box<dyn Behaviour<AgentState = S, Event = E>>>,
+    behaviours: VecDeque<Box<dyn Behaviour<AgentState = S, Event = E> + 'a>>,
     finished: usize,
     strategy: FinishStrategy,
 }
@@ -32,9 +35,9 @@ pub enum FinishStrategy {
     Never,
 }
 
-impl<S: 'static, E: 'static> ParallelBehaviourQueue<S, E> {
+impl<'a, S, E> ParallelBehaviourQueue<'a, S, E> {
     pub fn new<K>(
-        behaviours: impl IntoIterator<Item = impl IntoBehaviour<K, AgentState = S, Event = E>>,
+        behaviours: impl IntoIterator<Item = impl IntoBehaviour<'a, K, AgentState = S, Event = E>>,
         strategy: FinishStrategy,
     ) -> Self {
         let behaviours: VecDeque<_> = behaviours.into_iter().map(|b| b.into_behaviour()).collect();
@@ -58,7 +61,7 @@ impl<S: 'static, E: 'static> ParallelBehaviourQueue<S, E> {
 
     pub fn with_behaviour<K>(
         mut self,
-        behaviour: impl IntoBehaviour<K, AgentState = S, Event = E>,
+        behaviour: impl IntoBehaviour<'a, K, AgentState = S, Event = E>,
     ) -> Self {
         self.add_behaviour(behaviour);
         self
@@ -66,7 +69,7 @@ impl<S: 'static, E: 'static> ParallelBehaviourQueue<S, E> {
 
     pub fn add_behaviour<K>(
         &mut self,
-        behaviour: impl IntoBehaviour<K, AgentState = S, Event = E>,
+        behaviour: impl IntoBehaviour<'a, K, AgentState = S, Event = E>,
     ) {
         let behaviour = behaviour.into_behaviour();
         self.blocked.register(behaviour.id());
@@ -74,8 +77,8 @@ impl<S: 'static, E: 'static> ParallelBehaviourQueue<S, E> {
     }
 }
 
-impl<S: 'static, E: 'static> BehaviourScheduler<S, E> for ParallelBehaviourQueue<S, E> {
-    fn next(&mut self) -> Option<Box<dyn Behaviour<AgentState = S, Event = E>>> {
+impl<'a, S, E> BehaviourScheduler<'a, S, E> for ParallelBehaviourQueue<'a, S, E> {
+    fn next(&mut self) -> Option<Box<dyn Behaviour<AgentState = S, Event = E> + 'a>> {
         let mut seen = BTreeSet::new();
         while let Some(behaviour) = self.behaviours.pop_front() {
             let id = behaviour.id();
@@ -98,7 +101,7 @@ impl<S: 'static, E: 'static> BehaviourScheduler<S, E> for ParallelBehaviourQueue
         None
     }
 
-    fn reschedule(&mut self, behaviour: Box<dyn Behaviour<AgentState = S, Event = E>>) {
+    fn reschedule(&mut self, behaviour: Box<dyn Behaviour<AgentState = S, Event = E> + 'a>) {
         self.blocked.register(behaviour.id());
         self.behaviours.push_back(behaviour);
     }
@@ -128,12 +131,12 @@ impl<S: 'static, E: 'static> BehaviourScheduler<S, E> for ParallelBehaviourQueue
     }
 }
 
-struct ParallelBehaviourImpl<P: ParallelBehaviour> {
+struct ParallelBehaviourImpl<'a, P: ParallelBehaviour<'a>> {
     user_impl: P,
-    queue: ParallelBehaviourQueue<P::AgentState, P::ChildEvent>,
+    queue: ParallelBehaviourQueue<'a, P::AgentState, P::ChildEvent>,
 }
 
-impl<P: ParallelBehaviour> ComplexBehaviour for ParallelBehaviourImpl<P> {
+impl<'a, P: ParallelBehaviour<'a>> ComplexBehaviour for ParallelBehaviourImpl<'a, P> {
     type Event = P::Event;
 
     type ChildEvent = P::ChildEvent;
@@ -153,12 +156,10 @@ impl<P: ParallelBehaviour> ComplexBehaviour for ParallelBehaviourImpl<P> {
     }
 }
 
-impl<P: ParallelBehaviour> ScheduledComplexBehaviour for ParallelBehaviourImpl<P>
-where
-    Self::AgentState: 'static,
-    Self::ChildEvent: 'static,
-{
-    fn scheduler(&mut self) -> &mut impl BehaviourScheduler<Self::AgentState, Self::ChildEvent> {
+impl<'a, P: ParallelBehaviour<'a>> ScheduledComplexBehaviour<'a> for ParallelBehaviourImpl<'a, P> {
+    fn scheduler(
+        &mut self,
+    ) -> &mut impl BehaviourScheduler<'a, Self::AgentState, Self::ChildEvent> {
         &mut self.queue
     }
 }
@@ -166,15 +167,15 @@ where
 #[doc(hidden)]
 pub struct Parallel;
 
-impl<T: 'static, S: 'static, E: 'static> IntoBehaviour<Parallel> for T
+impl<'a, T, S, E> IntoBehaviour<'a, Parallel> for T
 where
-    T: ParallelBehaviour<AgentState = S, Event = E>,
+    T: ParallelBehaviour<'a, AgentState = S, Event = E>,
 {
     type Event = E;
 
     type AgentState = S;
 
-    fn into_behaviour(self) -> Box<dyn Behaviour<AgentState = S, Event = Self::Event>> {
+    fn into_behaviour(self) -> Box<dyn Behaviour<AgentState = S, Event = Self::Event> + 'a> {
         let queue = ParallelBehaviourQueue::new(self.initial_behaviours(), self.finish_strategy());
         Box::new(ComplexBehaviourImpl {
             id: get_id(),

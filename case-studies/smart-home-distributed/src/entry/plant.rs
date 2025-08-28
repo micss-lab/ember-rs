@@ -1,7 +1,6 @@
 use alloc::rc::Rc;
-use core::{cell::RefCell, ptr::addr_of_mut};
+use core::cell::RefCell;
 use esp_wifi::wifi::{WifiDeviceMode, WifiStaDevice};
-use macaddr::MacAddr6;
 
 use esp_backtrace as _;
 
@@ -13,6 +12,7 @@ use esp_hal::{
     rng::Rng,
     timer::timg::TimerGroup,
 };
+use macaddr::MacAddr6;
 
 use plant_monitoring::{light, moist, pump};
 
@@ -24,8 +24,6 @@ use crate::{
 const HEAP_SIZE: usize = 72 * 1024;
 
 const HOSTNAME: &[u8] = b"esp-smart-home-plant-monitoring";
-
-mod control;
 
 pub fn main() {
     // Set newline mode to linux line endings.
@@ -46,38 +44,24 @@ pub fn main() {
 
     log::trace!("Initializing wifi device.");
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    unsafe { &mut *addr_of_mut!(crate::WIFI_INIT) }
-        .set(
-            esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK)
-                .expect("failed to initialize wifi control."),
-        )
-        .unwrap();
+    let wifi_init = esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK)
+        .expect("failed to initialize wifi control.");
 
     let (wifi_device, esp_now_create_token) =
         esp_wifi::esp_now::enable_esp_now_with_wifi(peripherals.WIFI);
-    let (wifi_device, mut controller) = esp_wifi::wifi::new_with_mode(
-        unsafe { &mut *addr_of_mut!(crate::WIFI_INIT) }
-            .get()
-            .unwrap(),
-        wifi_device,
-        esp_wifi::wifi::WifiStaDevice,
-    )
-    .expect("failed to initialize wifi device");
+    let (wifi_device, mut controller) =
+        esp_wifi::wifi::new_with_mode(&wifi_init, wifi_device, esp_wifi::wifi::WifiStaDevice)
+            .expect("failed to initialize wifi device");
     let (mut esp_now_manager, mut esp_now_sender, mut esp_now_receiver) =
-        esp_wifi::esp_now::EspNow::new_with_wifi(
-            unsafe { &mut *addr_of_mut!(crate::WIFI_INIT) }
-                .get()
-                .unwrap(),
-            esp_now_create_token,
-        )
-        .expect("failed to initialize esp-now")
-        .split();
+        esp_wifi::esp_now::EspNow::new_with_wifi(&wifi_init, esp_now_create_token)
+            .expect("failed to initialize esp-now")
+            .split();
 
     log::trace!("Setting up network stack.");
-    wifi::create_network_stack(wifi_device, rng.random(), HOSTNAME);
+    let stack = wifi::create_network_stack(wifi_device, rng.random(), HOSTNAME);
 
     log::trace!("Connecting to access point.");
-    wifi::connect_to_access_point(&mut controller);
+    wifi::connect_to_access_point(&stack, &mut controller);
 
     // Discover services running on the same network.
     let discovery_info = discovery::DiscoveryInfo::discover(

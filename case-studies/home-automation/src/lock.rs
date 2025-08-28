@@ -11,7 +11,7 @@ pub fn lock_agent(
     password: &'static [u8],
     button: Input<'static>,
     serial_rx: UartRx<'static, Blocking>,
-) -> Agent<LockState, ()> {
+) -> Agent<'static, LockState, ()> {
     Agent::new("lock", LockState::new(password, serial_rx))
         .with_behaviour(UnlockButton::new(button))
         .with_behaviour(AutoLock)

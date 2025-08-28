@@ -7,9 +7,9 @@ use serde::{Deserialize, Serialize};
 
 use super::util::wrap_message;
 
-pub fn temperature_agent(
-    measurements: impl IntoIterator<Item = Measurement> + 'static,
-) -> Agent<(), ()> {
+pub fn temperature_agent<'a>(
+    measurements: impl IntoIterator<Item = Measurement> + 'a,
+) -> Agent<'a, (), ()> {
     Agent::new("temperature", ()).with_behaviour(Sensor::new(measurements.into_iter()))
 }
 

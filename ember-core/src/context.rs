@@ -46,7 +46,7 @@ impl<E> Default for LocalContext<E> {
     }
 }
 
-impl<E: 'static> Context<E> {
+impl<E> Context<E> {
     pub fn emit_event(&mut self, event: E) {
         self.local.events.push(event);
     }
@@ -82,7 +82,7 @@ impl<E: 'static> Context<E> {
     }
 }
 
-impl<E: 'static> Context<E> {
+impl<E> Context<E> {
     pub fn new_using_container(container_ctx: &mut ContainerContext) -> Self {
         Self {
             container: ContainerContext::new(container_ctx.message_inbox.take()),

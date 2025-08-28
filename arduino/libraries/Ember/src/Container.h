@@ -1,13 +1,13 @@
-#ifndef FRAMEWORK_CONTAINER_H
-#define FRAMEWORK_CONTAINER_H
+#ifndef EMBER_CONTAINER_H
+#define EMBER_CONTAINER_H
 
-#include "FrameworkCore.h"
+#include "EmberCore.h"
 
 #include "Object.h"
 
 #include "Agent.h"
 
-namespace framework {
+namespace ember {
 
 class Container: 
     public Object<__ffi::Container> {
@@ -36,4 +36,4 @@ void Container::add_agent(Agent<Event>&& agent) {
 
 }
 
-#endif // FRAMEWORK_CONTAINER_H
+#endif // EMBER_CONTAINER_H

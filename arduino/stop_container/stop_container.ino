@@ -1,21 +1,21 @@
-#include <Framework.h>
+#include <Ember.h>
 
 #include <utility>
 #include <memory>
 
 class HelloWorld: 
-    public framework::behaviour::OneShotBehaviour<> {
+    public ember::behaviour::OneShotBehaviour<> {
   public:
-    virtual void action(framework::behaviour::Context<>& context) const override {
+    virtual void action(ember::behaviour::Context<>& context, ember::Unit& agent_state) const override {
       Serial.println("Hello, World!");
       Serial.println("My friend appears to print infinitely many messages, but will kill the container after one.");
     }
 };
 
 class MessagePrinter:
-    public framework::behaviour::CyclicBehaviour<> {
+    public ember::behaviour::CyclicBehaviour<> {
   public:
-    virtual void action(framework::behaviour::Context<>& context) override {
+    virtual void action(ember::behaviour::Context<>& context, ember::Unit& agent_state) override {
         Serial.println("Printing the first message!");
 
         context.stop_container();
@@ -25,22 +25,22 @@ class MessagePrinter:
     }
 };
 
-std::unique_ptr<framework::Container> container;
+std::unique_ptr<ember::Container> container;
 
 void setup() {
   Serial.begin(115200);
   Serial.println("Hello, ESP32-C3!");
 
-  // Initialize the frameworks required resources.
-  framework::initialize(framework::logging::LogLevel::Debug);
-  /* framework::__ffi::initialize_logging(5); */
-  /* framework::__ffi::initialize_allocator(); */
+  // Initialize the embers required resources.
+  ember::initialize(ember::logging::LogLevel::Debug);
+  /* ember::__ffi::initialize_logging(5); */
+  /* ember::__ffi::initialize_allocator(); */
 
   // Create the main container instance.
-  container = std::make_unique<framework::Container>();
-  /* framework::__ffi::Container* container = framework::__ffi::container_new(); */
+  container = std::make_unique<ember::Container>();
+  /* ember::__ffi::Container* container = ember::__ffi::container_new(); */
 
-  framework::Agent hello_world_agent = framework::Agent("hello-world-agent");
+  ember::Agent<> hello_world_agent("hello-world-agent", ember::Unit());
   hello_world_agent.add_behaviour(std::make_unique<HelloWorld>());
   hello_world_agent.add_behaviour(std::make_unique<MessagePrinter>());
 
@@ -49,7 +49,7 @@ void setup() {
 }
 
 void loop() {
-  framework::Container::PollResult result = container->poll();
+  ember::Container::PollResult result = container->poll();
   if (result.should_stop) {
     Serial.println(
       (result.status == 0) ? "Finished executing." : "Container exited with an error!"

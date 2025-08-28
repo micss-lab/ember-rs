@@ -18,9 +18,9 @@ struct OneShotBehaviourImpl<O: OneShotBehaviour> {
     oneshot: O,
 }
 
-impl<O, S, E: 'static> Behaviour for OneShotBehaviourImpl<O>
+impl<O, S, E> Behaviour for OneShotBehaviourImpl<O>
 where
-    O: OneShotBehaviour<AgentState = S, Event = E> + 'static,
+    O: OneShotBehaviour<AgentState = S, Event = E>,
 {
     type AgentState = S;
 
@@ -47,15 +47,15 @@ where
 #[doc(hidden)]
 pub struct OneShot;
 
-impl<T, S, E: 'static> IntoBehaviour<OneShot> for T
+impl<'a, T, S, E> IntoBehaviour<'a, OneShot> for T
 where
-    T: OneShotBehaviour<AgentState = S, Event = E> + 'static,
+    T: OneShotBehaviour<AgentState = S, Event = E> + 'a,
 {
     type AgentState = S;
 
     type Event = E;
 
-    fn into_behaviour(self) -> Box<dyn Behaviour<AgentState = S, Event = Self::Event>> {
+    fn into_behaviour(self) -> Box<dyn Behaviour<AgentState = S, Event = Self::Event> + 'a> {
         Box::new(OneShotBehaviourImpl {
             id: get_id(),
             oneshot: self,

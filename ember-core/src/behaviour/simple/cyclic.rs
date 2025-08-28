@@ -20,9 +20,9 @@ struct CyclicBehaviourImpl<C: CyclicBehaviour> {
     cyclic: C,
 }
 
-impl<S, E: 'static, C> Behaviour for CyclicBehaviourImpl<C>
+impl<S, E, C> Behaviour for CyclicBehaviourImpl<C>
 where
-    C: CyclicBehaviour<AgentState = S, Event = E> + 'static,
+    C: CyclicBehaviour<AgentState = S, Event = E>,
 {
     type AgentState = S;
 
@@ -49,9 +49,9 @@ where
 #[doc(hidden)]
 pub struct Cyclic;
 
-impl<T, S, E: 'static> IntoBehaviour<Cyclic> for T
+impl<'a, T, S, E> IntoBehaviour<'a, Cyclic> for T
 where
-    T: CyclicBehaviour<AgentState = S, Event = E> + 'static,
+    T: CyclicBehaviour<AgentState = S, Event = E> + 'a,
 {
     type AgentState = S;
 
@@ -59,7 +59,7 @@ where
 
     fn into_behaviour(
         self,
-    ) -> Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::Event>> {
+    ) -> Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::Event> + 'a> {
         Box::new(CyclicBehaviourImpl {
             id: get_id(),
             cyclic: self,

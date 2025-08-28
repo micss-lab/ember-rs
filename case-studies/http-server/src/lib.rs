@@ -1,14 +1,11 @@
 #![no_std]
 #![cfg(target_os = "none")]
 
-use core::cell::OnceCell;
-
-use blocking_network_stack::Stack;
-use esp_wifi::wifi::{WifiDevice, WifiStaDevice};
-
 extern crate alloc;
 
-pub static mut WIFI_STACK: OnceCell<Stack<'static, WifiDevice<'static, WifiStaDevice>>> =
-    OnceCell::new();
-
 pub mod http;
+
+#[allow(clippy::identity_op)]
+const RX_BUFFER_SIZE: usize = 1 * 1024;
+#[allow(clippy::identity_op)]
+const TX_BUFFER_SIZE: usize = 1 * 1024;

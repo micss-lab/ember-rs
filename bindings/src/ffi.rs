@@ -113,7 +113,7 @@ mod container {
     /// The ownership of the instance is transferred to the caller. Make sure to free the memory
     /// with the accompanying [`container_free`].
     #[unsafe(no_mangle)]
-    pub extern "C" fn container_new() -> *mut Container<'static> {
+    pub extern "C" fn container_new() -> *mut Container<'static, 'static> {
         log::trace!("Creating new container");
         new(Container::default())
     }
@@ -127,7 +127,7 @@ mod container {
     #[unsafe(no_mangle)]
     pub extern "C" fn container_add_agent(
         container: *mut Container,
-        agent: *mut Agent<AgentState, Event>,
+        agent: *mut Agent<'static, AgentState, Event>,
     ) {
         non_null!(container, "got container null-pointer");
         non_null!(agent, "got agent null-pointer");
@@ -152,7 +152,7 @@ mod container {
     }
 
     #[unsafe(no_mangle)]
-    pub extern "C" fn container_poll(container: *mut Container<'_>) -> ContainerPollResult {
+    pub extern "C" fn container_poll(container: *mut Container) -> ContainerPollResult {
         non_null!(container, "got container null-pointer");
         let container = unsafe { ref_from_raw(container) };
         let (should_stop, status) = match container.poll() {
@@ -181,7 +181,7 @@ mod agent {
     pub extern "C" fn agent_new(
         name: *const c_char,
         agent_state: *mut AgentState,
-    ) -> *mut Agent<AgentState, Event> {
+    ) -> *mut Agent<'static, AgentState, Event> {
         let name = unsafe { string_from_raw(name) };
         non_null!(agent_state, "got agent state null-pointer");
         let agent_state = unsafe { from_raw(agent_state) };
@@ -233,7 +233,7 @@ mod agent {
 
     #[unsafe(no_mangle)]
     pub extern "C" fn agent_add_behaviour_sequential(
-        agent: *mut Agent<AgentState, Event>,
+        agent: *mut Agent<'static, AgentState, Event>,
         sequential: *mut SequentialBehaviour,
     ) {
         non_null!(agent, "got agent null-pointer");
@@ -498,7 +498,7 @@ mod behaviour {
 
                 fn add_behaviour<K>(
                     &mut self,
-                    behaviour: impl IntoBehaviour<K, AgentState = AgentState, Event = Event>,
+                    behaviour: impl IntoBehaviour<'static, K, AgentState = AgentState, Event = Event>,
                 ) {
                     self.0.push(behaviour.into_behaviour());
                 }
@@ -521,59 +521,59 @@ mod behaviour {
 
             #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_vec_add_behaviour_oneshot(
-                queue: *mut BehaviourVec,
+                behaviour_vec: *mut BehaviourVec,
                 oneshot: *mut OneShotBehaviour,
             ) {
-                non_null!(queue, "got sequential queue null-pointer");
+                non_null!(behaviour_vec, "got sequential behaviour vec null-pointer");
                 non_null!(oneshot, "got oneshot behaviour null-pointer");
-                let queue = unsafe { ref_from_raw(queue) };
+                let behaviour_vec = unsafe { ref_from_raw(behaviour_vec) };
                 let behaviour = unsafe { from_raw(oneshot) };
-                queue.add_behaviour(behaviour);
+                behaviour_vec.add_behaviour(behaviour);
             }
 
             #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_vec_add_behaviour_cyclic(
-                queue: *mut BehaviourVec,
+                behaviour_vec: *mut BehaviourVec,
                 cyclic: *mut CyclicBehaviour,
             ) {
-                non_null!(queue, "got sequential queue null-pointer");
+                non_null!(behaviour_vec, "got sequential behaviour vec null-pointer");
                 non_null!(cyclic, "got cyclic behaviour null-pointer");
-                let queue = unsafe { ref_from_raw(queue) };
+                let behaviour_vec = unsafe { ref_from_raw(behaviour_vec) };
                 let behaviour = unsafe { from_raw(cyclic) };
-                queue.add_behaviour(behaviour);
+                behaviour_vec.add_behaviour(behaviour);
             }
 
             #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_vec_add_behaviour_ticker(
-                queue: *mut BehaviourVec,
+                behaviour_vec: *mut BehaviourVec,
                 ticker: *mut TickerBehaviour,
             ) {
-                non_null!(queue, "got sequential queue null-pointer");
+                non_null!(behaviour_vec, "got sequential behaviour vec null-pointer");
                 non_null!(ticker, "got ticker behaviour null-pointer");
-                let queue = unsafe { ref_from_raw(queue) };
+                let behaviour_vec = unsafe { ref_from_raw(behaviour_vec) };
                 let behaviour = unsafe { from_raw(ticker) };
-                queue.add_behaviour(behaviour);
+                behaviour_vec.add_behaviour(behaviour);
             }
 
             #[unsafe(no_mangle)]
             pub extern "C" fn behaviour_vec_add_behaviour_sequential(
-                queue: *mut BehaviourVec,
+                behaviour_vec: *mut BehaviourVec,
                 sequential: *mut SequentialBehaviour,
             ) {
-                non_null!(queue, "got sequential queue null-pointer");
+                non_null!(behaviour_vec, "got sequential behaviour vec null-pointer");
                 non_null!(sequential, "got sequential behaviour null-pointer");
-                let queue = unsafe { ref_from_raw(queue) };
+                let behaviour_vec = unsafe { ref_from_raw(behaviour_vec) };
                 let behaviour = unsafe { from_raw(sequential) };
-                queue.add_behaviour(behaviour);
+                behaviour_vec.add_behaviour(behaviour);
             }
 
             #[unsafe(no_mangle)]
-            pub extern "C" fn behaviour_vec_free(queue: *mut BehaviourVec) {
+            pub extern "C" fn behaviour_vec_free(behaviour_vec: *mut BehaviourVec) {
                 non_null_or_bail!(
-                    queue,
-                    "attemted to free sequential behaviour queue null-pointer"
+                    behaviour_vec,
+                    "attemted to free sequential behaviour behaviour vec null-pointer"
                 );
-                unsafe { drop_raw(queue) };
+                unsafe { drop_raw(behaviour_vec) };
             }
         }
 
@@ -628,7 +628,7 @@ mod behaviour {
                 }
             }
 
-            impl SequentialBehaviourTrait for SequentialBehaviour {
+            impl SequentialBehaviourTrait<'static> for SequentialBehaviour {
                 fn initial_behaviours(
                     &self,
                 ) -> impl IntoIterator<

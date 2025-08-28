@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [lib]
-name = "framework_core"
+name = "ember"
 crate-type = ["staticlib"]
 
 [profile.release]
@@ -23,7 +23,7 @@ codegen-units = 16
 rpath = false
 
 [dependencies]
-ember = { workspace = true }
+ember = { workspace = true, features = ["esp32"] }
 
 cfg-if = "1.0.0"
 critical-section = "1.2.0"

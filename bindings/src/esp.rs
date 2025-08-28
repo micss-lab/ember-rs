@@ -3,7 +3,7 @@ use core::panic::PanicInfo;
 use esp_alloc as _;
 use esp_println::logger::init_logger;
 
-const HEAP_SIZE: usize = 160 * 1024;
+const HEAP_SIZE: usize = 72 * 1024;
 
 #[panic_handler]
 fn panic(_: &PanicInfo) -> ! {

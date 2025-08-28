@@ -8,7 +8,7 @@ use crate::util::wrap_message;
 
 pub use self::ontology::FanState;
 
-pub fn fan_agent() -> Agent<FanState, ()> {
+pub fn fan_agent() -> Agent<'static, FanState, ()> {
     Agent::new("fan", FanState::default()).with_behaviour(FanInteractions)
 }
 

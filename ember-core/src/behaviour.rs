@@ -16,7 +16,7 @@ pub mod simple;
 #[repr(transparent)]
 pub struct BehaviourId(u32);
 
-pub trait Behaviour: 'static {
+pub trait Behaviour {
     type Event;
 
     type AgentState;
@@ -28,7 +28,7 @@ pub trait Behaviour: 'static {
     fn reset(&mut self);
 }
 
-pub trait IntoBehaviour<Kind>
+pub trait IntoBehaviour<'a, Kind>
 where
     Self: Sized,
 {
@@ -38,46 +38,40 @@ where
 
     fn into_behaviour(
         self,
-    ) -> Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::Event>>;
+    ) -> Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::Event> + 'a>;
 }
 
-pub trait IntoBehaviourWithId<Kind>: IntoBehaviour<Kind>
+pub trait IntoBehaviourWithId<'a, Kind>: IntoBehaviour<'a, Kind>
 where
     Self: Sized,
-    Self::AgentState: 'static,
-    Self::Event: 'static,
 {
     fn into_behaviour_with_id(
         self,
     ) -> (
         BehaviourId,
-        Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::Event>>,
+        Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::Event> + 'a>,
     ) {
         let behaviour = self.into_behaviour();
         (behaviour.id(), behaviour)
     }
 }
 
-impl<K, B> IntoBehaviourWithId<K> for B
-where
-    B: IntoBehaviour<K>,
-    B::Event: 'static,
-    B::AgentState: 'static,
-{
-}
+impl<'a, K, B> IntoBehaviourWithId<'a, K> for B where B: IntoBehaviour<'a, K> {}
 
 // This way the user can convert the behaviour to a boxed one by themselves and still pass it to
 // functions expecting and "IntoBehaviour" impl.
 #[doc(hidden)]
 pub struct BoxedBehviour;
-impl<S, E> IntoBehaviour<BoxedBehviour> for Box<dyn Behaviour<AgentState = S, Event = E>> {
+impl<'a, S, E> IntoBehaviour<'a, BoxedBehviour>
+    for Box<dyn Behaviour<AgentState = S, Event = E> + 'a>
+{
     type Event = E;
 
     type AgentState = S;
 
     fn into_behaviour(
         self,
-    ) -> Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::Event>> {
+    ) -> Box<dyn Behaviour<AgentState = Self::AgentState, Event = Self::Event> + 'a> {
         self
     }
 }

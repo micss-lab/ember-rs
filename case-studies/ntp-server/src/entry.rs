@@ -1,15 +1,11 @@
 use alloc::collections::BTreeSet;
-use core::{cell::OnceCell, ptr::addr_of_mut};
 
 use esp_backtrace as _;
 
 use blocking_network_stack::Stack;
 use ember::{Agent, Container};
 use esp_hal::{clock::CpuClock, delay::Delay, rng::Rng, timer::timg::TimerGroup};
-use esp_wifi::{
-    EspWifiController,
-    wifi::{WifiController, WifiDevice, WifiStaDevice},
-};
+use esp_wifi::wifi::{WifiController, WifiDevice, WifiStaDevice};
 use smoltcp::{
     iface::{Interface, SocketSet, SocketStorage},
     phy::Device,
@@ -31,8 +27,6 @@ const WIFI_AP_SCAN_COUNT: u32 = 3;
 const SOCKET_COUNT: usize = 10;
 static mut SOCKET_STORE: [SocketStorage; SOCKET_COUNT] = [SocketStorage::EMPTY; SOCKET_COUNT];
 
-static mut WIFI_INIT: OnceCell<EspWifiController> = OnceCell::new();
-
 pub(crate) fn main() {
     // Set newline mode to linux line endings.
     esp_println::print!("\x1b[20h");
@@ -50,18 +44,11 @@ pub(crate) fn main() {
 
     log::trace!("Initializing wifi device.");
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    unsafe { &mut *addr_of_mut!(WIFI_INIT) }
-        .set(
-            esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK)
-                .expect("failed to initialize wifi control."),
-        )
-        .unwrap();
-    let (wifi_device, mut controller) = esp_wifi::wifi::new_with_mode(
-        unsafe { &mut *addr_of_mut!(WIFI_INIT) }.get().unwrap(),
-        peripherals.WIFI,
-        esp_wifi::wifi::WifiStaDevice,
-    )
-    .expect("failed to initialize wifi device");
+    let wifi_init = esp_wifi::init(timg0.timer0, rng, peripherals.RADIO_CLK)
+        .expect("failed to initialize wifi control.");
+    let (wifi_device, mut controller) =
+        esp_wifi::wifi::new_with_mode(&wifi_init, peripherals.WIFI, esp_wifi::wifi::WifiStaDevice)
+            .expect("failed to initialize wifi device");
 
     log::trace!("Setting up network stack.");
     let mut stack = create_network_stack(wifi_device, rng.random());
@@ -69,7 +56,7 @@ pub(crate) fn main() {
     log::trace!("Connecting to access point.");
     connect_to_access_point(&mut controller, &mut stack);
 
-    let server = ntp::Server::new(stack);
+    let server = ntp::Server::new(&stack);
     Container::default()
         .with_agent(Agent::new("server", ()).with_behaviour(server))
         .start()

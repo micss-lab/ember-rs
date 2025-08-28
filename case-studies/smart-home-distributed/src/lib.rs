@@ -3,13 +3,6 @@
 
 extern crate alloc;
 
-use core::cell::OnceCell;
-
-use blocking_network_stack::Stack;
-use esp_wifi::{
-    EspWifiController,
-    wifi::{WifiDevice, WifiStaDevice},
-};
 use smoltcp::iface::SocketStorage;
 
 const SSID: Option<&str> = option_env!("CASE_STUDY_SSID");
@@ -20,9 +13,6 @@ const WIFI_AP_SCAN_COUNT: u32 = 3;
 const SOCKET_COUNT: usize = 10;
 
 pub static mut SOCKET_STORE: [SocketStorage; SOCKET_COUNT] = [SocketStorage::EMPTY; SOCKET_COUNT];
-pub static mut WIFI_INIT: OnceCell<EspWifiController> = OnceCell::new();
-pub static mut WIFI_STACK: OnceCell<Stack<'static, WifiDevice<'static, WifiStaDevice>>> =
-    OnceCell::new();
 
 // ====== Configuration values. ======
 

@@ -1,9 +1,9 @@
-#ifndef FRAMEWORK_OBJECT_H
-#define FRAMEWORK_OBJECT_H
+#ifndef EMBER_OBJECT_H
+#define EMBER_OBJECT_H
 
 #include <functional>
 
-namespace framework {
+namespace ember {
 
 /**
  * Internal type used for managing ownership of ffi pointers.
@@ -70,6 +70,6 @@ Object<T>::~Object() {
     this->free(this->object);
 }
 
-} // namespace framework
+} // namespace ember
 
-#endif // FRAMEWORK_OBJECT_H
+#endif // EMBER_OBJECT_H
