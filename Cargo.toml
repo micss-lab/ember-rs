@@ -16,6 +16,7 @@ members = [
     "case-studies/plant-monitoring",
     "case-studies/smart-home",
     "case-studies/smart-home-distributed",
+    "case-studies/static-vs-dynamic",
 ]
 
 [workspace.dependencies]

@@ -1,0 +1,12 @@
+[package]
+name = "static-vs-dynamic-dispatch"
+version = "0.1.0"
+edition = "2024"
+
+[target.'cfg(target_os = "none")'.dependencies]
+esp-alloc = "0.6.0"
+esp-backtrace = { version = "0.14.2", default-features = false, features = ["esp32", "println", "panic-handler"] }
+esp-hal = { version = "0.23.1", features = ["esp32", "unstable"] }
+esp-println = { version = "0.12.0", features = ["esp32", "log"] }
+log = "0.4.27"
+ember = { workspace = true, features = ["esp32"] }
