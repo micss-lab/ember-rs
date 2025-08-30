@@ -6,6 +6,7 @@ edition = "2024"
 [lib]
 name = "ember"
 crate-type = ["staticlib"]
+doc = false
 
 [profile.release]
 panic = "abort"
