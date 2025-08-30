@@ -19,7 +19,17 @@ Plant Control:
 
 ## Static vs Dynamic dispatch
 
+Count till 6 000.
+
+Static: 218532000 ns
+Dynamic: 221725000 ns
+
 Count till 600 000.
 
-Static: 7588415000 ns
-Dynamic: 7718030000 ns
+Static: 21769595000 ns
+Dynamic: 21899339000 ns
+
+Count till 6 000 000.
+
+Static: 217688345000 ns
+Dynamic: 218965758000 ns

@@ -10,16 +10,16 @@ use esp_hal::{clock::CpuClock, time::Instant};
 
 const HEAP_SIZE: usize = 72 * 1024;
 
-const COUNTER: usize = 600_000;
+const COUNTER: usize = 6_000_000;
 
 struct DynamicAgent {
     counter: Box<dyn Behaviour<Event = (), AgentState = ()>>,
 }
 
 impl DynamicAgent {
-    fn new() -> Self {
+    fn new<const N: usize>() -> Self {
         Self {
-            counter: Counter::new(COUNTER).into_behaviour(),
+            counter: Counter::<N>::new().into_behaviour(),
         }
     }
 }
@@ -35,19 +35,19 @@ impl Agent for DynamicAgent {
     }
 }
 
-struct StaticAgent {
-    counter: Counter,
+struct StaticAgent<const N: usize> {
+    counter: Counter<N>,
 }
 
-impl StaticAgent {
+impl<const N: usize> StaticAgent<N> {
     fn new() -> Self {
         Self {
-            counter: Counter::new(COUNTER),
+            counter: Counter::<N>::new(),
         }
     }
 }
 
-impl Agent for StaticAgent {
+impl<const N: usize> Agent for StaticAgent<N> {
     fn update(&mut self, context: &mut ember::core::context::ContainerContext) -> bool {
         self.counter
             .action(&mut Context::new_using_container(context), &mut ());
@@ -69,24 +69,24 @@ impl Agent for StaticAgent {
     }
 }
 
-struct Counter {
+struct Counter<const N: usize> {
     target: usize,
     count: usize,
     start: Instant,
 }
 
-impl Counter {
-    fn new(target: usize) -> Self {
+impl<const N: usize> Counter<N> {
+    fn new() -> Self {
         let start = esp_hal::time::now();
         Self {
-            target,
+            target: N,
             count: 0,
             start,
         }
     }
 }
 
-impl CyclicBehaviour for Counter {
+impl<const N: usize> CyclicBehaviour for Counter<N> {
     type AgentState = ();
 
     type Event = ();
@@ -126,11 +126,11 @@ pub(crate) fn main() {
     log::trace!("Initialized peripherals.");
 
     Container::default()
-        .with_agent(StaticAgent::new())
+        .with_agent(StaticAgent::<COUNTER>::new())
         .start()
         .unwrap();
     Container::default()
-        .with_agent(DynamicAgent::new())
+        .with_agent(DynamicAgent::new::<COUNTER>())
         .start()
         .unwrap();
 }
