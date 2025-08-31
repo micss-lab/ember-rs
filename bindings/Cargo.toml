@@ -6,6 +6,7 @@ edition = "2024"
 [lib]
 name = "ember"
 crate-type = ["staticlib"]
+doc = false
 
 [profile.release]
 panic = "abort"
@@ -23,13 +24,15 @@ codegen-units = 16
 rpath = false
 
 [dependencies]
-ember = { workspace = true, features = ["esp32"] }
+ember = { workspace = true }
 
 cfg-if = "1.0.0"
 critical-section = "1.2.0"
 log = "0.4.22"
 
 [target.'cfg(target_os = "none")'.dependencies]
+ember = { workspace = true, features = ["esp32"] }
+
 critical-section = { version = "1.2.0", features = ["restore-state-u32"] }
 esp-alloc = "0.6.0"
 esp-println = { version = "0.12.0", default-features = false, features = ["log", "esp32", "auto"] }
