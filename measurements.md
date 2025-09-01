@@ -58,3 +58,9 @@ average: 118453 µs
 10% low: 79331 µs
 1% high: 285507 µs
 10% high: 174274 µs
+
+## Plant Monitoring System
+
+Setup peripherals: 646000 ns
+Setup: 2723000 ns
+Loop: 1761 tps
