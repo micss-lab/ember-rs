@@ -21,15 +21,15 @@ Plant Control:
 
 Count till 6 000.
 
-Static: 218532000 ns
-Dynamic: 221725000 ns
+Static: 106724000 ns
+Dynamic: 107707000 ns
 
 Count till 600 000.
 
-Static: 21769595000 ns
-Dynamic: 21899339000 ns
+Static: 10633518000 ns
+Dynamic: 10760725000 ns
 
 Count till 6 000 000.
 
-Static: 217688345000 ns
-Dynamic: 218965758000 ns
+Static: 106331643000 ns
+Dynamic: 107606350000 ns

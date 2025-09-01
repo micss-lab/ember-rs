@@ -48,6 +48,7 @@
                 pkgs.rustup
                 pkgs.espup
                 pkgs.bacon
+                pkgs.cargo-flamegraph
 
                 pkgs.arduino-cli
                 pkgs.arduino

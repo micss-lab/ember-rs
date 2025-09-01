@@ -41,6 +41,12 @@ impl Container<'_, '_> {
     }
 
     fn poll_associated_agents(&mut self) -> Result<(), Box<dyn core::error::Error>> {
+        if !self.agent_has_message(Aid::ams().local_name()) {
+            // Assume that the ams agent does not have to be scheduled if there is no message for
+            // it available.
+            return Ok(());
+        }
+
         let mut context = ContainerContext::new(
             self.messages_for_agent(Aid::ams().local_name())
                 .unwrap_or_default(),
@@ -91,23 +97,16 @@ impl Container<'_, '_> {
         Ok(false)
     }
 
+    fn agent_has_message(&self, agent_name: impl AsRef<str>) -> bool {
+        self.ladt.agent_has_message(agent_name)
+    }
+
     fn messages_for_agent(&mut self, agent_name: impl AsRef<str>) -> Option<Vec<MessageEnvelope>> {
-        Some(
-            core::mem::take(&mut self.ladt.get_local_mut(agent_name.as_ref())?.inbox)
-                .into_iter()
-                .collect(),
-        )
+        self.ladt.messages_for_agent(agent_name)
     }
 
     fn return_unhandled_messages(&mut self, agent_name: impl AsRef<str>, messages: MessageStore) {
-        if messages.is_empty() {
-            return;
-        }
-        self.ladt
-            .get_local_mut(agent_name.as_ref())
-            .expect("agent returning messages should be in ladt")
-            .inbox
-            .extend(messages)
+        self.ladt.return_unhandled_messages(agent_name, messages);
     }
 
     pub fn with_agent_proxy(mut self, local_name: impl ToString, agent_proxy: Aid) -> Self {
