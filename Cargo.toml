@@ -17,6 +17,8 @@ members = [
     "case-studies/smart-home",
     "case-studies/smart-home-distributed",
     "case-studies/static-vs-dynamic",
+
+    "tools/http-benchmark",
 ]
 
 [workspace.dependencies]
