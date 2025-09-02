@@ -51,13 +51,13 @@ average: 123855 µs
 Without Ember:
 
 Setup: 2227104000 ns
-Loop: 36892 tps
+Loop: 37340 tps
 
-average: 118453 µs
-1% low: 56864 µs
-10% low: 79331 µs
-1% high: 285507 µs
-10% high: 174274 µs
+average: 117028 µs
+1% low: 50403 µs
+10% low: 74684 µs
+1% high: 310216 µs
+10% high: 173505 µs
 
 ## Plant Monitoring System
 
