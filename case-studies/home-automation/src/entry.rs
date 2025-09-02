@@ -61,6 +61,8 @@ const MEASUREMENTS: [Measurement; 10] = [
 const LOCK_PASSWORD: &[u8] = b"1234";
 
 pub fn main() {
+    let peripheral_start = esp_hal::time::now();
+
     // Set newline mode to linux line endings.
     esp_println::print!("\x1b[20h");
     esp_println::logger::init_logger_from_env();
@@ -81,13 +83,37 @@ pub fn main() {
     let pir_pin = Input::new(peripherals.GPIO18, Pull::None);
 
     log::trace!("Initialized peripherals");
+    log::debug!(
+        "Peripheral setup: {} ns",
+        (esp_hal::time::now() - peripheral_start).to_nanos()
+    );
 
-    Container::default()
+    let ember_start = esp_hal::time::now();
+    let mut container = Container::default()
         .with_agent(fan::fan_agent())
         .with_agent(dht22::dht22_agent(MEASUREMENTS.into_iter().cycle()))
         .with_agent(lock::lock_agent(LOCK_PASSWORD, unlock_button, uart_rx))
         .with_agent(pir::pir_agent(pir_pin))
-        .with_agent(control::control_agent())
-        .start()
-        .unwrap()
+        .with_agent(control::control_agent());
+    log::debug!(
+        "Ember setup: {} ns",
+        (esp_hal::time::now() - ember_start).to_nanos()
+    );
+
+    let mut ticks = 0;
+    let mut last_print = esp_hal::time::now();
+
+    loop {
+        let should_stop = container.poll().unwrap();
+        if should_stop {
+            break;
+        }
+
+        ticks += 1;
+        if (esp_hal::time::now() - last_print).to_secs() >= 1 {
+            last_print = esp_hal::time::now();
+            log::debug!("Tps: {}", ticks);
+            ticks = 0;
+        }
+    }
 }

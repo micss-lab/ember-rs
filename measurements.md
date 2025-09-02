@@ -62,5 +62,11 @@ average: 117028 µs
 ## Plant Monitoring System
 
 Setup peripherals: 646000 ns
-Setup: 2723000 ns
+Setup ember: 2723000 ns
 Loop: 1761 tps
+
+## Home Automation
+
+Setup peripherals: 549000 ns
+Setup ember: 1169000 ns
+Loop: 4989 tps
