@@ -84,12 +84,7 @@ impl BeltInner {
     }
 
     fn made_combination(&mut self, bottom: Colour, top: Colour) -> usize {
-        let val = match (bottom, top) {
-            (Colour::Red, Colour::Red) => 100,
-            (Colour::Red, _) | (_, Colour::Red) => 50,
-            (Colour::Green, Colour::Green) | (Colour::Blue, Colour::Blue) => 25,
-            _ => 0,
-        };
+        let val = bottom.combine(top);
         self.score += val;
         return val;
     }

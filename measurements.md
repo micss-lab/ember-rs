@@ -70,3 +70,16 @@ Loop: 1761 tps
 Setup peripherals: 549000 ns
 Setup ember: 1169000 ns
 Loop: 4989 tps
+
+## Colour Combinator
+
+With Ember:
+
+Setup peripherals: 92000 ns
+Setup Ember: 1951000 ns
+Runtime: 104381000 ns
+
+Without Ember:
+
+Setup peripherals: 72000 ns
+Runtime: 167000 ns

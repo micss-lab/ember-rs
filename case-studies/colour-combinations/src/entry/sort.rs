@@ -111,6 +111,7 @@ impl CyclicBehaviour for Empty {
             None => {
                 state.print_score();
                 self.finsish = true;
+                ctx.stop_container();
                 return;
             }
         };

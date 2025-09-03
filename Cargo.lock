@@ -175,6 +175,7 @@ dependencies = [
 name = "case-study-colour-combinations"
 version = "0.1.0"
 dependencies = [
+ "cfg-if",
  "ember",
  "esp-alloc",
  "esp-backtrace",
