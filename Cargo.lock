@@ -181,6 +181,8 @@ dependencies = [
  "esp-hal",
  "esp-println",
  "log",
+ "postcard",
+ "serde",
 ]
 
 [[package]]

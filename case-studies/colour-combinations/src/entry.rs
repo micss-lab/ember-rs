@@ -1,7 +1,10 @@
-use colour::Colour;
+use belt::Belt;
 use esp_backtrace as _;
 
-use ember::Container;
+use ember::{
+    Container,
+    message::{Message, MessageEnvelope},
+};
 use esp_hal::clock::CpuClock;
 
 const HEAP_SIZE: usize = 72 * 1024;
@@ -22,7 +25,25 @@ const SEQUENCE: [Colour; 13] = [
     Colour::Blue,
 ];
 
-mod colour;
+mod belt;
+mod build;
+mod sort;
+mod trash;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Colour {
+    Red,
+    Green,
+    Blue,
+}
+
+fn wrap_message(m: Message) -> MessageEnvelope {
+    use ember::message::Receiver;
+    let Receiver::Single(ref r) = m.receiver else {
+        unimplemented!();
+    };
+    MessageEnvelope::new(r.clone(), m)
+}
 
 pub(crate) fn main() {
     // Set newline mode to linux line endings.
@@ -40,8 +61,11 @@ pub(crate) fn main() {
 
     log::trace!("Initialized peripherals.");
 
+    let belt = Belt::new(SEQUENCE);
     Container::default()
-        .with_agent(colour::colour_agent(SEQUENCE))
+        .with_agent(sort::sorting_agent(belt.clone()))
+        .with_agent(build::builder_agent(belt.clone()))
+        .with_agent(trash::trasher_agent(belt.clone()))
         .start()
         .unwrap()
 }
