@@ -1,6 +1,6 @@
 use alloc::rc::Rc;
 use core::cell::RefCell;
-use macaddr::MacAddr6;
+use esp_wifi::wifi::{WifiDeviceMode, WifiStaDevice};
 
 use esp_backtrace as _;
 
@@ -12,6 +12,7 @@ use esp_hal::{
     rng::Rng,
     timer::timg::TimerGroup,
 };
+use macaddr::MacAddr6;
 
 use home_automation::fan;
 
@@ -32,6 +33,8 @@ pub fn main() {
     esp_alloc::heap_allocator!(HEAP_SIZE);
 
     log::info!("Running case study `smart-home`.");
+
+    let setup_time = esp_hal::time::now();
 
     let peripherals = esp_hal::init({
         let mut config = esp_hal::Config::default();
@@ -71,6 +74,11 @@ pub fn main() {
 
     log::debug!("Found the following services: {:?}", discovery_info);
 
+    log::debug!(
+        "Mac address: {}",
+        MacAddr6::from(WifiStaDevice.mac_address())
+    );
+
     let mut adc_config = AdcConfig::new();
 
     let pump_switch = Input::new(peripherals.GPIO5, Pull::Up);
@@ -79,7 +87,7 @@ pub fn main() {
 
     let adc = Rc::new(RefCell::new(Adc::new(peripherals.ADC1, adc_config)));
 
-    Container::default()
+    let mut container = Container::default()
         .with_agent(temp::temperature_agent(temperature_sensor, adc.clone()))
         .with_agent(fan::fan_agent())
         .with_agent(control::control_agent(&stack, pump_switch, fan_active_led))
@@ -90,7 +98,25 @@ pub fn main() {
                 MacAddr6::from(discovery_info[&System::PlantMonitoring]),
             ),
         )
-        .with_espnow(Some(esp_now_sender), Some(esp_now_receiver))
-        .start()
-        .unwrap()
+        .with_espnow(Some(esp_now_sender), Some(esp_now_receiver));
+
+    log::debug!(
+        "Setup time: {} nanoseconds",
+        (esp_hal::time::now() - setup_time).to_nanos(),
+    );
+
+    let mut ticks = 0;
+    let mut last_print = esp_hal::time::now();
+    loop {
+        if (esp_hal::time::now() - last_print).to_secs() >= 1 {
+            log::debug!("Loop ticks per second: {}", ticks);
+            ticks = 0;
+            last_print = esp_hal::time::now();
+        }
+        ticks += 1;
+
+        if container.poll().unwrap() {
+            break;
+        }
+    }
 }

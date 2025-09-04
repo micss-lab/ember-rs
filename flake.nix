@@ -48,6 +48,7 @@
                 pkgs.rustup
                 pkgs.espup
                 pkgs.bacon
+                pkgs.cargo-flamegraph
 
                 pkgs.arduino-cli
                 pkgs.arduino
@@ -59,6 +60,9 @@
 
                 pkgs.just
                 pkgs.jq
+
+                pkgs.curl
+                pkgs.openssl
               ];
 
               env = {
@@ -67,6 +71,8 @@
                   pkgs.stdenv.cc.cc.lib
                   pkgs.zlib
                   pkgs.libxml2
+                  pkgs.openssl
+                  pkgs.curl
                 ]}";
               };
 

@@ -74,6 +74,8 @@ const MEASUREMENTS: [Measurement; 10] = [
 ];
 
 pub fn main() {
+    let peripheral_start = esp_hal::time::now();
+
     // Set newline mode to linux line endings.
     esp_println::print!("\x1b[20h");
     esp_println::logger::init_logger_from_env();
@@ -99,16 +101,58 @@ pub fn main() {
 
     log::trace!("Initialized peripherals");
 
-    Container::default()
-        .with_agent(temp::temperature_agent(MEASUREMENTS.into_iter().cycle()))
-        .with_agent(light::light_agent(
-            ldr_sensor_pin,
-            adc.clone(),
-            light_alert_pin,
-        ))
-        .with_agent(moist::moisture_agent(potentiometer_sensor_pin, adc))
-        .with_agent(pump::pump_agent(pump_light))
-        .with_agent(control::control_agent(user_switch))
-        .start()
-        .unwrap()
+    let setup_time = (esp_hal::time::now() - peripheral_start).to_nanos();
+    log::debug!("peripheral start: {} ns", setup_time);
+
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "without-ember")] {
+            use ember::behaviour::{CyclicBehaviour, Context};
+
+            let mut server = http::Server::new(HTTP_PORT, routes::handle_request, &stack);
+            let mut state = routes::State::new(led1, led2);
+
+            let mut last_print = esp_hal::time::now();
+            let mut ticks = 0;
+            loop {
+                server.action(&mut Context {..Default::default()}, &mut state);
+
+                ticks += 1;
+                if (esp_hal::time::now() - last_print).to_secs() >= 1 {
+                    log::debug!("Loop: {} tps", ticks);
+                    ticks = 0;
+                    last_print = esp_hal::time::now();
+                }
+            }
+        } else {
+            let ember_start = esp_hal::time::now();
+
+            let mut container = Container::default()
+                .with_agent(temp::temperature_agent(MEASUREMENTS.into_iter().cycle()))
+                .with_agent(light::light_agent(
+                    ldr_sensor_pin,
+                    adc.clone(),
+                    light_alert_pin,
+                ))
+                .with_agent(moist::moisture_agent(potentiometer_sensor_pin, adc))
+                .with_agent(pump::pump_agent(pump_light))
+                .with_agent(control::control_agent(user_switch));
+
+            log::debug!("Ember setup: {} ns", (esp_hal::time::now() - ember_start).to_nanos());
+            let mut ticks = 0;
+            let mut last_print = esp_hal::time::now();
+            loop {
+                let should_stop = container.poll().unwrap();
+                if should_stop {
+                    break;
+                }
+
+                ticks += 1;
+                if (esp_hal::time::now() - last_print).to_secs() >= 1 {
+                    log::debug!("Tps: {}", ticks);
+                    ticks = 0;
+                    last_print = esp_hal::time::now();
+                }
+            }
+        }
+    }
 }

@@ -8,6 +8,7 @@ use esp_hal::{
     timer::timg::TimerGroup,
     uart::UartRx,
 };
+use esp_wifi::wifi::{WifiDeviceMode, WifiStaDevice};
 use macaddr::MacAddr6;
 
 use home_automation::{lock /* , pir */};
@@ -30,6 +31,8 @@ pub fn main() {
     esp_alloc::heap_allocator!(HEAP_SIZE);
 
     log::info!("Running case study `smart-home-door-control`.");
+
+    let setup_time = esp_hal::time::now();
 
     let peripherals = esp_hal::init({
         let mut config = esp_hal::Config::default();
@@ -69,6 +72,11 @@ pub fn main() {
 
     log::debug!("Found the following services: {:?}", discovery_info);
 
+    log::debug!(
+        "Mac address: {}",
+        MacAddr6::from(WifiStaDevice.mac_address())
+    );
+
     // Home automation.
     let unlock_door_switch = Input::new(peripherals.GPIO22, Pull::Up);
     // let pir_sensor = Input::new(peripherals.GPIO18, Pull::Up);
@@ -77,7 +85,7 @@ pub fn main() {
         .unwrap()
         .with_rx(peripherals.GPIO3);
 
-    Container::default()
+    let mut container = Container::default()
         .with_agent(lock::lock_agent(
             LOCK_PASSWORD,
             unlock_door_switch,
@@ -92,7 +100,25 @@ pub fn main() {
             ),
         )
         // .with_agent(control::control_agent(pump_switch, fan_active_led))
-        .with_espnow(Some(esp_now_sender), Some(esp_now_receiver))
-        .start()
-        .unwrap()
+        .with_espnow(Some(esp_now_sender), Some(esp_now_receiver));
+
+    log::debug!(
+        "Setup time: {} nanoseconds",
+        (esp_hal::time::now() - setup_time).to_nanos()
+    );
+
+    let mut ticks = 0;
+    let mut last_print = esp_hal::time::now();
+    loop {
+        if (esp_hal::time::now() - last_print).to_secs() >= 1 {
+            log::debug!("Loop ticks per second: {}", ticks);
+            ticks = 0;
+            last_print = esp_hal::time::now();
+        }
+        ticks += 1;
+
+        if container.poll().unwrap() {
+            break;
+        }
+    }
 }

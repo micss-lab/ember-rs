@@ -16,5 +16,11 @@ log = "0.4.27"
 ember = { workspace = true, features = ["esp32"] }
 smoltcp = { version = "0.12.0", default-features = false, features = ["proto-ipv4"] }
 
+[dependencies]
+cfg-if = "1.0.3"
+
+[features]
+without-ember = []
+
 [lints.clippy]
 uninlined_format_args = { level = "allow" }

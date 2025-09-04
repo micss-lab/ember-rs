@@ -138,6 +138,8 @@ mod routes {
 }
 
 pub(crate) fn main() {
+    let peripheral_start = esp_hal::time::now();
+
     // Set newline mode to linux line endings.
     esp_println::print!("\x1b[20h");
     esp_println::logger::init_logger_from_env();
@@ -169,12 +171,50 @@ pub(crate) fn main() {
     log::trace!("Connecting to access point.");
     connect_to_access_point(&mut controller, &mut stack);
 
+    let setup_time = (esp_hal::time::now() - peripheral_start).to_nanos();
+    log::debug!("peripheral start: {} ns", setup_time);
+
     log::info!("Starting http server on port {}", HTTP_PORT);
-    let server = http::Server::new(HTTP_PORT, routes::handle_request, &stack);
-    Container::default()
-        .with_agent(Agent::new("server", routes::State::new(led1, led2)).with_behaviour(server))
-        .start()
-        .unwrap()
+
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "without-ember")] {
+            use ember::behaviour::{CyclicBehaviour, Context};
+            let mut server = http::Server::new(HTTP_PORT, routes::handle_request, &stack);
+            let mut state = routes::State::new(led1, led2);
+
+            let mut last_print = esp_hal::time::now();
+            let mut ticks = 0;
+            loop {
+                server.action(&mut Context {..Default::default()}, &mut state);
+
+                ticks += 1;
+                if (esp_hal::time::now() - last_print).to_secs() >= 1 {
+                    log::debug!("Loop: {} tps", ticks);
+                    ticks = 0;
+                    last_print = esp_hal::time::now();
+                }
+            }
+        } else {
+            let server = http::Server::new(HTTP_PORT, routes::handle_request, &stack);
+            let mut container = Container::default()
+                .with_agent(Agent::new("server", routes::State::new(led1, led2)).with_behaviour(server));
+            let mut ticks = 0;
+            let mut last_print = esp_hal::time::now();
+            loop {
+                let should_stop = container.poll().unwrap();
+                if should_stop {
+                    break;
+                }
+
+                ticks += 1;
+                if (esp_hal::time::now() - last_print).to_secs() >= 1 {
+                    log::debug!("Tps: {}", ticks);
+                    ticks = 0;
+                    last_print = esp_hal::time::now();
+                }
+            }
+        }
+    }
 }
 
 fn create_network_stack(
