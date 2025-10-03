@@ -1,4 +1,3 @@
-use alloc::vec::Vec;
 use belt::Belt;
 use esp_backtrace as _;
 

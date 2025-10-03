@@ -1,4 +1,5 @@
 #![cfg_attr(target_os = "none", no_std)]
+#![cfg_attr(target_os = "none", no_main)]
 
 #[cfg(not(target_os = "none"))]
 fn main() {
@@ -62,9 +63,6 @@ fn main() {
         println!("10% high: {} µs", times[ten_percent_high_idx]);
     }
 }
-
-#[cfg(target_os = "none")]
-fn main() {}
 
 #[cfg(target_os = "none")]
 #[panic_handler]
