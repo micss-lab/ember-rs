@@ -17,6 +17,8 @@ struct Context;
 
 struct CyclicBehaviour;
 
+struct Message;
+
 struct OneShotBehaviour;
 
 struct SequentialBehaviour;
@@ -127,6 +129,15 @@ void context_stop_container(Context<Event> *context);
 void context_remove_agent(Context<Event> *context);
 
 void context_block_behaviour(Context<Event> *context);
+
+Message *message_new(char performative,
+                     const char *const *receivers,
+                     uintptr_t receivers_len,
+                     const char *ontology,
+                     uint8_t *content,
+                     uintptr_t content_len);
+
+void message_free(Message *message);
 
 /**
  * Initialize the libraries global logger.

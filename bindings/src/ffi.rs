@@ -101,6 +101,7 @@ mod agent;
 mod behaviour;
 mod container;
 mod context;
+mod message;
 
 mod logging {
     use core::ffi::c_char;
