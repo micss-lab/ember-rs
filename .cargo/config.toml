@@ -12,20 +12,5 @@ rustflags = [
 ]
 runner = "espflash flash --monitor"
 
-[build]
-target-dir = "./target"
-target = ["xtensa-esp32-none-elf", "x86_64-unknown-linux-gnu"]
-
 [alias]
-check-local = "check --target=x86_64-unknown-linux-gnu"
-check-esp = "check --target=xtensa-esp32-none-elf -Zbuild-std=core,alloc"
-clippy-local = "clippy --target=x86_64-unknown-linux-gnu"
-clippy-esp = "clippy --target=xtensa-esp32-none-elf -Zbuild-std=core,alloc"
-build-local = "build --target=x86_64-unknown-linux-gnu"
-build-esp = "build --target=xtensa-esp32-none-elf -Zbuild-std=core,alloc"
-run-local = "run --target=x86_64-unknown-linux-gnu"
-run-esp = "run --target=xtensa-esp32-none-elf -Zbuild-std=core,alloc"
-test-local = "test --target=x86_64-unknown-linux-gnu"
-test-esp = "test --target=xtensa-esp32-none-elf -Zbuild-std=core,alloc"
-
-# clippy = "check-local"
+xtask = "run --package xtask --"
