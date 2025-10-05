@@ -767,7 +767,7 @@ dependencies = [
 name = "ember-time"
 version = "0.1.0"
 dependencies = [
- "esp-hal",
+ "esp32",
  "fugit",
 ]
 

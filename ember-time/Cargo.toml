@@ -6,8 +6,8 @@ edition = "2024"
 [dependencies]
 fugit = "0.3"
 
-esp-hal = { version = "0.23.1", default-features = false, optional = true }
+esp32 = { version = "0.35.0", default-features = false, optional = true }
 
 [features]
 std = []
-esp32 = ["esp-hal/esp32", "dep:esp-hal"]
+esp32 = ["dep:esp32"]
