@@ -26,3 +26,10 @@ Message::Message(
     ), __ffi::message_free
 ) {
 }
+
+Message::Message(__ffi::Message* inner): 
+    Object(inner, __ffi::message_free) {}
+
+MessageEnvelope Message::wrap_with_envelope() && {
+    __ffi::message_wrap_with_envelope(this->move_object());
+}

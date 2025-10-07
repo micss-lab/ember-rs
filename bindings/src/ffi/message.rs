@@ -4,11 +4,13 @@ use core::ffi::{CStr, c_char};
 use core::str::FromStr;
 
 use ember::Aid;
-use ember::message::{Content, Message, Performative, Receiver};
+use ember::message::{Content, Message, MessageEnvelope, Performative, Receiver};
 
-use crate::ffi::util::drop_raw;
+use crate::ffi::util::{drop_raw, from_raw};
 
 use super::util::new;
+
+mod filter;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn message_new(
@@ -54,6 +56,13 @@ pub extern "C" fn message_new(
 pub extern "C" fn message_free(message: *mut Message) {
     non_null_or_bail!(message, "attemted to free message null-pointer");
     unsafe { drop_raw(message) }
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn message_wrap_with_envelope(message: *mut Message) -> *mut MessageEnvelope {
+    non_null!(message, "attemted to free message null-pointer");
+    let message = unsafe { from_raw(message) };
+    new(message.wrap_with_envolope())
 }
 
 fn performative_from_c_char(performative: c_char) -> Performative {

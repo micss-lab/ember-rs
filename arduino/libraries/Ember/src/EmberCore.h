@@ -19,6 +19,10 @@ struct CyclicBehaviour;
 
 struct Message;
 
+struct MessageEnvelope;
+
+struct MessageFilter;
+
 struct OneShotBehaviour;
 
 struct SequentialBehaviour;
@@ -130,6 +134,12 @@ void context_remove_agent(Context<Event> *context);
 
 void context_block_behaviour(Context<Event> *context);
 
+void context_send_message(Context<Event> *context, MessageEnvelope *message);
+
+Message *context_receive_message(Context<Event> *context);
+
+Message *context_receive_message_with_filter(Context<Event> *context, MessageFilter *filter);
+
 Message *message_new(char performative,
                      const char *const *receivers,
                      uintptr_t receivers_len,
@@ -138,6 +148,18 @@ Message *message_new(char performative,
                      uintptr_t content_len);
 
 void message_free(Message *message);
+
+MessageEnvelope *message_wrap_with_envelope(Message *message);
+
+void message_filter_free(MessageFilter *filter);
+
+MessageFilter *message_filter_all();
+
+MessageFilter *message_filter_none();
+
+MessageFilter *message_filter_performative(char performative);
+
+MessageFilter *message_filter_ontology(const char *ontology);
 
 /**
  * Initialize the libraries global logger.

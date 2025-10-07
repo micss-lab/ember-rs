@@ -1,17 +1,21 @@
-#ifndef EMBER_MESSAGE_H
-#define EMBER_MESSAGE_H
+#ifndef EMBER_MESSAGE_MESSAGE_H
+#define EMBER_MESSAGE_MESSAGE_H
 
 #include <vector>
 #include <string>
 #include <cstdint>
 
-#include "./Object.h"
+#include "Object.h"
 
-#include "./EmberCore.h"
+#include "EmberCore.h"
 
 namespace ember {
 
 namespace message {
+
+class MessageEnvelope:
+    public Object<__ffi::MessageEnvelope> {};
+
 
 enum class Performative {
     AcceptProposal = 0,
@@ -48,10 +52,13 @@ class Message:
         const char* ontology,
         const std::vector<uint8_t>& content
     );
+    Message(__ffi::Message*);
+
+    MessageEnvelope wrap_with_envelope() &&;
 };
 
 } // namespace message
 
 } // namespace ember
 
-#endif // EMBER_MESSAGE_H
+#endif // EMBER_MESSAGE_MESSAGE_H
