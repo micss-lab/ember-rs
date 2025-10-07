@@ -12,5 +12,3 @@ const HTTP_SERVER_PORT: u16 = 80;
 
 pub mod control;
 pub mod temp;
-
-mod utils;

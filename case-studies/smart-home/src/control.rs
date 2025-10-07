@@ -23,7 +23,7 @@ use plant_monitoring::{
 };
 use smoltcp::phy::Device;
 
-use super::{temp::ontology::TempOntology, utils::wrap_message};
+use super::temp::ontology::TempOntology;
 
 mod http;
 
@@ -195,7 +195,7 @@ impl TickerBehaviour for PumpControl<'_> {
             _ => return,
         };
 
-        ctx.send_message(wrap_message(action.into_message()));
+        ctx.send_message(action.into_message().wrap_with_envolope());
     }
 
     fn is_finished(&self) -> bool {
@@ -284,12 +284,13 @@ impl TickerBehaviour for FanControl {
             state.temperature >= super::FAN_TEMPERATURE_THRESHOLD && state.human_home;
 
         if state.fan_active != should_fan_activate {
-            ctx.send_message(wrap_message(
+            ctx.send_message(
                 FanMessage {
                     action: FanAction::Toggle,
                 }
-                .into_message(),
-            ));
+                .into_message()
+                .wrap_with_envolope(),
+            );
         }
     }
 

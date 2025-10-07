@@ -162,19 +162,17 @@ impl FromStr for Metrics {
 
 impl From<Metrics> for MessageEnvelope {
     fn from(value: Metrics) -> Self {
-        MessageEnvelope::new(
-            Aid::local("server"),
-            Message {
-                performative: Performative::Inform,
-                sender: None,
-                receiver: Receiver::Single(Aid::local("server")),
-                reply_to: None,
-                ontology: None,
-                content: Content::Other {
-                    kind: None,
-                    content: format!("{},{},{}", value.temperature, value.humidity, value.light),
-                },
+        Message {
+            performative: Performative::Inform,
+            sender: None,
+            receiver: Receiver::Single(Aid::local("server")),
+            reply_to: None,
+            ontology: None,
+            content: Content::Other {
+                kind: None,
+                content: format!("{},{},{}", value.temperature, value.humidity, value.light),
             },
-        )
+        }
+        .wrap_with_envolope()
     }
 }

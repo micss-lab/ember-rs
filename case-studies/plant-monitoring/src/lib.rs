@@ -10,7 +10,6 @@ pub mod pump;
 pub mod temp;
 
 mod notif;
-mod util;
 
 const LIGHT_ALERT_THRESHOLD: f32 = 200.0;
 const LIGHT_LOW_THRESHOLD: f32 = 100.0;

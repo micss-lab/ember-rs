@@ -6,8 +6,6 @@ use ember::{
     message::{Message, Performative, Receiver},
 };
 
-use super::util::wrap_message;
-
 pub fn dht22_agent(
     measurements: impl IntoIterator<Item = Measurement> + 'static,
 ) -> Agent<'static, (), ()> {
@@ -106,7 +104,7 @@ where
             self.is_empty = true;
             return;
         };
-        ctx.send_message(wrap_message(measurement.into_message()))
+        ctx.send_message(measurement.into_message().wrap_with_envolope())
     }
 
     fn is_finished(&self) -> bool {

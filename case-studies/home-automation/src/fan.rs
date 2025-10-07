@@ -4,7 +4,6 @@ use ember::{
 };
 
 use self::ontology::FanAction;
-use crate::util::wrap_message;
 
 pub use self::ontology::FanState;
 
@@ -170,7 +169,7 @@ impl TickerBehaviour for FanInteractions {
             FanAction::Toggle => {
                 log::info!("Toggling fan.");
                 state.toggle();
-                ctx.send_message(wrap_message(state.into_message()));
+                ctx.send_message(state.into_message().wrap_with_envolope());
             }
         }
     }

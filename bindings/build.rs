@@ -20,7 +20,7 @@ fn main() {
         },
         no_includes: true,
         includes: Vec::from(["inttypes.h".into()]),
-        include_guard: Some("FRAMEWORK_CORE_H".into()),
+        include_guard: Some("EMBER_CORE_H".into()),
         documentation_style: DocumentationStyle::Doxy,
         ..Default::default()
     };

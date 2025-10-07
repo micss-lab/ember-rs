@@ -1,10 +1,7 @@
 use belt::Belt;
 use esp_backtrace as _;
 
-use ember::{
-    Container,
-    message::{Message, MessageEnvelope},
-};
+use ember::Container;
 use esp_hal::clock::CpuClock;
 
 const HEAP_SIZE: usize = 72 * 1024;
@@ -46,14 +43,6 @@ impl Colour {
             _ => 0,
         }
     }
-}
-
-fn wrap_message(m: Message) -> MessageEnvelope {
-    use ember::message::Receiver;
-    let Receiver::Single(ref r) = m.receiver else {
-        unimplemented!();
-    };
-    MessageEnvelope::new(r.clone(), m)
 }
 
 pub(crate) fn main() {

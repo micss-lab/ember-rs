@@ -40,7 +40,6 @@ use super::{
     belt::{Belt, Window},
     build::BuildMessage,
     trash::TrashMessage,
-    wrap_message,
 };
 
 pub fn sorting_agent(belt: Belt) -> Agent<'static, Belt, ()> {
@@ -204,9 +203,9 @@ fn green_blue_action<E>(next: Option<Colour>, ctx: &mut Context<E>) {
 }
 
 fn build<E>(ctx: &mut Context<E>) {
-    ctx.send_message(wrap_message(BuildMessage.into_message()));
+    ctx.send_message(BuildMessage.into_message().wrap_with_envolope());
 }
 
 fn trash<E>(ctx: &mut Context<E>) {
-    ctx.send_message(wrap_message(TrashMessage.into_message()));
+    ctx.send_message(TrashMessage.into_message().wrap_with_envolope());
 }

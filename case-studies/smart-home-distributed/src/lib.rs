@@ -29,4 +29,3 @@ pub mod wifi;
 mod control;
 mod discovery;
 mod temp;
-mod utils;

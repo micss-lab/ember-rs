@@ -52,7 +52,7 @@ mod std_time_driver_impl {
 /// [esp-hal]: https://github.com/esp-rs/esp-hal/blob/713cd491b6a6645bc8fe107d1e4d284135ca4459/esp-hal/src/time.rs
 #[cfg(feature = "esp32")]
 pub mod esp32_tim_driver_impl {
-    use esp_hal::peripherals::TIMG0;
+    use esp32::TIMG0;
 
     use super::{Driver, time_driver_impl};
     use crate::Instant;

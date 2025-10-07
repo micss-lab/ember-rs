@@ -7,7 +7,7 @@ use ember_core::agent::aid::Aid;
 use ember_core::behaviour::complex::parallel::{FinishStrategy, ParallelBehaviourQueue};
 use ember_core::behaviour::{BehaviourId, IntoBehaviour};
 use ember_core::context::{ContainerContext, Context};
-use ember_core::message::{Message, MessageEnvelope, Performative};
+use ember_core::message::{Message, Performative};
 
 use crate::fipa::{self, AmsAgentDescription, RegisterAction};
 
@@ -81,8 +81,7 @@ impl<S, E> AgentTrait for Agent<'_, S, E> {
                 // First register the agent with the ams.
                 let ams_aid = Aid::local("ams");
 
-                ctx.send_message(MessageEnvelope::new(
-                    ams_aid.clone(),
+                ctx.send_message(
                     Message {
                         performative: Performative::Request,
                         sender: None,
@@ -97,8 +96,9 @@ impl<S, E> AgentTrait for Agent<'_, S, E> {
                         }
                         .into_content()
                         .into(),
-                    },
-                ));
+                    }
+                    .wrap_with_envolope(),
+                );
                 log::debug!("Sending ams register request for agent `{}`.", self.name);
                 self.execution_state = Active;
                 return false;

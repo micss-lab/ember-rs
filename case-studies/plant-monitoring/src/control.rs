@@ -13,7 +13,6 @@ use super::{
         ontology::{PumpAction, PumpStatus},
     },
     temp,
-    util::wrap_message,
 };
 
 pub fn control_agent(user_switch: Input) -> Agent<'_, ControlState, ()> {
@@ -99,7 +98,7 @@ impl TickerBehaviour for PumpControl<'_> {
             _ => return,
         };
 
-        ctx.send_message(wrap_message(action.into_message()));
+        ctx.send_message(action.into_message().wrap_with_envolope());
     }
 
     fn is_finished(&self) -> bool {
