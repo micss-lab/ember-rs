@@ -1,6 +1,6 @@
 {
   inputs = {
-    nixpkgs.url = "nixpkgs/release-24.05";
+    nixpkgs.url = "nixpkgs/release-25.05";
     flake-utils.url = "github:numtide/flake-utils";
 
     rust-overlay.url = "github:oxalica/rust-overlay";
@@ -52,19 +52,13 @@
 
           RUST_SRC_PATH = "${devRustToolchain}/lib/rustlib/src/rust/library";
 
-          LD_LIBRARY_PATH = "${pkgs.lib.makeLibraryPath [
-            pkgs.stdenv.cc.cc.lib
-            # pkgs.gcc14
-            # pkgs.openssl_3_3
-            pkgs.zlib
-            # pkgs.libxml2
-            # pkgs.openssl
-            # pkgs.curl
-          ]}";
-
           shellHook = ''
             export PATH="$HOME/.rustup/toolchains/esp/bin:$PATH"
             export PATH="$HOME/.rustup/toolchains/esp/xtensa-esp-elf/esp-13.2.0_20230928/xtensa-esp-elf/bin:$PATH"
+            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [
+              pkgs.stdenv.cc.cc.lib
+              pkgs.zlib
+            ]}";
           '';
         });
       }
