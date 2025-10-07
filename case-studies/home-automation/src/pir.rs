@@ -5,8 +5,6 @@ use ember::{
 use esp_hal::gpio::Input;
 use ontology::PirMessage;
 
-use super::util::wrap_message;
-
 pub fn pir_agent(sensor: Input<'static>) -> Agent<'static, (), ()> {
     Agent::new("pir", ()).with_behaviour(Pir::new(sensor))
 }
@@ -78,12 +76,13 @@ impl TickerBehaviour for Pir {
     fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         if self.object_detected != self.sensor.is_high() {
             self.object_detected = self.sensor.is_high();
-            ctx.send_message(wrap_message(
+            ctx.send_message(
                 PirMessage {
                     object_detected: self.object_detected,
                 }
-                .into_message(),
-            ));
+                .into_message()
+                .wrap_with_envolope(),
+            );
         }
     }
 

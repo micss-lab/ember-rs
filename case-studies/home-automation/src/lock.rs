@@ -5,8 +5,6 @@ use ember::{
 use esp_hal::{Blocking, gpio::Input, uart::UartRx};
 use ontology::DoorLockAction;
 
-use crate::util::wrap_message;
-
 pub fn lock_agent(
     password: &'static [u8],
     button: Input<'static>,
@@ -154,7 +152,7 @@ impl CyclicBehaviour for UnlockButton {
             state.unlock();
 
             if !state.locked {
-                ctx.send_message(wrap_message(DoorLockAction::Unlock.into_message()));
+                ctx.send_message(DoorLockAction::Unlock.into_message().wrap_with_envolope());
             }
         }
         self.was_pressed = is_pressed;
@@ -180,7 +178,7 @@ impl TickerBehaviour for AutoLock {
         if !state.locked {
             log::info!("Automatically locking door.");
             state.lock();
-            ctx.send_message(wrap_message(DoorLockAction::Lock.into_message()))
+            ctx.send_message(DoorLockAction::Lock.into_message().wrap_with_envolope())
         }
     }
 

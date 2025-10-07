@@ -11,7 +11,6 @@ use crate::{
         ontology::{FanAction, FanMessage},
     },
     pir::{self, ontology::PirOntology},
-    util::wrap_message,
 };
 
 use super::{dht22, pir::ontology::PirMessage};
@@ -73,16 +72,19 @@ impl Receiver {
     }
 
     fn toggle_fan(&self, ctx: &mut Context<()>) {
-        ctx.send_message(wrap_message(Message {
-            performative: Performative::Request,
-            sender: None,
-            receiver: message::Receiver::Single(Aid::local("fan")),
-            reply_to: None,
-            ontology: Some(fan::ontology::FanOntology::name().into()),
-            content: message::Content::Structured(AgentActionCodec::into_content(FanMessage {
-                action: FanAction::Toggle,
-            })),
-        }))
+        ctx.send_message(
+            Message {
+                performative: Performative::Request,
+                sender: None,
+                receiver: message::Receiver::Single(Aid::local("fan")),
+                reply_to: None,
+                ontology: Some(fan::ontology::FanOntology::name().into()),
+                content: message::Content::Structured(AgentActionCodec::into_content(FanMessage {
+                    action: FanAction::Toggle,
+                })),
+            }
+            .wrap_with_envolope(),
+        )
     }
 }
 

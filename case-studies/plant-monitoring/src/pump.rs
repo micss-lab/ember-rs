@@ -5,8 +5,6 @@ use ember::{
 use esp_hal::gpio::Output;
 use ontology::{PumpAction, PumpStatus};
 
-use super::util::wrap_message;
-
 pub fn pump_agent(pump_light: Output) -> Agent<'_, PumpState, ()> {
     Agent::new("pump", PumpState::default())
         .with_behaviour(PumpInteractions)
@@ -100,24 +98,26 @@ impl CyclicBehaviour for PumpInteractions {
             (PumpAction::Activate, false) => state.active = true,
             (PumpAction::Deactivate, true) => state.active = false,
             _ => {
-                ctx.send_message(wrap_message(
+                ctx.send_message(
                     PumpStatus {
                         active: state.active,
                         changed: false,
                     }
-                    .into_message(),
-                ));
+                    .into_message()
+                    .wrap_with_envolope(),
+                );
                 return;
             }
         };
         log::debug!("new pump state: {}", state.active);
-        ctx.send_message(wrap_message(
+        ctx.send_message(
             PumpStatus {
                 active: state.active,
                 changed: true,
             }
-            .into_message(),
-        ));
+            .into_message()
+            .wrap_with_envolope(),
+        );
     }
 
     fn is_finished(&self) -> bool {

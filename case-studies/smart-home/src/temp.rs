@@ -8,8 +8,6 @@ use ember::{
 };
 use esp_hal::analog::adc::{Adc, AdcChannel, AdcPin, RegisterAccess};
 
-use super::utils::wrap_message;
-
 pub fn temperature_agent<'d, P: AdcChannel + 'd, ADCI: RegisterAccess + 'd>(
     sensor: AdcPin<P, ADCI>,
     adc: Rc<RefCell<Adc<'d, ADCI>>>,
@@ -86,7 +84,7 @@ where
             Err(err) => panic!("failed to read analog sensor: {:?}", err),
         };
         let temperature = adc_to_temperature(adc_reading);
-        ctx.send_message(wrap_message(Temperature(temperature).into_message()));
+        ctx.send_message(Temperature(temperature).into_message().wrap_with_envolope());
     }
 
     fn is_finished(&self) -> bool {

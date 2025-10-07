@@ -1,6 +1,5 @@
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
-use alloc::vec;
 use alloc::vec::Vec;
 use core::str::FromStr;
 
@@ -27,6 +26,18 @@ pub struct MessageEnvelope {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum MessageKind {
+    Parsed(Message),
+    // TODO: Support this.
+    // Bytes(bstr::BString),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AclRepresentation {
+    BitEfficient,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct Message {
     pub performative: Performative,
     pub sender: Option<Aid>,
@@ -42,19 +53,6 @@ pub struct Message {
     // reply_by: Option<String>,
 }
 
-impl MessageEnvelope {
-    pub fn new(to: Aid, message: Message) -> Self {
-        Self {
-            to: vec![to],
-            from: None,
-            date: DateTime::<Utc>::MIN_UTC.into(),
-            acl_representation: AclRepresentation::BitEfficient,
-            parameters: BTreeMap::new(),
-            message: MessageKind::Parsed(message),
-        }
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Receiver {
     Single(Aid),
@@ -64,6 +62,65 @@ pub enum Receiver {
 impl From<Aid> for Receiver {
     fn from(aid: Aid) -> Self {
         Self::Single(aid)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OtherLanguage {
+    Ccl,
+    Kif,
+    Rdf,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Content {
+    Structured(self::content::Content),
+    Bytes(Vec<u8>),
+    Other {
+        kind: Option<OtherLanguage>,
+        content: String,
+    },
+}
+
+impl From<self::content::Content> for Content {
+    fn from(content: self::content::Content) -> Self {
+        Self::Structured(content)
+    }
+}
+
+impl Message {
+    pub fn wrap_with_envolope(self) -> MessageEnvelope {
+        let to = match &self.receiver {
+            Receiver::Single(aid) => Vec::from([aid.clone()]),
+            Receiver::Multiple(btree_set) => Vec::from_iter(btree_set.iter().cloned()),
+        };
+        let from = self.sender.clone();
+        MessageEnvelope {
+            to,
+            from,
+            date: DateTime::<Utc>::MIN_UTC.into(),
+            acl_representation: AclRepresentation::BitEfficient,
+            parameters: BTreeMap::new(),
+            message: MessageKind::Parsed(self),
+        }
+    }
+}
+
+// TODO: Remove the need for these by using serialize directly.
+mod todo {
+    use super::Message;
+
+    impl core::fmt::Display for Message {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            f.write_str(&super::repr::human::to_string(&self))
+        }
+    }
+
+    impl Message {
+        #[allow(unused)]
+        pub fn try_from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, ()> {
+            super::repr::human::try_from_bytes(bytes)
+        }
     }
 }
 
@@ -92,59 +149,6 @@ pub enum Performative {
     Proxy,
     Propagate,
     Unknown,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Content {
-    Structured(self::content::Content),
-    Bytes(Vec<u8>),
-    Other {
-        kind: Option<OtherLanguage>,
-        content: String,
-    },
-}
-
-impl From<self::content::Content> for Content {
-    fn from(content: self::content::Content) -> Self {
-        Self::Structured(content)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum MessageKind {
-    Parsed(Message),
-    // TODO: Support this.
-    // Bytes(bstr::BString),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OtherLanguage {
-    Ccl,
-    Kif,
-    Rdf,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AclRepresentation {
-    BitEfficient,
-}
-
-// TODO: Remove the need for these by using serialize directly.
-mod todo {
-    use super::Message;
-
-    impl core::fmt::Display for Message {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            f.write_str(&super::repr::human::to_string(&self))
-        }
-    }
-
-    impl Message {
-        #[allow(unused)]
-        pub fn try_from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, ()> {
-            super::repr::human::try_from_bytes(bytes)
-        }
-    }
 }
 
 impl Performative {

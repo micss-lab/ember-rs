@@ -8,5 +8,3 @@ pub mod dht22;
 pub mod fan;
 pub mod lock;
 pub mod pir;
-
-mod util;

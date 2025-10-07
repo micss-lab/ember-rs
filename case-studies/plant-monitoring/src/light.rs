@@ -11,10 +11,7 @@ use esp_hal::{
 };
 use ontology::LightLevel;
 
-use super::{
-    notif::{ThresholdConfig, ThresholdNotification},
-    util::wrap_message,
-};
+use super::notif::{ThresholdConfig, ThresholdNotification};
 
 pub fn light_agent<'d, P: AdcChannel + 'd, ADCI: RegisterAccess>(
     ldr_sensor_pin: AdcPin<P, ADCI>,
@@ -129,7 +126,7 @@ where
 
         let lux = adc_to_lux(adc_reading);
         state.lux = lux;
-        ctx.send_message(wrap_message(LightLevel(lux).into_message()));
+        ctx.send_message(LightLevel(lux).into_message().wrap_with_envolope());
     }
 
     fn is_finished(&self) -> bool {

@@ -8,10 +8,7 @@ use ember::{
 use esp_hal::analog::adc::{Adc, AdcChannel, AdcPin, RegisterAccess};
 use ontology::MoisturePercent;
 
-use super::{
-    notif::{ThresholdConfig, ThresholdNotification},
-    util::wrap_message,
-};
+use super::notif::{ThresholdConfig, ThresholdNotification};
 
 pub fn moisture_agent<'d, P: AdcChannel + 'd, ADCI: RegisterAccess>(
     potentiometer_sensor_pin: AdcPin<P, ADCI>,
@@ -123,7 +120,7 @@ where
         };
         let percent = f32::from(moisture) / 4095.0 * 100.0;
         state.percent = percent;
-        ctx.send_message(wrap_message(MoisturePercent(percent).into_message()))
+        ctx.send_message(MoisturePercent(percent).into_message().wrap_with_envolope())
     }
 
     fn is_finished(&self) -> bool {

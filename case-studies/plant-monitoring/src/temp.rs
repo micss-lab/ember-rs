@@ -5,8 +5,6 @@ use ember::{
 };
 use serde::{Deserialize, Serialize};
 
-use super::util::wrap_message;
-
 pub fn temperature_agent<'a>(
     measurements: impl IntoIterator<Item = Measurement> + 'a,
 ) -> Agent<'a, (), ()> {
@@ -86,7 +84,7 @@ where
             self.is_empty = true;
             return;
         };
-        ctx.send_message(wrap_message(measurement.into_message()))
+        ctx.send_message(measurement.into_message().wrap_with_envolope())
     }
 
     fn is_finished(&self) -> bool {
