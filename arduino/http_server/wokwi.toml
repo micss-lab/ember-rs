@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+elf = "build/http_server.ino.elf"
+firmware = "build/http_server.ino.bin"

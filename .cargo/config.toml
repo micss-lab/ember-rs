@@ -4,11 +4,7 @@ ESP_LOG = "trace"
 [target.xtensa-esp32-none-elf]
 rustflags = [
     "-C",
-    "link-arg=-Tlinkall.x",
-    "-C",
     "link-arg=-nostartfiles",
-    "-C",
-    "link-arg=-Tesp32_rom_functions.x",
 ]
 runner = "espflash flash --monitor"
 
