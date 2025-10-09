@@ -13,29 +13,40 @@
   To purchase a Wokwi Club subscription, go to https://wokwi.com/club
 */
 
+#define USE_EMBER // uncomment this to run the http server with ember.
+
 #include <WiFi.h>
 #include <WiFiClient.h>
 #include <SPI.h>
+#include <Utils.h>
+
+#ifdef USE_EMBER
+#include <Ember.h>
+#include <HttpParse.h>
+#include "./WebServerBehaviour.h"
+#else
 #include <WebServer.h>
 #include <uri/UriBraces.h>
+#endif // USE_EMBER
 
-#include <exception>
+#include <memory>
 
 #define WIFI_SSID "hofterdoele-internet-iot"
 #define WIFI_PASSWORD "notthesamepasswordasmymainwifi1234;)"
-// Defining the WiFi channel speeds up the connection:
-#define WIFI_CHANNEL 6
 
+#ifdef USE_EMBER
+std::unique_ptr<ember::Container> container;
+#else
 WebServer server(80);
+#endif // USE_EMBER
 
 const int LED1 = 2;
 const int LED2 = 21;
 
 bool led1State = false;
 bool led2State = false;
-int wifi_status = WL_IDLE_STATUS;
 
-void sendHtml() {
+String format_html () {
   String response = R"(
     <!DOCTYPE html><html>
       <head>
@@ -67,98 +78,45 @@ void sendHtml() {
   )";
   response.replace("LED1_TEXT", led1State ? "ON" : "OFF");
   response.replace("LED2_TEXT", led2State ? "ON" : "OFF");
-  server.send(200, "text/html", response);
 }
 
-void printEncryptionType(int thisType) {
-  // read the encryption type and print out the name:
-  switch (thisType) {
-    case WIFI_AUTH_OPEN:
-        Serial.print("open");
-        break;
-    case WIFI_AUTH_WEP:
-        Serial.print("WEP");
-        break;
-    case WIFI_AUTH_WPA_PSK:
-        Serial.print("WPA");
-        break;
-    case WIFI_AUTH_WPA2_PSK:
-        Serial.print("WPA2");
-        break;
-    case WIFI_AUTH_WPA_WPA2_PSK:
-        Serial.print("WPA+WPA2");
-        break;
-    case WIFI_AUTH_WPA2_ENTERPRISE:
-        Serial.print("WPA2-EAP");
-        break;
-    case WIFI_AUTH_WPA3_PSK:
-        Serial.print("WPA3");
-        break;
-    case WIFI_AUTH_WPA2_WPA3_PSK:
-        Serial.print("WPA2+WPA3");
-        break;
-    case WIFI_AUTH_WAPI_PSK:
-        Serial.print("WAPI");
-        break;
-    default:
-        Serial.print("unknown");
-  }
-  Serial.println();
+#ifdef USE_EMBER
+
+std::tuple<std::string, uint16_t> handle_request(
+  const httpparse::Request& req,
+  ember::behaviour::Context<>& ctx,
+  ember::Unit& state
+) {
+  return std::make_tuple<std::string, uint16_t>(std::string("Hello, World"), 200);
 }
+
+#endif // USE_EMBER
 
 void setup(void) {
   Serial.begin(115200);
   pinMode(LED1, OUTPUT);
   pinMode(LED2, OUTPUT);
 
-  // check for the presence of the shield:
-  if (WiFi.status() == WL_NO_SHIELD) {
-    Serial.println("WiFi shield not present");
-    // don't continue:
-    while (true);
-  }
+  utils::connect_wifi(WIFI_SSID, WIFI_PASSWORD, true);
 
-  // scan for nearby networks:
-  Serial.println("** Scan Networks **");
-  int numSsid = WiFi.scanNetworks();
-  if (numSsid == -1) {
-    Serial.println("Couldn't get a wifi connection");
-    while (true);
-  }
+  #ifdef USE_EMBER
 
-  // print the list of networks seen:
-  Serial.print("number of available networks:");
-  Serial.println(numSsid);
+  // Initialize the embers required resources.
+  ember::initialize(ember::logging::LogLevel::Debug);
 
-  // print the network number and name for each network found:
-  for (int thisNet = 0; thisNet < numSsid; thisNet++) {
-    Serial.print(thisNet);
-    Serial.print(") ");
-    Serial.print(WiFi.SSID(thisNet));
-    Serial.print("\tSignal: ");
-    Serial.print(WiFi.RSSI(thisNet));
-    Serial.print(" dBm");
-    Serial.print("\tEncryption: ");
-    printEncryptionType(WiFi.encryptionType(thisNet));
-  }
+  // Create the main container instance.
+  container = std::make_unique<ember::Container>();
 
-  // attempt to connect to Wifi network:
-  wifi_status = WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  while ( wifi_status != WL_CONNECTED) {
-    Serial.print("Attempting to connect to network, SSID: ");
-    Serial.println(WIFI_SSID);
+  ember::Agent<> web_server_agent("web-server-agent", ember::Unit());
+  web_server_agent.add_behaviour(std::make_unique<WebServer<ember::Unit>>(handle_request, 80));
 
-    wifi_status = WiFi.status();
-    Serial.print("Wifi status: ");
-    Serial.println(wifi_status);
-    // wait 10 seconds for connection:
-    delay(2000);
-  }
+  container->add_agent(std::move(web_server_agent));
 
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
-
-  server.on("/", sendHtml);
+  #else
+  
+  server.on("/", []() {
+    server.send(200, "text/html", format_html())
+  });
 
   server.on(UriBraces("/toggle/{}"), []() {
     String led = server.pathArg(0);
@@ -176,14 +134,29 @@ void setup(void) {
         break;
     }
 
-    sendHtml();
+    server.send(200, "text/html", format_html())
   });
 
   server.begin();
+
+  #endif // USE_EMBER
   Serial.println("HTTP server started");
 }
 
 void loop(void) {
+  #ifdef USE_EMBER
+  
+  ember::Container::PollResult result = container->poll();
+  if (result.should_stop) {
+    Serial.println(
+      (result.status == 0) ? "Finished executing." : "Container exited with an error!"
+    );
+    exit(result.status);
+  }
+
+  #else
+
   server.handleClient();
-  delay(2);
+
+  #endif // USE_EMBER
 }

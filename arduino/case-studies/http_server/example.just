@@ -4,7 +4,7 @@ default:
     @just --unstable --justfile ./example.just --list
 
 build:
-    arduino-cli compile --build-path ./build --fqbn esp32:esp32:esp32 --libraries ../libraries --verbose
+    arduino-cli compile --build-path ./build --fqbn esp32:esp32:esp32 --libraries ../../libraries --verbose
 
 run: build
     arduino-cli upload --fqbn esp32:esp32:esp32 --input-dir ./build --port {{SERIAL_PORT}} --verbose
