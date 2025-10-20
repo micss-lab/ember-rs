@@ -24,7 +24,7 @@ use crate::{
 
 const HEAP_SIZE: usize = 72 * 1024;
 
-const HOSTNAME: &[u8] = b"esp-http-server";
+const HOSTNAME: &[u8] = b"esp-smart-home-control-panel";
 
 pub fn main() {
     // Set newline mode to linux line endings.
@@ -32,7 +32,7 @@ pub fn main() {
     esp_println::logger::init_logger_from_env();
     esp_alloc::heap_allocator!(HEAP_SIZE);
 
-    log::info!("Running case study `smart-home`.");
+    log::info!("Running case study `smart-home-control-panel`.");
 
     let setup_time = esp_hal::time::now();
 
