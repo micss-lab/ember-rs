@@ -36,33 +36,11 @@ impl LockState {
         log::info!("Unlocking door, enter password:");
 
         let mut password = [0u8; 25];
-        let mut read_chars = 0;
-        loop {
-            let mut buf = [0u8; 1];
-            let byte = match self.serial_rx.read_buffered_bytes(&mut buf) {
-                Ok(0) => continue,
-                Ok(1) => {
-                    let b = buf[0];
-                    log::debug!("byte: {b}");
-                    b
-                }
-                Ok(_) => unreachable!("cannot read more bytes than size of buffer"),
-                Err(e) => panic!("failed to read from console: {:?}", e),
-            };
-
-            if byte == b'\n' || byte == b'\r' {
-                break;
-            }
-            password[read_chars] = byte;
-            read_chars += 1;
-            if read_chars == 25 {
-                break;
-            }
-        }
+        super::read_chars_from_uart(&mut password, &mut self.serial_rx);
 
         log::debug!("Password: {}", password.as_bstr());
 
-        if password[..self.password.len()] == *self.password {
+        if password == *self.password {
             log::info!("Password correct, unlocking!");
             self.locked = false;
         } else {

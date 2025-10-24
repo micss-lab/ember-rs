@@ -13,7 +13,7 @@ use crate::{
     pir::{self, ontology::PirOntology},
 };
 
-use super::{dht22, pir::ontology::PirMessage};
+use super::{Measurement, dht22, pir::ontology::PirMessage};
 
 pub fn control_agent() -> Agent<'static, (), ()> {
     Agent::new("control", ()).with_behaviour(Receiver::new())
@@ -38,10 +38,10 @@ impl Receiver {
 
     fn handle_dht22_measurement(
         &mut self,
-        dht22::Measurement {
+        Measurement {
             temperature,
             humidity,
-        }: dht22::Measurement,
+        }: Measurement,
         ctx: &mut Context<()>,
     ) {
         self.temperature = temperature;

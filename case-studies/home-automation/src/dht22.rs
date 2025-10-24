@@ -6,6 +6,8 @@ use ember::{
     message::{Message, Performative, Receiver},
 };
 
+use crate::Measurement;
+
 pub fn dht22_agent(
     measurements: impl IntoIterator<Item = Measurement> + 'static,
 ) -> Agent<'static, (), ()> {
@@ -31,12 +33,6 @@ pub mod ontology {
             content.parse().expect("failed to parse message content")
         }
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub struct Measurement {
-    pub temperature: f32,
-    pub humidity: f32,
 }
 
 impl core::str::FromStr for Measurement {
