@@ -16,17 +16,24 @@ use core::cell::RefCell;
 
 use esp_backtrace as _;
 
-use ember::Container;
 use esp_hal::{
     analog::adc::{Adc, AdcConfig, Attenuation},
     clock::CpuClock,
     gpio::{Input, Level, Output, Pull},
 };
 
-use case_study_plant_monitoring::{
-    control, light, moist, pump,
-    temp::{self, Measurement},
-};
+use case_study_plant_monitoring::Measurement;
+
+cfg_if::cfg_if! {
+    if #[cfg(feature = "ember-based")] {
+        use ember::Container;
+        use case_study_plant_monitoring::{
+            control, light, moist, pump, temp,
+        };
+    } else {
+        use case_study_plant_monitoring::without_ember;
+    }
+}
 
 const HEAP_SIZE: usize = 72 * 1024;
 
@@ -97,34 +104,18 @@ pub fn main() {
     let pump_light = Output::new(peripherals.GPIO17, Level::Low);
     let user_switch = Input::new(peripherals.GPIO15, Pull::Up);
 
-    let adc = Rc::new(RefCell::new(Adc::new(peripherals.ADC2, adc_config)));
+    let adc = Adc::new(peripherals.ADC2, adc_config);
 
     log::trace!("Initialized peripherals");
 
     let setup_time = (esp_hal::time::now() - peripheral_start).to_nanos();
-    log::debug!("peripheral start: {} ns", setup_time);
+    log::debug!("peripheral start: {setup_time} ns");
 
     cfg_if::cfg_if! {
-        if #[cfg(feature = "without-ember")] {
-            use ember::behaviour::{CyclicBehaviour, Context};
-
-            let mut server = http::Server::new(HTTP_PORT, routes::handle_request, &stack);
-            let mut state = routes::State::new(led1, led2);
-
-            let mut last_print = esp_hal::time::now();
-            let mut ticks = 0;
-            loop {
-                server.action(&mut Context {..Default::default()}, &mut state);
-
-                ticks += 1;
-                if (esp_hal::time::now() - last_print).to_secs() >= 1 {
-                    log::debug!("Loop: {} tps", ticks);
-                    ticks = 0;
-                    last_print = esp_hal::time::now();
-                }
-            }
-        } else {
+        if #[cfg(feature = "ember-based")] {
             let ember_start = esp_hal::time::now();
+
+            let adc = Rc::new(RefCell::new(adc));
 
             let mut container = Container::default()
                 .with_agent(temp::temperature_agent(MEASUREMENTS.into_iter().cycle()))
@@ -152,6 +143,60 @@ pub fn main() {
                     ticks = 0;
                     last_print = esp_hal::time::now();
                 }
+            }
+        } else {
+            let mut measurements = MEASUREMENTS.into_iter().cycle();
+
+            let mut adc = adc;
+            let mut ldr_sensor_pin = ldr_sensor_pin;
+            let mut potentiometer_sensor_pin = potentiometer_sensor_pin;
+            let mut pump_light = pump_light;
+            let mut light_alert_pin = light_alert_pin;
+            let mut user_switch = user_switch;
+
+            let last_print_time = esp_hal::time::now();
+
+            let mut notification_checker = without_ember::NotificationChecker::default();
+
+            loop {
+                // float temperature = dht.readTemperature();
+                // float humidity = dht.readHumidity();
+                let Measurement {temperature, humidity} = measurements.next().expect("program cannot continue without dht measurements");
+
+                // int rawLight = analogRead(LDR_PIN);
+                // float sensorLux = ((4095 - rawLight) / 4095.0) * (MAX_LUX - MIN_LUX) + MIN_LUX;
+                // int mappedLuxGauge = (int)(((sensorLux - MIN_LUX) / (MAX_LUX - MIN_LUX)) * 4095);
+                let light_lux = without_ember::read_light_lux(&mut adc, &mut ldr_sensor_pin);
+
+                // int rawMoisture = analogRead(POTENTIOMETER_PIN);
+                // int mappedMoistureLevel = map(rawMoisture, 0, 4095, 0, 100);
+                let raw_moisture = match nb::block!(adc.read_oneshot(&mut potentiometer_sensor_pin)) {
+                    Ok(r) => r,
+                    Err(err) => panic!("failed to read analog sensor: {:?}", err),
+                };
+                let moisture = f32::from(raw_moisture) / 4095.0 * 100.0;
+
+                // static unsigned long lastPrintTime = 0;
+                // if (millis() - lastPrintTime >= 1000) {
+                //   printSensorValues(temperature, humidity, mappedLuxGauge, rawMoisture);
+                //   lastPrintTime = millis();
+                // }
+                if (esp_hal::time::now() - last_print_time).to_secs() >= 1 {
+                    without_ember::print_sensor_values(temperature, humidity, light_lux, moisture);
+                }
+
+                // handleLightAlert(mappedLuxGauge);
+                // handlePumpControl(effectivePumpSwitch, rawMoisture);
+                without_ember::handle_light_alert(light_lux, &mut light_alert_pin);
+                without_ember::handle_pump_control(moisture, &mut user_switch, &mut pump_light);
+
+                // checkLightNotification(mappedLuxGauge);
+                // checkMoistureNotification(mappedMoistureLevel);
+                notification_checker.check_light(light_lux);
+                notification_checker.check_moisture(moisture);
+
+                let start = esp_hal::time::now();
+                while (start - esp_hal::time::now()).to_secs() < 1 {}
             }
         }
     }

@@ -7,7 +7,7 @@ use ember::{
 use esp_hal::gpio::Input;
 
 use super::{
-    light, moist,
+    Measurement, light, moist,
     pump::{
         self,
         ontology::{PumpAction, PumpStatus},
@@ -34,10 +34,10 @@ pub struct ControlState {
 impl ControlState {
     fn handle_temp_measurement(
         &mut self,
-        temp::Measurement {
+        Measurement {
             temperature,
             humidity,
-        }: temp::Measurement,
+        }: Measurement,
     ) {
         self.temperature = temperature;
         self.humidity = humidity;

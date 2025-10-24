@@ -5,6 +5,8 @@ use ember::{
 };
 use serde::{Deserialize, Serialize};
 
+use crate::Measurement;
+
 pub fn temperature_agent<'a>(
     measurements: impl IntoIterator<Item = Measurement> + 'a,
 ) -> Agent<'a, (), ()> {
@@ -30,12 +32,6 @@ pub mod ontology {
             postcard::from_bytes(&content).expect("failed to parse content")
         }
     }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub struct Measurement {
-    pub temperature: f32,
-    pub humidity: f32,
 }
 
 impl Measurement {
