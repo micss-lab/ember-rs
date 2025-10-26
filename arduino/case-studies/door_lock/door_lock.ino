@@ -1,13 +1,19 @@
-// #define USE_EMBER // Uncomment this to use the ember library.
+#define USE_EMBER // Uncomment this to use the ember library.
 
-#include <cstdint>
-#include <cstddef>
+#include "common.h"
+
+#define PIR_PIN 18
+#define UNLOCK_BUTTON_PIN 22
+
+const char LOCK_PASSWORD[5] = "1234";
 
 #ifdef USE_EMBER
 #include "Ember.h"
+
+#include "agents/LockAgent.h"
+#include "agents/PirAgent.h"
 #endif // USE_EMBER
 
-#include "./common.h"
 
 #ifdef USE_EMBER
 
@@ -19,7 +25,6 @@ bool door_locked = true;
 unsigned long unlocked_at = 0;
 bool object_detected = false;
 
-const char LOCK_PASSWORD[5] = "1234";
 
 #endif // USE_EMBER
 
@@ -28,20 +33,6 @@ const char LOCK_PASSWORD[5] = "1234";
 ******************************************/
 #ifndef USE_EMBER
 
-void read_chars_from_uart(uint8_t* buffer, size_t max_len) {
-  size_t idx = 0;
-  memset(buffer, 0, max_len);
-  
-  while (idx < max_len - 1) {
-    if (Serial.available()) {
-      char c = Serial.read();
-      if (c == '\n' || c == '\r') {
-        break;
-      }
-      buffer[idx++] = c;
-    }
-  }
-}
 
 void unlock() {
   Serial.println("Unlocking door, enter password:");
@@ -82,6 +73,12 @@ void setup() {
 
   // Create the main container instance.
   container = std::make_unique<ember::Container>();
+
+  auto lock_agent = agents::lock::create_lock_agent(UNLOCK_BUTTON_PIN);
+  auto pir_agent = agents::pir::create_pir_agent(PIR_PIN);
+
+  container->add_agent(std::move(lock_agent));
+  container->add_agent(std::move(pir_agent));
 
   #endif // USE_EMBER
 
