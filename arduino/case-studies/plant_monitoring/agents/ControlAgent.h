@@ -185,7 +185,7 @@ class ControlStatePrinter:
 };
 
 ember::Agent<ControlState> create_control_agent(unsigned int user_switch_pin) {
-    ember::Agent<ControlState> control_agent{"control-agent", std::move(ControlState{})};
+    ember::Agent<ControlState> control_agent{"control", std::move(ControlState{})};
     auto pump_controller = std::make_unique<PumpController>(user_switch_pin);
     auto moisture_receiver = std::make_unique<MoistureReceiver>();
     auto light_receiver = std::make_unique<LightReceiver>();

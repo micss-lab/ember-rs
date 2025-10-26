@@ -67,7 +67,7 @@ class PotentionmeterSensor:
 };
 
 ember::Agent<MoistureState> create_moisture_agent(unsigned int potentiometer_pin) {
-    ember::Agent<MoistureState> moisture_agent{"moisture-agent", std::move(MoistureState{})};
+    ember::Agent<MoistureState> moisture_agent{"moisture", std::move(MoistureState{})};
     auto potentiometer_sensor = std::make_unique<PotentionmeterSensor>(potentiometer_pin);
     moisture_agent.add_behaviour(std::move(potentiometer_sensor));
     return std::move(moisture_agent);

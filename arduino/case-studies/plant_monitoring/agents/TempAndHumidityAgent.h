@@ -62,7 +62,7 @@ class SensorBehaviour:
 
 
 ember::Agent<> create_temp_and_humidity_agent() {
-    ember::Agent<> light_agent{"temp-and-humidity-agent", std::move(ember::Unit{})};
+    ember::Agent<> light_agent{"temp-and-humidity", std::move(ember::Unit{})};
     return std::move(light_agent);
 }
 

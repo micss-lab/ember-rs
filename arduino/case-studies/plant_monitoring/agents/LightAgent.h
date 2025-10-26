@@ -84,7 +84,7 @@ class LightAlertBehaviour:
 };
 
 ember::Agent<LightState> create_light_agent(unsigned int ldr_sensor_pin, unsigned int light_alert_pin) {
-    ember::Agent<LightState> light_agent{"light-agent", std::move(LightState{})};
+    ember::Agent<LightState> light_agent{"light", std::move(LightState{})};
     std::unique_ptr<SensorBehaviour> sensor_behaviour = std::make_unique<SensorBehaviour>(ldr_sensor_pin);
     std::unique_ptr<LightAlertBehaviour> light_alert_behaviour = std::make_unique<LightAlertBehaviour>(light_alert_pin);
     light_agent.add_behaviour(std::move(sensor_behaviour));

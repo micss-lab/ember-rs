@@ -130,7 +130,7 @@ class PumpLight:
 };
 
 ember::Agent<PumpState> create_pump_agent(unsigned int pump_light_pin) {
-    ember::Agent<PumpState> pump_agent{"pump-agent", std::move(PumpState{})};
+    ember::Agent<PumpState> pump_agent{"pump", std::move(PumpState{})};
     auto sensor_behaviour = std::make_unique<PumpInteractions>();
     auto pump_alert_behaviour = std::make_unique<PumpLight>(pump_light_pin);
     pump_agent.add_behaviour(std::move(sensor_behaviour));
