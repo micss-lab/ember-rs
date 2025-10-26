@@ -30,6 +30,15 @@
           devRustToolchain = rustToolchain.override {
             extensions = ["rust-analyzer" "rust-src"];
           };
+
+          vscode = pkgs.vscode-with-extensions.override {
+            vscodeExtensions = with pkgs.vscode-extensions; [
+              bbenoist.nix
+              vscodevim.vim
+              ms-vscode.cpptools
+              skellock.just
+            ];
+          };
         in {
           packages = [
             devRustToolchain
@@ -48,6 +57,8 @@
 
             pkgs.just
             pkgs.jq
+
+            vscode
           ];
 
           RUST_SRC_PATH = "${devRustToolchain}/lib/rustlib/src/rust/library";

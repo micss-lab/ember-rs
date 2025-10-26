@@ -7,3 +7,4 @@
 # Editor artifacts.
 .idea
 .ccls-cache
+.vscode
