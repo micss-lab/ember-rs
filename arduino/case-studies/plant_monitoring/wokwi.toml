@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+elf = "build/plant_monitoring.ino.elf"
+firmware = "build/plant_monitoring.ino.bin"
