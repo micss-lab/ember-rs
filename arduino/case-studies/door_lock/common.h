@@ -1,0 +1,2 @@
+#define PIR_PIN 18
+#define UNLOCK_BUTTON_PIN 22
