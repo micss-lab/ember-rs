@@ -43,6 +43,20 @@ enum class Performative {
     Unknown,
 };
 
+class ContentView {
+  public:
+    inline ContentView(const uint8_t* data, size_t size) : data(data), size_(size) {}
+    inline ContentView(__ffi::ContentView content): data(content.data), size_(content.len) {}
+    inline const uint8_t& operator[](size_t i) const { return data[i]; }
+    inline size_t size() const { return this->size_; }
+    inline const uint8_t* begin() const { return this->data; }
+    inline const uint8_t* end() const { return this->data + this->size_; }
+  public:
+    uint8_t const* const data;
+  private:
+    size_t size_;
+};
+
 class Message:
     public Object<__ffi::Message> {
   public:
@@ -53,6 +67,8 @@ class Message:
         const std::vector<uint8_t>& content
     );
     Message(__ffi::Message*);
+
+    ContentView get_content() const;
 
     MessageEnvelope wrap_with_envelope() &&;
 };

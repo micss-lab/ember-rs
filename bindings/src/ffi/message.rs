@@ -60,9 +60,28 @@ pub extern "C" fn message_free(message: *mut Message) {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn message_wrap_with_envelope(message: *mut Message) -> *mut MessageEnvelope {
-    non_null!(message, "attemted to free message null-pointer");
+    non_null!(message, "got message null-pointer");
     let message = unsafe { from_raw(message) };
     new(message.wrap_with_envolope())
+}
+
+#[repr(C)]
+pub struct ContentView {
+    pub data: *const u8,
+    pub len: usize,
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn message_get_content(message: *mut Message) -> ContentView {
+    non_null!(message, "got message null-pointer");
+    let message = unsafe { from_raw(message) };
+    let Content::Bytes(content) = &message.content else {
+        unimplemented!("message content can only be bytes");
+    };
+    ContentView {
+        data: content.as_ptr(),
+        len: content.len(),
+    }
 }
 
 fn performative_from_c_char(performative: c_char) -> Performative {

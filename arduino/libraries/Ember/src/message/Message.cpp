@@ -33,3 +33,8 @@ Message::Message(__ffi::Message* inner):
 MessageEnvelope Message::wrap_with_envelope() && {
     __ffi::message_wrap_with_envelope(this->move_object());
 }
+
+ContentView Message::get_content() const {
+    ContentView content(__ffi::message_get_content(this->object));
+    return content;
+}

@@ -42,6 +42,11 @@ struct ContainerPollResult {
   bool should_stop;
 };
 
+struct ContentView {
+  const uint8_t *data;
+  uintptr_t len;
+};
+
 extern "C" {
 
 void initialize_allocator();
@@ -150,6 +155,8 @@ Message *message_new(char performative,
 void message_free(Message *message);
 
 MessageEnvelope *message_wrap_with_envelope(Message *message);
+
+ContentView message_get_content(Message *message);
 
 void message_filter_free(MessageFilter *filter);
 
