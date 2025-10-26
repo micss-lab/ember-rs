@@ -14,6 +14,7 @@ class MessageFilter:
   private:
     MessageFilter(__ffi::MessageFilter*);
 
+  public:
     static MessageFilter all();
     static MessageFilter none();
     static MessageFilter performative(Performative performative);

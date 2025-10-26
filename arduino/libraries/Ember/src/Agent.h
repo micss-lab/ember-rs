@@ -17,6 +17,7 @@ class Agent:
     public Object<__ffi::Agent<__ffi::AgentState, __ffi::Event>> {
   public:
     Agent(const char* const name, State&& state);
+    Agent(Agent&&) = default;
     virtual ~Agent();
     
     void add_behaviour(std::unique_ptr<behaviour::Behaviour<State, Event>>&& behaviour);
