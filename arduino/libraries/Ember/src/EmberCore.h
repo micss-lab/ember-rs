@@ -8,6 +8,7 @@ namespace ember::__ffi {
 template<typename S = void, typename E = void>
 struct Agent;
 
+template<typename E = void>
 struct BehaviourVec;
 
 struct Container;
@@ -15,7 +16,20 @@ struct Container;
 template<typename E = void>
 struct Context;
 
+template<typename E = void>
 struct CyclicBehaviour;
+
+template<typename S = void, typename T = void, typename E = void>
+struct Fsm;
+
+template<typename E = void>
+struct FsmBehaviour;
+
+template<typename S = void, typename T = void, typename E = void>
+struct FsmBuilder;
+
+template<typename T = void, typename E = void>
+struct FsmEvent;
 
 struct Message;
 
@@ -23,10 +37,13 @@ struct MessageEnvelope;
 
 struct MessageFilter;
 
+template<typename E = void>
 struct OneShotBehaviour;
 
+template<typename E = void>
 struct SequentialBehaviour;
 
+template<typename E = void>
 struct TickerBehaviour;
 
 struct Event {
@@ -36,6 +53,8 @@ struct Event {
 struct AgentState {
   void *inner;
 };
+
+using BehaviourId = uint32_t;
 
 struct ContainerPollResult {
   int32_t status;
@@ -63,55 +82,136 @@ Agent<AgentState, Event> *agent_new(const char *name, AgentState *agent_state);
 
 void agent_free(Agent<AgentState, Event> *agent);
 
-void agent_add_behaviour_oneshot(Agent<AgentState, Event> *agent, OneShotBehaviour *oneshot);
+void agent_add_behaviour_oneshot(Agent<AgentState, Event> *agent, OneShotBehaviour<Event> *oneshot);
 
-void agent_add_behaviour_cyclic(Agent<AgentState, Event> *agent, CyclicBehaviour *cyclic);
+void agent_add_behaviour_cyclic(Agent<AgentState, Event> *agent, CyclicBehaviour<Event> *cyclic);
 
-void agent_add_behaviour_ticker(Agent<AgentState, Event> *agent, TickerBehaviour *ticker);
+void agent_add_behaviour_ticker(Agent<AgentState, Event> *agent, TickerBehaviour<Event> *ticker);
 
 void agent_add_behaviour_sequential(Agent<AgentState, Event> *agent,
-                                    SequentialBehaviour *sequential);
+                                    SequentialBehaviour<Event> *sequential);
 
-OneShotBehaviour *behaviour_oneshot_new(void *inner, void (*action)(void*,
-                                                                    Context<Event>*,
-                                                                    AgentState*));
+OneShotBehaviour<Event> *behaviour_oneshot_new(void *inner, void (*action)(void*,
+                                                                           Context<Event>*,
+                                                                           AgentState*));
 
-void behaviour_oneshot_free(OneShotBehaviour *oneshot);
+void behaviour_oneshot_free(OneShotBehaviour<Event> *oneshot);
 
-CyclicBehaviour *behaviour_cyclic_new(void *inner,
-                                      void (*action)(void*, Context<Event>*, AgentState*),
-                                      bool (*is_finished)(void*));
+CyclicBehaviour<Event> *behaviour_cyclic_new(void *inner,
+                                             void (*action)(void*, Context<Event>*, AgentState*),
+                                             bool (*is_finished)(void*));
 
-void behaviour_cyclic_free(CyclicBehaviour *cyclic);
+void behaviour_cyclic_free(CyclicBehaviour<Event> *cyclic);
 
-TickerBehaviour *behaviour_ticker_new(void *inner,
-                                      uint64_t (*interval)(void*),
-                                      void (*action)(void*, Context<Event>*, AgentState*),
-                                      bool (*is_finished)(void*));
+TickerBehaviour<Event> *behaviour_ticker_new(void *inner,
+                                             uint64_t (*interval)(void*),
+                                             void (*action)(void*, Context<Event>*, AgentState*),
+                                             bool (*is_finished)(void*));
 
-void behaviour_ticker_free(TickerBehaviour *ticker);
+void behaviour_ticker_free(TickerBehaviour<Event> *ticker);
 
-BehaviourVec *behaviour_vec_new();
+BehaviourVec<Event> *behaviour_vec_new();
 
-void behaviour_vec_add_behaviour_oneshot(BehaviourVec *behaviour_vec, OneShotBehaviour *oneshot);
+void behaviour_vec_add_behaviour_oneshot(BehaviourVec<Event> *behaviour_vec,
+                                         OneShotBehaviour<Event> *oneshot);
 
-void behaviour_vec_add_behaviour_cyclic(BehaviourVec *behaviour_vec, CyclicBehaviour *cyclic);
+void behaviour_vec_add_behaviour_cyclic(BehaviourVec<Event> *behaviour_vec,
+                                        CyclicBehaviour<Event> *cyclic);
 
-void behaviour_vec_add_behaviour_ticker(BehaviourVec *behaviour_vec, TickerBehaviour *ticker);
+void behaviour_vec_add_behaviour_ticker(BehaviourVec<Event> *behaviour_vec,
+                                        TickerBehaviour<Event> *ticker);
 
-void behaviour_vec_add_behaviour_sequential(BehaviourVec *behaviour_vec,
-                                            SequentialBehaviour *sequential);
+void behaviour_vec_add_behaviour_sequential(BehaviourVec<Event> *behaviour_vec,
+                                            SequentialBehaviour<Event> *sequential);
 
-void behaviour_vec_free(BehaviourVec *behaviour_vec);
+void behaviour_vec_free(BehaviourVec<Event> *behaviour_vec);
 
-SequentialBehaviour *behaviour_sequential_new(void *inner,
-                                              BehaviourVec *initial_behaviours,
-                                              void (*handle_child_event)(void*, Event*),
-                                              void (*after_child_action)(void*,
-                                                                         Context<Event>*,
-                                                                         AgentState*));
+SequentialBehaviour<Event> *behaviour_sequential_new(void *inner,
+                                                     BehaviourVec<Event> *initial_behaviours,
+                                                     void (*handle_child_event)(void*, Event*),
+                                                     void (*after_child_action)(void*,
+                                                                                Context<Event>*,
+                                                                                AgentState*));
 
-void behaviour_sequential_free(SequentialBehaviour *sequential);
+void behaviour_sequential_free(SequentialBehaviour<Event> *sequential);
+
+FsmBehaviour<Event> *behaviour_fsm_behaviour_new(void *inner,
+                                                 Fsm<AgentState, const char*, Event> *fsm,
+                                                 void (*handle_child_event)(void*, Event*),
+                                                 void (*after_child_action)(void*,
+                                                                            Context<Event>*,
+                                                                            AgentState*));
+
+void behaviour_fsm_behaviour_free(FsmBehaviour<Event> *fsm);
+
+FsmBuilder<AgentState, const char*, Event> *behaviour_fsm_builder_new();
+
+BehaviourId behaviour_fsm_builder_add_behaviour_oneshot(FsmBuilder<AgentState, const char*, Event> *builder,
+                                                        OneShotBehaviour<FsmEvent<const char*, Event>> *oneshot,
+                                                        bool is_final);
+
+BehaviourId behaviour_fsm_builder_add_behaviour_cyclic(FsmBuilder<AgentState, const char*, Event> *builder,
+                                                       CyclicBehaviour<FsmEvent<const char*, Event>> *cyclic,
+                                                       bool is_final);
+
+BehaviourId behaviour_fsm_builder_add_behaviour_ticker(FsmBuilder<AgentState, const char*, Event> *builder,
+                                                       TickerBehaviour<FsmEvent<const char*, Event>> *ticker,
+                                                       bool is_final);
+
+BehaviourId behaviour_fsm_builder_add_behaviour_sequential(FsmBuilder<AgentState, const char*, Event> *builder,
+                                                           SequentialBehaviour<FsmEvent<const char*, Event>> *sequential,
+                                                           bool is_final);
+
+BehaviourId behaviour_fsm_builder_add_behaviour_fsm(FsmBuilder<AgentState, const char*, Event> *builder,
+                                                    FsmBehaviour<FsmEvent<const char*, Event>> *fsm,
+                                                    bool is_final);
+
+Fsm<AgentState, const char*, Event> *behaviour_fsm_builder_build(FsmBuilder<AgentState, const char*, Event> *builder,
+                                                                 BehaviourId start_behaviour);
+
+OneShotBehaviour<FsmEvent<const char*, Event>> *behaviour_fsm_child_behaviour_oneshot_new(void *inner,
+                                                                                          void (*action)(void*,
+                                                                                                         Context<FsmEvent<const char*, Event>>*,
+                                                                                                         AgentState*));
+
+void behaviour_fsm_child_behaviour_oneshot_free(OneShotBehaviour<FsmEvent<const char*, Event>> *oneshot);
+
+CyclicBehaviour<FsmEvent<const char*, Event>> *behaviour_fsm_child_behaviour_cyclic_new(void *inner,
+                                                                                        void (*action)(void*,
+                                                                                                       Context<FsmEvent<const char*, Event>>*,
+                                                                                                       AgentState*),
+                                                                                        bool (*is_finished)(void*));
+
+void behaviour_fsm_child_behaviour_cyclic_free(CyclicBehaviour<FsmEvent<const char*, Event>> *cyclic);
+
+TickerBehaviour<FsmEvent<const char*, Event>> *behaviour_fsm_child_behaviour_ticker_new(void *inner,
+                                                                                        uint64_t (*interval)(void*),
+                                                                                        void (*action)(void*,
+                                                                                                       Context<FsmEvent<const char*, Event>>*,
+                                                                                                       AgentState*),
+                                                                                        bool (*is_finished)(void*));
+
+void behaviour_fsm_child_behaviour_ticker_free(TickerBehaviour<FsmEvent<const char*, Event>> *ticker);
+
+SequentialBehaviour<FsmEvent<const char*, Event>> *behaviour_fsm_child_behaviour_sequential_new(void *inner,
+                                                                                                BehaviourVec<Event> *initial_behaviours,
+                                                                                                void (*handle_child_event)(void*,
+                                                                                                                           Event*),
+                                                                                                void (*after_child_action)(void*,
+                                                                                                                           Context<FsmEvent<const char*, Event>>*,
+                                                                                                                           AgentState*));
+
+void behaviour_fsm_child_behaviour_sequential_free(SequentialBehaviour<FsmEvent<const char*, Event>> *sequential);
+
+FsmBehaviour<FsmEvent<const char*, Event>> *behaviour_fsm_child_behaviour_fsm_new(void *inner,
+                                                                                  Fsm<AgentState, const char*, Event> *fsm,
+                                                                                  void (*handle_child_event)(void*,
+                                                                                                             Event*),
+                                                                                  void (*after_child_action)(void*,
+                                                                                                             Context<FsmEvent<const char*, Event>>*,
+                                                                                                             AgentState*));
+
+void behaviour_fsm_child_behaviour_fsm_free(FsmBehaviour<FsmEvent<const char*, Event>> *fsm);
 
 /**
  * Creates a new container instance.

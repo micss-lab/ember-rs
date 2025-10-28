@@ -29,7 +29,7 @@ pub extern "C" fn agent_free(agent: *mut Agent<AgentState, Event>) {
 #[unsafe(no_mangle)]
 pub extern "C" fn agent_add_behaviour_oneshot(
     agent: *mut Agent<AgentState, Event>,
-    oneshot: *mut OneShotBehaviour,
+    oneshot: *mut OneShotBehaviour<Event>,
 ) {
     non_null!(agent, "got agent null-pointer");
     non_null!(oneshot, "got oneshot behaviour null-pointer");
@@ -41,7 +41,7 @@ pub extern "C" fn agent_add_behaviour_oneshot(
 #[unsafe(no_mangle)]
 pub extern "C" fn agent_add_behaviour_cyclic(
     agent: *mut Agent<AgentState, Event>,
-    cyclic: *mut CyclicBehaviour,
+    cyclic: *mut CyclicBehaviour<Event>,
 ) {
     non_null!(agent, "got agent null-pointer");
     non_null!(cyclic, "got cyclic behaviour null-pointer");
@@ -53,7 +53,7 @@ pub extern "C" fn agent_add_behaviour_cyclic(
 #[unsafe(no_mangle)]
 pub extern "C" fn agent_add_behaviour_ticker(
     agent: *mut Agent<AgentState, Event>,
-    ticker: *mut TickerBehaviour,
+    ticker: *mut TickerBehaviour<Event>,
 ) {
     non_null!(agent, "got agent null-pointer");
     non_null!(ticker, "got ticker behaviour null-pointer");
@@ -65,7 +65,7 @@ pub extern "C" fn agent_add_behaviour_ticker(
 #[unsafe(no_mangle)]
 pub extern "C" fn agent_add_behaviour_sequential(
     agent: *mut Agent<'static, AgentState, Event>,
-    sequential: *mut SequentialBehaviour,
+    sequential: *mut SequentialBehaviour<Event>,
 ) {
     non_null!(agent, "got agent null-pointer");
     non_null!(sequential, "got sequential behaviour null-pointer");

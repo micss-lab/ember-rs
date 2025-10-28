@@ -18,7 +18,7 @@ namespace behaviour {
 template<class AgentState=Unit, class E=void, class ChildEvent=void>
 class SequentialBehaviour:
     public Behaviour<AgentState, E>,
-    public Object<__ffi::SequentialBehaviour> {
+    public Object<__ffi::SequentialBehaviour<__ffi::Event>> {
   public:
     SequentialBehaviour(BehaviourVec<AgentState, ChildEvent>&& initial_behaviours);
     virtual ~SequentialBehaviour();
@@ -29,7 +29,7 @@ class SequentialBehaviour:
 
   public:
     virtual void __ffi_add_behaviour_to_agent(__ffi::Agent<__ffi::AgentState, __ffi::Event>* agent) override;
-    virtual void __ffi_add_behaviour_to_behaviour_vec(__ffi::BehaviourVec* vec) override;
+    virtual void __ffi_add_behaviour_to_behaviour_vec(__ffi::BehaviourVec<__ffi::Event>* vec) override;
 };
 
 // ======================= Impl =======================
@@ -79,7 +79,7 @@ void SequentialBehaviour<AgentState, E, ChildEvent>::__ffi_add_behaviour_to_agen
 }
 
 template<class AgentState, class E, class ChildEvent>
-void SequentialBehaviour<AgentState, E, ChildEvent>::__ffi_add_behaviour_to_behaviour_vec(__ffi::BehaviourVec* vec) {
+void SequentialBehaviour<AgentState, E, ChildEvent>::__ffi_add_behaviour_to_behaviour_vec(__ffi::BehaviourVec<__ffi::Event>* vec) {
     __ffi::behaviour_vec_add_behaviour_sequential(
         vec,
         this->move_object()

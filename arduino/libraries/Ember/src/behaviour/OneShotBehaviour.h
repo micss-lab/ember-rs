@@ -15,7 +15,7 @@ namespace behaviour {
 template<class AgentState=Unit, class Event=void>
 class OneShotBehaviour:
     public Behaviour<AgentState, Event>,
-    public Object<__ffi::OneShotBehaviour> {
+    public Object<__ffi::OneShotBehaviour<__ffi::Event>> {
   public:
     OneShotBehaviour();
     virtual ~OneShotBehaviour();
@@ -24,7 +24,7 @@ class OneShotBehaviour:
 
   public:
     virtual void __ffi_add_behaviour_to_agent(__ffi::Agent<__ffi::AgentState, __ffi::Event>* agent) override;
-    virtual void __ffi_add_behaviour_to_behaviour_vec(__ffi::BehaviourVec* vec) override;
+    virtual void __ffi_add_behaviour_to_behaviour_vec(__ffi::BehaviourVec<__ffi::Event>* vec) override;
 };
 
 // ======================= Impl =======================
@@ -56,7 +56,7 @@ void OneShotBehaviour<AgentState, Event>::__ffi_add_behaviour_to_agent(__ffi::Ag
 }
 
 template<class AgentState, class Event>
-void OneShotBehaviour<AgentState, Event>::__ffi_add_behaviour_to_behaviour_vec(__ffi::BehaviourVec* vec) {
+void OneShotBehaviour<AgentState, Event>::__ffi_add_behaviour_to_behaviour_vec(__ffi::BehaviourVec<__ffi::Event>* vec) {
     __ffi::behaviour_vec_add_behaviour_oneshot(
         vec,
         this->move_object()

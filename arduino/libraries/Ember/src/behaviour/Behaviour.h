@@ -18,12 +18,12 @@ template<class AgentState=Unit, class Event=void>
 class Behaviour {
   public:
     virtual void __ffi_add_behaviour_to_agent(__ffi::Agent<__ffi::AgentState, __ffi::Event>* agent) = 0;
-    virtual void __ffi_add_behaviour_to_behaviour_vec(__ffi::BehaviourVec* vec) = 0;
+    virtual void __ffi_add_behaviour_to_behaviour_vec(__ffi::BehaviourVec<__ffi::Event>* vec) = 0;
 };
 
 template<class AgentState=Unit, class Event=void> 
 class BehaviourVec:
-    public Object<__ffi::BehaviourVec> {
+    public Object<__ffi::BehaviourVec<__ffi::Event>> {
   public:
     BehaviourVec();
 

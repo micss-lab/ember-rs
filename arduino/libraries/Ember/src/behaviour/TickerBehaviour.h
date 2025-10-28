@@ -15,7 +15,7 @@ namespace behaviour {
 template<class AgentState=Unit, class Event=void>
 class TickerBehaviour:
     public Behaviour<AgentState, Event>,
-    public Object<__ffi::TickerBehaviour> {
+    public Object<__ffi::TickerBehaviour<__ffi::Event>> {
   public:
     TickerBehaviour();
     virtual ~TickerBehaviour();
@@ -26,7 +26,7 @@ class TickerBehaviour:
 
   public:
     virtual void __ffi_add_behaviour_to_agent(__ffi::Agent<__ffi::AgentState, __ffi::Event>* agent) override;
-    virtual void __ffi_add_behaviour_to_behaviour_vec(__ffi::BehaviourVec* vec) override;
+    virtual void __ffi_add_behaviour_to_behaviour_vec(__ffi::BehaviourVec<__ffi::Event>* vec) override;
 };
 
 // ======================= Impl =======================
@@ -66,7 +66,7 @@ void TickerBehaviour<AgentState, Event>::__ffi_add_behaviour_to_agent(__ffi::Age
 }
 
 template<class AgentState, class Event>
-void TickerBehaviour<AgentState, Event>::__ffi_add_behaviour_to_behaviour_vec(__ffi::BehaviourVec* vec) {
+void TickerBehaviour<AgentState, Event>::__ffi_add_behaviour_to_behaviour_vec(__ffi::BehaviourVec<__ffi::Event>* vec) {
     __ffi::behaviour_vec_add_behaviour_ticker(
         vec,
         this->move_object()

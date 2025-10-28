@@ -15,7 +15,7 @@ namespace behaviour {
 template<class AgentState=Unit, class Event=void>
 class CyclicBehaviour:
     public Behaviour<AgentState, Event>,
-    public Object<__ffi::CyclicBehaviour> {
+    public Object<__ffi::CyclicBehaviour<__ffi::Event>> {
   public:
     CyclicBehaviour();
     virtual ~CyclicBehaviour();
@@ -25,7 +25,7 @@ class CyclicBehaviour:
 
   public:
     virtual void __ffi_add_behaviour_to_agent(__ffi::Agent<__ffi::AgentState, __ffi::Event>* agent) override;
-    virtual void __ffi_add_behaviour_to_behaviour_vec(__ffi::BehaviourVec* vec) override;
+    virtual void __ffi_add_behaviour_to_behaviour_vec(__ffi::BehaviourVec<__ffi::Event>* vec) override;
 };
 
 // ======================= Impl =======================
@@ -61,7 +61,7 @@ void CyclicBehaviour<AgentState, Event>::__ffi_add_behaviour_to_agent(__ffi::Age
 }
 
 template<class AgentState, class Event>
-void CyclicBehaviour<AgentState, Event>::__ffi_add_behaviour_to_behaviour_vec(__ffi::BehaviourVec* vec) {
+void CyclicBehaviour<AgentState, Event>::__ffi_add_behaviour_to_behaviour_vec(__ffi::BehaviourVec<__ffi::Event>* vec) {
     __ffi::behaviour_vec_add_behaviour_cyclic(
         vec,
         this->move_object()

@@ -81,13 +81,21 @@ impl<'a, S, T, E> FsmBuilder<'a, S, T, E> {
         behaviour: impl IntoBehaviour<'a, K, AgentState = S, Event = FsmEvent<T, E>>,
         is_final: bool,
     ) -> Self {
+        self.add_behaviour(behaviour, is_final);
+        self
+    }
+
+    pub fn add_behaviour<K>(
+        &mut self,
+        behaviour: impl IntoBehaviour<'a, K, AgentState = S, Event = FsmEvent<T, E>>,
+        is_final: bool,
+    ) {
         let behaviour = behaviour.into_behaviour();
         let id = behaviour.id();
         self.behaviours.insert(id, behaviour);
         if is_final {
             self.final_states.insert(id);
         }
-        self
     }
 }
 
