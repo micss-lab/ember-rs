@@ -169,6 +169,15 @@ BehaviourId behaviour_fsm_builder_add_behaviour_fsm(FsmBuilder<AgentState, const
 Fsm<AgentState, const char*, Event> *behaviour_fsm_builder_build(FsmBuilder<AgentState, const char*, Event> *builder,
                                                                  BehaviourId start_behaviour);
 
+FsmEvent<const char*, Event> *fsm_event_transition_new(const char *transition);
+
+FsmEvent<const char*, Event> *fsm_event_event_new(Event *event);
+
+void fsm_event_free(FsmEvent<const char*, Event> *event);
+
+void context_emit_fsm_event(Context<FsmEvent<const char*, Event>> *context,
+                            FsmEvent<const char*, Event> *event);
+
 OneShotBehaviour<FsmEvent<const char*, Event>> *behaviour_fsm_child_behaviour_oneshot_new(void *inner,
                                                                                           void (*action)(void*,
                                                                                                          Context<FsmEvent<const char*, Event>>*,

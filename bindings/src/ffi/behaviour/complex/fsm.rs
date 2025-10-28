@@ -164,6 +164,59 @@ pub extern "C" fn behaviour_fsm_builder_build(
         .expect("failed to build fsm"))
 }
 
+pub(in crate::ffi) mod event {
+    use core::ffi::c_char;
+
+    use ember::behaviour::fsm::FsmEvent;
+
+    use crate::ffi::{
+        event::Event,
+        util::{drop_raw, from_raw, new},
+    };
+
+    #[unsafe(no_mangle)]
+    extern "C" fn fsm_event_transition_new(
+        transition: *const c_char,
+    ) -> *mut FsmEvent<*const c_char, Event> {
+        new(FsmEvent::Trigger(transition))
+    }
+
+    #[unsafe(no_mangle)]
+    extern "C" fn fsm_event_event_new(event: *mut Event) -> *mut FsmEvent<*const c_char, Event> {
+        non_null!(event, "got event null-pointer");
+        new(FsmEvent::Event(unsafe { from_raw(event) }))
+    }
+
+    #[unsafe(no_mangle)]
+    extern "C" fn fsm_event_free(event: *mut FsmEvent<*const c_char, Event>) {
+        non_null_or_bail!(event, "attempted to free fsm event null-pointer");
+        unsafe { drop_raw(event) }
+    }
+}
+
+pub(in crate::ffi) mod context {
+    use core::ffi::c_char;
+
+    use ember::behaviour::{Context, fsm::FsmEvent};
+
+    use crate::ffi::{
+        event::Event,
+        util::{from_raw, ref_from_raw},
+    };
+
+    #[unsafe(no_mangle)]
+    pub extern "C" fn context_emit_fsm_event(
+        context: *mut Context<FsmEvent<*const c_char, Event>>,
+        event: *mut FsmEvent<*const c_char, Event>,
+    ) {
+        non_null!(context, "got a context null-pointer");
+        non_null!(event, "got a event null-pointer");
+        let context = unsafe { ref_from_raw(context) };
+        let event = unsafe { from_raw(event) };
+        context.emit_event(event);
+    }
+}
+
 pub(in crate::ffi) mod fsm_child_behaviour {
     pub(in crate::ffi) mod simple {
         use core::ffi::{c_char, c_void};
