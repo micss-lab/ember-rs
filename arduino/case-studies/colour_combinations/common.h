@@ -8,6 +8,17 @@ enum class Colour {
     Blue,
 };
 
+const char* colour_as_string(Colour colour) {
+    switch (colour) {
+        case Colour::Red:
+            return "red";
+        case Colour::Green:
+            return "green";
+        case Colour::Blue:
+            return "blue";
+    }
+}
+
 unsigned int combine_colours(Colour bottom, Colour top) {
     if (bottom == Colour::Red && top == Colour::Red) {
         return 100;

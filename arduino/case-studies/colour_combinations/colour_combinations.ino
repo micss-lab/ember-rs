@@ -1,4 +1,4 @@
-// #define USE_EMBER // Uncomment this to use the ember library.
+#define USE_EMBER // Uncomment this to use the ember library.
 
 #include <array>
 #include <vector>
@@ -8,6 +8,10 @@
 #ifdef USE_EMBER
 
 #include "Ember.h"
+
+#include "./agents/SortAgent.h"
+#include "./agents/BuildAgent.h"
+#include "./agents/TrashAgent.h"
 
 #endif // USE_EMBER
 
@@ -51,11 +55,14 @@ void setup() {
   // Create the main container instance.
   container = std::make_unique<ember::Container>();
 
-  auto lock_agent = agents::lock::create_lock_agent(UNLOCK_BUTTON_PIN);
-  auto pir_agent = agents::pir::create_pir_agent(PIR_PIN);
+  auto belt = std::make_shared<Belt>(std::begin(sequence), std::end(sequence));
+  auto sort_agent = agents::sort::create_sort_agent(belt);
+  auto trash_agent = agents::trasher::create_trasher_agent(belt);
+  auto build_agent = agents::builder::create_builder_agent(belt);
 
-  container->add_agent(std::move(lock_agent));
-  container->add_agent(std::move(pir_agent));
+  container->add_agent(std::move(sort_agent));
+  container->add_agent(std::move(trash_agent));
+  container->add_agent(std::move(build_agent));
 
   #endif // USE_EMBER
 
