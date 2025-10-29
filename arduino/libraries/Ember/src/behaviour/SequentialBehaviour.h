@@ -15,7 +15,7 @@ namespace ember {
 
 namespace behaviour {
 
-template<class AgentState=Unit, class E=void, class ChildEvent=void>
+template<class AgentState=Unit, class E=Unit, class ChildEvent=Unit>
 class SequentialBehaviour:
     public Behaviour<AgentState, E>,
     public Object<__ffi::SequentialBehaviour<__ffi::Event>> {
@@ -30,6 +30,25 @@ class SequentialBehaviour:
   public:
     virtual void __ffi_add_behaviour_to_agent(__ffi::Agent<__ffi::AgentState, __ffi::Event>* agent) override;
     virtual void __ffi_add_behaviour_to_behaviour_vec(__ffi::BehaviourVec<__ffi::Event>* vec) override;
+};
+
+template<class AgentState, class E, class ChildEvent>
+class SequentialBehaviour<AgentState, FsmEvent<E>, ChildEvent>:
+    public Behaviour<AgentState, FsmEvent<E>>,
+    public Object<__ffi::SequentialBehaviour<__ffi::FsmEvent<const char*, __ffi::Event>>> {
+  public:
+    SequentialBehaviour(BehaviourVec<AgentState, ChildEvent>&& initial_behaviours);
+    virtual ~SequentialBehaviour();
+
+    virtual void handle_child_event(Event<ChildEvent>&& event);
+
+    virtual void after_child_action(Context<FsmEvent<E>>& context, AgentState& agent_state);
+
+  public:
+    virtual uint32_t __ffi_add_behaviour_to_fsm_builder(
+        __ffi::FsmBuilder<__ffi::AgentState, const char*, __ffi::Event>* builder,
+        bool is_final
+    ) override;
 };
 
 // ======================= Impl =======================
@@ -84,6 +103,50 @@ void SequentialBehaviour<AgentState, E, ChildEvent>::__ffi_add_behaviour_to_beha
         vec,
         this->move_object()
     );
+}
+
+// ======================= FsmEvent spec Impl =======================
+
+template<class AgentState, class E, class ChildEvent>
+SequentialBehaviour<AgentState, FsmEvent<E>, ChildEvent>::SequentialBehaviour(BehaviourVec<AgentState, ChildEvent>&& initial_behaviours):
+    Object(
+        __ffi::behaviour_fsm_child_behaviour_sequential_new(
+            this,
+            initial_behaviours.move_object(),
+            [](void* self_, __ffi::Event* event_) {
+                SequentialBehaviour<AgentState, FsmEvent<E>, ChildEvent>* self = static_cast<SequentialBehaviour<AgentState, FsmEvent<E>, ChildEvent>*>(self_);
+                Event<ChildEvent> event(event_);
+                self->handle_child_event(std::move(event));
+            },
+            [](void* self_, __ffi::Context<__ffi::FsmEvent<const char*, __ffi::Event>>* context_, __ffi::AgentState* agent_state_) {
+                SequentialBehaviour<AgentState, FsmEvent<E>, ChildEvent>* self = static_cast<SequentialBehaviour<AgentState, FsmEvent<E>, ChildEvent>*>(self_);
+                Context<FsmEvent<E>> context(context_);
+                AgentState& agent_state = *static_cast<AgentState*>(agent_state_->inner);
+                self->after_child_action(context, agent_state);
+            }
+        ),
+        __ffi::behaviour_fsm_child_behaviour_sequential_free
+    ) {}
+
+template<class AgentState, class E, class ChildEvent>
+SequentialBehaviour<AgentState, FsmEvent<E>, ChildEvent>::~SequentialBehaviour() {}
+
+template<class AgentState, class E, class ChildEvent>
+void SequentialBehaviour<AgentState, FsmEvent<E>, ChildEvent>::handle_child_event(Event<ChildEvent>&&) {
+    // Does nothing.
+}
+
+template<class AgentState, class E, class ChildEvent>
+void SequentialBehaviour<AgentState, FsmEvent<E>, ChildEvent>::after_child_action(Context<FsmEvent<E>>& context, AgentState& agent_state) {
+    // Does nothing.
+}
+
+template<class AgentState, class E, class ChildEvent>
+uint32_t SequentialBehaviour<AgentState, FsmEvent<E>, ChildEvent>::__ffi_add_behaviour_to_fsm_builder(
+    __ffi::FsmBuilder<__ffi::AgentState, const char*, __ffi::Event>* builder,
+    bool is_final
+) {
+    return __ffi::behaviour_fsm_builder_add_behaviour_sequential(builder, this->move_object(), is_final);
 }
 
 } // namespace behaviour

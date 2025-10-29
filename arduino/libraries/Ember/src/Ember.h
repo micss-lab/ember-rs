@@ -16,6 +16,7 @@
 #include "behaviour/CyclicBehaviour.h"
 #include "behaviour/TickerBehaviour.h"
 #include "behaviour/SequentialBehaviour.h"
+#include "behaviour/FsmBehaviour.h"
 
 
 namespace ember {

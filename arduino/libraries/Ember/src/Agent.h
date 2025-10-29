@@ -12,7 +12,7 @@
 
 namespace ember {
 
-template<typename State=Unit, typename Event=void>
+template<typename State=Unit, typename Event=Unit>
 class Agent: 
     public Object<__ffi::Agent<__ffi::AgentState, __ffi::Event>> {
   public:

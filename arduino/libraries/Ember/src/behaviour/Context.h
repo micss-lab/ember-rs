@@ -13,7 +13,7 @@ namespace ember {
 
 namespace behaviour {
 
-template<class E=void>
+template<class E=Unit>
 class Context {
   private:
     using Message = message::Message;
@@ -22,6 +22,7 @@ class Context {
     
   public:
     Context(__ffi::Context<__ffi::Event>* context);
+    Context(__ffi::Context<__ffi::FsmEvent<const char*, __ffi::Event>>* context);
 
   public:
     void emit_event(Event<E>&& event);
@@ -35,44 +36,54 @@ class Context {
     std::optional<Message> receive_message_with_filter(MessageFilter&& filter);
 
   private:
-    // Does not own the context value (essentially a mutable reference to the context).
-    __ffi::Context<__ffi::Event>* context;
+    union {
+        __ffi::Context<__ffi::Event>* regular_context;
+        __ffi::Context<__ffi::FsmEvent<const char*, __ffi::Event>>* fsm_context;
+    };
 };
 
 // ======================= Impl =======================
 
 template<class E>
 Context<E>::Context(__ffi::Context<__ffi::Event>* context):
-    context(context) {}
+    regular_context(context) {}
+
+template<class E>
+Context<E>::Context(__ffi::Context<__ffi::FsmEvent<const char*, __ffi::Event>>* context):
+    fsm_context(context) {}
 
 template<class E>
 void Context<E>::emit_event(Event<E>&& event) {
-    __ffi::context_emit_event(this->context, event.move_object());
+    if constexpr (is_fsm_event<E>::value) {
+        __ffi::context_emit_fsm_event(this->fsm_context, event.move_object());
+    } else {
+        __ffi::context_emit_event(this->regular_context, event.move_object());
+    }
 }
 
 template<class E>
 void Context<E>::stop_container() {
-    __ffi::context_stop_container(this->context);
+    __ffi::context_stop_container(this->regular_context);
 }
 
 template<class E>
 void Context<E>::remove_agent() {
-    __ffi::context_remove_agent(this->context);
+    __ffi::context_remove_agent(this->regular_context);
 }
 
 template<class E>
 void Context<E>::block_behaviour() {
-    __ffi::context_block_behaviour(this->context);
+    __ffi::context_block_behaviour(this->regular_context);
 }
 
 template<class E>
 void Context<E>::send_message(MessageEnvelope&& message) {
-    __ffi::context_send_message(this->context, message.move_object());
+    __ffi::context_send_message(this->regular_context, message.move_object());
 }
 
 template<class E>
 std::optional<message::Message> Context<E>::receive_message() {
-    __ffi::Message* message = __ffi::context_receive_message(this->context);
+    __ffi::Message* message = __ffi::context_receive_message(this->regular_context);
     if (message == nullptr) {
         return std::nullopt;
     }
@@ -84,7 +95,7 @@ std::optional<message::Message> Context<E>::receive_message_with_filter(
     message::MessageFilter&& filter
 ) {
     __ffi::Message* message = __ffi::context_receive_message_with_filter(
-        this->context,
+        this->regular_context,
         filter.move_object()
     );
     if (message == nullptr) {

@@ -91,6 +91,8 @@ void agent_add_behaviour_ticker(Agent<AgentState, Event> *agent, TickerBehaviour
 void agent_add_behaviour_sequential(Agent<AgentState, Event> *agent,
                                     SequentialBehaviour<Event> *sequential);
 
+void agent_add_behaviour_fsm(Agent<AgentState, Event> *agent, FsmBehaviour<Event> *fsm);
+
 OneShotBehaviour<Event> *behaviour_oneshot_new(void *inner, void (*action)(void*,
                                                                            Context<Event>*,
                                                                            AgentState*));
@@ -123,6 +125,8 @@ void behaviour_vec_add_behaviour_ticker(BehaviourVec<Event> *behaviour_vec,
 
 void behaviour_vec_add_behaviour_sequential(BehaviourVec<Event> *behaviour_vec,
                                             SequentialBehaviour<Event> *sequential);
+
+void behaviour_vec_add_behaviour_fsm(BehaviourVec<Event> *behaviour_vec, FsmBehaviour<Event> *fsm);
 
 void behaviour_vec_free(BehaviourVec<Event> *behaviour_vec);
 
@@ -165,6 +169,15 @@ BehaviourId behaviour_fsm_builder_add_behaviour_sequential(FsmBuilder<AgentState
 BehaviourId behaviour_fsm_builder_add_behaviour_fsm(FsmBuilder<AgentState, const char*, Event> *builder,
                                                     FsmBehaviour<FsmEvent<const char*, Event>> *fsm,
                                                     bool is_final);
+
+void behaviour_fsm_builder_add_default_transition(FsmBuilder<AgentState, const char*, Event> *builder,
+                                                  BehaviourId src,
+                                                  BehaviourId dest);
+
+void behaviour_fsm_builder_add_transition(FsmBuilder<AgentState, const char*, Event> *builder,
+                                          BehaviourId src,
+                                          BehaviourId dest,
+                                          const char *trigger);
 
 Fsm<AgentState, const char*, Event> *behaviour_fsm_builder_build(FsmBuilder<AgentState, const char*, Event> *builder,
                                                                  BehaviourId start_behaviour);
