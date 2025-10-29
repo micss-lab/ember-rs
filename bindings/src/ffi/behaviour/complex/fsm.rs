@@ -154,6 +154,27 @@ pub extern "C" fn behaviour_fsm_builder_add_behaviour_fsm(
 }
 
 #[unsafe(no_mangle)]
+pub extern "C" fn behaviour_fsm_builder_add_default_transition(
+    builder: *mut FsmBuilder<'static, AgentState, *const c_char, Event>,
+    src: BehaviourId,
+    dest: BehaviourId,
+) {
+    non_null!(builder, "got fsm builder null-pointer");
+    unsafe { ref_from_raw(builder) }.add_transition(src, dest, None);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn behaviour_fsm_builder_add_transition(
+    builder: *mut FsmBuilder<'static, AgentState, *const c_char, Event>,
+    src: BehaviourId,
+    dest: BehaviourId,
+    trigger: *const c_char,
+) {
+    non_null!(builder, "got fsm builder null-pointer");
+    unsafe { ref_from_raw(builder) }.add_transition(src, dest, Some(trigger));
+}
+
+#[unsafe(no_mangle)]
 pub extern "C" fn behaviour_fsm_builder_build(
     builder: *mut FsmBuilder<'static, AgentState, *const c_char, Event>,
     start_behaviour: BehaviourId,

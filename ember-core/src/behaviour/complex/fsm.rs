@@ -109,11 +109,20 @@ where
         destination: BehaviourId,
         trigger: Option<T>,
     ) -> Self {
+        self.add_transition(src, destination, trigger);
+        self
+    }
+
+    pub fn add_transition(
+        &mut self,
+        src: BehaviourId,
+        destination: BehaviourId,
+        trigger: Option<T>,
+    ) {
         self.transitions
             .entry(src)
             .or_default()
             .insert(trigger.map(Trigger::Other).unwrap_or_default(), destination);
-        self
     }
 }
 

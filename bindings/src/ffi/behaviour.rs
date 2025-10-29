@@ -191,7 +191,7 @@ pub(super) mod complex {
 
         use super::sequential::SequentialBehaviour;
         use super::simple::{CyclicBehaviour, OneShotBehaviour, TickerBehaviour};
-        use super::{AgentState, Event};
+        use super::{AgentState, Event, FsmBehaviour};
         use super::{drop_raw, from_raw, new, ref_from_raw};
 
         pub struct BehaviourVec<E>(Vec<Box<dyn Behaviour<AgentState = AgentState, Event = E>>>);
@@ -269,6 +269,18 @@ pub(super) mod complex {
             non_null!(sequential, "got sequential behaviour null-pointer");
             let behaviour_vec = unsafe { ref_from_raw(behaviour_vec) };
             let behaviour = unsafe { from_raw(sequential) };
+            behaviour_vec.add_behaviour(behaviour);
+        }
+
+        #[unsafe(no_mangle)]
+        pub extern "C" fn behaviour_vec_add_behaviour_fsm(
+            behaviour_vec: *mut BehaviourVec<Event>,
+            fsm: *mut FsmBehaviour<Event>,
+        ) {
+            non_null!(behaviour_vec, "got sequential behaviour vec null-pointer");
+            non_null!(fsm, "got fsm behaviour null-pointer");
+            let behaviour_vec = unsafe { ref_from_raw(behaviour_vec) };
+            let behaviour = unsafe { from_raw(fsm) };
             behaviour_vec.add_behaviour(behaviour);
         }
 

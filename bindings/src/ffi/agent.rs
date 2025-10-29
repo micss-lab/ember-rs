@@ -3,7 +3,7 @@ use core::ffi::c_char;
 use ember::Agent;
 
 use super::agent_state::AgentState;
-use super::behaviour::complex::SequentialBehaviour;
+use super::behaviour::complex::{FsmBehaviour, SequentialBehaviour};
 use super::behaviour::simple::{CyclicBehaviour, OneShotBehaviour, TickerBehaviour};
 use super::event::Event;
 use super::util::{drop_raw, from_raw, new, ref_from_raw, string_from_raw};
@@ -71,5 +71,17 @@ pub extern "C" fn agent_add_behaviour_sequential(
     non_null!(sequential, "got sequential behaviour null-pointer");
     let agent = unsafe { ref_from_raw(agent) };
     let behaviour = unsafe { from_raw(sequential) };
+    agent.add_behaviour(behaviour);
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn agent_add_behaviour_fsm(
+    agent: *mut Agent<'static, AgentState, Event>,
+    fsm: *mut FsmBehaviour<Event>,
+) {
+    non_null!(agent, "got agent null-pointer");
+    non_null!(fsm, "got fsm behaviour null-pointer");
+    let agent = unsafe { ref_from_raw(agent) };
+    let behaviour = unsafe { from_raw(fsm) };
     agent.add_behaviour(behaviour);
 }
