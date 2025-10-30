@@ -1,85 +1,77 @@
-# Case study measurements
+# Case Study Measurements
 
-## Smart home distributed (average over 20 launches)
+## Smart Home Distributed (average over 20 launches)
 
-Door Control:
-    - Setup: 1151000 nanoseconds
-    - Setup complete: 24997555000 nanoseconds
-    - Loop: 13051 tps (average)
+| Component      | Platform                | Setup (ns) | Setup Complete (ns) | Loop (tps) |
+|----------------|-------------------------|------------|---------------------|------------|
+| Door Control   | Rust                    | 1,151,000  | 24,997,555,000      | 13,051     |
+| Door Control   | Arduino (without Ember) | -          | -                   | -          |
+| Door Control   | Arduino (with Ember)    | -          | -                   | -          |
+| Center Control | Rust                    | 3,325,000  | 25,633,137,000      | 1,860      |
+| Center Control | Arduino (without Ember) | -          | -                   | -          |
+| Center Control | Arduino (with Ember)    | -          | -                   | -          |
+| Plant Control  | Rust                    | 3,091,000  | 24,226,499,000      | 2,224      |
+| Plant Control  | Arduino (without Ember) | -          | -                   | -          |
+| Plant Control  | Arduino (with Ember)    | -          | -                   | -          |
 
-Center Control:
-    - Setup: 3325000 nanoseconds
-    - Setup complete: 25633137000 nanoseconds
-    - Loop: 1860 tps (average)
+---
 
-Plant Control:
-    - Setup: 3091000 nanoseconds
-    - Setup complete: 24226499000 nanoseconds
-    - Loop: 2224 tps (average)
+## Static vs Dynamic Dispatch
 
-## Static vs Dynamic dispatch
+| Count Target | Platform                | Dispatch Type | Time (ns)       |
+|--------------|-------------------------|---------------|-----------------|
+| 6,000        | Rust                    | Static        | 106,724,000     |
+| 6,000        | Rust                    | Dynamic       | 107,707,000     |
+| 6,000        | Arduino (without Ember) | Static        | -               |
+| 6,000        | Arduino (with Ember)    | Static        | -               |
+| 600,000      | Rust                    | Static        | 10,633,518,000  |
+| 600,000      | Rust                    | Dynamic       | 10,760,725,000  |
+| 600,000      | Arduino (without Ember) | Static        | -               |
+| 600,000      | Arduino (with Ember)    | Static        | -               |
+| 6,000,000    | Rust                    | Static        | 106,331,643,000 |
+| 6,000,000    | Rust                    | Dynamic       | 107,606,350,000 |
+| 6,000,000    | Arduino (without Ember) | Static        | -               |
+| 6,000,000    | Arduino (with Ember)    | Static        | -               |
 
-Count till 6 000.
-
-Static: 106724000 ns
-Dynamic: 107707000 ns
-
-Count till 600 000.
-
-Static: 10633518000 ns
-Dynamic: 10760725000 ns
-
-Count till 6 000 000.
-
-Static: 106331643000 ns
-Dynamic: 107606350000 ns
+---
 
 ## HTTP Server
 
-With ember:
+| Platform                | Setup (ns)    | Setup Complete (ns) | Loop (tps) | Avg (µs) | 1% Low (µs) | 10% Low (µs) | 1% High (µs) | 10% High (µs) |
+|-------------------------|---------------|---------------------|------------|----------|-------------|--------------|--------------|---------------|
+| Rust (with Ember)       | 540,000       | 3,042,097,000       | 3,259      | 123,855  | 40,018      | 53,928       | 390,459      | 219,068       |
+| Rust (without Ember)    | 2,227,104,000 | -                   | 37,340     | 117,028  | 50,403      | 74,684       | 310,216      | 173,505       |
+| Arduino (without Ember) | -             | -                   | -          | -        | -           | -            | -            | -             |
+| Arduino (with Ember)    | -             | -                   | -          | -        | -           | -            | -            | -             |
 
-Setup: 540000 ns
-Setup Complete: 3042097000 ns
-Loop: 3259 tps
-
-average: 123855 µs
-1% low: 40018 µs
-10% low: 53928 µs
-1% high: 390459 µs
-10% high: 219068 µs
-
-Without Ember:
-
-Setup: 2227104000 ns
-Loop: 37340 tps
-
-average: 117028 µs
-1% low: 50403 µs
-10% low: 74684 µs
-1% high: 310216 µs
-10% high: 173505 µs
+---
 
 ## Plant Monitoring System
 
-Setup peripherals: 646000 ns
-Setup ember: 2723000 ns
-Loop: 1761 tps
+| Platform                | Setup Peripherals (ns) | Setup Ember (ns) | Loop (tps) |
+|-------------------------|------------------------|------------------|------------|
+| Rust (with Ember)       | 646,000                | 2,723,000        | 1,761      |
+| Arduino (without Ember) | -                      | -                | -          |
+| Arduino (with Ember)    | -                      | -                | -          |
+
+---
 
 ## Home Automation
 
-Setup peripherals: 549000 ns
-Setup ember: 1169000 ns
-Loop: 4989 tps
+| Platform                | Setup Peripherals (ns) | Setup Ember (ns) | Loop (tps) |
+|-------------------------|------------------------|------------------|------------|
+| Rust (with Ember)       | 549,000                | 1,169,000        | 4,989      |
+| Arduino (without Ember) | -                      | -                | -          |
+| Arduino (with Ember)    | -                      | -                | -          |
+
+---
 
 ## Colour Combinator
 
-With Ember:
+| Platform                | Setup Peripherals (ns) | Setup Ember (ns) | Runtime (ns) |
+|-------------------------|------------------------|------------------|--------------|
+| Rust (with Ember)       | 92,000                 | 1,951,000        | 104,381,000  |
+| Rust (without Ember)    | 72,000                 | -                | 167,000      |
+| Arduino (without Ember) | -                      | -                | -            |
+| Arduino (with Ember)    | -                      | -                | -            |
 
-Setup peripherals: 92000 ns
-Setup Ember: 1951000 ns
-Runtime: 104381000 ns
-
-Without Ember:
-
-Setup peripherals: 72000 ns
-Runtime: 167000 ns
