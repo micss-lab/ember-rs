@@ -45,14 +45,6 @@ mod util {
     }
 }
 
-#[cfg(target_os = "none")]
-mod esp {
-    #[unsafe(no_mangle)]
-    pub extern "C" fn initialize_allocator() {
-        crate::esp::initialize_allocator();
-    }
-}
-
 mod event {
     use core::ffi::c_void;
 

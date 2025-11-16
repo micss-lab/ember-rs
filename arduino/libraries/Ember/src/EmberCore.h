@@ -68,8 +68,6 @@ struct ContentView {
 
 extern "C" {
 
-void initialize_allocator();
-
 Event *event_new(void *event);
 
 void event_free(Event *event);
@@ -297,6 +295,12 @@ MessageFilter *message_filter_ontology(const char *ontology);
  * error, warn, info, debug, trace.
  */
 void initialize_logging(char level);
+
+extern uint8_t *malloc(uintptr_t size);
+
+extern void free(uint8_t *ptr);
+
+extern uint8_t *realloc(uint8_t *ptr, uintptr_t size);
 
 }  // extern "C"
 

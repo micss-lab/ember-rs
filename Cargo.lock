@@ -725,7 +725,6 @@ dependencies = [
  "cfg-if",
  "critical-section",
  "ember",
- "esp-alloc",
  "esp-println",
  "fugit",
  "log",

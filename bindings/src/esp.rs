@@ -1,9 +1,7 @@
 use core::panic::PanicInfo;
+use core::alloc::{GlobalAlloc, Layout};
 
-use esp_alloc as _;
 use esp_println::logger::init_logger;
-
-const HEAP_SIZE: usize = 72 * 1024;
 
 #[panic_handler]
 fn panic(_: &PanicInfo) -> ! {
@@ -15,9 +13,31 @@ pub(crate) fn initialize_logging(level: log::LevelFilter) {
     init_logger(level)
 }
 
-pub(crate) fn initialize_allocator() {
-    esp_alloc::heap_allocator!(HEAP_SIZE);
+unsafe extern "C" {
+    fn malloc(size: usize) -> *mut u8;
+    fn free(ptr: *mut u8);
+    fn realloc(ptr: *mut u8, size: usize) -> *mut u8;
 }
+
+/// Custom allocator delegating to esp-idf-provided functions.
+struct ESPIDFAllocator;
+
+unsafe impl GlobalAlloc for ESPIDFAllocator {
+    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
+        unsafe { malloc(layout.size()) }
+    }
+
+    unsafe fn dealloc(&self, ptr: *mut u8, _layout: Layout) {
+        unsafe { free(ptr) }
+    }
+
+    unsafe fn realloc(&self, ptr: *mut u8, _layout: Layout, new_size: usize) -> *mut u8 {
+        unsafe { realloc(ptr, new_size) }
+    }
+}
+
+#[global_allocator]
+static ALLOCATOR: ESPIDFAllocator = ESPIDFAllocator;
 
 /// Esp32 single core critical section implementation.
 ///

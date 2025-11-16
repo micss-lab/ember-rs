@@ -41,7 +41,6 @@ static void initialize(logging::LogLevel level) {
         return;
     }
     __ffi::initialize_logging((int) level);
-    __ffi::initialize_allocator();
     INITIALIZED = true;
 };
 
