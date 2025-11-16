@@ -5,9 +5,9 @@ default:
     @ just --list
 
 build:
-    cargo build --release --target xtensa-esp32-none-elf --package ember-bindings -Zbuild-std=core,alloc
+    cargo build --verbose --release --target ./xtensa-esp32-arduino-elf.json --package ember-bindings -Zbuild-std=compiler_builtins,core,alloc -Zbuild-std-features=,
 
 update-arduino-lib: build
     echo {{target-dir}}
-    cp {{target-dir}}/xtensa-esp32-none-elf/release/libember.a ../arduino/libraries/Ember/src/esp32/libEmberCore.a
+    cp {{target-dir}}/xtensa-esp32-arduino-elf/release/libember.a ../arduino/libraries/Ember/src/esp32/libEmberCore.a
     cp {{target-dir}}/bindings.hpp ../arduino/libraries/Ember/src/EmberCore.h
