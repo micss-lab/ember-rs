@@ -21,7 +21,7 @@ pub extern "C" fn agent_new(
 
 #[unsafe(no_mangle)]
 pub extern "C" fn agent_free(agent: *mut Agent<AgentState, Event>) {
-    non_null_or_bail!(agent, "attemted to free agent null-pointer");
+    non_null_or_bail!(agent, "attempted to free agent null-pointer");
     unsafe { drop_raw(agent) }
 }
 

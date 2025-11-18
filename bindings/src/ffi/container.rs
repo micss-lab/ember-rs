@@ -20,7 +20,7 @@ pub extern "C" fn container_new() -> *mut Container<'static, 'static> {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn container_free(container: *mut Container) {
-    non_null_or_bail!(container, "attemted to free container null-pointer");
+    non_null_or_bail!(container, "attempted to free container null-pointer");
     unsafe { drop_raw(container) }
 }
 

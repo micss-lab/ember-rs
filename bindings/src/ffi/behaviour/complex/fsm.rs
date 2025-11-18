@@ -265,7 +265,7 @@ pub(in crate::ffi) mod fsm_child_behaviour {
         pub extern "C" fn behaviour_fsm_child_behaviour_oneshot_free(
             oneshot: *mut OneShotBehaviour<FsmEvent<*const c_char, Event>>,
         ) {
-            non_null_or_bail!(oneshot, "attemted to free oneshot behaviour null-pointer");
+            non_null_or_bail!(oneshot, "attempted to free oneshot behaviour null-pointer");
             unsafe { drop_raw(oneshot) };
         }
 

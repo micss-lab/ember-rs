@@ -55,7 +55,7 @@ pub extern "C" fn message_new(
 
 #[unsafe(no_mangle)]
 pub extern "C" fn message_free(message: *mut Message) {
-    non_null_or_bail!(message, "attemted to free message null-pointer");
+    non_null_or_bail!(message, "attempted to free message null-pointer");
     unsafe { drop_raw(message) }
 }
 

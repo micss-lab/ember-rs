@@ -46,7 +46,7 @@ pub(super) mod simple {
 
         #[unsafe(no_mangle)]
         pub extern "C" fn behaviour_oneshot_free(oneshot: *mut OneShotBehaviour<Event>) {
-            non_null_or_bail!(oneshot, "attemted to free oneshot behaviour null-pointer");
+            non_null_or_bail!(oneshot, "attempted to free oneshot behaviour null-pointer");
             unsafe { drop_raw(oneshot) };
         }
     }
@@ -103,7 +103,7 @@ pub(super) mod simple {
 
         #[unsafe(no_mangle)]
         pub extern "C" fn behaviour_cyclic_free(cyclic: *mut CyclicBehaviour<Event>) {
-            non_null_or_bail!(cyclic, "attemted to free cyclic behaviour null-pointer");
+            non_null_or_bail!(cyclic, "attempted to free cyclic behaviour null-pointer");
             unsafe { drop_raw(cyclic) };
         }
     }
@@ -169,7 +169,7 @@ pub(super) mod simple {
 
         #[unsafe(no_mangle)]
         pub extern "C" fn behaviour_ticker_free(ticker: *mut TickerBehaviour<Event>) {
-            non_null_or_bail!(ticker, "attemted to free ticker behaviour null-pointer");
+            non_null_or_bail!(ticker, "attempted to free ticker behaviour null-pointer");
             unsafe { drop_raw(ticker) };
         }
     }
@@ -288,7 +288,7 @@ pub(super) mod complex {
         pub extern "C" fn behaviour_vec_free(behaviour_vec: *mut BehaviourVec<Event>) {
             non_null_or_bail!(
                 behaviour_vec,
-                "attemted to free sequential behaviour behaviour vec null-pointer"
+                "attempted to free sequential behaviour behaviour vec null-pointer"
             );
             unsafe { drop_raw(behaviour_vec) };
         }
