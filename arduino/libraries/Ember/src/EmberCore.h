@@ -288,6 +288,8 @@ MessageFilter *message_filter_performative(char performative);
 
 MessageFilter *message_filter_ontology(const char *ontology);
 
+void message_envelope_free(MessageEnvelope *envelope);
+
 /**
  * Initialize the libraries global logger.
  *
@@ -295,12 +297,6 @@ MessageFilter *message_filter_ontology(const char *ontology);
  * error, warn, info, debug, trace.
  */
 void initialize_logging(char level);
-
-extern uint8_t *malloc(uintptr_t size);
-
-extern void free(uint8_t *ptr);
-
-extern uint8_t *realloc(uint8_t *ptr, uintptr_t size);
 
 }  // extern "C"
 

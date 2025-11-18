@@ -11,6 +11,8 @@ T* copy_vector_to_leaked_array(const std::vector<T>& data) {
     return result;
 }
 
+MessageEnvelope::MessageEnvelope(__ffi::MessageEnvelope* envelope): Object(envelope, __ffi::message_envelope_free) {}
+
 Message::Message(
     Performative performative,
     const std::vector<const char*>& receivers,
@@ -31,7 +33,7 @@ Message::Message(__ffi::Message* inner):
     Object(inner, __ffi::message_free) {}
 
 MessageEnvelope Message::wrap_with_envelope() && {
-    __ffi::message_wrap_with_envelope(this->move_object());
+    return MessageEnvelope(__ffi::message_wrap_with_envelope(this->move_object()));
 }
 
 ContentView Message::get_content() const {

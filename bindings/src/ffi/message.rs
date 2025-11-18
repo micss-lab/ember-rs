@@ -6,11 +6,12 @@ use core::str::FromStr;
 use ember::Aid;
 use ember::message::{Content, Message, MessageEnvelope, Performative, Receiver};
 
-use crate::ffi::util::{drop_raw, from_raw};
+use crate::ffi::util::{drop_raw, from_raw, ref_from_raw};
 
 use super::util::new;
 
 mod filter;
+mod envelope;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn message_new(
@@ -74,8 +75,8 @@ pub struct ContentView {
 #[unsafe(no_mangle)]
 pub extern "C" fn message_get_content(message: *mut Message) -> ContentView {
     non_null!(message, "got message null-pointer");
-    let message = unsafe { from_raw(message) };
-    let Content::Bytes(content) = &message.content else {
+    let message = unsafe { ref_from_raw(message) };
+    let Content::Bytes(ref content) = message.content else {
         unimplemented!("message content can only be bytes");
     };
     ContentView {

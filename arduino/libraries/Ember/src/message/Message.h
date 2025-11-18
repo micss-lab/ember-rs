@@ -14,7 +14,10 @@ namespace ember {
 namespace message {
 
 class MessageEnvelope:
-    public Object<__ffi::MessageEnvelope> {};
+    public Object<__ffi::MessageEnvelope> {
+  public:
+    MessageEnvelope(__ffi::MessageEnvelope*);
+};
 
 
 enum class Performative {

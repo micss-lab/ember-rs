@@ -1,11 +1,11 @@
 use core::panic::PanicInfo;
-use core::alloc::{GlobalAlloc, Layout};
 
 use esp_println::logger::init_logger;
 
 #[panic_handler]
-fn panic(_: &PanicInfo) -> ! {
+fn panic(p: &PanicInfo) -> ! {
     log::error!("Got panic!");
+    log::error!("{}", p);
     loop {}
 }
 
