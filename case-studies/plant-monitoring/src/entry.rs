@@ -11,8 +11,12 @@
 //!     - [ ] buzzer
 //!     - [x] user switch: enable the pump manually
 
-use alloc::rc::Rc;
-use core::cell::RefCell;
+#[cfg(feature = "ember-based")]
+use {
+    alloc::rc::Rc,
+    core::cell::RefCell,
+};
+
 
 use esp_backtrace as _;
 
@@ -154,11 +158,15 @@ pub fn main() {
             let mut light_alert_pin = light_alert_pin;
             let mut user_switch = user_switch;
 
-            let last_print_time = esp_hal::time::now();
+            let mut last_print_time = esp_hal::time::now();
 
             let mut notification_checker = without_ember::NotificationChecker::default();
 
+            let mut ticks = 0;
+
             loop {
+                ticks += 1;
+
                 // float temperature = dht.readTemperature();
                 // float humidity = dht.readHumidity();
                 let Measurement {temperature, humidity} = measurements.next().expect("program cannot continue without dht measurements");
@@ -183,6 +191,9 @@ pub fn main() {
                 // }
                 if (esp_hal::time::now() - last_print_time).to_secs() >= 1 {
                     without_ember::print_sensor_values(temperature, humidity, light_lux, moisture);
+                    log::debug!("Tps: {}", ticks);
+                    ticks = 0;
+                    last_print_time = esp_hal::time::now();
                 }
 
                 // handleLightAlert(mappedLuxGauge);
@@ -194,9 +205,6 @@ pub fn main() {
                 // checkMoistureNotification(mappedMoistureLevel);
                 notification_checker.check_light(light_lux);
                 notification_checker.check_moisture(moisture);
-
-                let start = esp_hal::time::now();
-                while (start - esp_hal::time::now()).to_secs() < 1 {}
             }
         }
     }
