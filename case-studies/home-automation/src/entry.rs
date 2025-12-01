@@ -131,7 +131,7 @@ pub fn main() {
 
             let mut object_detected = false;
 
-            let mut serial_rx = serial_rx;
+            let mut serial_rx = uart_rx;
             let mut pir_pin = pir_pin;
 
             let mut unlock = || {
@@ -146,7 +146,7 @@ pub fn main() {
 
                 if password == LOCK_PASSWORD {
                     log::info!("Password correct, unlocking!");
-                    door = false;
+                    door_locked = false;
                 } else {
                     log::debug!("password: {password:?}");
                     log::debug!("set password: {:?}", LOCK_PASSWORD);
@@ -157,16 +157,16 @@ pub fn main() {
             loop {
                 object_detected = pir_pin.is_high();
 
-                if !door_locked && !object_detected && (esp_hal::time::now() - unlock_at).to_secs() >= 5 {
+                if !door_locked && !object_detected && (esp_hal::time::now() - unlocked_at).to_secs() >= 5 {
                     log::info!("Automatically locking door.");
-                    door_locked = true;
+                    *door_locked = true;
                 }
 
                 if unlock_button.is_low() && door_locked {
                     log::info!("Unlock button pressed.");
                     unlock();
 
-                    unlock_at = esp_hal::time::now();
+                    unlocked_at = esp_hal::time::now();
                 }
             }
         }

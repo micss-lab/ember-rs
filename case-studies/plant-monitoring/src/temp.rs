@@ -3,7 +3,6 @@ use ember::{
     behaviour::{Context, TickerBehaviour},
     message::{Message, Performative, Receiver},
 };
-use serde::{Deserialize, Serialize};
 
 use crate::Measurement;
 
