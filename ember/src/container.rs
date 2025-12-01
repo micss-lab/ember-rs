@@ -53,6 +53,14 @@ impl Container<'_, '_> {
         );
         self.ams.update(&mut context);
         self.ams.perform_platform_actions(&mut self.ladt);
+
+        // Handle all messages the agent wants to send.
+        for message in context.message_outbox.into_iter() {
+            self.mts.send_message(message, &mut self.ladt);
+        }
+
+        self.return_unhandled_messages(Aid::ams().local_name(), context.message_inbox);
+
         Ok(())
     }
 
