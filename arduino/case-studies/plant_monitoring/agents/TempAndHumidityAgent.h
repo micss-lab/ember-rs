@@ -24,14 +24,26 @@ struct Measurement {
     static Measurement decode_message(const ember::message::Message& message) {
         Measurement measurement{};
         ember::message::ContentView content = message.get_content();
-        memcpy(&measurement, content.data, sizeof(Measurement));
+        
+        // Deserialize each field individually
+        memcpy(&measurement.temperature, content.data, sizeof(float));
+        memcpy(&measurement.humidity, content.data + sizeof(float), sizeof(float));
+        
         return measurement;
     }
 
     ember::message::Message into_message() const {
-        std::vector<uint8_t> content{sizeof(Measurement)};
-        memcpy(content.data(), this, sizeof(Measurement));
-        return ember::message::Message(ember::message::Performative::Inform, {"control@local"}, temp_and_humidity_ontology(), content);
+        // Serialize each field individually (total size: 2 floats)
+        std::vector<uint8_t> content(2 * sizeof(float));
+        memcpy(content.data(), &this->temperature, sizeof(float));
+        memcpy(content.data() + sizeof(float), &this->humidity, sizeof(float));
+        
+        return ember::message::Message(
+            ember::message::Performative::Inform, 
+            {"control@local"}, 
+            temp_and_humidity_ontology(), 
+            content
+        );
     }
 };
 

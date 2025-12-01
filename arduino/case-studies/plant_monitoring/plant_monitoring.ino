@@ -3,14 +3,14 @@
 /******************************************
   Pin Definitions
 ******************************************/
-#define DHTPIN 14
-#define DHTTYPE DHT22
+
 #define LDR_PIN 34
 #define POTENTIOMETER_PIN 32
 #define WATER_PUMP_PIN 27
 #define LIGHT_ALERT_PIN 16
 #define USER_SWITCH_PIN 33
 #define LCD_SWITCH_PIN 35
+#define BUZZER_PIN 3
 
 #include "./common.h"
 
@@ -21,7 +21,10 @@
 #include "./agents/PumpAgent.h"
 #include "./agents/TempAndHumidityAgent.h"
 #else
-#include <Dht.h>
+#include <DHT.h>
+#define DHTPIN 14
+#define DHTTYPE DHT22
+DHT dht(DHTPIN, DHTTYPE);
 #include "./without_ember.h"
 #endif // USE_EMBER
 
@@ -36,6 +39,8 @@ unsigned int ticks = 0;
   Setup
 ******************************************/
 void setup() {
+  heap_caps_check_integrity_all(true);
+
   const unsigned long start_micros = micros();
 
   Serial.begin(115200);
@@ -130,13 +135,11 @@ void loop() {
   }
 
   handleLightAlert(mappedLuxGauge);
-  handlePumpControl(effectivePumpSwitch, rawMoisture);
+  handlePumpControl(digitalRead(USER_SWITCH_PIN) == HIGH, rawMoisture);
   checkTemperatureAlert(temperature);
   checkHumidityNotification(humidity);
   checkLightNotification(mappedLuxGauge);
   checkMoistureNotification(mappedMoistureLevel);
-
-  delay(1000);
 
   #endif // USE_EMBER
 }

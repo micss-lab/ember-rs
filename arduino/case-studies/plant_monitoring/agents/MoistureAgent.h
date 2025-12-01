@@ -19,13 +19,13 @@ struct MoisturePercent {
     static MoisturePercent decode_message(ember::message::Message message) {
         MoisturePercent moisture{};
         ember::message::ContentView content = message.get_content();
-        memcpy(&moisture, content.data, sizeof(MoisturePercent));
+        memcpy(&moisture.value, content.data, sizeof(float));
         return moisture;
     }
 
     ember::message::Message into_message() const {
-        std::vector<uint8_t> content{sizeof(MoisturePercent)};
-        memcpy(content.data(), this, sizeof(MoisturePercent));
+        std::vector<uint8_t> content(sizeof(float));
+        memcpy(content.data(), &this->value, sizeof(float));
         return ember::message::Message(ember::message::Performative::Request, {"control@local"}, moisture_ontology(), content);
     }
 

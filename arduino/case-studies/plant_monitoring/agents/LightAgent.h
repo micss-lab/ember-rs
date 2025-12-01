@@ -3,6 +3,10 @@
 #ifndef LIGHT_AGENT_H
 #define LIGHT_AGENT_H
 
+#include <sstream>
+#include <iomanip>
+#include <limits>
+
 #include "Ember.h"
 
 namespace agents::light {
@@ -19,13 +23,13 @@ struct LightLevel {
     static LightLevel decode_message(const ember::message::Message& message) {
         LightLevel light_level{};
         ember::message::ContentView content = message.get_content();
-        memcpy(&light_level, content.data, sizeof(LightLevel));
+        memcpy(&light_level.lux, content.data, sizeof(float));
         return light_level;
     }
 
     ember::message::Message into_message() const {
-        std::vector<uint8_t> content{sizeof(LightLevel)};
-        memcpy(content.data(), this, sizeof(LightLevel));
+        std::vector<uint8_t> content(sizeof(float));
+        memcpy(content.data(), &this->lux, sizeof(float));
         return ember::message::Message(ember::message::Performative::Inform, {"control@local"}, light_ontology(), content);
     }
 };

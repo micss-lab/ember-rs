@@ -30,19 +30,31 @@ struct PumpAction {
         return PumpAction {.value = PumpActionValue::Deactivate};
     }
 
-    static PumpAction decode_message(ember::message::Message message) {
+    static PumpAction decode_message(const ember::message::Message& message) {
         PumpAction pump_action{};
         ember::message::ContentView content = message.get_content();
-        memcpy(&pump_action, content.data, sizeof(PumpAction));
+        
+        // Deserialize only the enum value (uint8_t)
+        uint8_t enum_value = 0;
+        memcpy(&enum_value, content.data, sizeof(uint8_t));
+        pump_action.value = static_cast<PumpActionValue>(enum_value);
+        
         return pump_action;
     }
 
     ember::message::Message into_message() const {
-        std::vector<uint8_t> content{sizeof(PumpAction)};
-        memcpy(content.data(), this, sizeof(PumpAction));
-        return ember::message::Message(ember::message::Performative::Request, {"pump@local"}, pump_ontology(), content);
+        // Serialize only the enum value (uint8_t)
+        std::vector<uint8_t> content(sizeof(uint8_t));
+        uint8_t enum_value = static_cast<uint8_t>(this->value);
+        memcpy(content.data(), &enum_value, sizeof(uint8_t));
+        
+        return ember::message::Message(
+            ember::message::Performative::Request, 
+            {"pump@local"}, 
+            pump_ontology(), 
+            content
+        );
     }
-
 };
 
 struct PumpStatus {
@@ -57,7 +69,7 @@ struct PumpStatus {
     }
 
     ember::message::Message into_message() const {
-        std::vector<uint8_t> content{sizeof(PumpStatus)};
+        std::vector<uint8_t> content(sizeof(PumpStatus));
         memcpy(content.data(), this, sizeof(PumpStatus));
         return ember::message::Message(ember::message::Performative::Inform, {"control@local"}, pump_ontology(), content);
     }

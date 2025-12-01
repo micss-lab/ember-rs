@@ -165,18 +165,18 @@ class ControlStatePrinter:
     }
 
     void action(ember::behaviour::Context<>& context, ControlState& agent_state) override {
-        Serial.println("-----------------------------");
-        Serial.print("Temperature: ");
-        Serial.println(agent_state.temperature);
-        Serial.print("Humidity: ");
-        Serial.println(agent_state.humidity);
-        Serial.print("Light: ");
-        Serial.println(agent_state.light);
-        Serial.print("Moisture: ");
-        Serial.println(agent_state.moisture);
-        Serial.print("Pump Active: ");
-        Serial.println(agent_state.pump_active);
-        Serial.println("-----------------------------"); 
+        // Serial.println("-----------------------------");
+        // Serial.print("Temperature: ");
+        // Serial.println(agent_state.temperature);
+        // Serial.print("Humidity: ");
+        // Serial.println(agent_state.humidity);
+        // Serial.print("Light: ");
+        // Serial.println(agent_state.light);
+        // Serial.print("Moisture: ");
+        // Serial.println(agent_state.moisture);
+        // Serial.print("Pump Active: ");
+        // Serial.println(agent_state.pump_active);
+        // Serial.println("-----------------------------"); 
     }
 
     bool is_finished() const override {
@@ -195,7 +195,7 @@ ember::Agent<ControlState> create_control_agent(unsigned int user_switch_pin) {
     control_agent.add_behaviour(std::move(moisture_receiver));
     control_agent.add_behaviour(std::move(light_receiver));
     control_agent.add_behaviour(std::move(pump_status_receiver));
-    control_agent.add_behaviour(std::move(control_state_printer));
+    // control_agent.add_behaviour(std::move(control_state_printer));
     return std::move(control_agent);
 }
 
