@@ -57,16 +57,26 @@ void unlock() {
 
 #endif // USE_EMBER
 
+unsigned long current_time = micros();
+unsigned int ticks = 0;
+
 /******************************************
   Setup
 ******************************************/
 void setup() {
+  const unsigned long start_micros = micros();
+
   Serial.begin(115200);
 
   pinMode(PIR_PIN, INPUT);
   pinMode(UNLOCK_BUTTON_PIN, INPUT_PULLUP);
 
+  Serial.print("Peripheral setup: ");
+  Serial.println(micros() - start_micros);
+
   #ifdef USE_EMBER
+
+  const unsigned long ember_setup_micros = micros();
 
   // Initialize the embers required resources.
   ember::initialize(ember::logging::LogLevel::Debug);
@@ -80,6 +90,9 @@ void setup() {
   container->add_agent(std::move(lock_agent));
   container->add_agent(std::move(pir_agent));
 
+  Serial.print("Ember setup: ");
+  Serial.println(micros() - ember_setup_micros);
+
   #endif // USE_EMBER
 
   Serial.println("Door Lock System Initialized");
@@ -89,6 +102,16 @@ void setup() {
   Loop
 ******************************************/
 void loop() {
+  ticks += 1;
+  const unsigned long new_time = micros();
+  if (static_cast<float>(new_time - current_time) / 1e6 >= 1.0) {
+    Serial.print("tps: ");
+    Serial.println(ticks);
+
+    ticks = 0;
+    current_time = new_time;
+  }
+
   #ifdef USE_EMBER
 
   ember::Container::PollResult result = container->poll();

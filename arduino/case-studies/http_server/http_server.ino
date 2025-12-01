@@ -92,14 +92,24 @@ std::tuple<std::string, uint16_t> handle_request(
 
 #endif // USE_EMBER
 
+unsigned long current_time = micros();
+unsigned int ticks = 0;
+
 void setup(void) {
+  const unsigned long start_micros = micros();
+
   Serial.begin(115200);
   pinMode(LED1, OUTPUT);
   pinMode(LED2, OUTPUT);
 
   utils::connect_wifi(WIFI_SSID, WIFI_PASSWORD, true);
 
+  Serial.print("Peripheral setup: ");
+  Serial.println(micros() - start_micros);
+
   #ifdef USE_EMBER
+
+  const unsigned long ember_setup_micros = micros();
 
   // Initialize the embers required resources.
   ember::initialize(ember::logging::LogLevel::Debug);
@@ -111,6 +121,9 @@ void setup(void) {
   web_server_agent.add_behaviour(std::make_unique<WebServer<ember::Unit>>(handle_request, 80));
 
   container->add_agent(std::move(web_server_agent));
+
+  Serial.print("Ember setup: ");
+  Serial.println(micros() - ember_setup_micros);
 
   #else
   
@@ -144,6 +157,16 @@ void setup(void) {
 }
 
 void loop(void) {
+  ticks += 1;
+  const unsigned long new_time = micros();
+  if (static_cast<float>(new_time - current_time) / 1e6 >= 1.0) {
+    Serial.print("tps: ");
+    Serial.println(ticks);
+
+    ticks = 0;
+    current_time = new_time;
+  }
+
   #ifdef USE_EMBER
   
   ember::Container::PollResult result = container->poll();
