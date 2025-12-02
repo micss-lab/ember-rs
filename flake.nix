@@ -59,6 +59,9 @@
             pkgs.jq
 
             vscode
+
+            pkgs.pkg-config
+            pkgs.openssl
           ];
 
           RUST_SRC_PATH = "${devRustToolchain}/lib/rustlib/src/rust/library";
@@ -69,6 +72,7 @@
             export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [
               pkgs.stdenv.cc.cc.lib
               pkgs.zlib
+              pkgs.openssl
             ]}";
           '';
         });

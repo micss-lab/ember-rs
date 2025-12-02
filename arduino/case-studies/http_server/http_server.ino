@@ -78,6 +78,7 @@ String format_html () {
   )";
   response.replace("LED1_TEXT", led1State ? "ON" : "OFF");
   response.replace("LED2_TEXT", led2State ? "ON" : "OFF");
+  return response;
 }
 
 #ifdef USE_EMBER
@@ -128,7 +129,7 @@ void setup(void) {
   #else
   
   server.on("/", []() {
-    server.send(200, "text/html", format_html())
+    server.send(200, "text/html", format_html());
   });
 
   server.on(UriBraces("/toggle/{}"), []() {
@@ -147,7 +148,7 @@ void setup(void) {
         break;
     }
 
-    server.send(200, "text/html", format_html())
+    server.send(200, "text/html", format_html());
   });
 
   server.begin();

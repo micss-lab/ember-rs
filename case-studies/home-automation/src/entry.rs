@@ -134,7 +134,7 @@ pub fn main() {
             let mut serial_rx = uart_rx;
             let mut pir_pin = pir_pin;
 
-            let mut unlock = || {
+            let mut unlock = || -> bool {
                 use bstr::ByteSlice;
 
                 log::info!("Unlocking door, enter password:");
@@ -146,27 +146,38 @@ pub fn main() {
 
                 if password == LOCK_PASSWORD {
                     log::info!("Password correct, unlocking!");
-                    door_locked = false;
+                    return true;
                 } else {
                     log::debug!("password: {password:?}");
                     log::debug!("set password: {:?}", LOCK_PASSWORD);
                     log::info!("Incorrect password, door remains locked.");
+                    return false;
                 }
             };
+
+            let mut ticks = 0;
+            let mut last_print = esp_hal::time::now();
 
             loop {
                 object_detected = pir_pin.is_high();
 
                 if !door_locked && !object_detected && (esp_hal::time::now() - unlocked_at).to_secs() >= 5 {
                     log::info!("Automatically locking door.");
-                    *door_locked = true;
+                    door_locked = true;
                 }
 
                 if unlock_button.is_low() && door_locked {
                     log::info!("Unlock button pressed.");
-                    unlock();
+                    door_locked = !unlock();
 
                     unlocked_at = esp_hal::time::now();
+                }
+
+                ticks += 1;
+                if (esp_hal::time::now() - last_print).to_secs() >= 1 {
+                    last_print = esp_hal::time::now();
+                    log::debug!("Tps: {}", ticks);
+                    ticks = 0;
                 }
             }
         }
