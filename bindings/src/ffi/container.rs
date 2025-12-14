@@ -1,7 +1,9 @@
+use alloc::boxed::Box;
 use ember::{Agent, Container};
 
 use crate::ffi::util::{drop_raw, ref_from_raw};
 
+use super::acc::CustomAcc;
 use super::agent_state::AgentState;
 use super::event::Event;
 use super::util::{from_raw, new};
@@ -33,6 +35,14 @@ pub extern "C" fn container_add_agent(
     non_null!(agent, "got agent null-pointer");
     let agent = unsafe { from_raw(agent) };
     unsafe { (*container).add_agent(agent) };
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn container_enable_custom_acc(container: *mut Container, acc: *mut CustomAcc) {
+    non_null!(container, "got container null-pointer");
+    non_null!(acc, "got acc null-pointer");
+    let acc = unsafe { Box::from_raw(acc) };
+    unsafe { (*container).enable_custom_acc(acc) };
 }
 
 #[unsafe(no_mangle)]

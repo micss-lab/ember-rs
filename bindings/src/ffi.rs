@@ -89,6 +89,7 @@ mod agent_state {
     }
 }
 
+mod acc;
 mod agent;
 mod behaviour;
 mod container;

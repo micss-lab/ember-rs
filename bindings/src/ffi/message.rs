@@ -10,8 +10,8 @@ use crate::ffi::util::{drop_raw, from_raw, ref_from_raw};
 
 use super::util::new;
 
-mod filter;
 mod envelope;
+mod filter;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn message_new(
