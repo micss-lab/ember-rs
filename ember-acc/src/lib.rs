@@ -4,6 +4,8 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+#[cfg(feature = "custom")]
+use alloc::boxed::Box;
 use core::marker::PhantomData;
 
 use ember_core::agent::aid::Aid;
@@ -31,6 +33,9 @@ pub struct Channels<'c> {
     http: Option<HttpChannel>,
     #[cfg(feature = "espnow")]
     espnow: Option<EspNowChannel<'c>>,
+    #[cfg(feature = "custom")]
+    custom: Option<Box<dyn Acc + 'c>>,
+
     _lifetime: PhantomData<&'c ()>,
 }
 
@@ -40,7 +45,7 @@ impl Channels<'_> {
     }
 }
 
-impl Channels<'_> {
+impl<'c> Channels<'c> {
     #[cfg(feature = "http")]
     pub fn enable_http(&mut self, port: u16) {
         if self.http.is_some() {
@@ -49,9 +54,7 @@ impl Channels<'_> {
         }
         self.http = Some(HttpChannel::new(port));
     }
-}
 
-impl<'c> Channels<'c> {
     #[cfg(feature = "espnow")]
     pub fn enable_espnow(
         &mut self,
@@ -64,6 +67,14 @@ impl<'c> Channels<'c> {
         }
         self.espnow = Some(EspNowChannel::new(sender, receiver));
     }
+
+    #[cfg(feature = "custom")]
+    pub fn enable_custom(&mut self, custom: Box<dyn Acc + 'c>) {
+        if self.custom.is_some() {
+            log::warn!("Custom access channel already enabled. Nothing changed.");
+        }
+        self.custom = Some(custom);
+    }
 }
 
 impl Acc for Channels<'_> {
@@ -75,6 +86,8 @@ impl Acc for Channels<'_> {
                     .map_or(Err(()), |http| http.send(address, message))
             } else if #[cfg(feature = "espnow")] {
                 self.espnow.as_mut().map_or(Err(()), |espnow| espnow.send(address, message))
+            } else if #[cfg(feature = "custom")] {
+                self.custom.as_mut().map_or(Err(()), |custom| custom.send(address, message))
             } else {
                 let _ = (address, message);
                 Ok(())
@@ -88,6 +101,8 @@ impl Acc for Channels<'_> {
                 self.http.as_mut()?.receive()
             } else if #[cfg(feature = "espnow")] {
                 self.espnow.as_mut()?.receive()
+            } else if #[cfg(feature = "custom")] {
+                self.custom.as_mut()?.receive()
             } else {
                 None
             }

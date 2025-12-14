@@ -1,3 +1,5 @@
+#[cfg(feature = "acc-custom")]
+use alloc::boxed::Box;
 use alloc::collections::BTreeSet;
 
 #[cfg(feature = "acc-espnow")]
@@ -71,20 +73,23 @@ impl Mts<'_> {
     }
 }
 
-impl Mts<'_> {
+impl<'c> Mts<'c> {
     #[cfg(feature = "acc-http")]
     pub(super) fn enable_http(&mut self, port: u16) {
         self.channels.enable_http(port);
     }
-}
 
-impl<'c> Mts<'c> {
     #[cfg(feature = "acc-espnow")]
     pub(super) fn enable_espnow(
         &mut self,
         sender: Option<esp_now::EspNowSender<'c>>,
         receiver: Option<esp_now::EspNowReceiver<'c>>,
     ) {
-        self.channels.enable_espnow(sender, receiver)
+        self.channels.enable_espnow(sender, receiver);
+    }
+
+    #[cfg(feature = "acc-custom")]
+    pub(super) fn enable_custom_acc(&mut self, custom: Box<dyn Acc + 'c>) {
+        self.channels.enable_custom(custom);
     }
 }

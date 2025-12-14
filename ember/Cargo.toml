@@ -16,4 +16,5 @@ esp-wifi = { version = "0.12", features = ["esp-now"], optional = true }
 std = ["ember-time/std"]
 acc-espnow = ["ember-acc/espnow", "dep:esp-wifi"]
 acc-http = ["std", "ember-acc/http"]
+acc-custom = ["ember-acc/custom"]
 esp32 = ["ember-time/esp32"]

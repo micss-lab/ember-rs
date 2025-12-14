@@ -50,6 +50,7 @@ espnow = [
     "dep:postcard",
     "dep:serde",
 ]
+custom = []
 
 [lints.clippy]
 uninlined_format_args = { level = "allow" }

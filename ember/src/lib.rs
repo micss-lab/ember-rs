@@ -13,6 +13,10 @@ pub use ember_core::message;
 pub use self::agent::Agent;
 pub use self::container::Container;
 
+pub mod channels {
+    pub use ember_acc::Acc;
+}
+
 mod adt;
 mod agent;
 mod container;

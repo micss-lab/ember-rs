@@ -151,22 +151,45 @@ impl<'a> Container<'a, '_> {
     }
 }
 
-impl Container<'_, '_> {
+impl<'c> Container<'_, 'c> {
+    #[cfg(feature = "acc-http")]
+    pub fn enable_http(&mut self, port: u16) {
+        self.mts.enable_http(port);
+    }
+
     #[cfg(feature = "acc-http")]
     pub fn with_http(mut self, port: u16) -> Self {
-        self.mts.enable_http(port);
+        self.enable_http(port);
         self
     }
-}
 
-impl<'c> Container<'_, 'c> {
+    #[cfg(feature = "acc-espnow")]
+    pub fn enable_espnow(
+        &mut self,
+        sender: Option<esp_now::EspNowSender<'c>>,
+        receiver: Option<esp_now::EspNowReceiver<'c>>,
+    ) {
+        self.mts.enable_espnow(sender, receiver);
+    }
+
     #[cfg(feature = "acc-espnow")]
     pub fn with_espnow(
         mut self,
         sender: Option<esp_now::EspNowSender<'c>>,
         receiver: Option<esp_now::EspNowReceiver<'c>>,
     ) -> Self {
-        self.mts.enable_espnow(sender, receiver);
+        self.enable_espnow(sender, receiver);
+        self
+    }
+
+    #[cfg(feature = "acc-custom")]
+    pub fn enable_custom_acc(&mut self, custom: Box<dyn ember_acc::Acc + 'c>) {
+        self.mts.enable_custom_acc(custom);
+    }
+
+    #[cfg(feature = "acc-custom")]
+    pub fn with_custom_acc(mut self, custom: Box<dyn ember_acc::Acc + 'c>) -> Self {
+        self.enable_custom_acc(custom);
         self
     }
 }
