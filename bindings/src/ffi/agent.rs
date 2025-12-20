@@ -1,6 +1,6 @@
-use core::ffi::c_char;
+use core::ffi::{CStr, c_char};
 
-use ember::Agent;
+use ember::{Agent, Aid};
 
 use super::agent_state::AgentState;
 use super::behaviour::complex::{FsmBehaviour, SequentialBehaviour};
@@ -84,4 +84,14 @@ pub extern "C" fn agent_add_behaviour_fsm(
     let agent = unsafe { ref_from_raw(agent) };
     let behaviour = unsafe { from_raw(fsm) };
     agent.add_behaviour(behaviour);
+}
+
+pub(in crate::ffi) unsafe fn aid_from_c_str_pointer(aid: *const u8) -> Aid {
+    use core::str::FromStr;
+    Aid::from_str(unsafe {
+        CStr::from_ptr(aid)
+            .to_str()
+            .expect("aid string should be valid utf-8")
+    })
+    .expect("failed to parse string as aid")
 }

@@ -1,12 +1,15 @@
+use core::ffi::c_char;
+
 use alloc::boxed::Box;
 use ember::{Agent, Container};
 
 use crate::ffi::util::{drop_raw, ref_from_raw};
 
 use super::acc::CustomAcc;
+use super::agent::aid_from_c_str_pointer;
 use super::agent_state::AgentState;
 use super::event::Event;
-use super::util::{from_raw, new};
+use super::util::{from_raw, new, string_from_raw};
 
 /// Creates a new container instance.
 ///
@@ -35,6 +38,19 @@ pub extern "C" fn container_add_agent(
     non_null!(agent, "got agent null-pointer");
     let agent = unsafe { from_raw(agent) };
     unsafe { (*container).add_agent(agent) };
+}
+
+#[unsafe(no_mangle)]
+pub extern "C" fn container_add_agent_proxy(
+    container: *mut Container,
+    local_name: *const c_char,
+    aid: *const c_char,
+) {
+    non_null!(container, "got container null-pointer");
+    let container = unsafe { ref_from_raw(container) };
+    let local_name = unsafe { string_from_raw(local_name) };
+    let aid = unsafe { aid_from_c_str_pointer(aid) };
+    container.add_agent_proxy(local_name, aid);
 }
 
 #[unsafe(no_mangle)]

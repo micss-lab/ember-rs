@@ -1,14 +1,11 @@
 use alloc::string::ToString;
 use alloc::vec::Vec;
 use core::ffi::{CStr, c_char};
-use core::str::FromStr;
 
-use ember::Aid;
 use ember::message::{Content, Message, MessageEnvelope, Performative, Receiver};
 
-use crate::ffi::util::{drop_raw, from_raw, ref_from_raw};
-
-use super::util::new;
+use super::agent::aid_from_c_str_pointer;
+use super::util::{drop_raw, from_raw, new, ref_from_raw};
 
 mod envelope;
 mod filter;
@@ -112,13 +109,4 @@ fn performative_from_c_char(performative: c_char) -> Performative {
         22 => Performative::Unknown,
         _ => unreachable!("performative from ffi out of range"),
     }
-}
-
-unsafe fn aid_from_c_str_pointer(aid: *const u8) -> Aid {
-    Aid::from_str(unsafe {
-        CStr::from_ptr(aid)
-            .to_str()
-            .expect("aid string should be valid utf-8")
-    })
-    .expect("failed to parse string as aid")
 }
