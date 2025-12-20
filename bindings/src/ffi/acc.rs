@@ -11,7 +11,7 @@ use crate::ffi::util::{from_raw, new};
 pub struct CustomAcc {
     /// Type value defined by the user implementing the trait.
     inner: *mut c_void,
-    send: extern "C" fn(*mut c_void, *const c_char, *const MessageEnvelope) -> bool,
+    send: extern "C" fn(*mut c_void, *const c_char, *mut MessageEnvelope) -> bool,
     receive: extern "C" fn(*mut c_void) -> *mut MessageEnvelope,
 }
 
@@ -22,7 +22,7 @@ impl Acc for CustomAcc {
             CString::new(aid.to_string())
                 .expect("aid should be a valid c string")
                 .as_ptr(),
-            core::ptr::from_ref(&message),
+            new(message),
         )
         .then_some(())
         .ok_or(())
@@ -40,7 +40,7 @@ impl Acc for CustomAcc {
 #[unsafe(no_mangle)]
 pub extern "C" fn acc_custom_acc_new(
     inner: *mut c_void,
-    send: extern "C" fn(*mut c_void, *const c_char, *const MessageEnvelope) -> bool,
+    send: extern "C" fn(*mut c_void, *const c_char, *mut MessageEnvelope) -> bool,
     receive: extern "C" fn(*mut c_void) -> *mut MessageEnvelope,
 ) -> *mut CustomAcc {
     new(CustomAcc {
