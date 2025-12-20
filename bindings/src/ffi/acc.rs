@@ -1,6 +1,7 @@
+use alloc::ffi::CString;
+use alloc::string::ToString;
 use core::ffi::{c_char, c_void};
 
-use alloc::string::ToString;
 use ember::Aid;
 use ember::channels::Acc;
 use ember::message::MessageEnvelope;
@@ -18,7 +19,9 @@ impl Acc for CustomAcc {
     fn send(&mut self, aid: &Aid, message: MessageEnvelope) -> Result<(), ()> {
         (self.send)(
             self.inner,
-            aid.to_string().as_ptr(),
+            CString::new(aid.to_string())
+                .expect("aid should be a valid c string")
+                .as_ptr(),
             core::ptr::from_ref(&message),
         )
         .then_some(())

@@ -725,10 +725,12 @@ dependencies = [
  "cfg-if",
  "critical-section",
  "ember",
+ "ember-acc",
  "esp-println",
  "fugit",
  "log",
  "portable-atomic",
+ "postcard",
  "xtensa-lx 0.12.0",
 ]
 
