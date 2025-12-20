@@ -21,6 +21,26 @@ mod espnow;
 #[cfg(feature = "http")]
 mod http;
 
+#[cfg(any(feature = "serde-espnow", feature = "serde-http"))]
+pub mod serde;
+
+pub mod util {
+    use macaddr::MacAddr6;
+
+    use ember_core::agent::aid::Aid;
+
+    pub fn aid_to_mac(aid: &Aid) -> [u8; 6] {
+        use ember_core::agent::aid::AgentPlatform::*;
+        let mac = match aid.platform() {
+            Local => panic!("espnow channel does not support sending messages to localhost"),
+            Public(p) => p
+                .parse::<MacAddr6>()
+                .expect("failed to parse destination platform as mac address"),
+        };
+        mac.into_array()
+    }
+}
+
 pub trait Acc {
     fn send(&mut self, aid: &Aid, message: MessageEnvelope) -> Result<(), ()>;
 

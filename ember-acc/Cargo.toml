@@ -21,7 +21,7 @@ tiny_http = { version = "0.12", optional = true }
 ureq = { version = "3.0", default-features = false, optional = true }
 serde_bencode = { version = "0.2", optional = true }
 
-esp-hal = { version = "0.23", features = ["unstable"], optional = true }
+esp-hal = { version = "0.23", default-features = false, features = ["unstable"], optional = true }
 esp-wifi = { version = "0.12", features = ["esp32", "esp-now"], optional = true }
 macaddr = { version = "1.0", default-features = false, features = ["serde"], optional = true }
 postcard = { version = "1.1", default-features = false, features = ["alloc"], optional = true }
@@ -30,27 +30,34 @@ postcard = { version = "1.1", default-features = false, features = ["alloc"], op
 std = []
 http = [
     "std",
+    "serde-http",
 
     "dep:bstr",
     "dep:bytes",
-    "dep:chrono",
     "dep:hex",
     "dep:multipart",
     "dep:rand",
-    "dep:serde",
     "dep:serde_bencode",
     "dep:tiny_http",
     "dep:ureq",
 ]
 espnow = [
-    "dep:chrono",
+    "serde-espnow",
+
     "dep:esp-hal",
     "dep:esp-wifi",
-    "dep:macaddr",
     "dep:postcard",
-    "dep:serde",
 ]
 custom = []
+serde-http = [
+    "dep:chrono",
+    "dep:serde",
+]
+serde-espnow = [
+    "dep:chrono",
+    "dep:macaddr",
+    "dep:serde",
+]
 
 [lints.clippy]
 uninlined_format_args = { level = "allow" }
