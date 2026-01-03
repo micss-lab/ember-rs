@@ -1,0 +1,4 @@
+[wokwi]
+version = 1
+elf = "build/agent_a.ino.elf"
+firmware = "build/agent_a.ino.bin"
