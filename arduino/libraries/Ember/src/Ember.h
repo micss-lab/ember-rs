@@ -1,6 +1,8 @@
 #ifndef EMBER_H
 #define EMBER_H
 
+#define EMBER_ENABLE_ACC_ESPNOW // Allow the user to enable this manually for release.
+
 #include <inttypes.h>
 
 #include "EmberCore.h"
@@ -18,6 +20,13 @@
 #include "behaviour/SequentialBehaviour.h"
 #include "behaviour/FsmBehaviour.h"
 
+#include "message/Message.h"
+#include "message/Filter.h"
+
+#include "acc/Acc.h"
+#ifdef EMBER_ENABLE_ACC_ESPNOW
+#include "acc/EspNow.h"
+#endif // EMBER_ENABLE_ACC_ESPNOW
 
 namespace ember {
 

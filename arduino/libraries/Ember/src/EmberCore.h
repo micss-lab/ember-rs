@@ -16,6 +16,8 @@ struct Container;
 template<typename E = void>
 struct Context;
 
+struct CustomAcc;
+
 template<typename E = void>
 struct CyclicBehaviour;
 
@@ -66,6 +68,12 @@ struct ContentView {
   uintptr_t len;
 };
 
+struct PostcardBytes {
+  uint8_t *data;
+  uintptr_t len;
+  uintptr_t capacity;
+};
+
 extern "C" {
 
 Event *event_new(void *event);
@@ -75,6 +83,10 @@ void event_free(Event *event);
 AgentState *agent_state_new(void *agent_state);
 
 void agent_state_free(AgentState *agent_state);
+
+CustomAcc *acc_custom_acc_new(void *inner,
+                              bool (*send)(void*, const char*, MessageEnvelope*),
+                              MessageEnvelope *(*receive)(void*));
 
 Agent<AgentState, Event> *agent_new(const char *name, AgentState *agent_state);
 
@@ -247,6 +259,10 @@ void container_free(Container *container);
 
 void container_add_agent(Container *container, Agent<AgentState, Event> *agent);
 
+void container_add_agent_proxy(Container *container, const char *local_name, const char *aid);
+
+void container_enable_custom_acc(Container *container, CustomAcc *acc);
+
 int32_t container_start(Container *container);
 
 ContainerPollResult container_poll(Container *container);
@@ -278,6 +294,15 @@ MessageEnvelope *message_wrap_with_envelope(Message *message);
 
 ContentView message_get_content(Message *message);
 
+void message_envelope_free(MessageEnvelope *envelope);
+
+PostcardBytes message_envelope_serialize_to_postcard_bytes(MessageEnvelope *envelope);
+
+MessageEnvelope *message_envelope_deserialize_from_postcard_bytes(const uint8_t *data,
+                                                                  uintptr_t len);
+
+void postcard_bytes_free(PostcardBytes);
+
 void message_filter_free(MessageFilter *filter);
 
 MessageFilter *message_filter_all();
@@ -287,8 +312,6 @@ MessageFilter *message_filter_none();
 MessageFilter *message_filter_performative(char performative);
 
 MessageFilter *message_filter_ontology(const char *ontology);
-
-void message_envelope_free(MessageEnvelope *envelope);
 
 /**
  * Initialize the libraries global logger.

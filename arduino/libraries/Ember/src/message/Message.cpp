@@ -13,6 +13,10 @@ T* copy_vector_to_leaked_array(const std::vector<T>& data) {
 
 MessageEnvelope::MessageEnvelope(__ffi::MessageEnvelope* envelope): Object(envelope, __ffi::message_envelope_free) {}
 
+ember::__ffi::PostcardBytes MessageEnvelope::__ffi_to_postcard_bytes() const {
+    return __ffi::message_envelope_serialize_to_postcard_bytes(this->object);
+}
+
 Message::Message(
     Performative performative,
     const std::vector<const char*>& receivers,
@@ -29,7 +33,7 @@ Message::Message(
 ) {
 }
 
-Message::Message(__ffi::Message* inner): 
+Message::Message(__ffi::Message* inner):
     Object(inner, __ffi::message_free) {}
 
 MessageEnvelope Message::wrap_with_envelope() && {

@@ -14,7 +14,7 @@ mod serde {
     use ember_acc::serde::espnow::de::EspNowMessageDe;
     use ember_acc::serde::espnow::ser::EspNowMessageSer;
 
-    use crate::ffi::util::{from_raw, new};
+    use crate::ffi::util::{new, ref_from_raw};
 
     #[repr(C)]
     pub struct PostcardBytes {
@@ -34,9 +34,9 @@ mod serde {
         envelope: *mut MessageEnvelope,
     ) -> PostcardBytes {
         non_null!(envelope, "got message envelope null-pointer");
-        let envelope = unsafe { from_raw(envelope) };
+        let envelope = unsafe { ref_from_raw(envelope) };
         let (data, len, capacity) = {
-            let mut bytes = postcard::to_allocvec(&EspNowMessageSer(&envelope))
+            let mut bytes = postcard::to_allocvec(&EspNowMessageSer(envelope))
                 .expect("failed to serialize message envelope");
             let result = (bytes.as_mut_ptr(), bytes.len(), bytes.capacity());
             core::mem::forget(bytes);

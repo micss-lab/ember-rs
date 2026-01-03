@@ -17,6 +17,8 @@ class MessageEnvelope:
     public Object<__ffi::MessageEnvelope> {
   public:
     MessageEnvelope(__ffi::MessageEnvelope*);
+
+    __ffi::PostcardBytes __ffi_to_postcard_bytes() const;
 };
 
 
