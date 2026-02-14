@@ -46,3 +46,13 @@ panic = "abort"
 incremental = false
 codegen-units = 16
 rpath = false
+
+[profile.bindings]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true        # or "symbols" / true with newer Cargo
+debug = false
+
