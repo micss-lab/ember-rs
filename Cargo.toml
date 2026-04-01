@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "ember",
     "ember-acc",
+    "ember-bdi",
     "ember-core",
     "ember-time",
 

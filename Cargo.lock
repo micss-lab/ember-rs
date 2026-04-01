@@ -468,6 +468,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ember-bdi"
+version = "0.1.0"
+dependencies = [
+ "bstr",
+]
+
+[[package]]
 name = "ember-core"
 version = "0.1.0"
 dependencies = [

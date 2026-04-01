@@ -1,0 +1,7 @@
+[package]
+name = "ember-bdi"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bstr = { version = "1.12", default-features = false, features = ["alloc"] }
