@@ -12,7 +12,8 @@ pub enum Term {
     Number(f32),
     String(BString),
     Variable(String),
-    List(Vec<Term>),
+    // TODO: Support lists.
+    // List(Vec<Term>),
     Structure(Structure),
 }
 
