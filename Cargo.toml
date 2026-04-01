@@ -6,19 +6,7 @@ members = [
     "ember-core",
     "ember-time",
 
-    "bindings",
     "examples",
-
-    "case-studies/colour-combinations",
-    "case-studies/home-automation",
-    "case-studies/http-server",
-    "case-studies/ntp-server",
-    "case-studies/plant-monitoring",
-    "case-studies/smart-home",
-    "case-studies/smart-home-distributed",
-    "case-studies/static-vs-dynamic",
-
-    "tools/http-benchmark",
 ]
 
 [workspace.dependencies]
@@ -53,6 +41,5 @@ opt-level = "z"
 lto = true
 codegen-units = 1
 panic = "abort"
-strip = true        # or "symbols" / true with newer Cargo
+strip = true         # or "symbols" / true with newer Cargo
 debug = false
-

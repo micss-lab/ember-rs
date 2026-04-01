@@ -1,4 +1,0 @@
-[wokwi]
-version = 1
-elf = "build/message_agent.ino.elf"
-firmware = "build/messsage_agent.ino.bin"

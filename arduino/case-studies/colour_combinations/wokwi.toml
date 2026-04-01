@@ -1,4 +1,0 @@
-[wokwi]
-version = 1
-elf = "build/colour_combinations.ino.elf"
-firmware = "build/colour_combinations.ino.bin"

@@ -1,4 +1,0 @@
-[wokwi]
-version = 1
-elf = "build/door_lock.ino.elf"
-firmware = "build/door_lock.ino.bin"

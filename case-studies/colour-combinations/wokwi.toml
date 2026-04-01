@@ -1,4 +1,0 @@
-[wokwi]
-version = 1
-firmware = "../../target/xtensa-esp32-none-elf/release/case-study-colour-combinations"
-elf = "../../target/xtensa-esp32-none-elf/release/case-study-colour-combinations"

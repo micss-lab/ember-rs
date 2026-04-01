@@ -1,7 +1,0 @@
-[package]
-name = "http-benchmark"
-version = "0.1.0"
-edition = "2024"
-
-[target.'cfg(not(target_os = "none"))'.dependencies]
-curl = "0.4.49"

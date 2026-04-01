@@ -1,4 +1,0 @@
-[wokwi]
-version = 1
-elf = "build/message_parent.ino.elf"
-firmware = "build/message_parent.ino.bin"
