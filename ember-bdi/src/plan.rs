@@ -4,16 +4,16 @@ use alloc::vec::Vec;
 use crate::literal::Literal;
 use crate::term::Term;
 
-pub struct Plan {
-    trigger: TriggeringEvent,
-    context: Option<ContextFormula>,
-    body: Vec<Formula>,
+pub struct Plan<A> {
+    pub trigger: TriggeringEvent,
+    pub context: Option<ContextFormula>,
+    pub body: Vec<Formula<A>>,
 }
 
 pub struct TriggeringEvent {
-    trigger: Trigger,
-    event: Literal,
-    goal: Option<GoalKind>,
+    pub trigger: Trigger,
+    pub event: Literal,
+    pub goal: Option<GoalKind>,
 }
 
 pub enum Trigger {
@@ -73,18 +73,15 @@ pub enum ArithmeticOperator {
     Mul,
 }
 
-pub enum Formula {
-    Belief {
-        trigger: Trigger,
-        belief: Literal,
-    },
-    Goal {
-        kind: GoalKind,
-        goal: Literal,
-    },
-    Action {
-        // TODO: find a way to implement this.
-        // This will need to interface with rust, so a lookup table might not be the best
-        // idea if a function reference is possible.
-    },
+pub enum Formula<A> {
+    Belief { trigger: Trigger, belief: Literal },
+    Goal { kind: GoalKind, goal: Literal },
+    Action(Action<A>),
+}
+
+pub enum Action<A> {
+    // TODO: Implement system supported actions.
+    // For example, sending messages.
+    System(()),
+    User(A),
 }

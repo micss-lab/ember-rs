@@ -6,4 +6,4 @@ pub enum Literal<Groundness = NonGround> {
     Variable(Groundness),
 }
 
-pub type GroundedLiteral = Literal<Ground>;
+pub type GroundLiteral = Literal<Ground>;

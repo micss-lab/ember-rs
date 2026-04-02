@@ -6,7 +6,7 @@ use bstr::BString;
 
 pub struct Ground(Infallible);
 
-pub struct NonGround(Variable);
+pub struct NonGround(pub Variable);
 
 pub enum Term<Groundness = NonGround> {
     Number(f32),
@@ -17,11 +17,11 @@ pub enum Term<Groundness = NonGround> {
     Structure(Structure<Groundness>),
 }
 
-pub struct Variable(String);
+pub struct Variable(pub String);
 
 pub struct Structure<Groundness = NonGround> {
-    functor: Atom,
-    arguments: Vec<Term<Groundness>>,
+    pub functor: Atom,
+    pub arguments: Option<Vec<Term<Groundness>>>,
 }
 
-pub struct Atom(String);
+pub struct Atom(pub String);

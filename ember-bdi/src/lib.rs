@@ -2,7 +2,7 @@
 
 extern crate alloc;
 
-mod knowledge;
-mod literal;
-mod plan;
-mod term;
+pub mod knowledge;
+pub mod literal;
+pub mod plan;
+pub mod term;
