@@ -24,6 +24,7 @@ mod http;
 #[cfg(any(feature = "serde-espnow", feature = "serde-http"))]
 pub mod serde;
 
+#[cfg(feature = "espnow")]
 pub mod util {
     use macaddr::MacAddr6;
 
