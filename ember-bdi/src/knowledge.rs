@@ -1,16 +1,12 @@
+use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use crate::literal::GroundLiteral;
+use crate::term::Atom;
+
+pub type Belief = GroundLiteral;
 
 pub struct BeliefBase {
-    // TODO: Improve this container type.
-    beliefs: Vec<GroundLiteral>,
-}
-
-impl FromIterator<GroundLiteral> for BeliefBase {
-    fn from_iter<T: IntoIterator<Item = GroundLiteral>>(iter: T) -> Self {
-        Self {
-            beliefs: iter.into_iter().collect(),
-        }
-    }
+    /// Mapping from the belief atom and the arity to a list of ground truths.
+    beliefs: BTreeMap<(Atom, usize), Vec<Belief>>,
 }
