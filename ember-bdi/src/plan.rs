@@ -1,13 +1,14 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
+use crate::context::Context;
 use crate::literal::Literal;
 use crate::term::Term;
 
 pub struct Plan<A> {
     pub trigger: TriggeringEvent,
     pub context: Option<ContextFormula>,
-    pub body: Vec<Formula<A>>,
+    pub body: fn(&mut Context) -> Vec<Formula<A>>,
 }
 
 pub struct TriggeringEvent {

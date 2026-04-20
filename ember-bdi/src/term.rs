@@ -4,6 +4,8 @@ use core::convert::Infallible;
 
 use bstr::BString;
 
+use crate::variable::Variable;
+
 pub struct Ground(Infallible);
 
 pub struct NonGround(pub Variable);
@@ -16,8 +18,6 @@ pub enum Term<Groundness = NonGround> {
     // List(List),
     Structure(Structure<Groundness>),
 }
-
-pub struct Variable(pub String);
 
 pub struct Structure<Groundness = NonGround> {
     pub functor: Atom,
