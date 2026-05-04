@@ -1,18 +1,18 @@
-pub(crate) mod sync {
+pub mod sync {
     use core::cell::Cell;
 
     #[repr(transparent)]
-    pub(crate) struct AtomicU32(Cell<u32>);
+    pub struct AtomicU32(Cell<u32>);
 
     // SAFETY: Internal methods are protected using the [`critical-section`] crate.
     unsafe impl Sync for AtomicU32 {}
 
     impl AtomicU32 {
-        pub(crate) const fn new(value: u32) -> Self {
+        pub const fn new(value: u32) -> Self {
             Self(Cell::new(value))
         }
 
-        pub(crate) fn get_increment(&self) -> u32 {
+        pub fn get_increment(&self) -> u32 {
             critical_section::with(|_| {
                 let value = self.0.get();
                 self.0

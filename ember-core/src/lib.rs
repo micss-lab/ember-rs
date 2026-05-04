@@ -7,4 +7,4 @@ pub mod behaviour;
 pub mod context;
 pub mod message;
 
-pub(crate) mod util;
+pub mod util;
