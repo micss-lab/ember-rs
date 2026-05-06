@@ -21,7 +21,11 @@ pub enum Term<Groundness = NonGround> {
     Variable(Groundness),
     // TODO: Support lists.
     // List(List),
-    Structure(Structure<Groundness>),
+    Literal {
+        /// Explicit negation, not the closed-wold principle form of negation.
+        negated: bool,
+        structure: Structure<Groundness>,
+    },
 }
 
 impl Term<Ground> {
@@ -37,7 +41,13 @@ impl Term<Ground> {
                 // would not trigger an error if the type ever changes.
                 match i {}
             }
-            Structure(s) => Structure(s.into_non_ground()),
+            Literal {
+                negated,
+                structure: s,
+            } => Literal {
+                negated,
+                structure: s.into_non_ground(),
+            },
         }
     }
 }
@@ -49,13 +59,25 @@ impl Term<NonGround> {
             Number(n) => Number(n),
             String(s) => String(s),
             Variable(_) => return None,
-            Structure(s) => Structure(s.try_into_ground()?),
+            Literal {
+                negated,
+                structure: s,
+            } => Literal {
+                negated,
+                structure: s.try_into_ground()?,
+            },
         })
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct TotalCmpF32(f32);
+
+impl From<f32> for TotalCmpF32 {
+    fn from(value: f32) -> Self {
+        Self(value)
+    }
+}
 
 impl core::ops::Deref for TotalCmpF32 {
     type Target = f32;

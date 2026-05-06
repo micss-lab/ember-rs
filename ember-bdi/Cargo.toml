@@ -7,3 +7,6 @@ edition = "2024"
 ember-core = { workspace = true }
 
 bstr = { version = "1.12", default-features = false, features = ["alloc"] }
+
+[dev-dependencies]
+critical-section = { version = "1.2", features = ["std"] }

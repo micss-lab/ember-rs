@@ -2,6 +2,7 @@
 
 extern crate alloc;
 
+pub mod bindings;
 pub mod context;
 pub mod knowledge;
 pub mod literal;
