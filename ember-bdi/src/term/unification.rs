@@ -5,7 +5,7 @@ use crate::bindings::Bindings;
 use crate::term::{NonGround, Structure, Term};
 use crate::variable::Variable;
 
-type Result<T> = core::result::Result<T, UnificationFailedError>;
+pub(crate) type Result<T> = core::result::Result<T, UnificationFailedError>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnificationFailedError {
@@ -40,8 +40,7 @@ pub trait Unify<Rhs = Self> {
     /// sound.
     fn collect_constraints<'a>(&'a self, other: &'a Rhs) -> Result<Vec<BindingConstraint<'a>>>;
 
-    /// Try to unify this structure with something it can be unified with. If successful, it
-    /// returns a map of bindings from variables to terms that may not be grounded.
+    /// Try to unify this structure with something it can be unified with.
     fn unify<'a>(&'a self, other: &'a Rhs) -> Result<Bindings<'a>> {
         Bindings::build_from_constraints(self.collect_constraints(other)?)
     }
@@ -66,7 +65,6 @@ impl Unify for Term {
             (Literal { structure: s1, .. }, Literal { structure: s2, .. }) => {
                 s1.collect_constraints(s2)
             }
-
             _ => Err(UnificationFailedError::TypeMismatch),
         }
     }
@@ -166,9 +164,8 @@ mod solver {
                 .partitions
                 .variable_to_partition
                 .into_iter()
-                .map(|(vid, pid)| (vid, partition_assignments.get(&pid).cloned()))
-                .collect();
-            Ok(Bindings(bindings))
+                .map(|(vid, pid)| (vid, partition_assignments.get(&pid).cloned()));
+            Ok(Bindings::new(bindings))
         }
     }
 
@@ -318,8 +315,6 @@ mod tests {
     use crate::variable::Variable;
     use alloc::borrow::Cow;
 
-    // --- Helpers local to tests ---
-
     fn n(number: f32) -> Term {
         Term::Number(number.into())
     }
@@ -350,11 +345,6 @@ mod tests {
         }
     }
 
-    // Helper to extract a binding value for a variable ID
-    fn get_binding<'a>(bindings: &'a Bindings<'a>, variable: &Variable) -> Option<Cow<'a, Term>> {
-        bindings.0.get(&variable.id)?.clone()
-    }
-
     // --- Happy Day Scenarios ---
 
     #[test]
@@ -371,8 +361,8 @@ mod tests {
         let (x, val) = (v(), n(100.0));
 
         let result = x.unify(&val).expect("Unification failed");
-        let binding = get_binding(&result, &x).expect("Variable 1 should be bound");
-        assert_eq!(binding.into_owned(), n(100.0));
+        let binding = result.get(&x).expect("Variable 1 should be bound");
+        assert_eq!(binding, &n(100.0));
     }
 
     #[test]
@@ -384,7 +374,7 @@ mod tests {
         let t2 = literal(false, "f", vec![n(1.0), n(2.0)]);
 
         let result = t1.unify(&t2).expect("Unification failed");
-        assert_eq!(get_binding(&result, &x).map(Cow::into_owned), Some(n(1.0)));
+        assert_eq!(result.get(&x), Some(&n(1.0)));
     }
 
     #[test]
@@ -398,8 +388,8 @@ mod tests {
         let t2 = literal(false, "pair", vec![tv(&y), n(42.0)]);
 
         let result = t1.unify(&t2).expect("Unification failed");
-        assert_eq!(get_binding(&result, &x).map(Cow::into_owned), Some(n(42.0)));
-        assert_eq!(get_binding(&result, &y).map(Cow::into_owned), Some(n(42.0)));
+        assert_eq!(result.get(&x), Some(&n(42.0)));
+        assert_eq!(result.get(&y), Some(&n(42.0)));
     }
 
     // --- Edge Cases & Failures ---
@@ -499,11 +489,9 @@ mod tests {
 
         let result = query.unify(&belief).expect("Complex resolution failed");
 
-        let x_binding = get_binding(&result, &x)
-            .expect("X should be bound")
-            .into_owned();
+        let x_binding = result.get(&x).expect("X should be bound");
         let expected_x = literal(false, "g", vec![n(1.0)]);
-        assert_eq!(x_binding, expected_x);
+        assert_eq!(x_binding, &expected_x);
     }
 
     #[test]
@@ -551,10 +539,7 @@ mod tests {
 
         let result = t1.unify(&t2).expect("Deep chain failed");
         for v in [a, b, c, d] {
-            assert_eq!(
-                get_binding(&result, &v).map(Cow::into_owned),
-                Some(n(100.0))
-            );
+            assert_eq!(result.get(&v), Some(&n(100.0)));
         }
     }
 
@@ -569,9 +554,9 @@ mod tests {
 
         let result = t1.unify(&t2).expect("Unification with free vars failed");
 
-        assert_eq!(get_binding(&result, &x).map(Cow::into_owned), Some(n(1.0)));
+        assert_eq!(result.get(&x), Some(&n(1.0)));
 
-        assert_eq!(get_binding(&result, &y), None);
-        assert_eq!(get_binding(&result, &z), None);
+        assert_eq!(result.get(&y), None);
+        assert_eq!(result.get(&z), None);
     }
 }

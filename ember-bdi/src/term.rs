@@ -4,12 +4,13 @@ use core::convert::Infallible;
 
 use bstr::BString;
 
+use crate::literal::Literal;
 use crate::variable::Variable;
 
-mod unification;
+pub mod unification;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Ground(Infallible);
+pub struct Ground(pub(crate) Infallible);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NonGround(pub Variable);
@@ -22,10 +23,18 @@ pub enum Term<Groundness = NonGround> {
     // TODO: Support lists.
     // List(List),
     Literal {
-        /// Explicit negation, not the closed-wold principle form of negation.
         negated: bool,
         structure: Structure<Groundness>,
     },
+}
+
+impl<G> From<Literal<G>> for Term<G> {
+    fn from(literal: Literal<G>) -> Self {
+        match literal {
+            Literal::Atom { negated, structure } => Self::Literal { negated, structure },
+            Literal::Variable(g) => Self::Variable(g),
+        }
+    }
 }
 
 impl Term<Ground> {
@@ -41,12 +50,9 @@ impl Term<Ground> {
                 // would not trigger an error if the type ever changes.
                 match i {}
             }
-            Literal {
+            Literal { negated, structure } => Literal {
                 negated,
-                structure: s,
-            } => Literal {
-                negated,
-                structure: s.into_non_ground(),
+                structure: structure.into_non_ground(),
             },
         }
     }
@@ -59,12 +65,9 @@ impl Term<NonGround> {
             Number(n) => Number(n),
             String(s) => String(s),
             Variable(_) => return None,
-            Literal {
+            Literal { negated, structure } => Literal {
                 negated,
-                structure: s,
-            } => Literal {
-                negated,
-                structure: s.try_into_ground()?,
+                structure: structure.try_into_ground()?,
             },
         })
     }
