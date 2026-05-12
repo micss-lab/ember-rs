@@ -268,9 +268,11 @@ mod tests {
     use super::*;
 
     mod query {
+        use alloc::boxed::Box;
         use alloc::vec;
         use alloc::vec::Vec;
 
+        use crate::bindings::TermView;
         use crate::literal::Literal;
         use crate::term::{Atom, Ground, NonGround, Structure, Term};
         use crate::variable::Variable;
@@ -300,7 +302,8 @@ mod tests {
             let terms = args
                 .into_iter()
                 .map(|s| Term::<Ground>::String(s.into()))
-                .collect::<Vec<_>>();
+                .collect::<Vec<_>>()
+                .into_boxed_slice();
             let lit = Literal::Atom {
                 negated,
                 structure: Structure {
@@ -326,7 +329,7 @@ mod tests {
                 negated: false,
                 structure: Structure {
                     functor: Atom("p".into()),
-                    arguments: Some(vec![var_term(&v)]),
+                    arguments: Some(Box::new([var_term(&v)])),
                 },
             };
 
@@ -351,7 +354,7 @@ mod tests {
                 negated: false,
                 structure: Structure {
                     functor: Atom(f.into()),
-                    arguments: Some(vec![str_term(a)]),
+                    arguments: Some(Box::new([str_term(a)])),
                 },
             };
             assert!(bb.query(&q_pos).next_bindings().is_some());
@@ -368,7 +371,7 @@ mod tests {
                 negated: true,
                 structure: Structure {
                     functor: Atom(f.into()),
-                    arguments: Some(vec![str_term(a)]),
+                    arguments: Some(Box::new([str_term(a)])),
                 },
             };
             assert!(bb.query(&q_neg).next_bindings().is_some());
@@ -385,14 +388,14 @@ mod tests {
                 negated: false,
                 structure: Structure {
                     functor: Atom("likes".into()),
-                    arguments: Some(vec![str_term("alice"), var_term(&v)]),
+                    arguments: Some(Box::new([str_term("alice"), var_term(&v)])),
                 },
             };
 
             let mut q = bb.query(&query);
             let mut found = Vec::new();
             while let Some(bindings) = q.next_bindings() {
-                if let Some(Term::String(s)) = bindings.get(&v) {
+                if let Some(TermView::Term(Term::String(s))) = bindings.get(&v) {
                     found.push(s.clone());
                 }
             }
@@ -409,22 +412,22 @@ mod tests {
             // Manual construction of nested belief: at(robot, pos(10, 20))
             let inner_struct = Structure {
                 functor: Atom("pos".into()),
-                arguments: Some(vec![
+                arguments: Some(Box::new([
                     Term::<Ground>::Number(10.0.into()),
                     Term::<Ground>::Number(20.0.into()),
-                ]),
+                ])),
             };
             let outer_lit = Literal::Atom {
                 negated: false,
                 structure: Structure {
                     functor: Atom("at".into()),
-                    arguments: Some(vec![
+                    arguments: Some(Box::new([
                         Term::<Ground>::String("robot".into()),
                         Term::<Ground>::Literal {
                             negated: false,
                             structure: inner_struct,
                         },
-                    ]),
+                    ])),
                 },
             };
             bb.assert(Belief::from_ground_literal(outer_lit));
@@ -432,19 +435,19 @@ mod tests {
             let v_x = var();
             let query_inner = Structure {
                 functor: Atom("pos".into()),
-                arguments: Some(vec![var_term(&v_x), num_term(20.0)]),
+                arguments: Some(Box::new([var_term(&v_x), num_term(20.0)])),
             };
             let query = Literal::Atom {
                 negated: false,
                 structure: Structure {
                     functor: Atom("at".into()),
-                    arguments: Some(vec![
+                    arguments: Some(Box::new([
                         str_term("robot"),
                         Term::Literal {
                             negated: false,
                             structure: query_inner,
                         },
-                    ]),
+                    ])),
                 },
             };
 
@@ -452,7 +455,7 @@ mod tests {
                 .query(&query)
                 .next_bindings()
                 .expect("Deep unification failed");
-            assert_eq!(bindings.get(&v_x), Some(&num_term(10.0)));
+            assert_eq!(bindings.get(&v_x), Some(&num_term(10.0).as_view()));
         }
 
         #[test]
@@ -484,7 +487,7 @@ mod tests {
                 negated: false,
                 structure: Structure {
                     functor: Atom("p".into()),
-                    arguments: Some(vec![var_term(&v)]),
+                    arguments: Some(vec![var_term(&v)].into_boxed_slice()),
                 },
             };
             assert!(bb.query(&q_p1).next_bindings().is_none());
@@ -505,7 +508,7 @@ mod tests {
                 negated: false,
                 structure: Structure {
                     functor: Atom("fact".into()),
-                    arguments: Some(vec![str_term("shared")]),
+                    arguments: Some(Box::new([str_term("shared")])),
                 },
             };
 
@@ -530,7 +533,7 @@ mod tests {
                 negated: false,
                 structure: Structure {
                     functor: Atom("temp".into()),
-                    arguments: Some(vec![str_term("val")]),
+                    arguments: Some(Box::new([str_term("val")])),
                 },
             };
             assert!(bb.query(&q).next_bindings().is_none());

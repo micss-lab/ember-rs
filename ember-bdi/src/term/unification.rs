@@ -1,7 +1,7 @@
 use alloc::vec;
 use alloc::vec::Vec;
 
-use crate::bindings::Bindings;
+use crate::bindings::{Bindings, StructureView, TermView};
 use crate::term::{NonGround, Structure, Term};
 use crate::variable::Variable;
 
@@ -35,19 +35,41 @@ impl core::fmt::Display for UnificationFailedError {
 
 impl core::error::Error for UnificationFailedError {}
 
-pub trait Unify<Rhs = Self> {
+pub trait Unify<Rhs> {
     /// Collect individual constraints without recursive verification that they are collectively
     /// sound.
-    fn collect_constraints<'a>(&'a self, other: &'a Rhs) -> Result<Vec<BindingConstraint<'a>>>;
+    fn collect_constraints<'a>(&'a self, other: Rhs) -> Result<Vec<BindingConstraint<'a>>>
+    where
+        Rhs: 'a;
 
     /// Try to unify this structure with something it can be unified with.
-    fn unify<'a>(&'a self, other: &'a Rhs) -> Result<Bindings<'a>> {
+    fn unify<'a>(&'a self, other: Rhs) -> Result<Bindings<'a>>
+    where
+        Rhs: 'a,
+    {
         Bindings::build_from_constraints(self.collect_constraints(other)?)
     }
 }
 
-impl Unify for Term {
-    fn collect_constraints<'a>(&'a self, other: &'a Term) -> Result<Vec<BindingConstraint<'a>>> {
+pub trait UnifyView<'a>
+where
+    Self: 'a + Sized,
+{
+    /// Collect individual constraints without recursive verification that they are collectively
+    /// sound.
+    fn collect_constraints(self, other: Self) -> Result<Vec<BindingConstraint<'a>>>;
+
+    /// Try to unify this structure with something it can be unified with.
+    fn unify(self, other: Self) -> Result<Bindings<'a>> {
+        Bindings::build_from_constraints(self.collect_constraints(other)?)
+    }
+}
+
+impl Unify<&Term> for Term {
+    fn collect_constraints<'a>(&'a self, other: &'a Self) -> Result<Vec<BindingConstraint<'a>>>
+    where
+        Self: 'a,
+    {
         use Term::*;
 
         match (self, other) {
@@ -70,11 +92,67 @@ impl Unify for Term {
     }
 }
 
-impl Unify for Structure {
-    fn collect_constraints<'a>(
-        &'a self,
-        other: &'a Structure,
-    ) -> Result<Vec<BindingConstraint<'a>>> {
+impl<'a> UnifyView<'a> for TermView<'a> {
+    fn collect_constraints(self, other: Self) -> Result<Vec<BindingConstraint<'a>>> {
+        match (self, other) {
+            (TermView::Term(this), TermView::Term(other)) => this.collect_constraints(other),
+
+            (TermView::Term(Term::Variable(NonGround(v))), t)
+            | (t, TermView::Term(Term::Variable(NonGround(v)))) => v.collect_constraints(t),
+
+            (TermView::Term(this), TermView::Literal { negated, structure })
+            | (TermView::Literal { negated, structure }, TermView::Term(this)) => {
+                match (this, (negated, structure)) {
+                    (Term::Literal { negated: n1, .. }, (n2, _)) if *n1 != n2 => {
+                        Err(UnificationFailedError::NegationMismatch)
+                    }
+                    (Term::Literal { structure: s1, .. }, (_, s2)) => s1.collect_constraints(s2),
+
+                    _ => Err(UnificationFailedError::TypeMismatch),
+                }
+            }
+
+            (TermView::Literal { negated: n1, .. }, TermView::Literal { negated: n2, .. })
+                if n1 != n2 =>
+            {
+                Err(UnificationFailedError::NegationMismatch)
+            }
+            (TermView::Literal { structure: s1, .. }, TermView::Literal { structure: s2, .. }) => {
+                s1.collect_constraints(s2)
+            }
+        }
+    }
+}
+
+impl<'v> Unify<TermView<'v>> for Term {
+    fn collect_constraints<'a>(&'a self, other: TermView<'v>) -> Result<Vec<BindingConstraint<'a>>>
+    where
+        TermView<'v>: 'a,
+    {
+        match (self, other) {
+            (_, TermView::Term(other)) => self.collect_constraints(other),
+
+            (Term::Variable(NonGround(v)), other) => v.collect_constraints(other),
+
+            (Term::Literal { negated: n1, .. }, TermView::Literal { negated: n2, .. })
+                if *n1 != n2 =>
+            {
+                Err(UnificationFailedError::NegationMismatch)
+            }
+            (Term::Literal { structure: s1, .. }, TermView::Literal { structure: s2, .. }) => {
+                s1.collect_constraints(s2)
+            }
+
+            _ => Err(UnificationFailedError::TypeMismatch),
+        }
+    }
+}
+
+impl Unify<&Structure> for Structure {
+    fn collect_constraints<'a>(&'a self, other: &'a Self) -> Result<Vec<BindingConstraint<'a>>>
+    where
+        Self: 'a,
+    {
         if self.functor != other.functor {
             return Err(UnificationFailedError::FunctorMismatch);
         }
@@ -82,11 +160,9 @@ impl Unify for Structure {
         match (&self.arguments, &other.arguments) {
             (Some(args1), Some(args2)) if args1.len() == args2.len() => {
                 let mut bindings = Vec::new();
-
                 for (a1, a2) in args1.iter().zip(args2.iter()) {
                     bindings.extend(a1.collect_constraints(a2)?);
                 }
-
                 Ok(bindings)
             }
             (None, None) => Ok(vec![]),
@@ -95,36 +171,98 @@ impl Unify for Structure {
     }
 }
 
-impl Unify<Term> for Variable {
-    fn collect_constraints<'a>(&'a self, other: &'a Term) -> Result<Vec<BindingConstraint<'a>>> {
+impl<'a> UnifyView<'a> for StructureView<'a> {
+    fn collect_constraints(self, other: Self) -> Result<Vec<BindingConstraint<'a>>> {
+        if self.functor != other.functor {
+            return Err(UnificationFailedError::FunctorMismatch);
+        }
+
+        match (&self.arguments, &other.arguments) {
+            (Some(args1), Some(args2)) if args1.len() == args2.len() => {
+                let mut bindings = Vec::new();
+                for (a1, a2) in args1.iter().zip(args2.iter()) {
+                    bindings.extend(a1.clone().collect_constraints(a2.clone())?);
+                }
+                Ok(bindings)
+            }
+            (None, None) => Ok(vec![]),
+            _ => Err(UnificationFailedError::ArityMismatch),
+        }
+    }
+}
+
+impl<'v> Unify<StructureView<'v>> for Structure {
+    fn collect_constraints<'a>(
+        &'a self,
+        other: StructureView<'v>,
+    ) -> Result<Vec<BindingConstraint<'a>>>
+    where
+        StructureView<'v>: 'a,
+    {
+        if &self.functor != other.functor {
+            return Err(UnificationFailedError::FunctorMismatch);
+        }
+
+        match (&self.arguments, &other.arguments) {
+            (Some(args1), Some(args2)) if args1.len() == args2.len() => {
+                let mut bindings = Vec::new();
+                for (a1, a2) in args1.iter().zip(args2.iter()) {
+                    bindings.extend(a1.collect_constraints(a2.clone())?);
+                }
+                Ok(bindings)
+            }
+            (None, None) => Ok(vec![]),
+            _ => Err(UnificationFailedError::ArityMismatch),
+        }
+    }
+}
+
+impl Unify<&Term> for Variable {
+    fn collect_constraints<'a>(&'a self, other: &'a Term) -> Result<Vec<BindingConstraint<'a>>>
+    where
+        Term: 'a,
+    {
         // TODO: Check that the term can be converted to the type of the variable.
 
         Ok(vec![BindingConstraint::new(self, other)])
     }
 }
 
+impl<'v> Unify<TermView<'v>> for Variable {
+    fn collect_constraints<'a>(&'a self, other: TermView<'v>) -> Result<Vec<BindingConstraint<'a>>>
+    where
+        TermView<'v>: 'a,
+    {
+        // TODO: Check that the term can be converted to the type of the variable.
+
+        Ok(vec![BindingConstraint::new(self, other.clone())])
+    }
+}
+
 #[derive(Debug)]
 pub struct BindingConstraint<'a> {
     variable: &'a Variable,
-    value: &'a Term,
+    value: TermView<'a>,
 }
 
 impl<'a> BindingConstraint<'a> {
-    pub fn new(variable: &'a Variable, value: &'a Term) -> Self {
-        Self { variable, value }
+    pub fn new(variable: &'a Variable, value: impl Into<TermView<'a>>) -> Self {
+        Self {
+            variable,
+            value: value.into(),
+        }
     }
 }
 
 mod solver {
-    use alloc::borrow::Cow;
     use alloc::collections::BTreeMap;
     use alloc::vec::Vec;
 
-    use crate::bindings::Bindings;
+    use crate::bindings::{Bindings, StructureView, TermView};
     use crate::term::{NonGround, Term};
     use crate::variable::{Variable, VariableId};
 
-    use super::{BindingConstraint, Result, UnificationFailedError, Unify};
+    use super::{BindingConstraint, Result, UnificationFailedError, Unify, UnifyView};
 
     pub(super) struct ConstraintSolver<'a> {
         partitions: Partitions<'a>,
@@ -141,7 +279,7 @@ mod solver {
 
         pub(super) fn solve(mut self) -> Result<Bindings<'a>> {
             while let Some(BindingConstraint { variable, value }) = self.queue.pop() {
-                if let Term::Variable(NonGround(alias)) = value {
+                if let Some(alias) = value.as_variable() {
                     self.partitions.merge(variable, alias, &mut self.queue)?;
                 } else {
                     let pid = self.partitions.get_or_create(variable);
@@ -155,7 +293,9 @@ mod solver {
                     continue;
                 }
                 if let Some(term) = self.partitions.partition_to_term.get(pid) {
-                    let term = self.partitions.resolve_term(term, &mut Vec::new())?;
+                    let term = self
+                        .partitions
+                        .resolve_term(term.clone(), &mut Vec::new())?;
                     partition_assignments.insert(*pid, term);
                 }
             }
@@ -175,7 +315,7 @@ mod solver {
     struct Partitions<'a> {
         next_id: PartitionId,
         variable_to_partition: BTreeMap<VariableId, PartitionId>,
-        partition_to_term: BTreeMap<PartitionId, &'a Term>,
+        partition_to_term: BTreeMap<PartitionId, TermView<'a>>,
     }
 
     impl<'a> Partitions<'a> {
@@ -218,11 +358,11 @@ mod solver {
         fn add_term(
             &mut self,
             pid: PartitionId,
-            term: &'a Term,
+            term: TermView<'a>,
             queue: &mut Vec<BindingConstraint<'a>>,
         ) -> Result<()> {
             if let Some(t1) = self.partition_to_term.get(&pid) {
-                queue.extend(t1.collect_constraints(term)?);
+                queue.extend(t1.clone().collect_constraints(term)?);
             } else {
                 self.partition_to_term.insert(pid, term);
             }
@@ -233,41 +373,63 @@ mod solver {
         /// value, return it as is.
         fn resolve_term(
             &self,
-            term: &'a Term,
+            term: TermView<'a>,
             visiting: &mut Vec<PartitionId>,
-        ) -> Result<Cow<'a, Term>> {
+        ) -> Result<TermView<'a>> {
             match term {
-                Term::Number(_) | Term::String(_) => Ok(Cow::Borrowed(term)),
+                TermView::Term(term) => match term {
+                    Term::Number(_) | Term::String(_) => Ok(TermView::Term(term)),
 
-                Term::Variable(NonGround(v)) => {
-                    let Some(pid) = self.variable_to_partition.get(&v.id) else {
-                        return Ok(Cow::Borrowed(term));
-                    };
-                    Ok(self
-                        .resolve_pid(*pid, visiting)?
-                        .unwrap_or_else(|| Cow::Borrowed(term)))
-                }
-                Term::Literal {
-                    negated: n,
-                    structure: s,
-                } => {
-                    let args = match &s.arguments {
+                    Term::Variable(NonGround(v)) => {
+                        let Some(pid) = self.variable_to_partition.get(&v.id) else {
+                            return Ok(TermView::Term(term));
+                        };
+                        Ok(self
+                            .resolve_pid(*pid, visiting)?
+                            .unwrap_or(TermView::Term(term)))
+                    }
+                    Term::Literal {
+                        negated: n,
+                        structure: s,
+                    } => {
+                        let args = match &s.arguments {
+                            Some(args) => {
+                                let mut resolved_args = Vec::with_capacity(args.len());
+                                for arg in args.iter() {
+                                    resolved_args
+                                        .push(self.resolve_term(TermView::Term(arg), visiting)?);
+                                }
+                                Some(resolved_args.into_boxed_slice())
+                            }
+                            None => None,
+                        };
+                        Ok(TermView::Literal {
+                            negated: *n,
+                            structure: StructureView {
+                                functor: &s.functor,
+                                arguments: args,
+                            },
+                        })
+                    }
+                },
+                TermView::Literal { negated, structure } => {
+                    let args = match structure.arguments {
                         Some(args) => {
                             let mut resolved_args = Vec::with_capacity(args.len());
-                            for arg in args.iter() {
-                                resolved_args.push(self.resolve_term(arg, visiting)?.into_owned());
+                            for arg in args {
+                                resolved_args.push(self.resolve_term(arg, visiting)?);
                             }
-                            Some(resolved_args)
+                            Some(resolved_args.into_boxed_slice())
                         }
                         None => None,
                     };
-                    Ok(Cow::Owned(Term::Literal {
-                        negated: *n,
-                        structure: crate::term::Structure {
-                            functor: s.functor.clone(),
+                    Ok(TermView::Literal {
+                        negated,
+                        structure: StructureView {
+                            functor: structure.functor,
                             arguments: args,
                         },
-                    }))
+                    })
                 }
             }
         }
@@ -276,7 +438,7 @@ mod solver {
             &self,
             pid: PartitionId,
             visiting: &mut Vec<PartitionId>,
-        ) -> Result<Option<Cow<'a, Term>>> {
+        ) -> Result<Option<TermView<'a>>> {
             if visiting.contains(&pid) {
                 return Err(UnificationFailedError::CyclicReference); // Cycle detected
             }
@@ -285,7 +447,7 @@ mod solver {
             };
 
             visiting.push(pid);
-            let result = self.resolve_term(term, visiting);
+            let result = self.resolve_term(term.clone(), visiting);
             visiting.pop();
             result.map(Some)
         }
@@ -310,10 +472,12 @@ impl<'a> Bindings<'a> {
 
 #[cfg(test)]
 mod tests {
+
+    use alloc::boxed::Box;
+
     use super::*;
     use crate::term::{Atom, NonGround, Structure, Term};
     use crate::variable::Variable;
-    use alloc::borrow::Cow;
 
     fn n(number: f32) -> Term {
         Term::Number(number.into())
@@ -331,10 +495,10 @@ mod tests {
         Term::Variable(NonGround(variable.clone()))
     }
 
-    fn structure(functor: &str, args: Vec<Term>) -> Structure {
+    fn structure(functor: &str, args: impl Into<Vec<Term>>) -> Structure {
         Structure {
             functor: Atom(functor.into()),
-            arguments: Some(args),
+            arguments: Some(args.into().into_boxed_slice()),
         }
     }
 
@@ -362,7 +526,7 @@ mod tests {
 
         let result = x.unify(&val).expect("Unification failed");
         let binding = result.get(&x).expect("Variable 1 should be bound");
-        assert_eq!(binding, &n(100.0));
+        assert_eq!(binding, &n(100.0).as_view());
     }
 
     #[test]
@@ -374,7 +538,7 @@ mod tests {
         let t2 = literal(false, "f", vec![n(1.0), n(2.0)]);
 
         let result = t1.unify(&t2).expect("Unification failed");
-        assert_eq!(result.get(&x), Some(&n(1.0)));
+        assert_eq!(result.get(&x), Some(n(1.0).as_view()).as_ref());
     }
 
     #[test]
@@ -388,8 +552,8 @@ mod tests {
         let t2 = literal(false, "pair", vec![tv(&y), n(42.0)]);
 
         let result = t1.unify(&t2).expect("Unification failed");
-        assert_eq!(result.get(&x), Some(&n(42.0)));
-        assert_eq!(result.get(&y), Some(&n(42.0)));
+        assert_eq!(result.get(&x), Some(&n(42.0).as_view()));
+        assert_eq!(result.get(&y), Some(&n(42.0).as_view()));
     }
 
     // --- Edge Cases & Failures ---
@@ -490,7 +654,14 @@ mod tests {
         let result = query.unify(&belief).expect("Complex resolution failed");
 
         let x_binding = result.get(&x).expect("X should be bound");
-        let expected_x = literal(false, "g", vec![n(1.0)]);
+        let (g, n) = (Atom("g".into()), n(1.0));
+        let expected_x = TermView::Literal {
+            negated: false,
+            structure: StructureView {
+                functor: &g,
+                arguments: Some(Box::new([n.as_view()])),
+            },
+        };
         assert_eq!(x_binding, &expected_x);
     }
 
@@ -539,7 +710,7 @@ mod tests {
 
         let result = t1.unify(&t2).expect("Deep chain failed");
         for v in [a, b, c, d] {
-            assert_eq!(result.get(&v), Some(&n(100.0)));
+            assert_eq!(result.get(&v), Some(&n(100.0).as_view()));
         }
     }
 
@@ -554,7 +725,7 @@ mod tests {
 
         let result = t1.unify(&t2).expect("Unification with free vars failed");
 
-        assert_eq!(result.get(&x), Some(&n(1.0)));
+        assert_eq!(result.get(&x), Some(&n(1.0).as_view()));
 
         assert_eq!(result.get(&y), None);
         assert_eq!(result.get(&z), None);

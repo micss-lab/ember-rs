@@ -1,3 +1,4 @@
+use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::convert::Infallible;
@@ -119,7 +120,7 @@ impl Eq for TotalCmpF32 {}
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Structure<Groundness = NonGround> {
     pub functor: Atom,
-    pub arguments: Option<Vec<Term<Groundness>>>,
+    pub arguments: Option<Box<[Term<Groundness>]>>,
 }
 
 impl Structure<Ground> {
@@ -141,7 +142,8 @@ impl Structure<NonGround> {
                 Some(a) => Some(
                     a.into_iter()
                         .map(|t| t.try_into_ground())
-                        .collect::<Option<Vec<_>>>()?,
+                        .collect::<Option<Vec<_>>>()?
+                        .into_boxed_slice(),
                 ),
                 None => None,
             },
