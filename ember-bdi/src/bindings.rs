@@ -1,25 +1,57 @@
 use alloc::boxed::Box;
-use alloc::collections::BTreeMap;
+use alloc::collections::btree_set::BTreeSet;
+use alloc::collections::{BTreeMap, btree_map};
 use alloc::vec::Vec;
 
 use crate::term::{Atom, NonGround, Structure, Term};
 use crate::variable::{Variable, VariableId};
 
 #[derive(Debug)]
-pub struct Bindings<'a>(BTreeMap<VariableId, Option<TermView<'a>>>);
+pub struct Bindings<'a> {
+    pub(crate) bindings: BTreeMap<VariableId, Option<TermView<'a>>>,
+    pub(crate) aliases: AliasMap,
+}
 
 impl<'a> Bindings<'a> {
     pub(crate) fn new(
         bindings: impl IntoIterator<Item = (VariableId, Option<TermView<'a>>)>,
+        aliases: AliasMap,
     ) -> Self {
-        Self(bindings.into_iter().collect())
+        Self {
+            bindings: bindings.into_iter().collect(),
+            aliases,
+        }
     }
 }
 
-#[cfg(test)]
 impl<'a> Bindings<'a> {
-    pub(crate) fn get(&self, variable: &Variable) -> Option<&TermView<'a>> {
-        self.0.get(&variable.id)?.as_ref()
+    pub fn get(&self, variable: &Variable) -> Option<&TermView<'a>> {
+        self.bindings.get(&variable.id)?.as_ref()
+    }
+}
+
+impl<'a> Bindings<'a> {
+    pub(crate) fn get_using_id(&self, variable: VariableId) -> Option<&TermView<'a>> {
+        self.bindings.get(&variable)?.as_ref()
+    }
+}
+
+pub(crate) struct AliasMap(BTreeMap<VariableId, BTreeSet<VariableId>>);
+
+impl AliasMap {
+    pub(crate) fn new(
+        aliases: impl IntoIterator<Item = (VariableId, BTreeSet<VariableId>)>,
+    ) -> Self {
+        Self(aliases.into_iter().collect())
+    }
+
+    pub(crate) fn register(&mut self, variable: VariableId, alias: VariableId) {
+        self.0.entry(variable).or_default().insert(alias);
+        self.0.entry(alias).or_default().insert(variable);
+    }
+
+    pub(crate) fn iter(&self) -> btree_map::Iter<VariableId, BTreeSet<VariableId>> {
+        self.0.iter()
     }
 }
 

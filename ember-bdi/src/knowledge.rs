@@ -170,6 +170,7 @@ impl NormalizedBelief {
         &'a self,
         metadata: &BeliefMetadata,
         other: &'a Literal<NonGround>,
+        existing_bindings: Option<&'a Bindings>,
     ) -> unification::Result<Bindings<'a>> {
         use core::ops::BitXor;
 
@@ -188,7 +189,7 @@ impl NormalizedBelief {
                     negated: _,
                     structure: s2,
                 },
-            ) => structure.unify(s2),
+            ) => structure.unify(s2, existing_bindings),
             (_, Literal::Variable(NonGround(_))) => unimplemented!(),
         }
     }
@@ -244,10 +245,13 @@ mod query {
             Self { beliefs, query }
         }
 
-        pub fn next_bindings(&mut self) -> Option<Bindings<'a>> {
+        pub fn next_bindings<'b>(
+            &mut self,
+            existing_bindings: Option<&'a Bindings<'b>>,
+        ) -> Option<Bindings<'a>> {
             self.beliefs
                 .as_mut()?
-                .find_map(|(b, m)| b.unify_literal(m, self.query).ok())
+                .find_map(|(b, m)| b.unify_literal(m, self.query, existing_bindings).ok())
         }
     }
 }
@@ -334,9 +338,9 @@ mod tests {
             };
 
             let mut query = bb.query(&q_p1);
-            assert!(query.next_bindings().is_some());
+            assert!(query.next_bindings(None).is_some());
             assert!(
-                query.next_bindings().is_none(),
+                query.next_bindings(None).is_none(),
                 "Should only match p/1 signature"
             );
         }
@@ -357,13 +361,13 @@ mod tests {
                     arguments: Some(Box::new([str_term(a)])),
                 },
             };
-            assert!(bb.query(&q_pos).next_bindings().is_some());
+            assert!(bb.query(&q_pos).next_bindings(None).is_some());
 
             // Assert ~weather(sunny) - should update the collection
             bb.assert(make_belief(f, vec![a], true));
 
             assert!(
-                bb.query(&q_pos).next_bindings().is_none(),
+                bb.query(&q_pos).next_bindings(None).is_none(),
                 "Positive belief should be superseded"
             );
 
@@ -374,7 +378,7 @@ mod tests {
                     arguments: Some(Box::new([str_term(a)])),
                 },
             };
-            assert!(bb.query(&q_neg).next_bindings().is_some());
+            assert!(bb.query(&q_neg).next_bindings(None).is_some());
         }
 
         #[test]
@@ -394,7 +398,7 @@ mod tests {
 
             let mut q = bb.query(&query);
             let mut found = Vec::new();
-            while let Some(bindings) = q.next_bindings() {
+            while let Some(bindings) = q.next_bindings(None) {
                 if let Some(TermView::Term(Term::String(s))) = bindings.get(&v) {
                     found.push(s.clone());
                 }
@@ -453,7 +457,7 @@ mod tests {
 
             let bindings = bb
                 .query(&query)
-                .next_bindings()
+                .next_bindings(None)
                 .expect("Deep unification failed");
             assert_eq!(bindings.get(&v_x), Some(&num_term(10.0).as_view()));
         }
@@ -479,7 +483,7 @@ mod tests {
                     arguments: None,
                 },
             };
-            assert!(bb.query(&q_p).next_bindings().is_some());
+            assert!(bb.query(&q_p).next_bindings(None).is_some());
 
             // Ensure it doesn't match p(X)
             let v = var();
@@ -490,7 +494,7 @@ mod tests {
                     arguments: Some(vec![var_term(&v)].into_boxed_slice()),
                 },
             };
-            assert!(bb.query(&q_p1).next_bindings().is_none());
+            assert!(bb.query(&q_p1).next_bindings(None).is_none());
         }
 
         #[test]
@@ -513,9 +517,9 @@ mod tests {
             };
 
             let mut query = bb.query(&q);
-            assert!(query.next_bindings().is_some());
+            assert!(query.next_bindings(None).is_some());
             assert!(
-                query.next_bindings().is_none(),
+                query.next_bindings(None).is_none(),
                 "Should only yield one result for redundant facts"
             );
         }
@@ -536,7 +540,7 @@ mod tests {
                     arguments: Some(Box::new([str_term("val")])),
                 },
             };
-            assert!(bb.query(&q).next_bindings().is_none());
+            assert!(bb.query(&q).next_bindings(None).is_none());
         }
     }
 }
