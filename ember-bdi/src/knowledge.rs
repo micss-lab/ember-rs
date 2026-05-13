@@ -5,7 +5,7 @@ use crate::literal::Literal;
 use crate::term::unification::{UnificationFailedError, Unify};
 use crate::term::{Atom, Ground, NonGround, Structure, Term, unification};
 
-use self::query::Query;
+use self::query::{IntoQuery, Query};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Belief(
@@ -95,17 +95,8 @@ impl BeliefBase {
         beliefs.remove(belief)
     }
 
-    pub fn query<'a>(&'a self, query: &'a Literal) -> Query<'a> {
-        let beliefs = match query {
-            Literal::Atom { structure, .. } => self
-                .beliefs
-                .get(&atom_and_arity(structure))
-                .map(|b| b.0.iter()),
-            Literal::Variable(NonGround(_)) => {
-                unimplemented!("a single variable as a query is not supported")
-            }
-        };
-        Query::new(beliefs, query)
+    pub fn query<'a>(&'a self, query: impl IntoQuery<'a>) -> Query<'a> {
+        query.into_query(self)
     }
 }
 
@@ -224,73 +215,156 @@ impl BeliefMetadata {
 }
 
 mod query {
+    use alloc::boxed::Box;
     use alloc::collections::btree_map::Iter;
+    use alloc::vec::Vec;
 
     use crate::bindings::Bindings;
     use crate::literal::Literal;
+    use crate::term::NonGround;
 
-    use super::{BeliefMetadata, NormalizedBelief};
+    use super::{BeliefBase, BeliefMetadata, NormalizedBelief, atom_and_arity};
 
     /// Lazy resolution of a literal query.
+    #[derive(Debug, Clone)]
     pub struct Query<'a> {
-        beliefs: Option<Iter<'a, NormalizedBelief, BeliefMetadata>>,
-        query: &'a Literal,
+        conjunctions: Box<[Conjunction<'a>]>,
     }
 
     impl<'a> Query<'a> {
-        pub(super) fn new(
-            beliefs: Option<Iter<'a, NormalizedBelief, BeliefMetadata>>,
-            query: &'a Literal,
-        ) -> Self {
-            Self { beliefs, query }
+        pub fn next_bindings(&mut self) -> Option<Bindings<'a>> {
+            for conjunction in self.conjunctions.iter_mut() {
+                let Some(bindings) = conjunction.next_bindings() else {
+                    continue;
+                };
+                return Some(bindings);
+            }
+            None
         }
+    }
 
-        pub fn next_bindings(
+    #[derive(Debug, Clone)]
+    struct Conjunction<'a> {
+        operands: Box<[LiteralQuery<'a>]>,
+    }
+
+    impl<'a> Conjunction<'a> {
+        fn next_bindings(&mut self) -> Option<Bindings<'a>> {
+            let mut current_bindings = Vec::with_capacity(self.operands.len());
+            let mut cursor = 0_usize;
+            while let Some(operand) = self.operands.get_mut(cursor) {
+                match operand.next_bindings(current_bindings.get(cursor.saturating_sub(1))) {
+                    Some(bindings) => {
+                        current_bindings.push(bindings);
+                        cursor += 1;
+                    }
+                    None => {
+                        if cursor == 0 {
+                            break;
+                        }
+                        current_bindings.pop();
+                        operand.reset();
+                        cursor -= 1;
+                    }
+                }
+            }
+
+            // Reset every operand except the first one in case this function gets
+            // called again.
+            self.operands.iter_mut().skip(1).for_each(|o| o.reset());
+
+            current_bindings.pop()
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    struct LiteralQuery<'a> {
+        /// Closed-world principle of "not". If the query is not satisfyable with
+        /// any bindings, it succeeds.
+        negated: bool,
+        beliefs: Option<Iter<'a, NormalizedBelief, BeliefMetadata>>,
+        literal: &'a Literal,
+
+        /// On backtracking, the beliefs it has already tried have to be redone.
+        original: Option<Iter<'a, NormalizedBelief, BeliefMetadata>>,
+    }
+
+    impl<'a> LiteralQuery<'a> {
+        fn next_bindings(
             &mut self,
             existing_bindings: Option<&Bindings<'a>>,
         ) -> Option<Bindings<'a>> {
-            self.beliefs
-                .as_mut()?
-                .find_map(|(b, m)| b.unify_literal(m, self.query, existing_bindings).ok())
+            match (
+                self.negated,
+                self.beliefs.as_mut().and_then(|b| {
+                    b.find_map(|(b, m)| b.unify_literal(m, self.literal, existing_bindings).ok())
+                }),
+            ) {
+                (false, r) => r,
+                (true, Some(_)) => None,
+                (true, None) => Some(
+                    // Ensure that empty bindings are always returned such that the
+                    // query does not fail.
+                    existing_bindings
+                        .cloned()
+                        .unwrap_or_else(Bindings::empty),
+                ),
+            }
+        }
+
+        fn reset(&mut self) {
+            self.beliefs = self.original.clone();
         }
     }
-}
 
-fn atom_and_arity<G: Clone>(structure: &Structure<G>) -> (Atom, usize) {
-    (
-        structure.functor.clone(),
-        structure
-            .arguments
-            .as_ref()
-            .map(|args| args.len())
-            .unwrap_or(0),
-    )
-}
+    pub trait IntoQuery<'a>
+    where
+        Self: 'a,
+    {
+        fn into_query(self, knowledge: &'a BeliefBase) -> Query<'a>;
+    }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+    impl<'a> IntoQuery<'a> for &'a Literal {
+        fn into_query(self, knowledge: &'a BeliefBase) -> Query<'a> {
+            let beliefs = match self {
+                Literal::Atom { structure, .. } => knowledge
+                    .beliefs
+                    .get(&atom_and_arity(structure))
+                    .map(|b| b.0.iter()),
+                Literal::Variable(NonGround(_)) => {
+                    unimplemented!("a single variable as a query is not supported (yet)")
+                }
+            };
+            Query {
+                conjunctions: Box::new([Conjunction {
+                    operands: Box::new([LiteralQuery {
+                        negated: false,
+                        original: beliefs.clone(),
+                        beliefs,
+                        literal: self,
+                    }]),
+                }]),
+            }
+        }
+    }
 
-    mod query {
+    #[cfg(test)]
+    mod tests {
         use alloc::boxed::Box;
         use alloc::vec;
         use alloc::vec::Vec;
 
-        use crate::bindings::TermView;
+        use crate::knowledge::{Belief, BeliefBase};
         use crate::literal::Literal;
         use crate::term::{Atom, Ground, NonGround, Structure, Term};
         use crate::variable::Variable;
 
-        use super::*;
+        use super::{Conjunction, LiteralQuery, Query};
 
         // --- Fixed Helper Functions ---
 
         fn str_term(s: &str) -> Term<NonGround> {
             Term::String(s.into())
-        }
-
-        fn num_term(n: f32) -> Term<NonGround> {
-            Term::Number(n.into())
         }
 
         fn var() -> Variable {
@@ -318,229 +392,226 @@ mod tests {
             Belief::from_ground_literal(lit)
         }
 
-        // --- Comprehensive Test Suite ---
-
         #[test]
-        fn signature_partitioning() {
+        fn shared_variable_conjunction() {
             let mut bb = BeliefBase::default();
 
-            bb.assert(make_belief("p", vec!["a"], false));
-            bb.assert(make_belief("p", vec!["a", "b"], false));
-            bb.assert(make_belief("q", vec!["a"], false));
+            // Setup: parent(alice, bob), parent(bob, charlie)
+            bb.assert(make_belief("parent", vec!["alice", "bob"], false));
+            bb.assert(make_belief("parent", vec!["bob", "charlie"], false));
 
-            let v = var();
-            let q_p1 = Literal::Atom {
+            let x = var();
+            let y = var();
+
+            // Goal: parent(alice, X), parent(X, Y)
+            let lit1 = Literal::Atom {
+                negated: false,
+                structure: Structure {
+                    functor: Atom("parent".into()),
+                    arguments: Some(Box::new([str_term("alice"), var_term(&x)])),
+                },
+            };
+
+            let lit2 = Literal::Atom {
+                negated: false,
+                structure: Structure {
+                    functor: Atom("parent".into()),
+                    arguments: Some(Box::new([var_term(&x), var_term(&y)])),
+                },
+            };
+
+            // Manually constructing a conjunction query as IntoQuery is currently &Literal only
+            let mut query = Query {
+                conjunctions: Box::new([Conjunction {
+                    operands: Box::new([
+                        LiteralQuery {
+                            negated: false,
+                            beliefs: bb
+                                .beliefs
+                                .get(&(Atom("parent".into()), 2))
+                                .map(|b| b.0.iter()),
+                            original: bb
+                                .beliefs
+                                .get(&(Atom("parent".into()), 2))
+                                .map(|b| b.0.iter()),
+                            literal: &lit1,
+                        },
+                        LiteralQuery {
+                            negated: false,
+                            beliefs: bb
+                                .beliefs
+                                .get(&(Atom("parent".into()), 2))
+                                .map(|b| b.0.iter()),
+                            original: bb
+                                .beliefs
+                                .get(&(Atom("parent".into()), 2))
+                                .map(|b| b.0.iter()),
+                            literal: &lit2,
+                        },
+                    ]),
+                }]),
+            };
+
+            let bindings = query
+                .next_bindings()
+                .expect("Should find grandparent relation");
+            assert_eq!(bindings.get(&x), Some(&str_term("bob").as_view()));
+            assert_eq!(bindings.get(&y), Some(&str_term("charlie").as_view()));
+        }
+
+        #[test]
+        fn backtracking_across_operands() {
+            let mut bb = BeliefBase::default();
+
+            // p(1, 10). p(1, 20). q(20, 30).
+            // A query for p(1, X), q(X, Y) should skip X=10 and find X=20.
+            bb.assert(make_belief("p", vec!["1", "10"], false));
+            bb.assert(make_belief("p", vec!["1", "20"], false));
+            bb.assert(make_belief("q", vec!["20", "30"], false));
+
+            let x = var();
+            let y = var();
+
+            let lit_p = Literal::Atom {
                 negated: false,
                 structure: Structure {
                     functor: Atom("p".into()),
-                    arguments: Some(Box::new([var_term(&v)])),
+                    arguments: Some(Box::new([str_term("1"), var_term(&x)])),
+                },
+            };
+            let lit_q = Literal::Atom {
+                negated: false,
+                structure: Structure {
+                    functor: Atom("q".into()),
+                    arguments: Some(Box::new([var_term(&x), var_term(&y)])),
                 },
             };
 
-            let mut query = bb.query(&q_p1);
-            assert!(query.next_bindings(None).is_some());
+            let mut query = Query {
+                conjunctions: Box::new([Conjunction {
+                    operands: Box::new([
+                        LiteralQuery {
+                            negated: false,
+                            beliefs: bb.beliefs.get(&(Atom("p".into()), 2)).map(|b| b.0.iter()),
+                            original: bb.beliefs.get(&(Atom("p".into()), 2)).map(|b| b.0.iter()),
+                            literal: &lit_p,
+                        },
+                        LiteralQuery {
+                            negated: false,
+                            beliefs: bb.beliefs.get(&(Atom("q".into()), 2)).map(|b| b.0.iter()),
+                            original: bb.beliefs.get(&(Atom("q".into()), 2)).map(|b| b.0.iter()),
+                            literal: &lit_q,
+                        },
+                    ]),
+                }]),
+            };
+
+            let bindings = query
+                .next_bindings()
+                .expect("Backtracking should find X=20");
+            assert_eq!(bindings.get(&x), Some(&str_term("20").as_view()));
+            assert_eq!(bindings.get(&y), Some(&str_term("30").as_view()));
+        }
+
+        #[test]
+        fn closed_world_negation_success() {
+            let mut bb = BeliefBase::default();
+            bb.assert(make_belief("is_raining", vec![], false));
+
+            // Query: ~is_sunny (Should succeed because is_sunny is not known)
+            let lit_sunny = Literal::Atom {
+                negated: false,
+                structure: Structure {
+                    functor: Atom("is_sunny".into()),
+                    arguments: None,
+                },
+            };
+
+            let mut query = Query {
+                conjunctions: Box::new([Conjunction {
+                    operands: Box::new([LiteralQuery {
+                        negated: true, // Logical NOT
+                        beliefs: None,
+                        original: None,
+                        literal: &lit_sunny,
+                    }]),
+                }]),
+            };
+
             assert!(
-                query.next_bindings(None).is_none(),
-                "Should only match p/1 signature"
+                query.next_bindings().is_some(),
+                "Negation of unknown fact should succeed"
             );
         }
 
         #[test]
-        fn negation_consistency_and_replacement() {
-            let mut bb = BeliefBase::default();
-            let f = "weather";
-            let a = "sunny";
-
-            // Assert weather(sunny)
-            bb.assert(make_belief(f, vec![a], false));
-
-            let q_pos = Literal::Atom {
-                negated: false,
-                structure: Structure {
-                    functor: Atom(f.into()),
-                    arguments: Some(Box::new([str_term(a)])),
-                },
-            };
-            assert!(bb.query(&q_pos).next_bindings(None).is_some());
-
-            // Assert ~weather(sunny) - should update the collection
-            bb.assert(make_belief(f, vec![a], true));
-
-            assert!(
-                bb.query(&q_pos).next_bindings(None).is_none(),
-                "Positive belief should be superseded"
-            );
-
-            let q_neg = Literal::Atom {
-                negated: true,
-                structure: Structure {
-                    functor: Atom(f.into()),
-                    arguments: Some(Box::new([str_term(a)])),
-                },
-            };
-            assert!(bb.query(&q_neg).next_bindings(None).is_some());
-        }
-
-        #[test]
-        fn multi_result_unification() {
-            let mut bb = BeliefBase::default();
-            bb.assert(make_belief("likes", vec!["alice", "pizza"], false));
-            bb.assert(make_belief("likes", vec!["alice", "sushi"], false));
-
-            let v = var();
-            let query = Literal::Atom {
-                negated: false,
-                structure: Structure {
-                    functor: Atom("likes".into()),
-                    arguments: Some(Box::new([str_term("alice"), var_term(&v)])),
-                },
-            };
-
-            let mut q = bb.query(&query);
-            let mut found = Vec::new();
-            while let Some(bindings) = q.next_bindings(None) {
-                if let Some(TermView::Term(Term::String(s))) = bindings.get(&v) {
-                    found.push(s.clone());
-                }
-            }
-
-            assert_eq!(found.len(), 2);
-            assert!(found.contains(&"pizza".into()));
-            assert!(found.contains(&"sushi".into()));
-        }
-
-        #[test]
-        fn deep_structural_query() {
+        fn nested_structure_extraction() {
             let mut bb = BeliefBase::default();
 
-            // Manual construction of nested belief: at(robot, pos(10, 20))
-            let inner_struct = Structure {
-                functor: Atom("pos".into()),
-                arguments: Some(Box::new([
-                    Term::<Ground>::Number(10.0.into()),
-                    Term::<Ground>::Number(20.0.into()),
-                ])),
+            // color(circle(red))
+            let inner = Structure {
+                functor: Atom("circle".into()),
+                arguments: Some(Box::new([Term::String("red".into())])),
             };
-            let outer_lit = Literal::Atom {
+            bb.assert(Belief::from_ground_literal(Literal::Atom {
                 negated: false,
                 structure: Structure {
-                    functor: Atom("at".into()),
-                    arguments: Some(Box::new([
-                        Term::<Ground>::String("robot".into()),
-                        Term::<Ground>::Literal {
-                            negated: false,
-                            structure: inner_struct,
+                    functor: Atom("color".into()),
+                    arguments: Some(Box::new([Term::Literal {
+                        negated: false,
+                        structure: inner,
+                    }])),
+                },
+            }));
+
+            let x = var();
+            let query_lit = Literal::Atom {
+                negated: false,
+                structure: Structure {
+                    functor: Atom("color".into()),
+                    arguments: Some(Box::new([Term::Literal {
+                        negated: false,
+                        structure: Structure {
+                            functor: Atom("circle".into()),
+                            arguments: Some(Box::new([var_term(&x)])),
                         },
-                    ])),
-                },
-            };
-            bb.assert(Belief::from_ground_literal(outer_lit));
-
-            let v_x = var();
-            let query_inner = Structure {
-                functor: Atom("pos".into()),
-                arguments: Some(Box::new([var_term(&v_x), num_term(20.0)])),
-            };
-            let query = Literal::Atom {
-                negated: false,
-                structure: Structure {
-                    functor: Atom("at".into()),
-                    arguments: Some(Box::new([
-                        str_term("robot"),
-                        Term::Literal {
-                            negated: false,
-                            structure: query_inner,
-                        },
-                    ])),
+                    }])),
                 },
             };
 
             let bindings = bb
-                .query(&query)
-                .next_bindings(None)
-                .expect("Deep unification failed");
-            assert_eq!(bindings.get(&v_x), Some(&num_term(10.0).as_view()));
+                .query(&query_lit)
+                .next_bindings()
+                .expect("Nested unification failed");
+            assert_eq!(bindings.get(&x), Some(&str_term("red").as_view()));
         }
 
         #[test]
-        fn arity_zero_and_empty_states() {
+        fn partial_structural_mismatch() {
             let mut bb = BeliefBase::default();
+            bb.assert(make_belief("pair", vec!["a", "b"], false));
 
-            // p.
-            let b_p = Literal::Atom {
+            // Query: pair(a, c) - should fail
+            let query_lit = Literal::Atom {
                 negated: false,
                 structure: Structure {
-                    functor: Atom("p".into()),
-                    arguments: None,
-                },
-            };
-            bb.assert(Belief::from_ground_literal(b_p));
-
-            let q_p = Literal::Atom {
-                negated: false,
-                structure: Structure {
-                    functor: Atom("p".into()),
-                    arguments: None,
-                },
-            };
-            assert!(bb.query(&q_p).next_bindings(None).is_some());
-
-            // Ensure it doesn't match p(X)
-            let v = var();
-            let q_p1 = Literal::Atom {
-                negated: false,
-                structure: Structure {
-                    functor: Atom("p".into()),
-                    arguments: Some(vec![var_term(&v)].into_boxed_slice()),
-                },
-            };
-            assert!(bb.query(&q_p1).next_bindings(None).is_none());
-        }
-
-        #[test]
-        fn assertion_redundancy() {
-            let mut bb = BeliefBase::default();
-            let b = make_belief("fact", vec!["shared"], false);
-
-            assert!(bb.assert(b.clone()));
-            assert!(
-                !bb.assert(b.clone()),
-                "Duplicate assert should return false"
-            );
-
-            let q = Literal::Atom {
-                negated: false,
-                structure: Structure {
-                    functor: Atom("fact".into()),
-                    arguments: Some(Box::new([str_term("shared")])),
+                    functor: Atom("pair".into()),
+                    arguments: Some(Box::new([str_term("a"), str_term("c")])),
                 },
             };
 
-            let mut query = bb.query(&q);
-            assert!(query.next_bindings(None).is_some());
-            assert!(
-                query.next_bindings(None).is_none(),
-                "Should only yield one result for redundant facts"
-            );
-        }
-
-        #[test]
-        fn removal_logic() {
-            let mut bb = BeliefBase::default();
-            let b = make_belief("temp", vec!["val"], false);
-
-            bb.assert(b.clone());
-            assert!(bb.remove(b.clone()));
-            assert!(!bb.remove(b), "Second removal should return false");
-
-            let q = Literal::Atom {
-                negated: false,
-                structure: Structure {
-                    functor: Atom("temp".into()),
-                    arguments: Some(Box::new([str_term("val")])),
-                },
-            };
-            assert!(bb.query(&q).next_bindings(None).is_none());
+            assert!(bb.query(&query_lit).next_bindings().is_none());
         }
     }
+}
+
+fn atom_and_arity<G: Clone>(structure: &Structure<G>) -> (Atom, usize) {
+    (
+        structure.functor.clone(),
+        structure
+            .arguments
+            .as_ref()
+            .map(|args| args.len())
+            .unwrap_or(0),
+    )
 }

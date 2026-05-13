@@ -282,15 +282,17 @@ mod solver {
         }
 
         pub(super) fn load_existing_bindings(&mut self, existing: &Bindings<'a>) -> Result<()> {
-            for (&variable, term) in existing.bindings.iter() {
-                if let Some(term) = term {
-                    self.classes.register(
-                        BindingConstraint {
-                            variable,
-                            value: term.clone(),
-                        },
-                        &mut self.queue,
-                    )?;
+            if let Some(bindings) = &existing.bindings {
+                for (&variable, term) in bindings.iter() {
+                    if let Some(term) = term {
+                        self.classes.register(
+                            BindingConstraint {
+                                variable,
+                                value: term.clone(),
+                            },
+                            &mut self.queue,
+                        )?;
+                    }
                 }
             }
 

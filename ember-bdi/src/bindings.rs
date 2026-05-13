@@ -5,9 +5,9 @@ use alloc::vec::Vec;
 use crate::term::{Atom, NonGround, Structure, Term};
 use crate::variable::{Variable, VariableId};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Default)]
 pub struct Bindings<'a> {
-    pub(crate) bindings: BTreeMap<VariableId, Option<TermView<'a>>>,
+    pub(crate) bindings: Option<BTreeMap<VariableId, Option<TermView<'a>>>>,
     pub(crate) aliases: AliasMap,
 }
 
@@ -17,24 +17,35 @@ impl<'a> Bindings<'a> {
         aliases: AliasMap,
     ) -> Self {
         Self {
-            bindings: bindings.into_iter().collect(),
+            bindings: Some(bindings.into_iter().collect()),
             aliases,
+        }
+    }
+
+    pub(crate) fn empty() -> Self {
+        Self {
+            bindings: None,
+            aliases: AliasMap::empty(),
         }
     }
 }
 
 impl<'a> Bindings<'a> {
     pub fn get(&self, variable: &Variable) -> Option<&TermView<'a>> {
-        self.bindings.get(&variable.id)?.as_ref()
+        self.bindings.as_ref()?.get(&variable.id)?.as_ref()
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct AliasMap(Vec<(VariableId, VariableId)>);
 
 impl AliasMap {
     pub(crate) fn new(aliases: impl IntoIterator<Item = (VariableId, VariableId)>) -> Self {
         Self(aliases.into_iter().collect())
+    }
+
+    pub(crate) fn empty() -> Self {
+        Self(Vec::with_capacity(0))
     }
 
     pub(crate) fn iter(&self) -> core::slice::Iter<'_, (VariableId, VariableId)> {
