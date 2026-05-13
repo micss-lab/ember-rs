@@ -260,17 +260,16 @@ impl<'a> BindingConstraint<'a> {
 
 mod solver {
     use alloc::collections::BTreeMap;
-    use alloc::collections::btree_set::BTreeSet;
     use alloc::vec::Vec;
 
-    use crate::bindings::{Bindings, StructureView, TermView};
+    use crate::bindings::{AliasMap, Bindings, StructureView, TermView};
     use crate::term::{NonGround, Term};
-    use crate::variable::{Variable, VariableId};
+    use crate::variable::VariableId;
 
-    use super::{BindingConstraint, Result, UnificationFailedError, Unify, UnifyView};
+    use super::{BindingConstraint, Result, UnificationFailedError, UnifyView};
 
     pub(super) struct ConstraintSolver<'a, 'b> {
-        partitions: Partitions<'a>,
+        classes: EquivalenceClasses<'a>,
         queue: Vec<BindingConstraint<'a>>,
         existing_bindings: Option<&'b Bindings<'a>>,
     }
@@ -278,29 +277,23 @@ mod solver {
     impl<'a, 'b> ConstraintSolver<'a, 'b> {
         pub(super) fn new(constraints: impl IntoIterator<Item = BindingConstraint<'a>>) -> Self {
             Self {
-                partitions: Partitions::default(),
+                classes: EquivalenceClasses::default(),
                 queue: constraints.into_iter().collect(),
                 existing_bindings: None,
             }
         }
 
-        pub(super) fn with_existing_bindings(
-            mut self,
+        pub(super) fn load_existing_bindings(
+            &mut self,
             existing_bindings: &'b Bindings<'a>,
-        ) -> Self {
-            self.existing_bindings = Some(existing_bindings);
-            self
-        }
-    }
+        ) -> Result<()> {
+            let Some(existing) = self.existing_bindings else {
+                return Ok(());
+            };
 
-    impl<'a> ConstraintSolver<'a, '_> {
-        pub(super) fn solve(mut self) -> Result<Bindings<'a>> {
-            if let Some(existing_bindings) = self.existing_bindings {
-                for (&variable, term) in existing_bindings.bindings.iter() {
-                    let Some(term) = term else {
-                        continue;
-                    };
-                    self.partitions.register(
+            for (&variable, term) in existing.bindings.iter() {
+                if let Some(term) = term {
+                    self.classes.register(
                         BindingConstraint {
                             variable,
                             value: term.clone(),
@@ -308,91 +301,111 @@ mod solver {
                         &mut self.queue,
                     )?;
                 }
-
-                for (variable, aliases) in existing_bindings.aliases.iter() {
-                    for alias in aliases {
-                        self.partitions.merge(*variable, *alias, &mut self.queue)?;
-                    }
-                }
             }
 
-            while let Some(constraint) = self.queue.pop() {
-                self.partitions.register(constraint, &mut self.queue)?;
+            for &(var1, var2) in existing.aliases.iter() {
+                self.classes.merge(var1, var2, &mut self.queue)?;
             }
 
-            let bindings = {
-                // 1. Resolve each partition exactly once
-                let mut partition_assignments = BTreeMap::new();
-                for (&pid, term) in &self.partitions.partition_to_term {
-                    let resolved = self
-                        .partitions
-                        .resolve_term(term.clone(), &mut Vec::new())?;
-                    partition_assignments.insert(pid, resolved);
-                }
-
-                // 2. Map variables to their resolved partition values
-                let mut bindings = self
-                    .partitions
-                    .variable_to_partition
-                    .iter()
-                    .map(|(&vid, &pid)| (vid, partition_assignments.get(&pid).cloned()))
-                    .collect::<BTreeMap<_, _>>();
-
-                let aliases = {
-                    let mut aliases: BTreeMap<PartitionId, BTreeSet<VariableId>> = BTreeMap::new();
-                    for (variable, pid) in self.partitions.variable_to_partition.iter() {
-                        aliases.entry(*pid).or_default().insert(*variable);
-                    }
-                    aliases.into_iter().map(|(_, v)| v).collect::<Vec<_>>()
-                };
-
-                Bindings::new(bindings, aliases)
-            };
-
-            Ok(bindings)
+            Ok(())
         }
     }
 
-    type PartitionId = usize;
+    impl<'a> ConstraintSolver<'a, '_> {
+        pub(super) fn solve(mut self) -> Result<Bindings<'a>> {
+            self.process_constraints()?;
+            self.finalize()
+        }
 
-    #[derive(Debug, Default)]
-    struct Partitions<'a> {
-        next_id: PartitionId,
-        variable_to_partition: BTreeMap<VariableId, PartitionId>,
-        partition_to_term: BTreeMap<PartitionId, TermView<'a>>,
+        fn process_constraints(&mut self) -> Result<()> {
+            while let Some(constraint) = self.queue.pop() {
+                self.classes.register(constraint, &mut self.queue)?;
+            }
+            Ok(())
+        }
+
+        fn finalize(&mut self) -> Result<Bindings<'a>> {
+            let variables: Vec<VariableId> = self.classes.parent.keys().copied().collect();
+            for &var in &variables {
+                self.classes.find_root(var);
+            }
+
+            let mut root_assignments = BTreeMap::new();
+            for (&root, term) in &self.classes.root_to_term {
+                let resolved = self.classes.resolve_term(term.clone(), &mut Vec::new())?;
+                root_assignments.insert(root, resolved);
+            }
+
+            let mut bindings = BTreeMap::new();
+            let mut root_to_vars: BTreeMap<VariableId, Vec<VariableId>> = BTreeMap::new();
+
+            for &var in &variables {
+                let root = self.classes.find_root(var);
+                bindings.insert(var, root_assignments.get(&root).cloned());
+                root_to_vars.entry(root).or_default().push(var);
+            }
+
+            let aliases = self.extract_aliases(root_to_vars);
+
+            Ok(Bindings::new(bindings, aliases))
+        }
+
+        fn extract_aliases(&self, root_to_vars: BTreeMap<VariableId, Vec<VariableId>>) -> AliasMap {
+            let mut aliases_pairs = Vec::new();
+            for vars in root_to_vars.values() {
+                if let Some((&first, rest)) = vars.split_first() {
+                    for &other in rest {
+                        aliases_pairs.push((first, other));
+                    }
+                }
+            }
+            AliasMap::new(aliases_pairs)
+        }
     }
 
-    impl<'a> Partitions<'a> {
-        fn get_or_create(&mut self, variable: VariableId) -> PartitionId {
-            *self
-                .variable_to_partition
-                .entry(variable)
-                .or_insert_with(|| {
-                    let id = self.next_id;
-                    self.next_id += 1;
-                    id
-                })
+    #[derive(Debug, Default)]
+    struct EquivalenceClasses<'a> {
+        parent: BTreeMap<VariableId, VariableId>,
+        root_to_term: BTreeMap<VariableId, TermView<'a>>,
+    }
+
+    impl<'a> EquivalenceClasses<'a> {
+        fn find_root(&mut self, var: VariableId) -> VariableId {
+            let p = *self.parent.entry(var).or_insert(var);
+            if p != var {
+                let root = self.find_root(p);
+                self.parent.insert(var, root);
+                root
+            } else {
+                p
+            }
+        }
+
+        fn root_of(&self, var: VariableId) -> Option<VariableId> {
+            let mut current = var;
+            loop {
+                match self.parent.get(&current) {
+                    Some(&p) if p == current => return Some(current),
+                    Some(&p) => current = p,
+                    None => return None,
+                }
+            }
         }
 
         fn merge(
             &mut self,
-            variable: VariableId,
-            alias: VariableId,
+            var1: VariableId,
+            var2: VariableId,
             queue: &mut Vec<BindingConstraint<'a>>,
         ) -> Result<()> {
-            let pid1 = self.get_or_create(variable);
-            let pid2 = self.get_or_create(alias);
+            let root1 = self.find_root(var1);
+            let root2 = self.find_root(var2);
 
-            if pid1 != pid2 {
-                // Update all mappings pointing to pid2 to point to pid1
-                for pid in self.variable_to_partition.values_mut() {
-                    if *pid == pid2 {
-                        *pid = pid1;
-                    }
-                }
+            if root1 != root2 {
+                self.parent.insert(root2, root1);
 
-                if let Some(t2) = self.partition_to_term.remove(&pid2) {
-                    self.add_term(pid1, t2, queue)?;
+                if let Some(t2) = self.root_to_term.remove(&root2) {
+                    self.add_term(root1, t2, queue)?;
                 }
             }
 
@@ -407,42 +420,40 @@ mod solver {
             if let Some(alias) = value.as_variable() {
                 self.merge(variable, alias.id, queue)
             } else {
-                let pid = self.get_or_create(variable);
-                self.add_term(pid, value, queue)
+                let root = self.find_root(variable);
+                self.add_term(root, value, queue)
             }
         }
 
         fn add_term(
             &mut self,
-            pid: PartitionId,
+            root: VariableId,
             term: TermView<'a>,
             queue: &mut Vec<BindingConstraint<'a>>,
         ) -> Result<()> {
-            if let Some(t1) = self.partition_to_term.get(&pid) {
+            if let Some(t1) = self.root_to_term.get(&root) {
                 queue.extend(t1.clone().collect_constraints(term)?);
             } else {
-                self.partition_to_term.insert(pid, term);
+                self.root_to_term.insert(root, term);
             }
             Ok(())
         }
 
-        /// Try to resolve the term as far as possible. If a variable does not have a
-        /// value, return it as is.
         fn resolve_term(
             &self,
             term: TermView<'a>,
-            visiting: &mut Vec<PartitionId>,
+            visiting: &mut Vec<VariableId>,
         ) -> Result<TermView<'a>> {
             match term {
                 TermView::Term(term) => match term {
                     Term::Number(_) | Term::String(_) => Ok(TermView::Term(term)),
 
                     Term::Variable(NonGround(v)) => {
-                        let Some(pid) = self.variable_to_partition.get(&v.id) else {
+                        let Some(root) = self.root_of(v.id) else {
                             return Ok(TermView::Term(term));
                         };
                         Ok(self
-                            .resolve_pid(*pid, visiting)?
+                            .resolve_root(root, visiting)?
                             .unwrap_or(TermView::Term(term)))
                     }
                     Term::Literal {
@@ -491,19 +502,19 @@ mod solver {
             }
         }
 
-        fn resolve_pid(
+        fn resolve_root(
             &self,
-            pid: PartitionId,
-            visiting: &mut Vec<PartitionId>,
+            root: VariableId,
+            visiting: &mut Vec<VariableId>,
         ) -> Result<Option<TermView<'a>>> {
-            if visiting.contains(&pid) {
-                return Err(UnificationFailedError::CyclicReference); // Cycle detected
+            if visiting.contains(&root) {
+                return Err(UnificationFailedError::CyclicReference);
             }
-            let Some(term) = self.partition_to_term.get(&pid) else {
+            let Some(term) = self.root_to_term.get(&root) else {
                 return Ok(None);
             };
 
-            visiting.push(pid);
+            visiting.push(root);
             let result = self.resolve_term(term.clone(), visiting);
             visiting.pop();
             result.map(Some)
@@ -527,7 +538,7 @@ impl<'a> Bindings<'a> {
     ) -> Result<Self> {
         let mut solver = solver::ConstraintSolver::new(constraints);
         if let Some(existing_bindings) = existing_bindings {
-            solver = solver.with_existing_bindings(existing_bindings);
+            solver.load_existing_bindings(existing_bindings)?;
         }
         solver.solve()
     }

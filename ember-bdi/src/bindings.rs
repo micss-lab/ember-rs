@@ -1,6 +1,5 @@
 use alloc::boxed::Box;
-use alloc::collections::btree_set::BTreeSet;
-use alloc::collections::{BTreeMap, btree_map};
+use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use crate::term::{Atom, NonGround, Structure, Term};
@@ -36,21 +35,15 @@ impl<'a> Bindings<'a> {
     }
 }
 
-pub(crate) struct AliasMap(BTreeMap<VariableId, BTreeSet<VariableId>>);
+#[derive(Debug, Default)]
+pub(crate) struct AliasMap(Vec<(VariableId, VariableId)>);
 
 impl AliasMap {
-    pub(crate) fn new(
-        aliases: impl IntoIterator<Item = (VariableId, BTreeSet<VariableId>)>,
-    ) -> Self {
+    pub(crate) fn new(aliases: impl IntoIterator<Item = (VariableId, VariableId)>) -> Self {
         Self(aliases.into_iter().collect())
     }
 
-    pub(crate) fn register(&mut self, variable: VariableId, alias: VariableId) {
-        self.0.entry(variable).or_default().insert(alias);
-        self.0.entry(alias).or_default().insert(variable);
-    }
-
-    pub(crate) fn iter(&self) -> btree_map::Iter<VariableId, BTreeSet<VariableId>> {
+    pub(crate) fn iter(&self) -> core::slice::Iter<'_, (VariableId, VariableId)> {
         self.0.iter()
     }
 }
