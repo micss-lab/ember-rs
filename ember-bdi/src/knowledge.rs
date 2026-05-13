@@ -170,7 +170,7 @@ impl NormalizedBelief {
         &'a self,
         metadata: &BeliefMetadata,
         other: &'a Literal<NonGround>,
-        existing_bindings: Option<&'a Bindings>,
+        existing_bindings: Option<&Bindings<'a>>,
     ) -> unification::Result<Bindings<'a>> {
         use core::ops::BitXor;
 
@@ -245,9 +245,9 @@ mod query {
             Self { beliefs, query }
         }
 
-        pub fn next_bindings<'b>(
+        pub fn next_bindings(
             &mut self,
-            existing_bindings: Option<&'a Bindings<'b>>,
+            existing_bindings: Option<&Bindings<'a>>,
         ) -> Option<Bindings<'a>> {
             self.beliefs
                 .as_mut()?
