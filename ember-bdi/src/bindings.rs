@@ -29,12 +29,6 @@ impl<'a> Bindings<'a> {
     }
 }
 
-impl<'a> Bindings<'a> {
-    pub(crate) fn get_using_id(&self, variable: VariableId) -> Option<&TermView<'a>> {
-        self.bindings.get(&variable)?.as_ref()
-    }
-}
-
 #[derive(Debug, Default)]
 pub(crate) struct AliasMap(Vec<(VariableId, VariableId)>);
 

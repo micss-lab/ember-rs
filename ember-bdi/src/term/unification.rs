@@ -268,29 +268,20 @@ mod solver {
 
     use super::{BindingConstraint, Result, UnificationFailedError, UnifyView};
 
-    pub(super) struct ConstraintSolver<'a, 'b> {
+    pub(super) struct ConstraintSolver<'a> {
         classes: EquivalenceClasses<'a>,
         queue: Vec<BindingConstraint<'a>>,
-        existing_bindings: Option<&'b Bindings<'a>>,
     }
 
-    impl<'a, 'b> ConstraintSolver<'a, 'b> {
+    impl<'a> ConstraintSolver<'a> {
         pub(super) fn new(constraints: impl IntoIterator<Item = BindingConstraint<'a>>) -> Self {
             Self {
                 classes: EquivalenceClasses::default(),
                 queue: constraints.into_iter().collect(),
-                existing_bindings: None,
             }
         }
 
-        pub(super) fn load_existing_bindings(
-            &mut self,
-            existing_bindings: &'b Bindings<'a>,
-        ) -> Result<()> {
-            let Some(existing) = self.existing_bindings else {
-                return Ok(());
-            };
-
+        pub(super) fn load_existing_bindings(&mut self, existing: &Bindings<'a>) -> Result<()> {
             for (&variable, term) in existing.bindings.iter() {
                 if let Some(term) = term {
                     self.classes.register(
@@ -309,9 +300,7 @@ mod solver {
 
             Ok(())
         }
-    }
 
-    impl<'a> ConstraintSolver<'a, '_> {
         pub(super) fn solve(mut self) -> Result<Bindings<'a>> {
             self.process_constraints()?;
             self.finalize()
