@@ -2,12 +2,13 @@ use alloc::boxed::Box;
 
 use crate::context::Context;
 use crate::literal::Literal;
-use crate::term::Term;
+
+pub use crate::knowledge::query::formula::*;
 
 #[derive(Debug)]
 pub struct Plan<A> {
     pub trigger: TriggeringEvent,
-    pub context: Option<ContextFormula>,
+    pub context: Option<QueryFormula>,
     pub body: fn(&mut Context) -> Box<[Formula<A>]>,
 }
 
@@ -28,59 +29,6 @@ pub enum Trigger {
 pub enum GoalKind {
     Achieve,
     Query,
-}
-
-#[derive(Debug)]
-pub enum ContextFormula {
-    Not(Box<ContextFormula>),
-    Logical {
-        operator: LogicalOperator,
-        operands: Box<[ContextFormula]>,
-    },
-    Relational {
-        operator: RelationalOperator,
-        operands: Box<(ArithmeticExpression, ArithmeticExpression)>,
-    },
-    Literal(Literal),
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum LogicalOperator {
-    Conjunction,
-    Disjunction,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum RelationalOperator {
-    Compare {
-        operator: CompareOperator,
-        equal: bool,
-    },
-    Unify,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum CompareOperator {
-    LessThan,
-    GreaterThan,
-    EqualTo,
-}
-
-#[derive(Debug)]
-pub enum ArithmeticExpression {
-    Term(Term),
-    Operation {
-        operator: ArithmeticOperator,
-        operands: Box<[ArithmeticExpression]>,
-    },
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum ArithmeticOperator {
-    Sum,
-    Min,
-    Div,
-    Mul,
 }
 
 #[derive(Debug)]

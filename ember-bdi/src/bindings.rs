@@ -2,7 +2,7 @@ use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
-use crate::term::{Atom, NonGround, Structure, Term};
+use crate::term::{Atom, NonGround, Structure, Term, TotalCmpF32};
 use crate::variable::{Variable, VariableId};
 
 #[derive(Debug, Clone, Default)]
@@ -56,6 +56,7 @@ impl AliasMap {
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TermView<'a> {
     Term(&'a Term),
+    Number(TotalCmpF32),
     Literal {
         negated: bool,
         structure: StructureView<'a>,
@@ -65,8 +66,9 @@ pub enum TermView<'a> {
 impl Clone for TermView<'_> {
     fn clone(&self) -> Self {
         match self {
-            TermView::Term(term) => TermView::Term(term),
-            TermView::Literal { negated, structure } => TermView::Literal {
+            Self::Term(term) => Self::Term(term),
+            Self::Number(n) => Self::Number(*n),
+            Self::Literal { negated, structure } => Self::Literal {
                 negated: *negated,
                 structure: structure.clone(),
             },
@@ -76,7 +78,10 @@ impl Clone for TermView<'_> {
 
 impl<'a> From<&'a Term> for TermView<'a> {
     fn from(value: &'a Term) -> Self {
-        Self::Term(value)
+        match value {
+            Term::Number(n) => TermView::Number(*n),
+            t => TermView::Term(t),
+        }
     }
 }
 

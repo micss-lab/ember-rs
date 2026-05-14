@@ -5,10 +5,10 @@ use crate::bindings::{Bindings, StructureView, TermView};
 use crate::term::{NonGround, Structure, Term};
 use crate::variable::{Variable, VariableId};
 
-pub(crate) type Result<T> = core::result::Result<T, UnificationFailedError>;
+pub(crate) type Result<T> = core::result::Result<T, UnificationError>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UnificationFailedError {
+pub enum UnificationError {
     NumberMismatch,
     StringMismatch,
     FunctorMismatch,
@@ -18,7 +18,7 @@ pub enum UnificationFailedError {
     CyclicReference,
 }
 
-impl core::fmt::Display for UnificationFailedError {
+impl core::fmt::Display for UnificationError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "unification failed: ")?;
         match self {
@@ -33,7 +33,7 @@ impl core::fmt::Display for UnificationFailedError {
     }
 }
 
-impl core::error::Error for UnificationFailedError {}
+impl core::error::Error for UnificationError {}
 
 pub trait Unify<Rhs> {
     /// Collect individual constraints without recursive verification that they are collectively
@@ -80,18 +80,18 @@ impl Unify<&Term> for Term {
             (Variable(NonGround(v)), t) | (t, Variable(NonGround(v))) => v.collect_constraints(t),
 
             (Number(n1), Number(n2)) if n1 == n2 => Ok(vec![]),
-            (Number(_), Number(_)) => Err(UnificationFailedError::NumberMismatch),
+            (Number(_), Number(_)) => Err(UnificationError::NumberMismatch),
 
             (String(s1), String(s2)) if s1 == s2 => Ok(vec![]),
-            (String(_), String(_)) => Err(UnificationFailedError::StringMismatch),
+            (String(_), String(_)) => Err(UnificationError::StringMismatch),
 
             (Literal { negated: n1, .. }, Literal { negated: n2, .. }) if n1 != n2 => {
-                Err(UnificationFailedError::NegationMismatch)
+                Err(UnificationError::NegationMismatch)
             }
             (Literal { structure: s1, .. }, Literal { structure: s2, .. }) => {
                 s1.collect_constraints(s2)
             }
-            _ => Err(UnificationFailedError::TypeMismatch),
+            _ => Err(UnificationError::TypeMismatch),
         }
     }
 }
@@ -99,31 +99,22 @@ impl Unify<&Term> for Term {
 impl<'a> UnifyView<'a> for TermView<'a> {
     fn collect_constraints(self, other: Self) -> Result<Vec<BindingConstraint<'a>>> {
         match (self, other) {
-            (TermView::Term(this), TermView::Term(other)) => this.collect_constraints(other),
-
-            (TermView::Term(Term::Variable(NonGround(v))), t)
-            | (t, TermView::Term(Term::Variable(NonGround(v)))) => v.collect_constraints(t),
-
-            (TermView::Term(this), TermView::Literal { negated, structure })
-            | (TermView::Literal { negated, structure }, TermView::Term(this)) => {
-                match (this, (negated, structure)) {
-                    (Term::Literal { negated: n1, .. }, (n2, _)) if *n1 != n2 => {
-                        Err(UnificationFailedError::NegationMismatch)
-                    }
-                    (Term::Literal { structure: s1, .. }, (_, s2)) => s1.collect_constraints(s2),
-
-                    _ => Err(UnificationFailedError::TypeMismatch),
-                }
+            (TermView::Term(this), other) | (other, TermView::Term(this)) => {
+                this.collect_constraints(other)
             }
 
             (TermView::Literal { negated: n1, .. }, TermView::Literal { negated: n2, .. })
                 if n1 != n2 =>
             {
-                Err(UnificationFailedError::NegationMismatch)
+                Err(UnificationError::NegationMismatch)
             }
             (TermView::Literal { structure: s1, .. }, TermView::Literal { structure: s2, .. }) => {
                 s1.collect_constraints(s2)
             }
+            (TermView::Number(n1), TermView::Number(n2)) => (n1 == n2)
+                .then(alloc::vec::Vec::new)
+                .ok_or(UnificationError::NumberMismatch),
+            _ => Err(UnificationError::TypeMismatch),
         }
     }
 }
@@ -141,13 +132,17 @@ impl<'v> Unify<TermView<'v>> for Term {
             (Term::Literal { negated: n1, .. }, TermView::Literal { negated: n2, .. })
                 if *n1 != n2 =>
             {
-                Err(UnificationFailedError::NegationMismatch)
+                Err(UnificationError::NegationMismatch)
             }
             (Term::Literal { structure: s1, .. }, TermView::Literal { structure: s2, .. }) => {
                 s1.collect_constraints(s2)
             }
 
-            _ => Err(UnificationFailedError::TypeMismatch),
+            (Term::Number(n1), TermView::Number(n2)) => (*n1 == n2)
+                .then(alloc::vec::Vec::new)
+                .ok_or(UnificationError::NumberMismatch),
+
+            _ => Err(UnificationError::TypeMismatch),
         }
     }
 }
@@ -158,7 +153,7 @@ impl Unify<&Structure> for Structure {
         Self: 'a,
     {
         if self.functor != other.functor {
-            return Err(UnificationFailedError::FunctorMismatch);
+            return Err(UnificationError::FunctorMismatch);
         }
 
         match (&self.arguments, &other.arguments) {
@@ -170,7 +165,7 @@ impl Unify<&Structure> for Structure {
                 Ok(bindings)
             }
             (None, None) => Ok(vec![]),
-            _ => Err(UnificationFailedError::ArityMismatch),
+            _ => Err(UnificationError::ArityMismatch),
         }
     }
 }
@@ -178,7 +173,7 @@ impl Unify<&Structure> for Structure {
 impl<'a> UnifyView<'a> for StructureView<'a> {
     fn collect_constraints(self, other: Self) -> Result<Vec<BindingConstraint<'a>>> {
         if self.functor != other.functor {
-            return Err(UnificationFailedError::FunctorMismatch);
+            return Err(UnificationError::FunctorMismatch);
         }
 
         match (&self.arguments, &other.arguments) {
@@ -190,7 +185,7 @@ impl<'a> UnifyView<'a> for StructureView<'a> {
                 Ok(bindings)
             }
             (None, None) => Ok(vec![]),
-            _ => Err(UnificationFailedError::ArityMismatch),
+            _ => Err(UnificationError::ArityMismatch),
         }
     }
 }
@@ -204,7 +199,7 @@ impl<'v> Unify<StructureView<'v>> for Structure {
         StructureView<'v>: 'a,
     {
         if &self.functor != other.functor {
-            return Err(UnificationFailedError::FunctorMismatch);
+            return Err(UnificationError::FunctorMismatch);
         }
 
         match (&self.arguments, &other.arguments) {
@@ -216,7 +211,7 @@ impl<'v> Unify<StructureView<'v>> for Structure {
                 Ok(bindings)
             }
             (None, None) => Ok(vec![]),
-            _ => Err(UnificationFailedError::ArityMismatch),
+            _ => Err(UnificationError::ArityMismatch),
         }
     }
 }
@@ -266,7 +261,7 @@ mod solver {
     use crate::term::{NonGround, Term};
     use crate::variable::VariableId;
 
-    use super::{BindingConstraint, Result, UnificationFailedError, UnifyView};
+    use super::{BindingConstraint, Result, UnificationError, UnifyView};
 
     pub(super) struct ConstraintSolver<'a> {
         classes: EquivalenceClasses<'a>,
@@ -437,7 +432,8 @@ mod solver {
         ) -> Result<TermView<'a>> {
             match term {
                 TermView::Term(term) => match term {
-                    Term::Number(_) | Term::String(_) => Ok(TermView::Term(term)),
+                    Term::Number(n) => Ok(TermView::Number(*n)),
+                    Term::String(_) => Ok(TermView::Term(term)),
 
                     Term::Variable(NonGround(v)) => {
                         let Some(root) = self.root_of(v.id) else {
@@ -490,6 +486,7 @@ mod solver {
                         },
                     })
                 }
+                TermView::Number(_) => Ok(term.clone()),
             }
         }
 
@@ -499,7 +496,7 @@ mod solver {
             visiting: &mut Vec<VariableId>,
         ) -> Result<Option<TermView<'a>>> {
             if visiting.contains(&root) {
-                return Err(UnificationFailedError::CyclicReference);
+                return Err(UnificationError::CyclicReference);
             }
             let Some(term) = self.root_to_term.get(&root) else {
                 return Ok(None);
@@ -627,13 +624,13 @@ mod tests {
         let (t1, t2) = (n(1.0), n(2.0));
         assert_eq!(
             t1.unify(&t2, None).unwrap_err(),
-            UnificationFailedError::NumberMismatch
+            UnificationError::NumberMismatch
         );
 
         let (s1, s2) = (s("a"), s("b"));
         assert_eq!(
             s1.unify(&s2, None).unwrap_err(),
-            UnificationFailedError::StringMismatch
+            UnificationError::StringMismatch
         );
     }
 
@@ -642,7 +639,7 @@ mod tests {
         let (t1, t2) = (n(1.0), s("1"));
         assert_eq!(
             t1.unify(&t2, None).unwrap_err(),
-            UnificationFailedError::TypeMismatch
+            UnificationError::TypeMismatch
         );
     }
 
@@ -654,7 +651,7 @@ mod tests {
         );
         assert_eq!(
             t1.unify(&t2, None).unwrap_err(),
-            UnificationFailedError::ArityMismatch
+            UnificationError::ArityMismatch
         );
     }
 
@@ -666,7 +663,7 @@ mod tests {
         );
         assert_eq!(
             t1.unify(&t2, None).unwrap_err(),
-            UnificationFailedError::FunctorMismatch
+            UnificationError::FunctorMismatch
         );
     }
 
@@ -678,7 +675,7 @@ mod tests {
         );
         assert_eq!(
             t1.unify(&t2, None).unwrap_err(),
-            UnificationFailedError::NegationMismatch
+            UnificationError::NegationMismatch
         );
     }
 
@@ -694,7 +691,7 @@ mod tests {
 
         assert_eq!(
             t1.unify(&t2, None).unwrap_err(),
-            UnificationFailedError::NumberMismatch
+            UnificationError::NumberMismatch
         );
     }
 
@@ -738,7 +735,7 @@ mod tests {
 
         assert_eq!(
             x.unify(&fx, None).unwrap_err(),
-            UnificationFailedError::CyclicReference
+            UnificationError::CyclicReference
         );
     }
 
@@ -759,7 +756,7 @@ mod tests {
 
         assert_eq!(
             t1.unify(&t2, None).unwrap_err(),
-            UnificationFailedError::CyclicReference
+            UnificationError::CyclicReference
         );
     }
 
@@ -819,7 +816,7 @@ mod tests {
         let t2 = literal(false, "f", vec![n(2.0)]);
 
         let err = t1.unify(&t2, Some(&existing)).unwrap_err();
-        assert_eq!(err, UnificationFailedError::NumberMismatch);
+        assert_eq!(err, UnificationError::NumberMismatch);
     }
 
     // --- Existing bindings ---
