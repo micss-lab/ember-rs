@@ -8,8 +8,6 @@ use bstr::BString;
 use crate::literal::Literal;
 use crate::variable::Variable;
 
-pub mod unification;
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Ground(pub(crate) Infallible);
 

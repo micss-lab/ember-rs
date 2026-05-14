@@ -6,7 +6,8 @@ use crate::bindings::Bindings;
 use crate::literal::Literal;
 use crate::plan::RelationalQueryFormula;
 
-use super::{BeliefBase, BeliefMetadata, NormalizedBelief};
+use super::belief::{BeliefMetadata, NormalizedBelief};
+use super::store::BeliefBase;
 
 use self::formula::eval::EvaluationError;
 
@@ -143,7 +144,7 @@ impl RelationalQueryFormula {
 pub(crate) mod formula {
     use alloc::boxed::Box;
 
-    use crate::knowledge::BeliefBase;
+    use crate::knowledge::store::BeliefBase;
     use crate::literal::Literal;
     use crate::term::Term;
 
@@ -213,8 +214,8 @@ pub(crate) mod formula {
 
     pub(crate) mod eval {
         use crate::bindings::{Bindings, TermView};
-        use crate::term::unification::UnifyView;
         use crate::term::{NonGround, Term, TotalCmpF32};
+        use crate::unification::traits::UnifyView;
 
         use super::{
             ArithmeticExpression, ArithmeticOperator, CompareOperator, RelationalOperator,
@@ -359,8 +360,10 @@ pub(crate) mod formula {
         use alloc::vec;
         use alloc::vec::Vec;
 
+        use crate::knowledge::belief::atom_and_arity;
         use crate::knowledge::query::{Conjunction, GroundQuery, Query, QueryOperand};
-        use crate::knowledge::{BeliefBase, atom_and_arity};
+        use crate::knowledge::store::BeliefBase;
+
         use crate::literal::Literal;
 
         use super::{LogicalOperator, QueryFormula};
@@ -697,7 +700,8 @@ mod tests {
     use alloc::vec::Vec;
 
     use crate::bindings::TermView;
-    use crate::knowledge::{Belief, BeliefBase};
+    use crate::knowledge::belief::Belief;
+    use crate::knowledge::store::BeliefBase;
     use crate::literal::Literal;
     use crate::plan::{
         ArithmeticExpression, ArithmeticOperator, CompareOperator, LogicalOperator, QueryFormula,
@@ -741,7 +745,7 @@ mod tests {
         .try_into_ground()
         .expect("belief can only contain ground literals");
 
-        Belief::from_ground_literal(lit)
+        lit.into()
     }
 
     fn lit(functor: &str, args: Vec<Term>) -> QueryFormula {
