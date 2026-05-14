@@ -230,6 +230,15 @@ impl<'a> EquivalenceClasses<'a> {
                 })
             }
             TermView::Number(_) => Ok(term.clone()),
+
+            TermView::Variable(v) => {
+                let Some(root) = self.root_of(v.id) else {
+                    return Ok(TermView::Variable(v));
+                };
+                Ok(self
+                    .resolve_root(root, visiting)?
+                    .unwrap_or(TermView::Variable(v)))
+            }
         }
     }
 

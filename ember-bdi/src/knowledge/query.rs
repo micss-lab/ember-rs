@@ -18,9 +18,12 @@ pub struct Query<'a> {
 }
 
 impl<'a> Query<'a> {
-    pub fn next_bindings(&mut self) -> Option<Bindings<'a>> {
+    pub fn next_bindings(
+        &mut self,
+        existing_bindings: Option<&Bindings<'a>>,
+    ) -> Option<Bindings<'a>> {
         for conjunction in self.conjunctions.iter_mut() {
-            let Some(bindings) = conjunction.next_bindings() else {
+            let Some(bindings) = conjunction.next_bindings(existing_bindings) else {
                 continue;
             };
             return Some(bindings);
@@ -35,11 +38,15 @@ pub(crate) struct Conjunction<'a> {
 }
 
 impl<'a> Conjunction<'a> {
-    fn next_bindings(&mut self) -> Option<Bindings<'a>> {
+    fn next_bindings(&mut self, existing_bindings: Option<&Bindings<'a>>) -> Option<Bindings<'a>> {
         let mut current_bindings = Vec::with_capacity(self.operands.len());
         let mut cursor = 0_usize;
         while let Some(operand) = self.operands.get_mut(cursor) {
-            match operand.next_bindings(current_bindings.get(cursor.saturating_sub(1))) {
+            match operand.next_bindings(
+                current_bindings
+                    .get(cursor.saturating_sub(1))
+                    .or(existing_bindings),
+            ) {
                 Some(bindings) => {
                     current_bindings.push(bindings);
                     cursor += 1;
@@ -150,7 +157,7 @@ pub(crate) mod formula {
 
     use super::{IntoQuery, Query};
 
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
     pub enum QueryFormula {
         Not(Box<QueryFormula>),
         Logical {
@@ -167,19 +174,19 @@ pub(crate) mod formula {
         }
     }
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     pub enum LogicalOperator {
         Conjunction,
         Disjunction,
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
     pub struct RelationalQueryFormula {
         pub operator: RelationalOperator,
         pub operands: Box<(ArithmeticExpression, ArithmeticExpression)>,
     }
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     pub enum RelationalOperator {
         Compare {
             operator: CompareOperator,
@@ -188,14 +195,14 @@ pub(crate) mod formula {
         Unify,
     }
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     pub enum CompareOperator {
         LessThan,
         GreaterThan,
         EqualTo,
     }
 
-    #[derive(Debug, Clone)]
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
     pub enum ArithmeticExpression {
         Term(Term),
         Operation {
@@ -204,7 +211,7 @@ pub(crate) mod formula {
         },
     }
 
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     pub enum ArithmeticOperator {
         Sum,
         Min,
@@ -345,6 +352,9 @@ pub(crate) mod formula {
                 Term::Number(n) => Ok(**n),
                 Term::Variable(NonGround(v)) => match bindings.get(v) {
                     Some(TermView::Term(t)) => resolve_to_f32(t, bindings),
+                    Some(TermView::Variable(v)) => {
+                        resolve_to_f32(&Term::Variable(NonGround((*v).clone())), bindings)
+                    }
                     Some(TermView::Literal { .. }) => Err(EvaluationError::TypeMismatch),
                     Some(TermView::Number(n)) => Ok(**n),
                     None => Err(EvaluationError::InsufficientlyBound),
@@ -360,7 +370,6 @@ pub(crate) mod formula {
         use alloc::vec;
         use alloc::vec::Vec;
 
-        use crate::knowledge::belief::atom_and_arity;
         use crate::knowledge::query::{Conjunction, GroundQuery, Query, QueryOperand};
         use crate::knowledge::store::BeliefBase;
 
@@ -459,7 +468,7 @@ pub(crate) mod formula {
             let beliefs = match operand {
                 QueryOperand::Literal(Literal::Atom { structure, .. }) => bb
                     .beliefs
-                    .get(&atom_and_arity(structure))
+                    .get(&structure.atom_and_arity())
                     .map(|b| b.0.iter()),
                 _ => None,
             };
@@ -828,7 +837,7 @@ mod tests {
         ]);
 
         let mut query = (&formula).into_query(&bb);
-        let bindings = query.next_bindings().expect("Should find bindings");
+        let bindings = query.next_bindings(None).expect("Should find bindings");
 
         assert_eq!(bindings.get(&x), Some(&s("bob").as_view()));
         assert_eq!(bindings.get(&y), Some(&s("charlie").as_view()));
@@ -848,7 +857,7 @@ mod tests {
         ]);
 
         let mut query = (&formula).into_query(&bb);
-        let bindings = query.next_bindings().expect("Should backtrack to X=20");
+        let bindings = query.next_bindings(None).expect("Should backtrack to X=20");
 
         assert_eq!(bindings.get(&x), Some(&n(20.0).as_view()));
         assert_eq!(bindings.get(&y), Some(&n(30.0).as_view()));
@@ -860,10 +869,10 @@ mod tests {
         bb.assert(make_belief("is_raining", vec![]));
 
         let f_sunny = not(lit("is_sunny", vec![]));
-        assert!((&f_sunny).into_query(&bb).next_bindings().is_some());
+        assert!((&f_sunny).into_query(&bb).next_bindings(None).is_some());
 
         let f_raining = not(lit("is_raining", vec![]));
-        assert!((&f_raining).into_query(&bb).next_bindings().is_none());
+        assert!((&f_raining).into_query(&bb).next_bindings(None).is_none());
     }
 
     #[test]
@@ -881,9 +890,9 @@ mod tests {
         ]);
 
         let mut query = (&formula).into_query(&bb);
-        let bindings = query.next_bindings().expect("Should match X=2");
+        let bindings = query.next_bindings(None).expect("Should match X=2");
         assert_eq!(bindings.get(&x), Some(&n(2.0).as_view()));
-        assert!(query.next_bindings().is_none());
+        assert!(query.next_bindings(None).is_none());
     }
 
     #[test]
@@ -905,9 +914,9 @@ mod tests {
         ]);
 
         let mut query = (&formula).into_query(&bb);
-        let bindings = query.next_bindings().expect("Should find X=15");
+        let bindings = query.next_bindings(None).expect("Should find X=15");
         assert_eq!(bindings.get(&x), Some(&n(15.0).as_view()));
-        assert!(query.next_bindings().is_none());
+        assert!(query.next_bindings(None).is_none());
     }
 
     #[test]
@@ -926,7 +935,7 @@ mod tests {
         ]);
 
         let mut query = (&formula).into_query(&bb);
-        let bindings = query.next_bindings().expect("Should unify Y to 20");
+        let bindings = query.next_bindings(None).expect("Should unify Y to 20");
         assert_eq!(bindings.get(&y), Some(&TermView::Number(20.0.into())));
     }
 
@@ -950,9 +959,11 @@ mod tests {
 
         let mut query = (&formula).into_query(&bb);
         // The Div by 0 branch should return None natively and backtrack to X=2
-        let bindings = query.next_bindings().expect("Should recover and find X=2");
+        let bindings = query
+            .next_bindings(None)
+            .expect("Should recover and find X=2");
         assert_eq!(bindings.get(&x), Some(&n(2.0).as_view()));
-        assert!(query.next_bindings().is_none());
+        assert!(query.next_bindings(None).is_none());
     }
 
     #[test]
@@ -973,7 +984,7 @@ mod tests {
         ]);
 
         let mut query = (&formula).into_query(&bb);
-        assert!(query.next_bindings().is_none());
+        assert!(query.next_bindings(None).is_none());
     }
 
     #[test]
@@ -989,6 +1000,6 @@ mod tests {
         ]));
 
         let mut query = (&formula).into_query(&bb);
-        assert!(query.next_bindings().is_some());
+        assert!(query.next_bindings(None).is_some());
     }
 }

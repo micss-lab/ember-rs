@@ -88,6 +88,11 @@ impl<'a> UnifyView<'a> for TermView<'a> {
             (TermView::Number(n1), TermView::Number(n2)) => (n1 == n2)
                 .then(alloc::vec::Vec::new)
                 .ok_or(UnificationError::NumberMismatch),
+
+            (TermView::Variable(v), other) | (other, TermView::Variable(v)) => {
+                v.collect_constraints(other)
+            }
+
             _ => Err(UnificationError::TypeMismatch),
         }
     }
@@ -102,6 +107,7 @@ impl<'v> Unify<TermView<'v>> for Term {
             (_, TermView::Term(other)) => self.collect_constraints(other),
 
             (Term::Variable(NonGround(v)), other) => v.collect_constraints(other),
+            (other, TermView::Variable(v)) => v.collect_constraints(other),
 
             (Term::Literal { negated: n1, .. }, TermView::Literal { negated: n2, .. })
                 if *n1 != n2 =>

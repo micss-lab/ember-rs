@@ -5,7 +5,7 @@ use crate::term::Atom;
 use super::belief::{Belief, BeliefMetadata, NormalizedBelief};
 use super::query::{IntoQuery, Query};
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct BeliefBase {
     /// Mapping from the belief atom and the arity to a list of ground truths.
     pub(super) beliefs: BTreeMap<(Atom, usize), BeliefCollection>,

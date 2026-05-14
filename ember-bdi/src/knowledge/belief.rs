@@ -71,7 +71,7 @@ impl Belief {
 impl Belief {
     pub(super) fn atom_and_arity(&self) -> (Atom, usize) {
         let (_, structure) = self.as_literal_atom();
-        atom_and_arity(structure)
+        structure.atom_and_arity()
     }
 }
 
@@ -150,15 +150,4 @@ impl BeliefMetadata {
         }
         (updated, should_remove)
     }
-}
-
-pub(crate) fn atom_and_arity<G: Clone>(structure: &Structure<G>) -> (Atom, usize) {
-    (
-        structure.functor.clone(),
-        structure
-            .arguments
-            .as_ref()
-            .map(|args| args.len())
-            .unwrap_or(0),
-    )
 }

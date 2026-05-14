@@ -149,5 +149,17 @@ impl Structure<NonGround> {
     }
 }
 
+impl<G> Structure<G>
+where
+    G: Clone,
+{
+    pub(crate) fn atom_and_arity(&self) -> (Atom, usize) {
+        (
+            self.functor.clone(),
+            self.arguments.as_ref().map(|args| args.len()).unwrap_or(0),
+        )
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Atom(pub String);

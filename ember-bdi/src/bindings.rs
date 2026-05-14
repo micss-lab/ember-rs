@@ -2,6 +2,7 @@ use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
+use crate::literal::Literal;
 use crate::term::{Atom, NonGround, Structure, Term, TotalCmpF32};
 use crate::variable::{Variable, VariableId};
 
@@ -57,6 +58,7 @@ impl AliasMap {
 pub enum TermView<'a> {
     Term(&'a Term),
     Number(TotalCmpF32),
+    Variable(&'a Variable),
     Literal {
         negated: bool,
         structure: StructureView<'a>,
@@ -68,6 +70,7 @@ impl Clone for TermView<'_> {
         match self {
             Self::Term(term) => Self::Term(term),
             Self::Number(n) => Self::Number(*n),
+            Self::Variable(v) => Self::Variable(v),
             Self::Literal { negated, structure } => Self::Literal {
                 negated: *negated,
                 structure: structure.clone(),
@@ -81,6 +84,15 @@ impl<'a> From<&'a Term> for TermView<'a> {
         match value {
             Term::Number(n) => TermView::Number(*n),
             t => TermView::Term(t),
+        }
+    }
+}
+
+impl<'a> From<&'a Literal> for TermView<'a> {
+    fn from(literal: &'a Literal) -> Self {
+        match literal {
+            Literal::Atom { negated, structure } => TermView::Literal { negated: *negated, structure: structure.into() },
+            Literal::Variable(_) => todo!(),
         }
     }
 }
