@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 log = "0.4.22"
 hex = { version = "0.4.3", default-features = false, features = ["alloc"] }
+ember-bdi = { path = "../ember-bdi" }
 
 [target.'cfg(not(target_os = "none"))'.dependencies]
 ember = { workspace = true, features = ["acc-http"] }

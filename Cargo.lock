@@ -509,6 +509,7 @@ version = "0.1.0"
 dependencies = [
  "critical-section",
  "ember",
+ "ember-bdi",
  "env_logger",
  "esp-alloc",
  "esp-backtrace",
