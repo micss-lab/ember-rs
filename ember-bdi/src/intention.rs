@@ -31,7 +31,8 @@ impl<'b, A> Intention<'b, A> {
             return IntentionRunResult::Done;
         };
 
-        todo!("merge bindings here");
+        frame.bindings = Bindings::merge([&frame.bindings, &bindings])
+            .expect("merging bindings between frames failed");
         IntentionRunResult::NotDone
     }
 }

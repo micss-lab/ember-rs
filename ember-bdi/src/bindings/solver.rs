@@ -3,11 +3,10 @@ use alloc::vec::Vec;
 
 use crate::bindings::{AliasMap, Bindings, StructureView, TermView};
 use crate::term::{NonGround, Term};
+use crate::unification::constraint::BindingConstraint;
+use crate::unification::error::{Result, UnificationError};
+use crate::unification::traits::UnifyView;
 use crate::variable::VariableId;
-
-use super::constraint::BindingConstraint;
-use super::error::{Result, UnificationError};
-use super::traits::UnifyView;
 
 pub(super) struct ConstraintSolver<'a> {
     classes: EquivalenceClasses<'a>,

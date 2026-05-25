@@ -4,9 +4,12 @@ use alloc::vec::Vec;
 
 use crate::literal::Literal;
 use crate::term::{Atom, NonGround, Structure, Term, TotalCmpF32};
+use crate::unification::constraint::BindingConstraint;
+use crate::unification::error::UnificationError;
 use crate::variable::{Variable, VariableId};
 
 pub(crate) mod resolver;
+pub(crate) mod solver;
 
 #[derive(Debug, Clone, Default)]
 pub struct Bindings<'a> {
@@ -36,6 +39,39 @@ impl<'a> Bindings<'a> {
 impl<'a> Bindings<'a> {
     pub fn get(&self, variable: &Variable) -> Option<&TermView<'a>> {
         self.bindings.as_ref()?.get(&variable.id)?.as_ref()
+    }
+
+    /// Tries to build a unification map of the collected constraints using the existing
+    /// bindings as additional constraints.
+    ///
+    /// # Implementation
+    ///
+    /// The function does the following: given a collection of constraints, find or create the
+    /// partition this variable belongs to. If the partition already contains a value, try to
+    /// unify the current value with the new one returning new constraints. Do this for each
+    /// constraint in the queue.
+    pub(crate) fn build_from_constraints<'b>(
+        constraints: impl IntoIterator<Item = BindingConstraint<'a>>,
+        existing_bindings: Option<&Bindings<'a>>,
+    ) -> Result<Self, UnificationError> {
+        let mut solver = solver::ConstraintSolver::new(constraints);
+        if let Some(existing_bindings) = existing_bindings {
+            solver.load_existing_bindings(existing_bindings)?;
+        }
+        solver.solve()
+    }
+
+    pub(crate) fn merge<'b>(
+        bindings: impl IntoIterator<Item = &'b Self>,
+    ) -> Result<Self, UnificationError>
+    where
+        'a: 'b,
+    {
+        let mut solver = solver::ConstraintSolver::new(core::iter::empty());
+        bindings
+            .into_iter()
+            .try_for_each(|b| solver.load_existing_bindings(b))?;
+        solver.solve()
     }
 }
 
