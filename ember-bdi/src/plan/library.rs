@@ -1,15 +1,20 @@
-use alloc::collections::{BTreeMap, btree_set::BTreeSet};
+use alloc::collections::{BTreeMap, BTreeSet};
 
-use crate::{literal::Literal, term::Atom};
+use crate::bindings::Bindings;
+use crate::knowledge::store::BeliefBase;
+use crate::literal::Literal;
+use crate::term::Atom;
 
+use super::selection::PlanSelection;
+use super::selector::PlanSelector;
 use super::{GoalKind, Plan, Trigger, TriggeringEvent};
 
 #[derive(Debug)]
-pub struct PlanStore<A> {
+pub struct PlanLibrary<A> {
     pub(super) plans: BTreeMap<PlanKey, BTreeSet<Plan<A>>>,
 }
 
-impl<A> Default for PlanStore<A> {
+impl<A> Default for PlanLibrary<A> {
     fn default() -> Self {
         Self {
             plans: BTreeMap::default(),
@@ -17,19 +22,37 @@ impl<A> Default for PlanStore<A> {
     }
 }
 
-impl<A> PlanStore<A> {
-    pub fn insert(&mut self, plan: Plan<A>) -> bool {
+impl<A> PlanLibrary<A> {
+    pub fn add(&mut self, plan: Plan<A>) -> bool {
         self.plans
             .entry((&plan.trigger).into())
             .or_default()
             .insert(plan)
     }
+
+    pub fn select<'p, 'b, 'e, S>(
+        &'p mut self,
+        event: &'e TriggeringEvent,
+        knowledge: &'b BeliefBase,
+        mut selector: S,
+    ) -> Option<(&'p Plan<A>, Bindings<'b>)>
+    where
+        'p: 'b,
+        'e: 'b,
+        S: PlanSelector,
+    {
+        let selection = PlanSelection::select_from_library(event, self);
+        selector.select_plan(selection, knowledge)
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct PlanKey {
+    /// Whether the event is an addition or deletion.
     trigger: Trigger,
+    /// What is the class of event that happened.
     event: (Atom, usize),
+    /// What should the goal of the plan be.
     goal: Option<GoalKind>,
 }
 

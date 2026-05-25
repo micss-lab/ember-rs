@@ -7,8 +7,9 @@ use crate::literal::Literal;
 
 pub use crate::knowledge::query::formula::*;
 
+pub mod library;
+pub mod selection;
 pub mod selector;
-pub mod store;
 
 #[derive(Debug)]
 #[derive_where(PartialOrd, Ord, PartialEq, Eq)]
