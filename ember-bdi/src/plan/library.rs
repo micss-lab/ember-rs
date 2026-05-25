@@ -22,14 +22,16 @@ impl<A> Default for PlanLibrary<A> {
     }
 }
 
-impl<A> PlanLibrary<A> {
+impl<A: Ord> PlanLibrary<A> {
     pub fn add(&mut self, plan: Plan<A>) -> bool {
         self.plans
             .entry((&plan.trigger).into())
             .or_default()
             .insert(plan)
     }
+}
 
+impl<A> PlanLibrary<A> {
     pub fn select<'p, 'b, 'e, S>(
         &'p mut self,
         event: &'e TriggeringEvent,

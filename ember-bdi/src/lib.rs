@@ -4,6 +4,8 @@ extern crate alloc;
 
 pub mod bindings;
 pub mod context;
+pub mod event;
+pub mod intention;
 pub mod knowledge;
 pub mod literal;
 pub mod plan;
