@@ -1,8 +1,10 @@
+use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use derive_where::derive_where;
 
 use crate::bindings::Bindings;
+use crate::bindings::resolver::ResolveFailure;
 use crate::context::Context;
 use crate::plan::{Formula, Trigger, TriggeringEvent};
 
@@ -17,8 +19,10 @@ impl<'b, A> Intention<'b, A> {
             return IntentionRunResult::Done;
         };
 
-        let FrameStepResult::Done { bindings } = frame.step(context) else {
-            return IntentionRunResult::NotDone;
+        let bindings = match frame.step(context) {
+            Ok(FrameStep::Done { bindings }) => bindings,
+            Ok(FrameStep::NotDone) => return IntentionRunResult::NotDone,
+            Err(_) => unimplemented!("handle the error"),
         };
 
         self.stack.pop();
@@ -28,7 +32,7 @@ impl<'b, A> Intention<'b, A> {
         };
 
         todo!("merge bindings here");
-        IntentionRunResult::NotDone;
+        IntentionRunResult::NotDone
     }
 }
 
@@ -51,31 +55,73 @@ struct Frame<'b, A> {
 impl<'b, A> Frame<'b, A> {
     fn step(&mut self, context: &mut Context<A>) -> FrameStepResult<'b> {
         let Some(formula) = self.remaining.pop() else {
-            return FrameStepResult::Done {
+            return Ok(FrameStep::Done {
                 bindings: core::mem::replace(&mut self.bindings, Bindings::empty()),
-            };
+            });
         };
 
         match formula {
-            Formula::Belief { trigger, belief } => context.emit_event(TriggeringEvent {
-                trigger,
-                event: todo!("implement resolving of a literal"),
-                goal: None,
-            }),
-            Formula::Goal { kind, goal } => context.emit_event(TriggeringEvent {
-                trigger: Trigger::Addition,
-                event: todo!("implement resolving of a literal"),
-                goal: Some(kind),
-            }),
+            Formula::Belief { trigger, belief } => {
+                let event = belief
+                    .resolve_possible(&self.bindings)?
+                    .try_into_ground()
+                    .ok_or(FrameStepError::ResolveIncomplete)?
+                    // TODO: Avoid the extra conversion here by using an `is_ground`
+                    // function.
+                    .into_non_ground();
+
+                context.emit_event(TriggeringEvent {
+                    trigger,
+                    event,
+                    goal: None,
+                })
+            }
+            Formula::Goal { kind, goal } => {
+                let event = goal.resolve_possible(&self.bindings)?;
+                context.emit_event(TriggeringEvent {
+                    trigger: Trigger::Addition,
+                    event,
+                    goal: Some(kind),
+                })
+            }
             Formula::Action(action) => context.perform_action(action),
         }
 
-        FrameStepResult::NotDone
+        // TODO: Immediately return the bindings here if no formula is left.
+        Ok(FrameStep::NotDone)
     }
 }
 
-// TODO: Add `failed` as a possible variant.
-enum FrameStepResult<'b> {
+type FrameStepResult<'b> = core::result::Result<FrameStep<'b>, FrameStepError>;
+
+#[derive(Debug)]
+enum FrameStep<'b> {
     NotDone,
     Done { bindings: Bindings<'b> },
+}
+
+#[derive(Debug)]
+enum FrameStepError {
+    ResolveFailure(ResolveFailure),
+    ResolveIncomplete,
+}
+
+impl core::fmt::Display for FrameStepError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        use FrameStepError::*;
+        write!(
+            f,
+            "frame step error: {}",
+            match self {
+                ResolveFailure(failure) => failure.to_string(),
+                ResolveIncomplete => "resolve incomplete".to_string(),
+            }
+        )
+    }
+}
+
+impl From<ResolveFailure> for FrameStepError {
+    fn from(error: ResolveFailure) -> Self {
+        Self::ResolveFailure(error)
+    }
 }

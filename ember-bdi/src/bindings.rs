@@ -6,6 +6,8 @@ use crate::literal::Literal;
 use crate::term::{Atom, NonGround, Structure, Term, TotalCmpF32};
 use crate::variable::{Variable, VariableId};
 
+pub(crate) mod resolver;
+
 #[derive(Debug, Clone, Default)]
 pub struct Bindings<'a> {
     pub(crate) bindings: Option<BTreeMap<VariableId, Option<TermView<'a>>>>,
@@ -91,7 +93,10 @@ impl<'a> From<&'a Term> for TermView<'a> {
 impl<'a> From<&'a Literal> for TermView<'a> {
     fn from(literal: &'a Literal) -> Self {
         match literal {
-            Literal::Atom { negated, structure } => TermView::Literal { negated: *negated, structure: structure.into() },
+            Literal::Atom { negated, structure } => TermView::Literal {
+                negated: *negated,
+                structure: structure.into(),
+            },
             Literal::Variable(_) => todo!(),
         }
     }
@@ -106,6 +111,23 @@ impl<'a> TermView<'a> {
             return None;
         };
         Some(v)
+    }
+}
+
+impl TermView<'_> {
+    pub(crate) fn to_owned(&self) -> Term {
+        match *self {
+            TermView::Term(term) => term.clone(),
+            TermView::Number(n) => Term::Number(n),
+            TermView::Variable(v) => Term::Variable(NonGround(v.clone())),
+            TermView::Literal {
+                negated,
+                ref structure,
+            } => Term::Literal {
+                negated,
+                structure: structure.to_owned(),
+            },
+        }
     }
 }
 
@@ -149,6 +171,20 @@ impl<'a> From<&'a Structure> for TermView<'a> {
         Self::Literal {
             negated: false,
             structure: structure.into(),
+        }
+    }
+}
+
+impl StructureView<'_> {
+    pub(crate) fn to_owned(&self) -> Structure {
+        Structure {
+            functor: self.functor.clone(),
+            arguments: self.arguments.as_ref().map(|ts| {
+                ts.into_iter()
+                    .map(|t| t.to_owned())
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice()
+            }),
         }
     }
 }

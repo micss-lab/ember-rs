@@ -1,0 +1,312 @@
+use alloc::vec::Vec;
+
+use crate::literal::Literal;
+use crate::term::Structure;
+use crate::term::{NonGround, Term};
+
+use super::{Bindings, StructureView, TermView};
+
+#[derive(Debug)]
+pub enum ResolveFailure {
+    /// The structural language type the variable resolved to did not match the context it was
+    /// used in. For example, a variable used in the place of a literal should always resolve
+    /// to a literal.
+    IncorrectKind,
+}
+
+impl core::fmt::Display for ResolveFailure {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "resolve failure: {}",
+            match self {
+                ResolveFailure::IncorrectKind => "incorrect kind",
+            }
+        )
+    }
+}
+
+impl core::error::Error for ResolveFailure {}
+
+impl Literal {
+    /// Resolve the literal using existing bindings as much as possible verifying that the
+    /// created binding is valid in the place it used.
+    pub fn resolve_possible<'b>(self, bindings: &Bindings<'b>) -> Result<Self, ResolveFailure> {
+        Ok(match self.resolve_possible_as_view(bindings) {
+            TermView::Literal { negated, structure } => Self::Atom {
+                negated,
+                structure: structure.to_owned(),
+            },
+            TermView::Variable(v) => Self::Variable(NonGround(v.clone())),
+
+            _ => return Err(ResolveFailure::IncorrectKind),
+        })
+    }
+
+    pub fn resolve_possible_as_view<'a>(&'a self, bindings: &Bindings<'a>) -> TermView<'a> {
+        match *self {
+            Literal::Atom {
+                negated,
+                ref structure,
+            } => TermView::Literal {
+                negated,
+                structure: structure.resolve_possible_as_view(bindings),
+            },
+            Literal::Variable(NonGround(ref v)) => bindings
+                .get(v)
+                .cloned()
+                .unwrap_or_else(|| TermView::Variable(v)),
+        }
+    }
+}
+
+impl Term {
+    pub fn resolve_possible_as_view<'a>(&'a self, bindings: &Bindings<'a>) -> TermView<'a> {
+        match *self {
+            Term::Number(_) | Term::String(_) => TermView::Term(self),
+            Term::Variable(NonGround(ref v)) => bindings
+                .get(v)
+                .cloned()
+                .unwrap_or_else(|| TermView::Variable(v)),
+            Term::Literal {
+                negated,
+                ref structure,
+            } => TermView::Literal {
+                negated,
+                structure: structure.resolve_possible_as_view(bindings),
+            },
+        }
+    }
+}
+
+impl Structure {
+    pub fn resolve_possible_as_view<'a>(&'a self, bindings: &Bindings<'a>) -> StructureView<'a> {
+        StructureView {
+            functor: &self.functor,
+            arguments: self.arguments.as_ref().map(|args| {
+                args.into_iter()
+                    .map(|a| a.resolve_possible_as_view(bindings))
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice()
+            }),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::vec;
+    use alloc::vec::Vec;
+
+    use crate::bindings::{Bindings, TermView};
+    use crate::literal::Literal;
+    use crate::term::{Atom, NonGround, Structure, Term};
+    use crate::variable::Variable;
+
+    use super::*;
+
+    // --- Helpers ---
+
+    fn n(num: f32) -> Term {
+        Term::Number(num.into())
+    }
+
+    fn s(str: &str) -> Term {
+        Term::String(str.into())
+    }
+
+    fn v() -> Variable {
+        Variable::new()
+    }
+
+    fn tv(var: &Variable) -> Term {
+        Term::Variable(NonGround(var.clone()))
+    }
+
+    fn mock_atom(functor: &str, args: Vec<Term>) -> Literal {
+        Literal::Atom {
+            negated: false,
+            structure: Structure {
+                functor: Atom(functor.into()),
+                arguments: if args.is_empty() {
+                    None
+                } else {
+                    Some(args.into_boxed_slice())
+                },
+            },
+        }
+    }
+
+    fn mock_variable_literal(var: &Variable) -> Literal {
+        Literal::Variable(NonGround(var.clone()))
+    }
+
+    fn make_bindings<'a>(list: Vec<(Variable, TermView<'a>)>) -> Bindings<'a> {
+        let pairs = list
+            .into_iter()
+            .map(|(v, tv)| (v.id, Some(tv)))
+            .collect::<Vec<_>>();
+        Bindings::new(pairs, crate::bindings::AliasMap::empty())
+    }
+
+    // --- Tests ---
+
+    #[test]
+    fn test_resolve_ground_atom_unchanged() {
+        let bindings = Bindings::empty();
+        let literal = mock_atom("parent", vec![s("alice"), s("bob")]);
+
+        let resolved = literal
+            .clone()
+            .resolve_possible(&bindings)
+            .expect("Should resolve successfully");
+
+        assert_eq!(resolved, literal);
+    }
+
+    #[test]
+    fn test_resolve_unbound_variable_literal_remains_variable() {
+        let bindings = Bindings::empty();
+        let var = v();
+        let literal = mock_variable_literal(&var);
+
+        let resolved = literal
+            .clone()
+            .resolve_possible(&bindings)
+            .expect("Should resolve successfully");
+
+        assert_eq!(resolved, literal);
+        assert!(matches!(resolved, Literal::Variable(_)));
+    }
+
+    #[test]
+    fn test_resolve_variable_to_atom_literal() {
+        let target_atom = mock_atom("sunny", vec![]);
+        let target_view = TermView::from(&target_atom);
+
+        let var = v();
+        let bindings = make_bindings(vec![(var.clone(), target_view)]);
+        let literal = mock_variable_literal(&var);
+
+        let resolved = literal
+            .resolve_possible(&bindings)
+            .expect("Should resolve successfully");
+
+        assert_eq!(resolved, target_atom);
+        assert!(matches!(resolved, Literal::Atom { .. }));
+    }
+
+    #[test]
+    fn test_resolve_variable_to_invalid_kind_fails() {
+        let var_num = v();
+        let num_bindings = make_bindings(vec![(var_num.clone(), TermView::Number(42.0.into()))]);
+        let lit_num = mock_variable_literal(&var_num);
+
+        let result_num = lit_num.resolve_possible(&num_bindings);
+        assert!(matches!(result_num, Err(ResolveFailure::IncorrectKind)));
+
+        let var_str = v();
+        let term_str = s("hello");
+        let str_bindings = make_bindings(vec![(var_str.clone(), TermView::Term(&term_str))]);
+        let lit_str = mock_variable_literal(&var_str);
+
+        let result_str = lit_str.resolve_possible(&str_bindings);
+        assert!(matches!(result_str, Err(ResolveFailure::IncorrectKind)));
+    }
+
+    #[test]
+    fn test_resolve_nested_variables_inside_atom() {
+        let (x, y) = (v(), v());
+        let bindings = make_bindings(vec![
+            (x.clone(), TermView::Number(10.0.into())),
+            (y.clone(), TermView::Variable(&x)), // Chained view referencing X
+        ]);
+
+        // p(X, Y)
+        let literal = mock_atom("p", vec![tv(&x), tv(&y)]);
+        let resolved_view = literal.resolve_possible_as_view(&bindings);
+
+        // Verify structure views are mapped out cleanly
+        if let TermView::Literal { structure, .. } = resolved_view {
+            let args = structure.arguments.expect("Should contain arguments");
+            assert_eq!(args.len(), 2);
+            assert_eq!(args[0], TermView::Number(10.0.into()));
+            assert_eq!(args[1], TermView::Variable(&x));
+        } else {
+            panic!("Expected a TermView::Literal");
+        }
+    }
+
+    #[test]
+    fn test_resolve_preserves_negation_states() {
+        let target_atom = mock_atom("raining", vec![]);
+        let target_view = TermView::from(&target_atom);
+
+        let var = v();
+        let bindings = make_bindings(vec![(var.clone(), target_view)]);
+
+        // A negated variable literal
+        let literal = Literal::Variable(NonGround(var));
+
+        // Ensure that resolve_possible_as_view captures underlying literal aspects,
+        // but note that the `negated` value produced matches the variant wrapped by the view.
+        let resolved = literal
+            .resolve_possible(&bindings)
+            .expect("Should resolve successfully");
+
+        if let Literal::Atom { negated, .. } = resolved {
+            assert!(!negated, "Inner ground atom definition was not negated");
+        } else {
+            panic!("Expected a Literal::Atom");
+        }
+    }
+
+    #[test]
+    fn test_deeply_nested_literal_term_resolution() {
+        let x = v();
+        let term_num = n(31.5);
+        let bindings = make_bindings(vec![(x.clone(), TermView::Term(&term_num))]);
+
+        // Embedded structure: inner_lit(X)
+        let inner_structure = Structure {
+            functor: Atom("inner_lit".into()),
+            arguments: Some(vec![tv(&x)].into_boxed_slice()),
+        };
+
+        // Term wrapper around structural literal: Term::Literal { ... }
+        let embedded_term = Term::Literal {
+            negated: false,
+            structure: inner_structure,
+        };
+
+        // Outer wrapper: outer_lit(embedded_term)
+        let outer_literal = mock_atom("outer_lit", vec![embedded_term]);
+
+        let resolved = outer_literal
+            .resolve_possible(&bindings)
+            .expect("Should recursively map out inner structure terms");
+
+        if let Literal::Atom { structure, .. } = resolved {
+            let outer_args = structure.arguments.expect("Should have outer args");
+            let Term::Literal {
+                structure: inner_struct,
+                ..
+            } = &outer_args[0]
+            else {
+                panic!("Expected a nested Term::Literal wrapper");
+            };
+
+            let inner_args = inner_struct
+                .arguments
+                .as_ref()
+                .expect("Should have inner args");
+            assert_eq!(
+                inner_args[0],
+                n(31.5),
+                "Nested variable X should be resolved to 31.5"
+            );
+        } else {
+            panic!("Expected a Literal::Atom wrapper");
+        }
+    }
+}
