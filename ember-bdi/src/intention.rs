@@ -6,10 +6,16 @@ use derive_where::derive_where;
 use crate::bindings::Bindings;
 use crate::bindings::resolver::ResolveFailure;
 use crate::context::Context;
-use crate::plan::{Action, Formula, Trigger, TriggeringEvent};
+use crate::plan::{Action, Formula, Plan, Trigger, TriggeringEvent};
+
+pub(crate) mod queue;
+
+pub(crate) type IntentionId = usize;
 
 #[derive_where(Default)]
+#[derive(Debug)]
 pub(crate) struct Intention<'b, A> {
+    id: IntentionId,
     stack: Vec<Frame<'b, A>>,
 }
 
@@ -37,12 +43,21 @@ impl<'b, A> Intention<'b, A> {
     }
 }
 
+impl<'b, A: Clone> Intention<'b, A> {
+    fn push(&mut self, plan: &'_ Plan<A>, bindings: Bindings<'b>) {
+        self.stack.push(Frame::new(plan, bindings, self.id))
+    }
+}
+
 pub(crate) enum IntentionRunResult {
     NotDone,
     Done,
 }
 
+#[derive(Debug)]
 struct Frame<'b, A> {
+    /// The id of the intention this frame belongs to.
+    intention_id: IntentionId,
     /// The event that triggered the creation of this frame. Used to stop the execution of
     /// plans.
     event: TriggeringEvent,
@@ -51,6 +66,17 @@ struct Frame<'b, A> {
     bindings: Bindings<'b>,
     /// Remaining parts of the plan body to execute.
     remaining: Vec<Formula<A>>,
+}
+
+impl<'b, A: Clone> Frame<'b, A> {
+    fn new(plan: &'_ Plan<A>, bindings: Bindings<'b>, intention_id: IntentionId) -> Self {
+        Self {
+            intention_id,
+            event: plan.trigger.clone(),
+            bindings,
+            remaining: plan.body.clone().into(),
+        }
+    }
 }
 
 impl<'b, A> Frame<'b, A> {
@@ -71,19 +97,25 @@ impl<'b, A> Frame<'b, A> {
                     // function.
                     .into_non_ground();
 
-                context.emit_event(TriggeringEvent {
-                    trigger,
-                    event,
-                    goal: None,
-                })
+                context.emit_event(
+                    TriggeringEvent {
+                        trigger,
+                        event,
+                        goal: None,
+                    },
+                    self.intention_id,
+                )
             }
             Formula::Goal { kind, goal } => {
                 let event = goal.resolve_possible(&self.bindings)?;
-                context.emit_event(TriggeringEvent {
-                    trigger: Trigger::Addition,
-                    event,
-                    goal: Some(kind),
-                })
+                context.emit_event(
+                    TriggeringEvent {
+                        trigger: Trigger::Addition,
+                        event,
+                        goal: Some(kind),
+                    },
+                    self.intention_id,
+                )
             }
             Formula::Action(action) => match action {
                 Action::System(action) => action.execute(context),

@@ -1,3 +1,4 @@
+use crate::intention::IntentionId;
 use crate::literal::Literal;
 
 pub(crate) mod queue;
@@ -20,4 +21,11 @@ pub enum Trigger {
 pub enum GoalKind {
     Achieve,
     Query,
+}
+
+pub(crate) enum EventSource {
+    /// The event is fired from the execution of an internal intention.
+    Internal(IntentionId),
+    /// The event is generated from an external interaction.
+    External,
 }

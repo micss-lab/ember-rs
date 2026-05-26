@@ -1,18 +1,17 @@
-use alloc::boxed::Box;
-
-use derive_more::Debug;
+use alloc::rc::Rc;
 
 use crate::context::Context;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Action<A> {
     System(SystemAction<A>),
     User(A),
 }
 
-#[derive(Debug)]
+#[derive(derive_more::Debug, Clone)]
 pub enum SystemAction<A> {
-    Boxed(#[debug("boxed action")] Box<dyn FnOnce(&mut Context<A>)>),
+    // TODO: Remove this action.
+    Boxed(#[debug("boxed action")] Rc<dyn Fn(&mut Context<A>)>),
 }
 
 impl<A> SystemAction<A> {

@@ -55,7 +55,7 @@ impl<'a, A> From<&'a Plan<A>> for PlanEqOrd<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Formula<A> {
     Belief { trigger: Trigger, belief: Literal },
     Goal { kind: GoalKind, goal: Literal },
