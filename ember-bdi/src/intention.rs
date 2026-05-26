@@ -74,7 +74,7 @@ impl<'b, A: Clone> Frame<'b, A> {
             intention_id,
             event: plan.trigger.clone(),
             bindings,
-            remaining: plan.body.clone().into(),
+            remaining: plan.body.iter().rev().cloned().collect(),
         }
     }
 }
