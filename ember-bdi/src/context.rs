@@ -19,3 +19,22 @@ impl<A> Context<A> {
             .push((EventSource::Internal(intention_id), event));
     }
 }
+
+// TODO: Remove this.
+#[cfg(test)]
+impl<A> Context<A> {
+    pub(crate) fn new() -> Self {
+        Self {
+            actions: Vec::new(),
+            events: Vec::new(),
+        }
+    }
+
+    pub(crate) fn actions(&self) -> &[A] {
+        &self.actions
+    }
+
+    pub(crate) fn events(&self) -> &[(EventSource, TriggeringEvent)] {
+        &self.events
+    }
+}

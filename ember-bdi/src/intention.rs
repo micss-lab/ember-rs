@@ -161,3 +161,109 @@ impl From<ResolveFailure> for FrameStepError {
         Self::ResolveFailure(error)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use alloc::vec;
+
+    use crate::bindings::Bindings;
+    use crate::context::Context;
+    use crate::plan::{Action, Formula, Trigger};
+
+    use crate::testing::*;
+
+    use super::*;
+
+    #[test]
+    fn test_intention_step_empty() {
+        let mut intention: Intention<'_, ()> = Intention::default();
+        let mut context = Context::new();
+
+        // Step with no frames returns Done
+        assert!(matches!(
+            intention.step(&mut context),
+            IntentionRunResult::Done
+        ));
+    }
+
+    #[test]
+    fn test_intention_push_and_step() {
+        let mut intention: Intention<'_, ()> = Intention::default();
+        let mut context = Context::new();
+
+        let trigger = trigger("event", vec![], None);
+        let plan = plan(trigger.clone(), None, vec![]);
+
+        intention.push(&plan, Bindings::empty());
+
+        assert_eq!(intention.stack.len(), 1);
+
+        // Plan has no body, so one step should complete the frame, merge bindings, and remove the frame.
+        // It returns Done because the intention has no more frames.
+        let result = intention.step(&mut context);
+        assert!(matches!(result, IntentionRunResult::Done));
+        assert_eq!(intention.stack.len(), 0);
+    }
+
+    #[test]
+    fn test_intention_step_with_actions() {
+        let mut intention: Intention<'_, &'static str> = Intention::default();
+        let mut context = Context::new();
+
+        let trigger = trigger("event", vec![], None);
+        let plan = plan(
+            trigger.clone(),
+            None,
+            vec![
+                Formula::Action(Action::User("action1")),
+                Formula::Action(Action::User("action2")),
+            ],
+        );
+
+        intention.push(&plan, Bindings::empty());
+
+        // step 1: executes action1 (because it's popped first)
+        let result = intention.step(&mut context);
+        assert!(matches!(result, IntentionRunResult::NotDone));
+        assert_eq!(context.actions(), &["action1"]);
+
+        // step 2: executes action2
+        let result = intention.step(&mut context);
+        assert!(matches!(result, IntentionRunResult::NotDone));
+        assert_eq!(context.actions(), &["action1", "action2"]);
+
+        // step 3: frame done, intention done
+        let result = intention.step(&mut context);
+        assert!(matches!(result, IntentionRunResult::Done));
+    }
+
+    #[test]
+    fn test_intention_step_with_beliefs_and_goals() {
+        let mut intention: Intention<'_, ()> = Intention::default();
+        let mut context = Context::new();
+
+        let trigger = trigger("event", vec![], None);
+        let plan = plan(
+            trigger.clone(),
+            None,
+            vec![
+                Formula::Goal {
+                    kind: crate::plan::GoalKind::Achieve,
+                    goal: literal("goal1", Vec::with_capacity(0)),
+                },
+                Formula::Belief {
+                    trigger: Trigger::Addition,
+                    belief: literal("belief1", Vec::with_capacity(0)),
+                },
+            ],
+        );
+
+        intention.push(&plan, Bindings::empty());
+
+        let result = intention.step(&mut context);
+        assert!(matches!(result, IntentionRunResult::NotDone));
+
+        let result = intention.step(&mut context);
+        assert!(matches!(result, IntentionRunResult::NotDone));
+    }
+}

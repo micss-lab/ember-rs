@@ -96,12 +96,10 @@ impl Structure {
 #[cfg(test)]
 mod tests {
     use alloc::vec;
-    
 
     use crate::bindings::{Bindings, TermView};
     use crate::literal::Literal;
     use crate::term::{Atom, NonGround, Structure, Term};
-    
 
     use crate::testing::*;
 
