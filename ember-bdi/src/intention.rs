@@ -6,7 +6,7 @@ use derive_where::derive_where;
 use crate::bindings::Bindings;
 use crate::bindings::resolver::ResolveFailure;
 use crate::context::Context;
-use crate::plan::{Formula, Trigger, TriggeringEvent};
+use crate::plan::{Action, Formula, Trigger, TriggeringEvent};
 
 #[derive_where(Default)]
 pub(crate) struct Intention<'b, A> {
@@ -85,7 +85,10 @@ impl<'b, A> Frame<'b, A> {
                     goal: Some(kind),
                 })
             }
-            Formula::Action(action) => context.perform_action(action),
+            Formula::Action(action) => match action {
+                Action::System(action) => action.execute(context),
+                Action::User(action) => context.perform_action(action),
+            },
         }
 
         // TODO: Immediately return the bindings here if no formula is left.
