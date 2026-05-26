@@ -11,26 +11,11 @@ mod tests {
     use alloc::vec::Vec;
 
     use crate::bindings::{StructureView, TermView};
-    use crate::term::{Atom, NonGround, Structure, Term};
+    use crate::term::{Atom, Structure, Term};
     use crate::unification::error::UnificationError;
     use crate::unification::traits::Unify;
-    use crate::variable::Variable;
 
-    fn n(number: f32) -> Term {
-        Term::Number(number.into())
-    }
-
-    fn s(string: impl AsRef<str>) -> Term {
-        Term::String(string.as_ref().into())
-    }
-
-    fn v() -> Variable {
-        Variable::new()
-    }
-
-    fn tv(variable: &Variable) -> Term {
-        Term::Variable(NonGround(variable.clone()))
-    }
+    use crate::testing::*;
 
     fn structure(functor: &str, args: impl Into<Vec<Term>>) -> Structure {
         Structure {
@@ -71,7 +56,7 @@ mod tests {
         let x = v();
 
         // f(X, 2) == f(1, 2)
-        let t1 = literal(false, "f", vec![tv(&x), n(2.0)]);
+        let t1 = literal(false, "f", vec![vt(&x), n(2.0)]);
         let t2 = literal(false, "f", vec![n(1.0), n(2.0)]);
 
         let result = t1.unify(&t2, None).expect("Unification failed");
@@ -85,8 +70,8 @@ mod tests {
         // X == Y, Y == 42 => X == 42
         // We simulate this by unifying a structure that forces these constraints
         // pair(X, Y) == pair(Y, 42)
-        let t1 = literal(false, "pair", vec![tv(&x), tv(&y)]);
-        let t2 = literal(false, "pair", vec![tv(&y), n(42.0)]);
+        let t1 = literal(false, "pair", vec![vt(&x), vt(&y)]);
+        let t2 = literal(false, "pair", vec![vt(&y), n(42.0)]);
 
         let result = t1.unify(&t2, None).expect("Unification failed");
         assert_eq!(result.get(&x), Some(&n(42.0).as_view()));
@@ -161,7 +146,7 @@ mod tests {
 
         // pair(X, X) == pair(1, 2) -> Should fail because X cannot be 1 and 2
         let (t1, t2) = (
-            literal(false, "pair", vec![tv(&x), tv(&x)]),
+            literal(false, "pair", vec![vt(&x), vt(&x)]),
             literal(false, "pair", vec![n(1.0), n(2.0)]),
         );
 
@@ -179,11 +164,11 @@ mod tests {
 
         // f(X) == f(g(Y)), Y == 1 => X should resolve to g(1)
         let (t1, t2) = (
-            literal(false, "f", vec![tv(&x)]),
-            literal(false, "f", vec![literal(false, "g", vec![tv(&y)])]),
+            literal(false, "f", vec![vt(&x)]),
+            literal(false, "f", vec![literal(false, "g", vec![vt(&y)])]),
         );
 
-        let query = literal(false, "triple", vec![t1, tv(&y)]);
+        let query = literal(false, "triple", vec![t1, vt(&y)]);
         let belief = literal(false, "triple", vec![t2, n(1.0)]);
 
         let result = query
@@ -207,7 +192,7 @@ mod tests {
         let x = v();
 
         // X == f(X)
-        let fx = literal(false, "f", vec![tv(&x)]);
+        let fx = literal(false, "f", vec![vt(&x)]);
 
         assert_eq!(
             x.unify(&fx, None).unwrap_err(),
@@ -220,13 +205,13 @@ mod tests {
         let (x, y) = (v(), v());
 
         // X == f(Y), Y == f(X)
-        let t1 = literal(false, "pair", vec![tv(&x), tv(&y)]);
+        let t1 = literal(false, "pair", vec![vt(&x), vt(&y)]);
         let t2 = literal(
             false,
             "pair",
             vec![
-                literal(false, "f", vec![tv(&y)]),
-                literal(false, "f", vec![tv(&x)]),
+                literal(false, "f", vec![vt(&y)]),
+                literal(false, "f", vec![vt(&x)]),
             ],
         );
 
@@ -241,8 +226,8 @@ mod tests {
         let (a, b, c, d) = (v(), v(), v(), v());
 
         // A=B, B=C, C=D, D=E, E=100
-        let t1 = literal(false, "chain", vec![tv(&a), tv(&b), tv(&c), tv(&d)]);
-        let t2 = literal(false, "chain", vec![tv(&b), tv(&c), tv(&d), n(100.0)]);
+        let t1 = literal(false, "chain", vec![vt(&a), vt(&b), vt(&c), vt(&d)]);
+        let t2 = literal(false, "chain", vec![vt(&b), vt(&c), vt(&d), n(100.0)]);
 
         let result = t1.unify(&t2, None).expect("Deep chain failed");
         for v in [a, b, c, d] {
@@ -254,8 +239,8 @@ mod tests {
     fn unbound_variables_in_result() {
         let (x, y, z) = (v(), v(), v());
 
-        let t1 = literal(false, "f", vec![tv(&x), tv(&y)]);
-        let t2 = literal(false, "f", vec![n(1.0), tv(&z)]);
+        let t1 = literal(false, "f", vec![vt(&x), vt(&y)]);
+        let t2 = literal(false, "f", vec![n(1.0), vt(&z)]);
 
         let result = t1
             .unify(&t2, None)
@@ -274,7 +259,7 @@ mod tests {
         let existing = x.unify(&n1, None).unwrap();
 
         // f(X) == f(1) where X is already 1
-        let t1 = literal(false, "f", vec![tv(&x)]);
+        let t1 = literal(false, "f", vec![vt(&x)]);
         let t2 = literal(false, "f", vec![n(1.0)]);
 
         let result = t1.unify(&t2, Some(&existing)).expect("Should succeed");
@@ -288,7 +273,7 @@ mod tests {
         let existing = x.unify(&n1, None).unwrap();
 
         // f(X) == f(2) where X is already 1 -> Should fail
-        let t1 = literal(false, "f", vec![tv(&x)]);
+        let t1 = literal(false, "f", vec![vt(&x)]);
         let t2 = literal(false, "f", vec![n(2.0)]);
 
         let err = t1.unify(&t2, Some(&existing)).unwrap_err();
@@ -301,11 +286,11 @@ mod tests {
     fn existing_alias_propagation() {
         let (x, y) = (v(), v());
         // Existing: X == Y
-        let t_init1 = literal(false, "pair", vec![tv(&x), tv(&y)]);
-        let t_init2 = literal(false, "pair", vec![tv(&y), tv(&x)]);
+        let t_init1 = literal(false, "pair", vec![vt(&x), vt(&y)]);
+        let t_init2 = literal(false, "pair", vec![vt(&y), vt(&x)]);
         let existing = t_init1.unify(&t_init2, None).unwrap();
 
-        let t1 = tv(&x);
+        let t1 = vt(&x);
         let t2 = n(10.0);
 
         let result = t1.unify(&t2, Some(&existing)).expect("Aliasing failed");
@@ -317,7 +302,7 @@ mod tests {
     fn existing_binding_deep_resolution() {
         let (x, y) = (v(), v());
 
-        let yt = tv(&y);
+        let yt = vt(&y);
 
         let term_g_y = TermView::Literal {
             negated: false,
@@ -332,7 +317,7 @@ mod tests {
 
         assert_eq!(existing.get(&x), Some(term_g_y).as_ref());
 
-        let t1 = literal(false, "f", vec![tv(&y)]);
+        let t1 = literal(false, "f", vec![vt(&y)]);
         let t2 = literal(false, "f", vec![n(10.0)]);
 
         let final_bindings = t1

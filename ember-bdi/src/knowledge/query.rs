@@ -716,30 +716,19 @@ mod tests {
         ArithmeticExpression, ArithmeticOperator, CompareOperator, LogicalOperator, QueryFormula,
         RelationalOperator, RelationalQueryFormula,
     };
-    use crate::term::{Atom, NonGround, Structure, Term};
-    use crate::variable::Variable;
+    use crate::term::{Atom, Structure, Term};
+
+    use crate::testing::*;
 
     use super::IntoQuery;
 
     // --- Helpers ---
 
-    fn n(num: f32) -> Term {
-        Term::Number(num.into())
+    fn literal(functor: &str, args: Vec<Term>) -> QueryFormula {
+        QueryFormula::Literal(crate::testing::literal(functor, args))
     }
 
-    fn s(str: &str) -> Term {
-        Term::String(str.into())
-    }
-
-    fn v() -> Variable {
-        Variable::new()
-    }
-
-    fn tv(var: &Variable) -> Term {
-        Term::Variable(NonGround(var.clone()))
-    }
-
-    fn make_belief(functor: &str, args: Vec<Term>) -> Belief {
+    fn belief(functor: &str, args: Vec<Term>) -> Belief {
         let lit = Literal::Atom {
             negated: false,
             structure: Structure {
@@ -755,20 +744,6 @@ mod tests {
         .expect("belief can only contain ground literals");
 
         lit.into()
-    }
-
-    fn lit(functor: &str, args: Vec<Term>) -> QueryFormula {
-        QueryFormula::Literal(Literal::Atom {
-            negated: false,
-            structure: Structure {
-                functor: Atom(functor.into()),
-                arguments: if args.is_empty() {
-                    None
-                } else {
-                    Some(args.into_boxed_slice())
-                },
-            },
-        })
     }
 
     fn and(ops: Vec<QueryFormula>) -> QueryFormula {
@@ -827,13 +802,13 @@ mod tests {
     #[test]
     fn shared_variable_conjunction() {
         let mut bb = BeliefBase::default();
-        bb.assert(make_belief("parent", vec![s("alice"), s("bob")]));
-        bb.assert(make_belief("parent", vec![s("bob"), s("charlie")]));
+        bb.assert(belief("parent", vec![s("alice"), s("bob")]));
+        bb.assert(belief("parent", vec![s("bob"), s("charlie")]));
 
         let (x, y) = (v(), v());
         let formula = and(vec![
-            lit("parent", vec![s("alice"), tv(&x)]),
-            lit("parent", vec![tv(&x), tv(&y)]),
+            literal("parent", vec![s("alice"), vt(&x)]),
+            literal("parent", vec![vt(&x), vt(&y)]),
         ]);
 
         let mut query = (&formula).into_query(&bb);
@@ -846,14 +821,14 @@ mod tests {
     #[test]
     fn backtracking_across_operands() {
         let mut bb = BeliefBase::default();
-        bb.assert(make_belief("p", vec![n(1.0), n(10.0)]));
-        bb.assert(make_belief("p", vec![n(1.0), n(20.0)]));
-        bb.assert(make_belief("q", vec![n(20.0), n(30.0)]));
+        bb.assert(belief("p", vec![n(1.0), n(10.0)]));
+        bb.assert(belief("p", vec![n(1.0), n(20.0)]));
+        bb.assert(belief("q", vec![n(20.0), n(30.0)]));
 
         let (x, y) = (v(), v());
         let formula = and(vec![
-            lit("p", vec![n(1.0), tv(&x)]),
-            lit("q", vec![tv(&x), tv(&y)]),
+            literal("p", vec![n(1.0), vt(&x)]),
+            literal("q", vec![vt(&x), vt(&y)]),
         ]);
 
         let mut query = (&formula).into_query(&bb);
@@ -866,27 +841,27 @@ mod tests {
     #[test]
     fn closed_world_negation() {
         let mut bb = BeliefBase::default();
-        bb.assert(make_belief("is_raining", vec![]));
+        bb.assert(belief("is_raining", vec![]));
 
-        let f_sunny = not(lit("is_sunny", vec![]));
+        let f_sunny = not(literal("is_sunny", vec![]));
         assert!((&f_sunny).into_query(&bb).next_bindings(None).is_some());
 
-        let f_raining = not(lit("is_raining", vec![]));
+        let f_raining = not(literal("is_raining", vec![]));
         assert!((&f_raining).into_query(&bb).next_bindings(None).is_none());
     }
 
     #[test]
     fn disjunction_and_flattening() {
         let mut bb = BeliefBase::default();
-        bb.assert(make_belief("a", vec![n(1.0)]));
-        bb.assert(make_belief("b", vec![n(2.0)]));
-        bb.assert(make_belief("c", vec![n(2.0)]));
+        bb.assert(belief("a", vec![n(1.0)]));
+        bb.assert(belief("b", vec![n(2.0)]));
+        bb.assert(belief("c", vec![n(2.0)]));
 
         let x = v();
         // (a(X) | b(X)) & c(X) -> Should bind X=2
         let formula = and(vec![
-            or(vec![lit("a", vec![tv(&x)]), lit("b", vec![tv(&x)])]),
-            lit("c", vec![tv(&x)]),
+            or(vec![literal("a", vec![vt(&x)]), literal("b", vec![vt(&x)])]),
+            literal("c", vec![vt(&x)]),
         ]);
 
         let mut query = (&formula).into_query(&bb);
@@ -898,15 +873,15 @@ mod tests {
     #[test]
     fn relational_comparison() {
         let mut bb = BeliefBase::default();
-        bb.assert(make_belief("val", vec![n(5.0)]));
-        bb.assert(make_belief("val", vec![n(15.0)]));
+        bb.assert(belief("val", vec![n(5.0)]));
+        bb.assert(belief("val", vec![n(15.0)]));
 
         let x = v();
         // val(X) & X > 10
         let formula = and(vec![
-            lit("val", vec![tv(&x)]),
+            literal("val", vec![vt(&x)]),
             cmp(
-                expr(tv(&x)),
+                expr(vt(&x)),
                 CompareOperator::GreaterThan,
                 false,
                 expr(n(10.0)),
@@ -922,15 +897,15 @@ mod tests {
     #[test]
     fn relational_unification_math() {
         let mut bb = BeliefBase::default();
-        bb.assert(make_belief("base", vec![n(10.0)]));
+        bb.assert(belief("base", vec![n(10.0)]));
 
         let (x, y) = (v(), v());
         // base(X) & Y = X * 2
         let formula = and(vec![
-            lit("base", vec![tv(&x)]),
+            literal("base", vec![vt(&x)]),
             unify(
-                expr(tv(&y)),
-                math(ArithmeticOperator::Mul, vec![expr(tv(&x)), expr(n(2.0))]),
+                expr(vt(&y)),
+                math(ArithmeticOperator::Mul, vec![expr(vt(&x)), expr(n(2.0))]),
             ),
         ]);
 
@@ -942,15 +917,15 @@ mod tests {
     #[test]
     fn arithmetic_division_by_zero_fails_gracefully() {
         let mut bb = BeliefBase::default();
-        bb.assert(make_belief("val", vec![n(0.0)]));
-        bb.assert(make_belief("val", vec![n(2.0)]));
+        bb.assert(belief("val", vec![n(0.0)]));
+        bb.assert(belief("val", vec![n(2.0)]));
 
         let x = v();
         // val(X) & (10 / X) == 5
         let formula = and(vec![
-            lit("val", vec![tv(&x)]),
+            literal("val", vec![vt(&x)]),
             cmp(
-                math(ArithmeticOperator::Div, vec![expr(n(10.0)), expr(tv(&x))]),
+                math(ArithmeticOperator::Div, vec![expr(n(10.0)), expr(vt(&x))]),
                 CompareOperator::EqualTo,
                 true,
                 expr(n(5.0)),
@@ -969,14 +944,14 @@ mod tests {
     #[test]
     fn type_mismatch_fails_gracefully() {
         let mut bb = BeliefBase::default();
-        bb.assert(make_belief("val", vec![s("not_a_number")]));
+        bb.assert(belief("val", vec![s("not_a_number")]));
 
         let x = v();
         // val(X) & X > 0
         let formula = and(vec![
-            lit("val", vec![tv(&x)]),
+            literal("val", vec![vt(&x)]),
             cmp(
-                expr(tv(&x)),
+                expr(vt(&x)),
                 CompareOperator::GreaterThan,
                 false,
                 expr(n(0.0)),
@@ -990,13 +965,13 @@ mod tests {
     #[test]
     fn complex_de_morgan_resolution() {
         let mut bb = BeliefBase::default();
-        bb.assert(make_belief("p", vec![n(1.0)]));
-        bb.assert(make_belief("q", vec![n(1.0)]));
+        bb.assert(belief("p", vec![n(1.0)]));
+        bb.assert(belief("q", vec![n(1.0)]));
 
         // !( !p(1) | !q(1) ) => p(1) & q(1)
         let formula = not(or(vec![
-            not(lit("p", vec![n(1.0)])),
-            not(lit("q", vec![n(1.0)])),
+            not(literal("p", vec![n(1.0)])),
+            not(literal("q", vec![n(1.0)])),
         ]));
 
         let mut query = (&formula).into_query(&bb);

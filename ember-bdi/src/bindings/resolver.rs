@@ -96,65 +96,21 @@ impl Structure {
 #[cfg(test)]
 mod tests {
     use alloc::vec;
-    use alloc::vec::Vec;
+    
 
     use crate::bindings::{Bindings, TermView};
     use crate::literal::Literal;
     use crate::term::{Atom, NonGround, Structure, Term};
-    use crate::variable::Variable;
+    
+
+    use crate::testing::*;
 
     use super::*;
-
-    // --- Helpers ---
-
-    fn n(num: f32) -> Term {
-        Term::Number(num.into())
-    }
-
-    fn s(str: &str) -> Term {
-        Term::String(str.into())
-    }
-
-    fn v() -> Variable {
-        Variable::new()
-    }
-
-    fn tv(var: &Variable) -> Term {
-        Term::Variable(NonGround(var.clone()))
-    }
-
-    fn mock_atom(functor: &str, args: Vec<Term>) -> Literal {
-        Literal::Atom {
-            negated: false,
-            structure: Structure {
-                functor: Atom(functor.into()),
-                arguments: if args.is_empty() {
-                    None
-                } else {
-                    Some(args.into_boxed_slice())
-                },
-            },
-        }
-    }
-
-    fn mock_variable_literal(var: &Variable) -> Literal {
-        Literal::Variable(NonGround(var.clone()))
-    }
-
-    fn make_bindings<'a>(list: Vec<(Variable, TermView<'a>)>) -> Bindings<'a> {
-        let pairs = list
-            .into_iter()
-            .map(|(v, tv)| (v.id, Some(tv)))
-            .collect::<Vec<_>>();
-        Bindings::new(pairs, crate::bindings::AliasMap::empty())
-    }
-
-    // --- Tests ---
 
     #[test]
     fn test_resolve_ground_atom_unchanged() {
         let bindings = Bindings::empty();
-        let literal = mock_atom("parent", vec![s("alice"), s("bob")]);
+        let literal = literal("parent", vec![s("alice"), s("bob")]);
 
         let resolved = literal
             .clone()
@@ -168,7 +124,7 @@ mod tests {
     fn test_resolve_unbound_variable_literal_remains_variable() {
         let bindings = Bindings::empty();
         let var = v();
-        let literal = mock_variable_literal(&var);
+        let literal = literal_variable(&var);
 
         let resolved = literal
             .clone()
@@ -181,12 +137,12 @@ mod tests {
 
     #[test]
     fn test_resolve_variable_to_atom_literal() {
-        let target_atom = mock_atom("sunny", vec![]);
+        let target_atom = literal("sunny", vec![]);
         let target_view = TermView::from(&target_atom);
 
         let var = v();
-        let bindings = make_bindings(vec![(var.clone(), target_view)]);
-        let literal = mock_variable_literal(&var);
+        let bindings = bindings(vec![(var.clone(), target_view)]);
+        let literal = literal_variable(&var);
 
         let resolved = literal
             .resolve_possible(&bindings)
@@ -199,16 +155,16 @@ mod tests {
     #[test]
     fn test_resolve_variable_to_invalid_kind_fails() {
         let var_num = v();
-        let num_bindings = make_bindings(vec![(var_num.clone(), TermView::Number(42.0.into()))]);
-        let lit_num = mock_variable_literal(&var_num);
+        let num_bindings = bindings(vec![(var_num.clone(), TermView::Number(42.0.into()))]);
+        let lit_num = literal_variable(&var_num);
 
         let result_num = lit_num.resolve_possible(&num_bindings);
         assert!(matches!(result_num, Err(ResolveFailure::IncorrectKind)));
 
         let var_str = v();
         let term_str = s("hello");
-        let str_bindings = make_bindings(vec![(var_str.clone(), TermView::Term(&term_str))]);
-        let lit_str = mock_variable_literal(&var_str);
+        let str_bindings = bindings(vec![(var_str.clone(), TermView::Term(&term_str))]);
+        let lit_str = literal_variable(&var_str);
 
         let result_str = lit_str.resolve_possible(&str_bindings);
         assert!(matches!(result_str, Err(ResolveFailure::IncorrectKind)));
@@ -217,13 +173,13 @@ mod tests {
     #[test]
     fn test_resolve_nested_variables_inside_atom() {
         let (x, y) = (v(), v());
-        let bindings = make_bindings(vec![
+        let bindings = bindings(vec![
             (x.clone(), TermView::Number(10.0.into())),
             (y.clone(), TermView::Variable(&x)), // Chained view referencing X
         ]);
 
         // p(X, Y)
-        let literal = mock_atom("p", vec![tv(&x), tv(&y)]);
+        let literal = literal("p", vec![vt(&x), vt(&y)]);
         let resolved_view = literal.resolve_possible_as_view(&bindings);
 
         // Verify structure views are mapped out cleanly
@@ -239,11 +195,11 @@ mod tests {
 
     #[test]
     fn test_resolve_preserves_negation_states() {
-        let target_atom = mock_atom("raining", vec![]);
+        let target_atom = literal("raining", vec![]);
         let target_view = TermView::from(&target_atom);
 
         let var = v();
-        let bindings = make_bindings(vec![(var.clone(), target_view)]);
+        let bindings = bindings(vec![(var.clone(), target_view)]);
 
         // A negated variable literal
         let literal = Literal::Variable(NonGround(var));
@@ -265,12 +221,12 @@ mod tests {
     fn test_deeply_nested_literal_term_resolution() {
         let x = v();
         let term_num = n(31.5);
-        let bindings = make_bindings(vec![(x.clone(), TermView::Term(&term_num))]);
+        let bindings = bindings(vec![(x.clone(), TermView::Term(&term_num))]);
 
         // Embedded structure: inner_lit(X)
         let inner_structure = Structure {
             functor: Atom("inner_lit".into()),
-            arguments: Some(vec![tv(&x)].into_boxed_slice()),
+            arguments: Some(vec![vt(&x)].into_boxed_slice()),
         };
 
         // Term wrapper around structural literal: Term::Literal { ... }
@@ -280,7 +236,7 @@ mod tests {
         };
 
         // Outer wrapper: outer_lit(embedded_term)
-        let outer_literal = mock_atom("outer_lit", vec![embedded_term]);
+        let outer_literal = literal("outer_lit", vec![embedded_term]);
 
         let resolved = outer_literal
             .resolve_possible(&bindings)
