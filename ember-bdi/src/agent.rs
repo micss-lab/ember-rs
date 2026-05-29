@@ -11,7 +11,7 @@ use crate::intention::queue::{Fifo, IntentionQueue};
 use crate::knowledge::store::BeliefBase;
 use crate::plan::library::PlanLibrary;
 use crate::plan::selector::FirstApplicable;
-use crate::plan::{Trigger, TriggeringEvent};
+use crate::plan::{Action, Trigger, TriggeringEvent};
 use crate::sensor::{Percept, Sensor};
 
 #[derive(Debug)]
@@ -79,10 +79,10 @@ where
     }
 }
 
-impl<A, const S: usize, Action, P> EmberAgent for BdiAgent<'_, S, A, Action, P>
+impl<A, const S: usize, UserAction, P> EmberAgent for BdiAgent<'_, S, A, UserAction, P>
 where
-    A: Agent<Action = Action, Percept = P>,
-    Action: Clone,
+    A: Agent<Action = UserAction, Percept = P>,
+    UserAction: Clone,
     P: Percept,
 {
     fn update(&mut self, _context: &mut ContainerContext) -> bool {
@@ -110,7 +110,10 @@ where
         self.intentions.step(&mut Fifo, &mut context);
 
         while let Some(action) = context.actions.pop() {
-            self.agent.perform_action(action, &mut context);
+            match action {
+                Action::System(action) => action.execute(&mut context),
+                Action::User(action) => self.agent.perform_action(action, &mut context),
+            }
         }
 
         context.events.into_iter().for_each(|(source, event)| {

@@ -2,10 +2,10 @@ use alloc::vec::Vec;
 
 use crate::event::EventSource;
 use crate::intention::IntentionId;
-use crate::plan::TriggeringEvent;
+use crate::plan::{Action, TriggeringEvent};
 
 pub struct Context<A> {
-    pub(crate) actions: Vec<A>,
+    pub(crate) actions: Vec<Action<A>>,
     pub(crate) events: Vec<(EventSource, TriggeringEvent)>,
 }
 
@@ -17,7 +17,7 @@ impl<A> Context<A> {
         }
     }
 
-    pub(crate) fn perform_action(&mut self, action: A) {
+    pub(crate) fn perform_action(&mut self, action: Action<A>) {
         self.actions.push(action);
     }
 

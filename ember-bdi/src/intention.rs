@@ -6,7 +6,7 @@ use derive_where::derive_where;
 use crate::bindings::resolver::ResolveFailure;
 use crate::bindings::{Bindings, OwnedBindings};
 use crate::context::Context;
-use crate::plan::{Action, Formula, Plan, Trigger, TriggeringEvent};
+use crate::plan::{Formula, Plan, Trigger, TriggeringEvent};
 
 pub(crate) mod queue;
 
@@ -118,10 +118,7 @@ impl<A> Frame<A> {
                 },
                 Some(self.intention_id),
             ),
-            Formula::Action(action) => match action {
-                Action::System(action) => action.execute(context),
-                Action::User(action) => context.perform_action(action),
-            },
+            Formula::Action(action) => context.perform_action(action),
         }
 
         // TODO: Immediately return the bindings here if no formula is left.
@@ -226,12 +223,15 @@ mod tests {
         // step 1: executes action1 (because it's popped first)
         let result = intention.step(&mut context);
         assert!(matches!(result, IntentionRunResult::NotDone));
-        assert_eq!(context.actions, &["action1"]);
+        assert_eq!(context.actions, &[Action::User("action1")]);
 
         // step 2: executes action2
         let result = intention.step(&mut context);
         assert!(matches!(result, IntentionRunResult::NotDone));
-        assert_eq!(context.actions, &["action1", "action2"]);
+        assert_eq!(
+            context.actions,
+            &[Action::User("action1"), Action::User("action2")]
+        );
 
         // step 3: frame done, intention done
         let result = intention.step(&mut context);

@@ -1,24 +1,16 @@
-use alloc::rc::Rc;
-
 use crate::context::Context;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action<A> {
-    System(SystemAction<A>),
+    System(SystemAction),
     User(A),
 }
 
-#[derive(derive_more::Debug, Clone)]
-pub enum SystemAction<A> {
-    // TODO: Remove this action.
-    #[allow(clippy::type_complexity)]
-    Boxed(#[debug("boxed action")] Rc<dyn Fn(&mut Context<A>)>),
-}
+#[derive(derive_more::Debug, Clone, PartialEq, Eq)]
+pub enum SystemAction {}
 
-impl<A> SystemAction<A> {
-    pub(crate) fn execute(self, context: &mut Context<A>) {
-        match self {
-            SystemAction::Boxed(f) => f(context),
-        }
+impl SystemAction {
+    pub(crate) fn execute<A>(self, _context: &mut Context<A>) {
+        match self {}
     }
 }
