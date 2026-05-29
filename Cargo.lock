@@ -533,6 +533,7 @@ dependencies = [
  "critical-section",
  "ember",
  "ember-bdi",
+ "ember-core",
  "env_logger",
  "esp-alloc",
  "esp-backtrace",

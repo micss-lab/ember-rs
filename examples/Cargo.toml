@@ -10,6 +10,7 @@ ember-bdi = { path = "../ember-bdi" }
 
 [target.'cfg(not(target_os = "none"))'.dependencies]
 ember = { workspace = true, features = ["acc-http"] }
+ember-core = { workspace = true }
 
 env_logger = "0.11.8"
 critical-section = { version = "1.2.0", features = ["std"] }
