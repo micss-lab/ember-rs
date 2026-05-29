@@ -1,7 +1,8 @@
 use alloc::vec;
 use alloc::vec::Vec;
 
-use crate::bindings::{Bindings, StructureView, TermView};
+use crate::bindings::Bindings;
+use crate::term::view::{StructureView, TermView};
 use crate::term::{NonGround, Structure, Term};
 use crate::unification::error::UnificationError;
 use crate::variable::Variable;
@@ -136,17 +137,18 @@ impl Unify<&Structure> for Structure {
             return Err(UnificationError::FunctorMismatch);
         }
 
-        match (&self.arguments, &other.arguments) {
-            (Some(args1), Some(args2)) if args1.len() == args2.len() => {
-                let mut bindings = Vec::new();
-                for (a1, a2) in args1.iter().zip(args2.iter()) {
-                    bindings.extend(a1.collect_constraints(a2)?);
-                }
-                Ok(bindings)
-            }
-            (None, None) => Ok(vec![]),
-            _ => Err(UnificationError::ArityMismatch),
+        let args1 = self.arguments.as_deref().unwrap_or(&[]);
+        let args2 = other.arguments.as_deref().unwrap_or(&[]);
+
+        if args1.len() != args2.len() {
+            return Err(UnificationError::ArityMismatch);
         }
+
+        let mut bindings = Vec::new();
+        for (a1, a2) in args1.iter().zip(args2.iter()) {
+            bindings.extend(a1.collect_constraints(a2)?);
+        }
+        Ok(bindings)
     }
 }
 
@@ -156,17 +158,18 @@ impl<'a> UnifyView<'a> for StructureView<'a> {
             return Err(UnificationError::FunctorMismatch);
         }
 
-        match (&self.arguments, &other.arguments) {
-            (Some(args1), Some(args2)) if args1.len() == args2.len() => {
-                let mut bindings = Vec::new();
-                for (a1, a2) in args1.iter().zip(args2.iter()) {
-                    bindings.extend(a1.clone().collect_constraints(a2.clone())?);
-                }
-                Ok(bindings)
-            }
-            (None, None) => Ok(vec![]),
-            _ => Err(UnificationError::ArityMismatch),
+        let args1 = self.arguments.as_deref().unwrap_or(&[]);
+        let args2 = other.arguments.as_deref().unwrap_or(&[]);
+
+        if args1.len() != args2.len() {
+            return Err(UnificationError::ArityMismatch);
         }
+
+        let mut bindings = Vec::new();
+        for (a1, a2) in args1.iter().zip(args2.iter()) {
+            bindings.extend(a1.clone().collect_constraints(a2.clone())?);
+        }
+        Ok(bindings)
     }
 }
 
@@ -182,17 +185,18 @@ impl<'v> Unify<StructureView<'v>> for Structure {
             return Err(UnificationError::FunctorMismatch);
         }
 
-        match (&self.arguments, &other.arguments) {
-            (Some(args1), Some(args2)) if args1.len() == args2.len() => {
-                let mut bindings = Vec::new();
-                for (a1, a2) in args1.iter().zip(args2.iter()) {
-                    bindings.extend(a1.collect_constraints(a2.clone())?);
-                }
-                Ok(bindings)
-            }
-            (None, None) => Ok(vec![]),
-            _ => Err(UnificationError::ArityMismatch),
+        let args1 = self.arguments.as_deref().unwrap_or(&[]);
+        let args2 = other.arguments.as_deref().unwrap_or(&[]);
+
+        if args1.len() != args2.len() {
+            return Err(UnificationError::ArityMismatch);
         }
+
+        let mut bindings = Vec::new();
+        for (a1, a2) in args1.iter().zip(args2.iter()) {
+            bindings.extend(a1.collect_constraints(a2.clone())?);
+        }
+        Ok(bindings)
     }
 }
 

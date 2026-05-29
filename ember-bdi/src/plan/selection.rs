@@ -1,7 +1,8 @@
 use alloc::collections::btree_set::Iter;
 
-use crate::bindings::{Bindings, TermView};
+use crate::bindings::Bindings;
 use crate::knowledge::store::BeliefBase;
+use crate::term::view::TermView;
 
 use super::library::PlanLibrary;
 use super::{Plan, TriggeringEvent};

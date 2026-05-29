@@ -23,7 +23,8 @@ pub enum GoalKind {
     Query,
 }
 
-pub(crate) enum EventSource {
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum EventSource {
     /// The event is fired from the execution of an internal intention.
     Internal(IntentionId),
     /// The event is generated from an external interaction.

@@ -23,21 +23,36 @@ impl<'a> ConstraintSolver<'a> {
 
     pub(super) fn load_existing_bindings(&mut self, existing: &Bindings<'a>) -> Result<()> {
         if let Some(bindings) = &existing.bindings {
-            for (&variable, term) in bindings.iter() {
-                if let Some(term) = term {
-                    self.classes.register(
-                        BindingConstraint::new(variable, term.clone()),
-                        &mut self.queue,
-                    )?;
-                }
-            }
+            self.register_constraints(
+                bindings
+                    .iter()
+                    .filter_map(|(v, t)| t.as_ref().map(|t| (*v, t.clone()))),
+            )?;
         }
 
-        for &(var1, var2) in existing.aliases.iter() {
-            self.classes.merge(var1, var2, &mut self.queue)?;
-        }
+        self.register_aliases(existing.aliases.iter().copied())
+    }
 
-        Ok(())
+    pub(super) fn register_constraints<C>(
+        &mut self,
+        constraints: impl IntoIterator<Item = C>,
+    ) -> Result<()>
+    where
+        C: Into<BindingConstraint<'a>>,
+    {
+        constraints
+            .into_iter()
+            .map(|c| c.into())
+            .try_for_each(|c| self.classes.register(c, &mut self.queue))
+    }
+
+    pub(super) fn register_aliases(
+        &mut self,
+        aliases: impl IntoIterator<Item = (VariableId, VariableId)>,
+    ) -> Result<()> {
+        aliases
+            .into_iter()
+            .try_for_each(|(var1, var2)| self.classes.merge(var1, var2, &mut self.queue))
     }
 
     pub(super) fn solve(mut self) -> Result<Bindings<'a>> {

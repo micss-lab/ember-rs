@@ -2,12 +2,13 @@ use alloc::vec::Vec;
 
 use crate::literal::Literal;
 use crate::term::Structure;
+use crate::term::view::{StructureView, TermView};
 use crate::term::{NonGround, Term};
 
-use super::{Bindings, StructureView, TermView};
+use super::BindingLookup;
 
 #[derive(Debug)]
-pub enum ResolveFailure {
+pub(crate) enum ResolveFailure {
     /// The structural language type the variable resolved to did not match the context it was
     /// used in. For example, a variable used in the place of a literal should always resolve
     /// to a literal.
@@ -31,7 +32,10 @@ impl core::error::Error for ResolveFailure {}
 impl Literal {
     /// Resolve the literal using existing bindings as much as possible verifying that the
     /// created binding is valid in the place it used.
-    pub fn resolve_possible<'b>(self, bindings: &Bindings<'b>) -> Result<Self, ResolveFailure> {
+    pub(crate) fn resolve_possible<B>(self, bindings: &B) -> Result<Self, ResolveFailure>
+    where
+        B: BindingLookup,
+    {
         Ok(match self.resolve_possible_as_view(bindings) {
             TermView::Literal { negated, structure } => Self::Atom {
                 negated,
@@ -43,7 +47,10 @@ impl Literal {
         })
     }
 
-    pub fn resolve_possible_as_view<'a>(&'a self, bindings: &Bindings<'a>) -> TermView<'a> {
+    pub(crate) fn resolve_possible_as_view<'b>(
+        &'b self,
+        bindings: &'b impl BindingLookup,
+    ) -> TermView<'b> {
         match *self {
             Literal::Atom {
                 negated,
@@ -52,22 +59,21 @@ impl Literal {
                 negated,
                 structure: structure.resolve_possible_as_view(bindings),
             },
-            Literal::Variable(NonGround(ref v)) => bindings
-                .get(v)
-                .cloned()
-                .unwrap_or_else(|| TermView::Variable(v)),
+            Literal::Variable(NonGround(ref v)) => {
+                bindings.lookup(v).unwrap_or(TermView::Variable(v))
+            }
         }
     }
 }
 
 impl Term {
-    pub fn resolve_possible_as_view<'a>(&'a self, bindings: &Bindings<'a>) -> TermView<'a> {
+    pub(crate) fn resolve_possible_as_view<'b, B>(&'b self, bindings: &'b B) -> TermView<'b>
+    where
+        B: BindingLookup,
+    {
         match *self {
             Term::Number(_) | Term::String(_) => TermView::Term(self),
-            Term::Variable(NonGround(ref v)) => bindings
-                .get(v)
-                .cloned()
-                .unwrap_or_else(|| TermView::Variable(v)),
+            Term::Variable(NonGround(ref v)) => bindings.lookup(v).unwrap_or(TermView::Variable(v)),
             Term::Literal {
                 negated,
                 ref structure,
@@ -80,7 +86,10 @@ impl Term {
 }
 
 impl Structure {
-    pub fn resolve_possible_as_view<'a>(&'a self, bindings: &Bindings<'a>) -> StructureView<'a> {
+    pub(crate) fn resolve_possible_as_view<'b>(
+        &'b self,
+        bindings: &'b impl BindingLookup,
+    ) -> StructureView<'b> {
         StructureView {
             functor: &self.functor,
             arguments: self.arguments.as_ref().map(|args| {
@@ -97,8 +106,9 @@ impl Structure {
 mod tests {
     use alloc::vec;
 
-    use crate::bindings::{Bindings, TermView};
+    use crate::bindings::Bindings;
     use crate::literal::Literal;
+    use crate::term::view::TermView;
     use crate::term::{Atom, NonGround, Structure, Term};
 
     use crate::testing::*;
@@ -107,7 +117,7 @@ mod tests {
 
     #[test]
     fn test_resolve_ground_atom_unchanged() {
-        let bindings = Bindings::empty();
+        let bindings: Bindings<'_> = Bindings::empty();
         let literal = literal("parent", vec![s("alice"), s("bob")]);
 
         let resolved = literal
@@ -120,7 +130,7 @@ mod tests {
 
     #[test]
     fn test_resolve_unbound_variable_literal_remains_variable() {
-        let bindings = Bindings::empty();
+        let bindings: Bindings<'_> = Bindings::empty();
         let var = v();
         let literal = literal_variable(&var);
 

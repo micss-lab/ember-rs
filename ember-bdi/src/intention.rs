@@ -3,8 +3,8 @@ use alloc::vec::Vec;
 
 use derive_where::derive_where;
 
-use crate::bindings::Bindings;
 use crate::bindings::resolver::ResolveFailure;
+use crate::bindings::{Bindings, OwnedBindings};
 use crate::context::Context;
 use crate::plan::{Action, Formula, Plan, Trigger, TriggeringEvent};
 
@@ -14,13 +14,13 @@ pub(crate) type IntentionId = usize;
 
 #[derive_where(Default)]
 #[derive(Debug)]
-pub(crate) struct Intention<'b, A> {
+pub(crate) struct Intention<A> {
     id: IntentionId,
-    stack: Vec<Frame<'b, A>>,
+    stack: Vec<Frame<A>>,
 }
 
-impl<'b, A> Intention<'b, A> {
-    fn step(&mut self, context: &mut Context<A>) -> IntentionRunResult {
+impl<A> Intention<A> {
+    pub(crate) fn step(&mut self, context: &mut Context<A>) -> IntentionRunResult {
         let Some(frame) = self.stack.last_mut() else {
             return IntentionRunResult::Done;
         };
@@ -28,7 +28,7 @@ impl<'b, A> Intention<'b, A> {
         let bindings = match frame.step(context) {
             Ok(FrameStep::Done { bindings }) => bindings,
             Ok(FrameStep::NotDone) => return IntentionRunResult::NotDone,
-            Err(_) => unimplemented!("handle the error"),
+            Err(_) => return IntentionRunResult::Done,
         };
 
         self.stack.pop();
@@ -37,14 +37,17 @@ impl<'b, A> Intention<'b, A> {
             return IntentionRunResult::Done;
         };
 
-        frame.bindings = Bindings::merge([&frame.bindings, &bindings])
-            .expect("merging bindings between frames failed");
+        frame.bindings = Bindings::merge([
+            core::mem::replace(&mut frame.bindings, Bindings::empty()),
+            bindings,
+        ])
+        .expect("merging bindings between frames failed");
         IntentionRunResult::NotDone
     }
 }
 
-impl<'b, A: Clone> Intention<'b, A> {
-    fn push(&mut self, plan: &'_ Plan<A>, bindings: Bindings<'b>) {
+impl<A: Clone> Intention<A> {
+    fn push(&mut self, plan: &'_ Plan<A>, bindings: Bindings<'_>) {
         self.stack.push(Frame::new(plan, bindings, self.id))
     }
 }
@@ -55,42 +58,43 @@ pub(crate) enum IntentionRunResult {
 }
 
 #[derive(Debug)]
-struct Frame<'b, A> {
+struct Frame<A> {
     /// The id of the intention this frame belongs to.
     intention_id: IntentionId,
     /// The event that triggered the creation of this frame. Used to stop the execution of
     /// plans.
-    event: TriggeringEvent,
+    _event: TriggeringEvent,
     /// Bindings that this frame is created with and that have been resolved during the
     /// execution of this frame.
-    bindings: Bindings<'b>,
+    bindings: OwnedBindings,
     /// Remaining parts of the plan body to execute.
     remaining: Vec<Formula<A>>,
 }
 
-impl<'b, A: Clone> Frame<'b, A> {
-    fn new(plan: &'_ Plan<A>, bindings: Bindings<'b>, intention_id: IntentionId) -> Self {
+impl<A: Clone> Frame<A> {
+    fn new(plan: &'_ Plan<A>, bindings: Bindings<'_>, intention_id: IntentionId) -> Self {
         Self {
             intention_id,
-            event: plan.trigger.clone(),
-            bindings,
+            _event: plan.trigger.clone(),
+            bindings: bindings.into(),
             remaining: plan.body.iter().rev().cloned().collect(),
         }
     }
 }
 
-impl<'b, A> Frame<'b, A> {
-    fn step(&mut self, context: &mut Context<A>) -> FrameStepResult<'b> {
+impl<A> Frame<A> {
+    fn step(&mut self, context: &mut Context<A>) -> FrameStepResult {
         let Some(formula) = self.remaining.pop() else {
             return Ok(FrameStep::Done {
                 bindings: core::mem::replace(&mut self.bindings, Bindings::empty()),
             });
         };
 
+        let formula = formula.resolve_possible(&self.bindings)?;
+
         match formula {
             Formula::Belief { trigger, belief } => {
                 let event = belief
-                    .resolve_possible(&self.bindings)?
                     .try_into_ground()
                     .ok_or(FrameStepError::ResolveIncomplete)?
                     // TODO: Avoid the extra conversion here by using an `is_ground`
@@ -106,17 +110,14 @@ impl<'b, A> Frame<'b, A> {
                     self.intention_id,
                 )
             }
-            Formula::Goal { kind, goal } => {
-                let event = goal.resolve_possible(&self.bindings)?;
-                context.emit_event(
-                    TriggeringEvent {
-                        trigger: Trigger::Addition,
-                        event,
-                        goal: Some(kind),
-                    },
-                    self.intention_id,
-                )
-            }
+            Formula::Goal { kind, goal } => context.emit_event(
+                TriggeringEvent {
+                    trigger: Trigger::Addition,
+                    event: goal,
+                    goal: Some(kind),
+                },
+                self.intention_id,
+            ),
             Formula::Action(action) => match action {
                 Action::System(action) => action.execute(context),
                 Action::User(action) => context.perform_action(action),
@@ -128,12 +129,12 @@ impl<'b, A> Frame<'b, A> {
     }
 }
 
-type FrameStepResult<'b> = core::result::Result<FrameStep<'b>, FrameStepError>;
+type FrameStepResult = core::result::Result<FrameStep, FrameStepError>;
 
 #[derive(Debug)]
-enum FrameStep<'b> {
+enum FrameStep {
     NotDone,
-    Done { bindings: Bindings<'b> },
+    Done { bindings: OwnedBindings },
 }
 
 #[derive(Debug)]
@@ -176,7 +177,7 @@ mod tests {
 
     #[test]
     fn test_intention_step_empty() {
-        let mut intention: Intention<'_, ()> = Intention::default();
+        let mut intention: Intention<()> = Intention::default();
         let mut context = Context::new();
 
         // Step with no frames returns Done
@@ -188,7 +189,7 @@ mod tests {
 
     #[test]
     fn test_intention_push_and_step() {
-        let mut intention: Intention<'_, ()> = Intention::default();
+        let mut intention: Intention<()> = Intention::default();
         let mut context = Context::new();
 
         let trigger = trigger("event", vec![], None);
@@ -207,7 +208,7 @@ mod tests {
 
     #[test]
     fn test_intention_step_with_actions() {
-        let mut intention: Intention<'_, &'static str> = Intention::default();
+        let mut intention: Intention<&'static str> = Intention::default();
         let mut context = Context::new();
 
         let trigger = trigger("event", vec![], None);
@@ -225,12 +226,12 @@ mod tests {
         // step 1: executes action1 (because it's popped first)
         let result = intention.step(&mut context);
         assert!(matches!(result, IntentionRunResult::NotDone));
-        assert_eq!(context.actions(), &["action1"]);
+        assert_eq!(context.actions, &["action1"]);
 
         // step 2: executes action2
         let result = intention.step(&mut context);
         assert!(matches!(result, IntentionRunResult::NotDone));
-        assert_eq!(context.actions(), &["action1", "action2"]);
+        assert_eq!(context.actions, &["action1", "action2"]);
 
         // step 3: frame done, intention done
         let result = intention.step(&mut context);
@@ -239,7 +240,7 @@ mod tests {
 
     #[test]
     fn test_intention_step_with_beliefs_and_goals() {
-        let mut intention: Intention<'_, ()> = Intention::default();
+        let mut intention: Intention<()> = Intention::default();
         let mut context = Context::new();
 
         let trigger = trigger("event", vec![], None);

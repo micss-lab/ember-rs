@@ -5,23 +5,10 @@ use crate::intention::IntentionId;
 use crate::plan::TriggeringEvent;
 
 pub struct Context<A> {
-    actions: Vec<A>,
-    events: Vec<(EventSource, TriggeringEvent)>,
+    pub(crate) actions: Vec<A>,
+    pub(crate) events: Vec<(EventSource, TriggeringEvent)>,
 }
 
-impl<A> Context<A> {
-    pub(crate) fn perform_action(&mut self, action: A) {
-        self.actions.push(action);
-    }
-
-    pub(crate) fn emit_event(&mut self, event: TriggeringEvent, intention_id: IntentionId) {
-        self.events
-            .push((EventSource::Internal(intention_id), event));
-    }
-}
-
-// TODO: Remove this.
-#[cfg(test)]
 impl<A> Context<A> {
     pub(crate) fn new() -> Self {
         Self {
@@ -30,11 +17,12 @@ impl<A> Context<A> {
         }
     }
 
-    pub(crate) fn actions(&self) -> &[A] {
-        &self.actions
+    pub(crate) fn perform_action(&mut self, action: A) {
+        self.actions.push(action);
     }
 
-    pub(crate) fn events(&self) -> &[(EventSource, TriggeringEvent)] {
-        &self.events
+    pub(crate) fn emit_event(&mut self, event: TriggeringEvent, intention_id: IntentionId) {
+        self.events
+            .push((EventSource::Internal(intention_id), event));
     }
 }

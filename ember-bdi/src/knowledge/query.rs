@@ -151,9 +151,9 @@ impl RelationalQueryFormula {
 pub(crate) mod formula {
     use alloc::boxed::Box;
 
-    use crate::knowledge::store::BeliefBase;
     use crate::literal::Literal;
-    use crate::term::Term;
+    use crate::term::{Atom, Term};
+    use crate::{knowledge::store::BeliefBase, term::Structure};
 
     use super::{IntoQuery, Query};
 
@@ -171,6 +171,47 @@ pub(crate) mod formula {
     impl<'a> IntoQuery<'a> for &'a QueryFormula {
         fn into_query(self, knowledge: &'a BeliefBase) -> Query<'a> {
             self::into_dnf::convert(self, knowledge)
+        }
+    }
+
+    impl QueryFormula {
+        pub fn and<const N: usize>(operands: [QueryFormula; N]) -> Self {
+            QueryFormula::Logical {
+                operator: LogicalOperator::Conjunction,
+                operands: Box::new(operands),
+            }
+        }
+
+        pub fn or<const N: usize>(operands: [QueryFormula; N]) -> Self {
+            QueryFormula::Logical {
+                operator: LogicalOperator::Disjunction,
+                operands: Box::new(operands),
+            }
+        }
+
+        pub fn negate(self) -> Self {
+            Self::Not(Box::new(self))
+        }
+
+        pub fn literal(
+            negated: bool,
+            functor: impl Into<Atom>,
+            arguments: Option<impl Into<Box<[Term]>>>,
+        ) -> Self {
+            Literal::Atom {
+                negated,
+                structure: Structure {
+                    functor: functor.into(),
+                    arguments: arguments.map(Into::into),
+                },
+            }
+            .into()
+        }
+    }
+
+    impl From<Literal> for QueryFormula {
+        fn from(literal: Literal) -> Self {
+            Self::Literal(literal)
         }
     }
 
@@ -220,7 +261,8 @@ pub(crate) mod formula {
     }
 
     pub(crate) mod eval {
-        use crate::bindings::{Bindings, TermView};
+        use crate::bindings::Bindings;
+        use crate::term::view::TermView;
         use crate::term::{NonGround, Term, TotalCmpF32};
         use crate::unification::traits::UnifyView;
 
@@ -708,7 +750,6 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
 
-    use crate::bindings::TermView;
     use crate::knowledge::belief::Belief;
     use crate::knowledge::store::BeliefBase;
     use crate::literal::Literal;
@@ -716,6 +757,7 @@ mod tests {
         ArithmeticExpression, ArithmeticOperator, CompareOperator, LogicalOperator, QueryFormula,
         RelationalOperator, RelationalQueryFormula,
     };
+    use crate::term::view::TermView;
     use crate::term::{Atom, Structure, Term};
 
     use crate::testing::*;

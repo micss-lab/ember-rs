@@ -1,4 +1,4 @@
-use crate::bindings::TermView;
+use crate::term::view::TermView;
 use crate::variable::VariableId;
 
 #[derive(Debug)]
@@ -13,5 +13,14 @@ impl<'a> BindingConstraint<'a> {
             variable,
             value: value.into(),
         }
+    }
+}
+
+impl<'a, T> From<(VariableId, T)> for BindingConstraint<'a>
+where
+    T: Into<TermView<'a>>,
+{
+    fn from((variable, term): (VariableId, T)) -> Self {
+        Self::new(variable, term)
     }
 }

@@ -2,6 +2,7 @@
 
 extern crate alloc;
 
+pub mod agent;
 pub mod bindings;
 pub mod context;
 pub mod event;

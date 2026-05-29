@@ -10,7 +10,7 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
 
-    use crate::bindings::{StructureView, TermView};
+    use crate::term::view::{StructureView, TermView};
     use crate::term::{Atom, Structure, Term};
     use crate::unification::error::UnificationError;
     use crate::unification::traits::Unify;

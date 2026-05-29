@@ -11,6 +11,7 @@ pub enum Action<A> {
 #[derive(derive_more::Debug, Clone)]
 pub enum SystemAction<A> {
     // TODO: Remove this action.
+    #[allow(clippy::type_complexity)]
     Boxed(#[debug("boxed action")] Rc<dyn Fn(&mut Context<A>)>),
 }
 

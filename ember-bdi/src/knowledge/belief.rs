@@ -83,7 +83,7 @@ pub(super) struct NormalizedBelief(Belief);
 
 impl NormalizedBelief {
     /// Construct a belief from the normalized version and the accompanying metadata.
-    fn denormalize(self, metadata: BeliefMetadata) -> Belief {
+    fn _denormalize(self, metadata: BeliefMetadata) -> Belief {
         use core::ops::BitXor;
 
         let (negated, structure) = self.0.into_literal_atom_non_ground();

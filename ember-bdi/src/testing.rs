@@ -1,9 +1,10 @@
 use alloc::vec::Vec;
 
-use crate::bindings::{Bindings, TermView};
+use crate::bindings::Bindings;
 use crate::knowledge::store::BeliefBase;
 use crate::literal::Literal;
 use crate::plan::{Formula, GoalKind, Plan, QueryFormula, Trigger, TriggeringEvent};
+use crate::term::view::TermView;
 use crate::term::{Atom, NonGround, Structure, Term};
 use crate::variable::Variable;
 
