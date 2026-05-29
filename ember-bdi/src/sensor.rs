@@ -1,23 +1,39 @@
 use alloc::boxed::Box;
 
+use crate::knowledge::belief::Belief;
+use crate::plan::Trigger;
+
 /// Abstraction over anything that can percept the environment of the agent.
 pub trait Perceptor {
-    /// The result of percepting the environment.
-    type Percept;
+    type Percept: Percept;
 
     /// Poll the sensor for any available perceptions.
     fn percept(&mut self) -> Option<Self::Percept>;
 }
 
+pub trait Percept: Sized {
+    fn into_beliefs(self) -> impl IntoIterator<Item = (Trigger, Belief)>;
+}
+
+// Implementation needed for users with an agent that does not percept the environment.
+impl Percept for () {
+    fn into_beliefs(self) -> impl IntoIterator<Item = (Trigger, Belief)> {
+        []
+    }
+}
+
 /// Wrapper type around [`Perceptors`] for a better internal interface.
 ///
 /// [`Perceptors`]: crate::sensor::Perceptor
-pub struct Sensor<'s, P>(Box<dyn crate::sensor::Perceptor<Percept = P> + 's>);
+pub struct Sensor<'s, Percept>(Box<dyn crate::sensor::Perceptor<Percept = Percept> + 's>);
 
-impl<'s, P> Sensor<'s, P> {
-    pub fn new<PP>(perceptor: PP) -> Self
+impl<'s, PP> Sensor<'s, PP>
+where
+    PP: Percept,
+{
+    pub fn new<P>(perceptor: P) -> Self
     where
-        PP: Perceptor<Percept = P> + 's,
+        P: Perceptor<Percept = PP> + 's,
     {
         Self(Box::new(perceptor))
     }
@@ -25,21 +41,22 @@ impl<'s, P> Sensor<'s, P> {
     // NOTE: This cannot be implemented through the trait due to conflicting `From`
     // implementations.
     /// Poll the sensor for any available perceptions.
-    pub(crate) fn percept(&mut self) -> Option<P> {
+    pub(crate) fn percept(&mut self) -> Option<PP> {
         self.0.percept()
     }
 }
 
-impl<'s, P, PP> From<PP> for Sensor<'s, P>
+impl<'s, P, PP> From<P> for Sensor<'s, PP>
 where
-    PP: Perceptor<Percept = P> + 's,
+    P: Perceptor<Percept = PP> + 's,
+    PP: Percept,
 {
-    fn from(perceptor: PP) -> Self {
+    fn from(perceptor: P) -> Self {
         Self::new(perceptor)
     }
 }
 
-impl<P> core::fmt::Debug for Sensor<'_, P> {
+impl<Percept> core::fmt::Debug for Sensor<'_, Percept> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_tuple("Sensor").field(&"<perceptor>").finish()
     }

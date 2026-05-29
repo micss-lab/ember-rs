@@ -153,7 +153,7 @@ mod tests {
         }
         .try_into_ground()
         .expect("belief should be ground literal");
-        bb.assert(ready_belief);
+        bb.assert_no_event(ready_belief);
 
         let mut selection2 = PlanSelection::select_from_library(&event, &store);
         assert!(
@@ -268,7 +268,7 @@ mod tests {
         }
         .try_into_ground()
         .expect("belief should be ground literal");
-        bb.assert(colour_belief);
+        bb.assert_no_event(colour_belief);
 
         let x = v();
         // Plan: +!check(Obj) : colour(Obj, red) <- ...

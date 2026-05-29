@@ -63,7 +63,7 @@ pub fn assert_belief(bb: &mut BeliefBase, functor: &str, args: Vec<Term>) {
     let lit = literal(functor, args)
         .try_into_ground()
         .expect("belief should be ground literal");
-    bb.assert(lit);
+    bb.assert_no_event(lit);
 }
 
 pub fn plan<A>(

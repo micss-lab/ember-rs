@@ -107,7 +107,7 @@ impl<A> Frame<A> {
                         event,
                         goal: None,
                     },
-                    self.intention_id,
+                    Some(self.intention_id),
                 )
             }
             Formula::Goal { kind, goal } => context.emit_event(
@@ -116,7 +116,7 @@ impl<A> Frame<A> {
                     event: goal,
                     goal: Some(kind),
                 },
-                self.intention_id,
+                Some(self.intention_id),
             ),
             Formula::Action(action) => match action {
                 Action::System(action) => action.execute(context),

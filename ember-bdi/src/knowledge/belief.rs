@@ -23,6 +23,13 @@ impl From<Literal<Ground>> for Belief {
     }
 }
 
+impl From<Belief> for Literal<NonGround> {
+    fn from(value: Belief) -> Self {
+        let (negated, structure) = value.into_literal_atom_non_ground();
+        Literal::Atom { negated, structure }
+    }
+}
+
 impl Belief {
     fn from_ground_literal(literal: Literal<Ground>) -> Self {
         Self(literal.into_non_ground().into())

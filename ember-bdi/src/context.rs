@@ -21,8 +21,13 @@ impl<A> Context<A> {
         self.actions.push(action);
     }
 
-    pub(crate) fn emit_event(&mut self, event: TriggeringEvent, intention_id: IntentionId) {
-        self.events
-            .push((EventSource::Internal(intention_id), event));
+    pub(crate) fn emit_event(&mut self, event: TriggeringEvent, intention_id: Option<IntentionId>) {
+        self.events.push((
+            match intention_id {
+                Some(id) => EventSource::Internal(id),
+                None => EventSource::External,
+            },
+            event,
+        ));
     }
 }

@@ -844,8 +844,8 @@ mod tests {
     #[test]
     fn shared_variable_conjunction() {
         let mut bb = BeliefBase::default();
-        bb.assert(belief("parent", vec![s("alice"), s("bob")]));
-        bb.assert(belief("parent", vec![s("bob"), s("charlie")]));
+        bb.assert_no_event(belief("parent", vec![s("alice"), s("bob")]));
+        bb.assert_no_event(belief("parent", vec![s("bob"), s("charlie")]));
 
         let (x, y) = (v(), v());
         let formula = and(vec![
@@ -863,9 +863,9 @@ mod tests {
     #[test]
     fn backtracking_across_operands() {
         let mut bb = BeliefBase::default();
-        bb.assert(belief("p", vec![n(1.0), n(10.0)]));
-        bb.assert(belief("p", vec![n(1.0), n(20.0)]));
-        bb.assert(belief("q", vec![n(20.0), n(30.0)]));
+        bb.assert_no_event(belief("p", vec![n(1.0), n(10.0)]));
+        bb.assert_no_event(belief("p", vec![n(1.0), n(20.0)]));
+        bb.assert_no_event(belief("q", vec![n(20.0), n(30.0)]));
 
         let (x, y) = (v(), v());
         let formula = and(vec![
@@ -883,7 +883,7 @@ mod tests {
     #[test]
     fn closed_world_negation() {
         let mut bb = BeliefBase::default();
-        bb.assert(belief("is_raining", vec![]));
+        bb.assert_no_event(belief("is_raining", vec![]));
 
         let f_sunny = not(literal("is_sunny", vec![]));
         assert!((&f_sunny).into_query(&bb).next_bindings(None).is_some());
@@ -895,9 +895,9 @@ mod tests {
     #[test]
     fn disjunction_and_flattening() {
         let mut bb = BeliefBase::default();
-        bb.assert(belief("a", vec![n(1.0)]));
-        bb.assert(belief("b", vec![n(2.0)]));
-        bb.assert(belief("c", vec![n(2.0)]));
+        bb.assert_no_event(belief("a", vec![n(1.0)]));
+        bb.assert_no_event(belief("b", vec![n(2.0)]));
+        bb.assert_no_event(belief("c", vec![n(2.0)]));
 
         let x = v();
         // (a(X) | b(X)) & c(X) -> Should bind X=2
@@ -915,8 +915,8 @@ mod tests {
     #[test]
     fn relational_comparison() {
         let mut bb = BeliefBase::default();
-        bb.assert(belief("val", vec![n(5.0)]));
-        bb.assert(belief("val", vec![n(15.0)]));
+        bb.assert_no_event(belief("val", vec![n(5.0)]));
+        bb.assert_no_event(belief("val", vec![n(15.0)]));
 
         let x = v();
         // val(X) & X > 10
@@ -939,7 +939,7 @@ mod tests {
     #[test]
     fn relational_unification_math() {
         let mut bb = BeliefBase::default();
-        bb.assert(belief("base", vec![n(10.0)]));
+        bb.assert_no_event(belief("base", vec![n(10.0)]));
 
         let (x, y) = (v(), v());
         // base(X) & Y = X * 2
@@ -959,8 +959,8 @@ mod tests {
     #[test]
     fn arithmetic_division_by_zero_fails_gracefully() {
         let mut bb = BeliefBase::default();
-        bb.assert(belief("val", vec![n(0.0)]));
-        bb.assert(belief("val", vec![n(2.0)]));
+        bb.assert_no_event(belief("val", vec![n(0.0)]));
+        bb.assert_no_event(belief("val", vec![n(2.0)]));
 
         let x = v();
         // val(X) & (10 / X) == 5
@@ -986,7 +986,7 @@ mod tests {
     #[test]
     fn type_mismatch_fails_gracefully() {
         let mut bb = BeliefBase::default();
-        bb.assert(belief("val", vec![s("not_a_number")]));
+        bb.assert_no_event(belief("val", vec![s("not_a_number")]));
 
         let x = v();
         // val(X) & X > 0
@@ -1007,8 +1007,8 @@ mod tests {
     #[test]
     fn complex_de_morgan_resolution() {
         let mut bb = BeliefBase::default();
-        bb.assert(belief("p", vec![n(1.0)]));
-        bb.assert(belief("q", vec![n(1.0)]));
+        bb.assert_no_event(belief("p", vec![n(1.0)]));
+        bb.assert_no_event(belief("q", vec![n(1.0)]));
 
         // !( !p(1) | !q(1) ) => p(1) & q(1)
         let formula = not(or(vec![

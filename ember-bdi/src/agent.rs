@@ -12,7 +12,7 @@ use crate::knowledge::store::BeliefBase;
 use crate::plan::library::PlanLibrary;
 use crate::plan::selector::FirstApplicable;
 use crate::plan::{Trigger, TriggeringEvent};
-use crate::sensor::Sensor;
+use crate::sensor::{Percept, Sensor};
 
 #[derive(Debug)]
 pub struct BdiAgent<'s, const S: usize, Agent, Action, Percept> {
@@ -61,8 +61,8 @@ where
                 .expect("belief update must be ground");
 
             match event.trigger {
-                Trigger::Addition => self.beliefs.assert(ground),
-                Trigger::Deletion => self.beliefs.remove(ground),
+                Trigger::Addition => self.beliefs.assert_no_event(ground),
+                Trigger::Deletion => self.beliefs.remove_no_event(ground),
             };
         }
 
@@ -79,26 +79,34 @@ where
     }
 }
 
-impl<A, const S: usize, Action, Percept> EmberAgent for BdiAgent<'_, S, A, Action, Percept>
+impl<A, const S: usize, Action, P> EmberAgent for BdiAgent<'_, S, A, Action, P>
 where
-    A: Agent<Action = Action, Percept = Percept>,
+    A: Agent<Action = Action, Percept = P>,
     Action: Clone,
+    P: Percept,
 {
     fn update(&mut self, _context: &mut ContainerContext) -> bool {
         // TODO: Implement interaction with the ember framework.
+        //
+        let mut context = Context::new();
 
         for sensor in self.sensors.iter_mut() {
             let Some(percept) = sensor.percept() else {
                 continue;
             };
-            self.agent.handle_percept(percept, &mut self.beliefs);
+
+            for (trigger, belief) in percept.into_beliefs().into_iter() {
+                let _ = match trigger {
+                    Trigger::Addition => self.beliefs.assert(belief, &mut context),
+                    Trigger::Deletion => self.beliefs.remove(belief, &mut context),
+                };
+            }
         }
 
         if let Some((event, source)) = self.event_queue.next_event(FirstEvent) {
             self.handle_event(event, source);
         }
 
-        let mut context = Context::new();
         self.intentions.step(&mut Fifo, &mut context);
 
         while let Some(action) = context.actions.pop() {
@@ -122,6 +130,4 @@ pub trait Agent {
     type Percept;
 
     fn perform_action(&mut self, action: Self::Action, context: &mut Context<Self::Action>);
-
-    fn handle_percept(&mut self, percept: Self::Percept, knowledge: &mut BeliefBase);
 }

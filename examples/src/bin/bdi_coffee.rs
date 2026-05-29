@@ -67,13 +67,6 @@ impl Agent for CoffeeAgent {
             }
         }
     }
-
-    fn handle_percept(
-        &mut self,
-        _percept: Self::Percept,
-        _knowledge: &mut ember_bdi::knowledge::store::BeliefBase,
-    ) {
-    }
 }
 
 fn example() {
@@ -106,7 +99,7 @@ fn example() {
 
     let belief_count = beliefs.len();
     beliefs.into_iter().for_each(|b| {
-        belief_base.assert(b);
+        belief_base.assert_no_event(b);
     });
 
     info!("🧠 Agent has {} initial beliefs.", belief_count);
