@@ -1,4 +1,5 @@
-use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::collections::BTreeMap;
+use alloc::vec::Vec;
 
 use crate::bindings::Bindings;
 use crate::knowledge::store::BeliefBase;
@@ -11,7 +12,7 @@ use super::{GoalKind, Plan, Trigger, TriggeringEvent};
 
 #[derive(Debug)]
 pub struct PlanLibrary<A> {
-    pub(super) plans: BTreeMap<PlanKey, BTreeSet<Plan<A>>>,
+    pub(super) plans: BTreeMap<PlanKey, Vec<Plan<A>>>,
 }
 
 impl<A> Default for PlanLibrary<A> {
@@ -23,11 +24,11 @@ impl<A> Default for PlanLibrary<A> {
 }
 
 impl<A: Ord> PlanLibrary<A> {
-    pub fn add(&mut self, plan: Plan<A>) -> bool {
+    pub fn add(&mut self, plan: Plan<A>) {
         self.plans
             .entry((&plan.trigger).into())
             .or_default()
-            .insert(plan)
+            .push(plan)
     }
 }
 

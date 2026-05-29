@@ -1,4 +1,4 @@
-use alloc::collections::btree_set::Iter;
+use core::slice::Iter;
 
 use crate::bindings::Bindings;
 use crate::knowledge::store::BeliefBase;
