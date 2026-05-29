@@ -25,7 +25,10 @@ setup_example!();
 #[derive(Debug)]
 struct CoffeeAgent;
 
-impl Agent<Structure> for CoffeeAgent {
+impl Agent for CoffeeAgent {
+    type Action = Structure;
+    type Percept = ();
+
     /// This function is called by the BDI engine when a plan executes a custom action.
     fn perform_action(
         &mut self,
@@ -63,6 +66,13 @@ impl Agent<Structure> for CoffeeAgent {
                 info!("[ACTION] ❓ Unknown action: {:?}", action);
             }
         }
+    }
+
+    fn handle_percept(
+        &mut self,
+        _percept: Self::Percept,
+        _knowledge: &mut ember_bdi::knowledge::store::BeliefBase,
+    ) {
     }
 }
 
@@ -124,7 +134,8 @@ fn example() {
     let mut bdi_agent = BdiAgent::new(
         "coffee-maker",
         CoffeeAgent,
-        belief_base,
+        [],
+        Some(belief_base),
         plan_library,
         vec![initial_goal],
     );

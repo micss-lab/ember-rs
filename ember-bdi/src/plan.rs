@@ -1,13 +1,13 @@
 use alloc::boxed::Box;
 
+use crate::bindings::BindingLookup;
+use crate::bindings::resolver::ResolveFailure;
 use crate::literal::Literal;
 
 pub use crate::event::{GoalKind, Trigger, TriggeringEvent};
 pub use crate::knowledge::query::formula::*;
 
 pub use self::action::{Action, SystemAction};
-use crate::bindings::BindingLookup;
-use crate::bindings::resolver::ResolveFailure;
 
 pub mod action;
 pub mod library;

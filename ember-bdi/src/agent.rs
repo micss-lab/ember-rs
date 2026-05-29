@@ -12,32 +12,39 @@ use crate::knowledge::store::BeliefBase;
 use crate::plan::library::PlanLibrary;
 use crate::plan::selector::FirstApplicable;
 use crate::plan::{Trigger, TriggeringEvent};
+use crate::sensor::Sensor;
 
 #[derive(Debug)]
-pub struct BdiAgent<Agent, Action> {
+pub struct BdiAgent<'s, const S: usize, Agent, Action, Percept> {
     name: Cow<'static, str>,
     agent: Agent,
     beliefs: BeliefBase,
     plans: PlanLibrary<Action>,
     intentions: IntentionQueue<Action>,
     event_queue: EventQueue,
+    sensors: [Sensor<'s, Percept>; S],
 }
 
-impl<Agent, Action: Clone> BdiAgent<Agent, Action> {
+impl<'s, Agent, const S: usize, Action, Percept> BdiAgent<'s, S, Agent, Action, Percept>
+where
+    Action: Clone,
+{
     pub fn new(
         name: impl Into<Cow<'static, str>>,
         agent: Agent,
-        beliefs: BeliefBase,
+        sensors: [Sensor<'s, Percept>; S],
+        beliefs: Option<BeliefBase>,
         plans: PlanLibrary<Action>,
         initial_goals: impl IntoIterator<Item = TriggeringEvent>,
     ) -> Self {
         let mut this = Self {
             name: name.into(),
             agent,
-            beliefs,
+            beliefs: beliefs.unwrap_or_default(),
             plans,
             intentions: IntentionQueue::default(),
             event_queue: EventQueue::default(),
+            sensors,
         };
         initial_goals
             .into_iter()
@@ -72,11 +79,20 @@ impl<Agent, Action: Clone> BdiAgent<Agent, Action> {
     }
 }
 
-impl<Action: Clone, A: Agent<Action>> EmberAgent for BdiAgent<A, Action> {
+impl<A, const S: usize, Action, Percept> EmberAgent for BdiAgent<'_, S, A, Action, Percept>
+where
+    A: Agent<Action = Action, Percept = Percept>,
+    Action: Clone,
+{
     fn update(&mut self, _context: &mut ContainerContext) -> bool {
         // TODO: Implement interaction with the ember framework.
 
-        // TODO: Implement sensing of the environment through sensors.
+        for sensor in self.sensors.iter_mut() {
+            let Some(percept) = sensor.percept() else {
+                continue;
+            };
+            self.agent.handle_percept(percept, &mut self.beliefs);
+        }
 
         if let Some((event, source)) = self.event_queue.next_event(FirstEvent) {
             self.handle_event(event, source);
@@ -101,6 +117,11 @@ impl<Action: Clone, A: Agent<Action>> EmberAgent for BdiAgent<A, Action> {
     }
 }
 
-pub trait Agent<A> {
-    fn perform_action(&mut self, action: A, context: &mut Context<A>);
+pub trait Agent {
+    type Action;
+    type Percept;
+
+    fn perform_action(&mut self, action: Self::Action, context: &mut Context<Self::Action>);
+
+    fn handle_percept(&mut self, percept: Self::Percept, knowledge: &mut BeliefBase);
 }

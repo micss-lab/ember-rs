@@ -10,6 +10,7 @@ pub mod intention;
 pub mod knowledge;
 pub mod literal;
 pub mod plan;
+pub mod sensor;
 pub mod term;
 pub mod unification;
 pub mod variable;
