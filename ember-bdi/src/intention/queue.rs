@@ -37,7 +37,9 @@ impl<A: Clone> IntentionQueue<A> {
     ) {
         let id = existing_intention.unwrap_or_else(|| self.next_id());
         self.intentions.entry(id).or_default().push(plan, bindings);
-        self.queue.push_back(id);
+        if !self.queue.contains(&id) {
+            self.queue.push_back(id);
+        }
     }
 
     pub(crate) fn step<S: Scheduler<A>>(&mut self, scheduler: &mut S, context: &mut Context<A>) {
