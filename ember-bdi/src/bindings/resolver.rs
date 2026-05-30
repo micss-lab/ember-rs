@@ -7,8 +7,8 @@ use crate::term::{NonGround, Term};
 
 use super::BindingLookup;
 
-#[derive(Debug)]
-pub(crate) enum ResolveFailure {
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum ResolveFailure {
     /// The structural language type the variable resolved to did not match the context it was
     /// used in. For example, a variable used in the place of a literal should always resolve
     /// to a literal.
@@ -29,14 +29,28 @@ impl core::fmt::Display for ResolveFailure {
 
 impl core::error::Error for ResolveFailure {}
 
-impl Literal {
+pub trait Resolve: Sized {
+    type View<'a>
+    where
+        // Bound currently needed until GAT's are fully supported. See issue
+        // https://github.com/rust-lang/rust/issues/87479.
+        Self: 'a;
+
+    fn resolve(self, bindings: &impl BindingLookup) -> Result<Self, ResolveFailure>;
+
+    fn resolve_as_view<'a>(
+        &'a self,
+        bindings: &'a impl BindingLookup,
+    ) -> Result<Self::View<'a>, ResolveFailure>;
+}
+
+impl Resolve for Literal {
+    type View<'a> = TermView<'a>;
+
     /// Resolve the literal using existing bindings as much as possible verifying that the
     /// created binding is valid in the place it used.
-    pub(crate) fn resolve_possible<B>(self, bindings: &B) -> Result<Self, ResolveFailure>
-    where
-        B: BindingLookup,
-    {
-        Ok(match self.resolve_possible_as_view(bindings) {
+    fn resolve(self, bindings: &impl BindingLookup) -> Result<Self, ResolveFailure> {
+        Ok(match self.resolve_as_view(bindings)? {
             TermView::Literal { negated, structure } => Self::Atom {
                 negated,
                 structure: structure.to_owned(),
@@ -47,31 +61,37 @@ impl Literal {
         })
     }
 
-    pub(crate) fn resolve_possible_as_view<'b>(
+    fn resolve_as_view<'b>(
         &'b self,
         bindings: &'b impl BindingLookup,
-    ) -> TermView<'b> {
-        match *self {
+    ) -> Result<TermView<'b>, ResolveFailure> {
+        Ok(match *self {
             Literal::Atom {
                 negated,
                 ref structure,
             } => TermView::Literal {
                 negated,
-                structure: structure.resolve_possible_as_view(bindings),
+                structure: structure.resolve_as_view(bindings)?,
             },
             Literal::Variable(NonGround(ref v)) => {
                 bindings.lookup(v).unwrap_or(TermView::Variable(v))
             }
-        }
+        })
     }
 }
 
-impl Term {
-    pub(crate) fn resolve_possible_as_view<'b, B>(&'b self, bindings: &'b B) -> TermView<'b>
-    where
-        B: BindingLookup,
-    {
-        match *self {
+impl Resolve for Term {
+    type View<'a> = TermView<'a>;
+
+    fn resolve(self, bindings: &impl BindingLookup) -> Result<Self, ResolveFailure> {
+        Ok(self.resolve_as_view(bindings)?.to_owned())
+    }
+
+    fn resolve_as_view<'a>(
+        &'a self,
+        bindings: &'a impl BindingLookup,
+    ) -> Result<TermView<'a>, ResolveFailure> {
+        Ok(match *self {
             Term::Number(_) | Term::String(_) => TermView::Term(self),
             Term::Variable(NonGround(ref v)) => bindings.lookup(v).unwrap_or(TermView::Variable(v)),
             Term::Literal {
@@ -79,26 +99,35 @@ impl Term {
                 ref structure,
             } => TermView::Literal {
                 negated,
-                structure: structure.resolve_possible_as_view(bindings),
+                structure: structure.resolve_as_view(bindings)?,
             },
-        }
+        })
     }
 }
 
-impl Structure {
-    pub(crate) fn resolve_possible_as_view<'b>(
+impl Resolve for Structure {
+    type View<'a> = StructureView<'a>;
+
+    fn resolve(self, bindings: &impl BindingLookup) -> Result<Self, ResolveFailure> {
+        Ok(self.resolve_as_view(bindings)?.to_owned())
+    }
+
+    fn resolve_as_view<'b>(
         &'b self,
         bindings: &'b impl BindingLookup,
-    ) -> StructureView<'b> {
-        StructureView {
+    ) -> Result<StructureView<'b>, ResolveFailure> {
+        Ok(StructureView {
             functor: &self.functor,
-            arguments: self.arguments.as_ref().map(|args| {
-                args.into_iter()
-                    .map(|a| a.resolve_possible_as_view(bindings))
-                    .collect::<Vec<_>>()
-                    .into_boxed_slice()
-            }),
-        }
+            arguments: match self.arguments.as_ref() {
+                Some(args) => Some(
+                    args.into_iter()
+                        .map(|a| a.resolve_as_view(bindings))
+                        .collect::<Result<Vec<_>, _>>()?
+                        .into_boxed_slice(),
+                ),
+                None => None,
+            },
+        })
     }
 }
 
@@ -122,7 +151,7 @@ mod tests {
 
         let resolved = literal
             .clone()
-            .resolve_possible(&bindings)
+            .resolve(&bindings)
             .expect("Should resolve successfully");
 
         assert_eq!(resolved, literal);
@@ -136,7 +165,7 @@ mod tests {
 
         let resolved = literal
             .clone()
-            .resolve_possible(&bindings)
+            .resolve(&bindings)
             .expect("Should resolve successfully");
 
         assert_eq!(resolved, literal);
@@ -153,7 +182,7 @@ mod tests {
         let literal = literal_variable(&var);
 
         let resolved = literal
-            .resolve_possible(&bindings)
+            .resolve(&bindings)
             .expect("Should resolve successfully");
 
         assert_eq!(resolved, target_atom);
@@ -166,7 +195,7 @@ mod tests {
         let num_bindings = bindings(vec![(var_num.clone(), TermView::Number(42.0.into()))]);
         let lit_num = literal_variable(&var_num);
 
-        let result_num = lit_num.resolve_possible(&num_bindings);
+        let result_num = lit_num.resolve(&num_bindings);
         assert!(matches!(result_num, Err(ResolveFailure::IncorrectKind)));
 
         let var_str = v();
@@ -174,7 +203,7 @@ mod tests {
         let str_bindings = bindings(vec![(var_str.clone(), TermView::Term(&term_str))]);
         let lit_str = literal_variable(&var_str);
 
-        let result_str = lit_str.resolve_possible(&str_bindings);
+        let result_str = lit_str.resolve(&str_bindings);
         assert!(matches!(result_str, Err(ResolveFailure::IncorrectKind)));
     }
 
@@ -188,7 +217,9 @@ mod tests {
 
         // p(X, Y)
         let literal = literal("p", vec![vt(&x), vt(&y)]);
-        let resolved_view = literal.resolve_possible_as_view(&bindings);
+        let resolved_view = literal
+            .resolve_as_view(&bindings)
+            .expect("literal should resolve");
 
         // Verify structure views are mapped out cleanly
         if let TermView::Literal { structure, .. } = resolved_view {
@@ -215,7 +246,7 @@ mod tests {
         // Ensure that resolve_possible_as_view captures underlying literal aspects,
         // but note that the `negated` value produced matches the variant wrapped by the view.
         let resolved = literal
-            .resolve_possible(&bindings)
+            .resolve(&bindings)
             .expect("Should resolve successfully");
 
         if let Literal::Atom { negated, .. } = resolved {
@@ -247,7 +278,7 @@ mod tests {
         let outer_literal = literal("outer_lit", vec![embedded_term]);
 
         let resolved = outer_literal
-            .resolve_possible(&bindings)
+            .resolve(&bindings)
             .expect("Should recursively map out inner structure terms");
 
         if let Literal::Atom { structure, .. } = resolved {

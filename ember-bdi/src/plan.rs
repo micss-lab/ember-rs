@@ -7,7 +7,7 @@ use crate::literal::Literal;
 pub use crate::event::{GoalKind, Trigger, TriggeringEvent};
 pub use crate::knowledge::query::formula::*;
 
-pub use self::action::{Action, SystemAction};
+pub use self::action::{Action, BuiltinAction};
 
 pub mod action;
 pub mod library;
@@ -87,14 +87,16 @@ impl<A> Formula<A> {
         self,
         bindings: &B,
     ) -> Result<Self, ResolveFailure> {
+        use crate::bindings::resolver::Resolve;
+
         Ok(match self {
             Formula::Belief { trigger, belief } => Formula::Belief {
                 trigger,
-                belief: belief.resolve_possible(bindings)?,
+                belief: belief.resolve(bindings)?,
             },
             Formula::Goal { kind, goal } => Formula::Goal {
                 kind,
-                goal: goal.resolve_possible(bindings)?,
+                goal: goal.resolve(bindings)?,
             },
             action @ Formula::Action(_) => action,
         })

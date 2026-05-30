@@ -1,5 +1,6 @@
 use alloc::borrow::Cow;
 
+use alloc::boxed::Box;
 use ember_core::agent::Agent as EmberAgent;
 use ember_core::context::ContainerContext;
 
@@ -9,30 +10,31 @@ use crate::event::queue::EventQueue;
 use crate::event::selector::FirstEvent;
 use crate::intention::queue::{Fifo, IntentionQueue};
 use crate::knowledge::store::BeliefBase;
+use crate::plan::action::Execute;
 use crate::plan::library::PlanLibrary;
 use crate::plan::selector::FirstApplicable;
-use crate::plan::{Action, Trigger, TriggeringEvent};
+use crate::plan::{Trigger, TriggeringEvent};
 use crate::sensor::{Percept, Sensor};
 
 #[derive(Debug)]
-pub struct BdiAgent<'s, const S: usize, Agent, Action, Percept> {
+pub struct BdiAgent<'s, Agent, Action, Percept> {
     name: Cow<'static, str>,
     agent: Agent,
     beliefs: BeliefBase,
     plans: PlanLibrary<Action>,
     intentions: IntentionQueue<Action>,
     event_queue: EventQueue,
-    sensors: [Sensor<'s, Percept>; S],
+    sensors: Box<[Sensor<'s, Percept>]>,
 }
 
-impl<'s, Agent, const S: usize, Action, Percept> BdiAgent<'s, S, Agent, Action, Percept>
+impl<'s, Agent, Action, Percept> BdiAgent<'s, Agent, Action, Percept>
 where
     Action: Clone,
 {
     pub fn new(
         name: impl Into<Cow<'static, str>>,
         agent: Agent,
-        sensors: [Sensor<'s, Percept>; S],
+        sensors: impl Into<Box<[Sensor<'s, Percept>]>>,
         beliefs: Option<BeliefBase>,
         plans: PlanLibrary<Action>,
         initial_goals: impl IntoIterator<Item = TriggeringEvent>,
@@ -44,7 +46,7 @@ where
             plans,
             intentions: IntentionQueue::default(),
             event_queue: EventQueue::default(),
-            sensors,
+            sensors: sensors.into(),
         };
         initial_goals
             .into_iter()
@@ -79,10 +81,9 @@ where
     }
 }
 
-impl<A, const S: usize, UserAction, P> EmberAgent for BdiAgent<'_, S, A, UserAction, P>
+impl<Agent, Action, P> EmberAgent for BdiAgent<'_, Agent, Action, P>
 where
-    A: Agent<Action = UserAction, Percept = P>,
-    UserAction: Clone,
+    Action: Execute<Agent = Agent, Action = Action> + Clone,
     P: Percept,
 {
     fn update(&mut self, _context: &mut ContainerContext) -> bool {
@@ -107,12 +108,13 @@ where
             self.handle_event(event, source);
         }
 
-        self.intentions.step(&mut Fifo, &mut context);
+        let bindings = self.intentions.step(&mut Fifo, &mut context);
 
         while let Some(action) = context.actions.pop() {
+            use crate::plan::Action::*;
             match action {
-                Action::System(action) => action.execute(&mut context),
-                Action::User(action) => self.agent.perform_action(action, &mut context),
+                Builtin(action) => action.execute(&bindings, &mut context),
+                User(action) => action.execute(&bindings, &mut context, &mut self.agent),
             }
         }
 
@@ -120,17 +122,11 @@ where
             self.event_queue.push(event, source);
         });
 
+        drop(bindings);
         self.intentions.is_empty()
     }
 
     fn get_name(&self) -> Cow<str> {
         self.name.clone()
     }
-}
-
-pub trait Agent {
-    type Action;
-    type Percept;
-
-    fn perform_action(&mut self, action: Self::Action, context: &mut Context<Self::Action>);
 }

@@ -157,7 +157,7 @@ pub(crate) mod formula {
 
     use super::{IntoQuery, Query};
 
-    #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
     pub enum QueryFormula {
         Not(Box<QueryFormula>),
         Logical {

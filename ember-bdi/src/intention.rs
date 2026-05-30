@@ -1,14 +1,15 @@
-use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use derive_where::derive_where;
 
-use crate::bindings::resolver::ResolveFailure;
 use crate::bindings::{Bindings, OwnedBindings};
 use crate::context::Context;
 use crate::plan::{Formula, Plan, Trigger, TriggeringEvent};
 
+use self::result::*;
+
 pub(crate) mod queue;
+pub(crate) mod result;
 
 pub(crate) type IntentionId = usize;
 
@@ -20,29 +21,40 @@ pub(crate) struct Intention<A> {
 }
 
 impl<A> Intention<A> {
-    pub(crate) fn step(&mut self, context: &mut Context<A>) -> IntentionRunResult {
+    pub(crate) fn step(&mut self, context: &mut Context<A>) -> Result {
         let Some(frame) = self.stack.last_mut() else {
-            return IntentionRunResult::Done;
+            return StepOk::done();
         };
 
-        let bindings = match frame.step(context) {
-            Ok(FrameStep::Done { bindings }) => bindings,
-            Ok(FrameStep::NotDone) => return IntentionRunResult::NotDone,
-            Err(_) => return IntentionRunResult::Done,
+        let bindings = match frame.step(context)? {
+            StepOk::Done => frame.take_bindings(),
+            StepOk::Pending => return StepOk::pending(),
         };
 
-        self.stack.pop();
+        self.stack.pop(); // Remove the done frame
 
-        let Some(frame) = self.stack.last_mut() else {
-            return IntentionRunResult::Done;
+        let Some(next_frame) = self.stack.last_mut() else {
+            return StepOk::done();
         };
 
-        frame.bindings = Bindings::merge([
-            core::mem::replace(&mut frame.bindings, Bindings::empty()),
+        next_frame.bindings = Bindings::merge([
             bindings,
+            core::mem::replace(&mut next_frame.bindings, Bindings::empty()),
         ])
         .expect("merging bindings between frames failed");
-        IntentionRunResult::NotDone
+
+        StepOk::pending()
+    }
+
+    pub(crate) fn get_last_bindings(&self) -> Option<&OwnedBindings> {
+        Some(&self.stack.last()?.bindings)
+    }
+
+    pub(crate) fn take_last_bindings(&mut self) -> OwnedBindings {
+        self.stack
+            .last_mut()
+            .map(|f| f.take_bindings())
+            .unwrap_or_else(OwnedBindings::empty)
     }
 }
 
@@ -50,11 +62,6 @@ impl<A: Clone> Intention<A> {
     fn push(&mut self, plan: &'_ Plan<A>, bindings: Bindings<'_>) {
         self.stack.push(Frame::new(plan, bindings, self.id))
     }
-}
-
-pub(crate) enum IntentionRunResult {
-    NotDone,
-    Done,
 }
 
 #[derive(Debug)]
@@ -83,11 +90,9 @@ impl<A: Clone> Frame<A> {
 }
 
 impl<A> Frame<A> {
-    fn step(&mut self, context: &mut Context<A>) -> FrameStepResult {
+    fn step(&mut self, context: &mut Context<A>) -> Result {
         let Some(formula) = self.remaining.pop() else {
-            return Ok(FrameStep::Done {
-                bindings: core::mem::replace(&mut self.bindings, Bindings::empty()),
-            });
+            return StepOk::done();
         };
 
         let formula = formula.resolve_possible(&self.bindings)?;
@@ -96,7 +101,7 @@ impl<A> Frame<A> {
             Formula::Belief { trigger, belief } => {
                 let event = belief
                     .try_into_ground()
-                    .ok_or(FrameStepError::ResolveIncomplete)?
+                    .ok_or(StepError::ResolveIncomplete)?
                     // TODO: Avoid the extra conversion here by using an `is_ground`
                     // function.
                     .into_non_ground();
@@ -121,42 +126,11 @@ impl<A> Frame<A> {
             Formula::Action(action) => context.perform_action(action),
         }
 
-        // TODO: Immediately return the bindings here if no formula is left.
-        Ok(FrameStep::NotDone)
+        StepOk::pending()
     }
-}
 
-type FrameStepResult = core::result::Result<FrameStep, FrameStepError>;
-
-#[derive(Debug)]
-enum FrameStep {
-    NotDone,
-    Done { bindings: OwnedBindings },
-}
-
-#[derive(Debug)]
-enum FrameStepError {
-    ResolveFailure(ResolveFailure),
-    ResolveIncomplete,
-}
-
-impl core::fmt::Display for FrameStepError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        use FrameStepError::*;
-        write!(
-            f,
-            "frame step error: {}",
-            match self {
-                ResolveFailure(failure) => failure.to_string(),
-                ResolveIncomplete => "resolve incomplete".to_string(),
-            }
-        )
-    }
-}
-
-impl From<ResolveFailure> for FrameStepError {
-    fn from(error: ResolveFailure) -> Self {
-        Self::ResolveFailure(error)
+    fn take_bindings(&mut self) -> OwnedBindings {
+        core::mem::replace(&mut self.bindings, Bindings::empty())
     }
 }
 
@@ -180,7 +154,7 @@ mod tests {
         // Step with no frames returns Done
         assert!(matches!(
             intention.step(&mut context),
-            IntentionRunResult::Done
+            Ok(StepOk::Done { .. })
         ));
     }
 
@@ -199,7 +173,7 @@ mod tests {
         // Plan has no body, so one step should complete the frame, merge bindings, and remove the frame.
         // It returns Done because the intention has no more frames.
         let result = intention.step(&mut context);
-        assert!(matches!(result, IntentionRunResult::Done));
+        assert!(matches!(result, Ok(StepOk::Done { .. })));
         assert_eq!(intention.stack.len(), 0);
     }
 
@@ -222,12 +196,12 @@ mod tests {
 
         // step 1: executes action1 (because it's popped first)
         let result = intention.step(&mut context);
-        assert!(matches!(result, IntentionRunResult::NotDone));
+        assert!(matches!(result, Ok(StepOk::Pending { .. })));
         assert_eq!(context.actions, &[Action::User("action1")]);
 
         // step 2: executes action2
         let result = intention.step(&mut context);
-        assert!(matches!(result, IntentionRunResult::NotDone));
+        assert!(matches!(result, Ok(StepOk::Pending { .. })));
         assert_eq!(
             context.actions,
             &[Action::User("action1"), Action::User("action2")]
@@ -235,7 +209,7 @@ mod tests {
 
         // step 3: frame done, intention done
         let result = intention.step(&mut context);
-        assert!(matches!(result, IntentionRunResult::Done));
+        assert!(matches!(result, Ok(StepOk::Done { .. })));
     }
 
     #[test]
@@ -262,9 +236,9 @@ mod tests {
         intention.push(&plan, Bindings::empty());
 
         let result = intention.step(&mut context);
-        assert!(matches!(result, IntentionRunResult::NotDone));
+        assert!(matches!(result, Ok(StepOk::Pending { .. })));
 
         let result = intention.step(&mut context);
-        assert!(matches!(result, IntentionRunResult::NotDone));
+        assert!(matches!(result, Ok(StepOk::Pending { .. })));
     }
 }

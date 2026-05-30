@@ -2,19 +2,24 @@
 #![cfg_attr(target_os = "none", no_main)]
 
 use alloc::boxed::Box;
+use alloc::string::String;
 use alloc::vec;
 
+use ember_bdi::bindings::BindingLookup;
+use ember_bdi::plan::action::Execute;
 use log::{debug, info};
 
 use ember_core::agent::Agent as EmberAgent;
 use ember_core::context::ContainerContext;
 
-use ember_bdi::agent::{Agent, BdiAgent};
+use ember_bdi::agent::BdiAgent;
 use ember_bdi::knowledge::belief::Belief;
 use ember_bdi::knowledge::store::BeliefBase;
 use ember_bdi::literal::Literal;
 use ember_bdi::plan::library::PlanLibrary;
-use ember_bdi::plan::{Action, Formula, GoalKind, Plan, QueryFormula, Trigger, TriggeringEvent};
+use ember_bdi::plan::{
+    Action, BuiltinAction, Formula, GoalKind, Plan, QueryFormula, Trigger, TriggeringEvent,
+};
 use ember_bdi::term::{NonGround, Structure, Term};
 use ember_bdi::variable::Variable;
 
@@ -25,45 +30,36 @@ setup_example!();
 #[derive(Debug)]
 struct CoffeeAgent;
 
-impl Agent for CoffeeAgent {
-    type Action = Structure;
-    type Percept = ();
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+enum AgentAction {
+    Move { from: Variable, to: Variable },
+    Buy(String),
+}
 
-    /// This function is called by the BDI engine when a plan executes a custom action.
-    fn perform_action(
-        &mut self,
-        action: Structure,
-        _context: &mut ember_bdi::context::Context<Structure>,
+impl Execute for AgentAction {
+    type Agent = CoffeeAgent;
+
+    type Action = Self;
+
+    fn execute(
+        self,
+        bindings: &impl BindingLookup,
+        _context: &mut ember_bdi::context::Context<Self::Action>,
+        _agent: &mut Self::Agent,
     ) {
-        match action.functor.0.as_ref() {
-            "print" => {
-                let arg = action
-                    .arguments
-                    .and_then(|args| args.get(0).cloned())
-                    .unwrap_or(Term::String("".into()));
-                info!("[ACTION] 💬 {:?}", arg);
-            }
-            "move" => {
-                let from = action
-                    .arguments
-                    .as_ref()
-                    .and_then(|args| args.get(0).cloned())
-                    .unwrap_or(Term::String("??".into()));
-                let to = action
-                    .arguments
-                    .and_then(|args| args.get(1).cloned())
-                    .unwrap_or(Term::String("??".into()));
+        match self {
+            AgentAction::Move { from, to } => {
+                let from = bindings
+                    .lookup(&from)
+                    .expect("failed to lookup from in bindings");
+                let to = bindings
+                    .lookup(&to)
+                    .expect("failed to lookup to in bindings");
+
                 info!("[ACTION] 🏃 Moving from {:?} to {:?}", from, to);
             }
-            "buy" => {
-                let item = action
-                    .arguments
-                    .and_then(|args| args.get(0).cloned())
-                    .unwrap_or(Term::String("nothing".into()));
-                info!("[ACTION] 🛒 Buying {:?}", item);
-            }
-            _ => {
-                info!("[ACTION] ❓ Unknown action: {:?}", action);
+            AgentAction::Buy(item) => {
+                info!("[ACTION] 🛒 Buying {}", item);
             }
         }
     }
@@ -124,7 +120,7 @@ fn example() {
     info!("🎯 Initial Goal: +!make_coffee\n");
 
     // 5. Create the BdiAgent instance.
-    let mut bdi_agent = BdiAgent::new(
+    let mut bdi_agent = BdiAgent::<_, _, ()>::new(
         "coffee-maker",
         CoffeeAgent,
         [],
@@ -206,7 +202,7 @@ fn example() {
 ///       <- .buy(coffee_beans);
 ///          +have(coffee_beans).
 /// ```
-fn define_plans() -> PlanLibrary<Structure> {
+fn define_plans() -> PlanLibrary<AgentAction> {
     let mut lib = PlanLibrary::default();
 
     // --- Plans for `!make_coffee` ---
@@ -245,12 +241,11 @@ fn define_plans() -> PlanLibrary<Structure> {
             ),
             QueryFormula::literal(false, "have", Some([Term::String("coffee_beans".into())])),
         ])),
-        body: Box::new([Formula::Action(Action::User(Structure {
-            functor: "print".into(),
-            arguments: Some(Box::new([Term::String(
-                "Enjoying a fresh cup of coffee!".into(),
-            )])),
-        }))]),
+        body: Box::new([Formula::Action(Action::Builtin(BuiltinAction::Log(
+            log::Level::Info,
+            "[ACTION] 💬 Enjoying a fresh cup of coffee!".into(),
+            None,
+        )))]),
     });
 
     // Plan B: Sub-goaling plan to make coffee if conditions are not met.
@@ -330,13 +325,11 @@ fn define_plans() -> PlanLibrary<Structure> {
                 Term::Variable(NonGround(v_dest.clone())),
             ]),
         )),
-        body: Box::new([Formula::Action(Action::User(Structure {
-            functor: "print".into(),
-            arguments: Some(Box::new([
-                Term::String("Already at ".into()),
-                Term::Variable(NonGround(v_dest.clone())),
-            ])),
-        }))]),
+        body: Box::new([Formula::Action(Action::Builtin(BuiltinAction::Log(
+            log::Level::Info,
+            "[ACTION] 💬 Already at".into(),
+            Some(Box::new([Term::Variable(NonGround(v_dest.clone()))])),
+        )))]),
     });
 
     // Plan D: Move to a new location.
@@ -364,12 +357,9 @@ fn define_plans() -> PlanLibrary<Structure> {
             ]),
         )),
         body: Box::new([
-            Formula::Action(Action::User(Structure {
-                functor: "move".into(),
-                arguments: Some(Box::new([
-                    Term::Variable(NonGround(v_from.clone())),
-                    Term::Variable(NonGround(v_dest.clone())),
-                ])),
+            Formula::Action(Action::User(AgentAction::Move {
+                from: v_from.clone(),
+                to: v_dest.clone(),
             })),
             Formula::Belief {
                 trigger: Trigger::Deletion,
@@ -421,12 +411,11 @@ fn define_plans() -> PlanLibrary<Structure> {
             "have",
             Some([Term::String("coffee_beans".into())]),
         )),
-        body: Box::new([Formula::Action(Action::User(Structure {
-            functor: "print".into(),
-            arguments: Some(Box::new([Term::String(
-                "Found coffee beans in the pantry.".into(),
-            )])),
-        }))]),
+        body: Box::new([Formula::Action(Action::Builtin(BuiltinAction::Log(
+            log::Level::Info,
+            "[ACTION] 💬 Found coffee beans in the pantry.".into(),
+            None,
+        )))]),
     });
 
     // Plan F: Need to buy beans.
@@ -445,10 +434,7 @@ fn define_plans() -> PlanLibrary<Structure> {
         },
         context: None,
         body: Box::new([
-            Formula::Action(Action::User(Structure {
-                functor: "buy".into(),
-                arguments: Some(Box::new([Term::String("coffee_beans".into())])),
-            })),
+            Formula::Action(Action::User(AgentAction::Buy("coffee_beans".into()))),
             Formula::Belief {
                 trigger: Trigger::Addition,
                 belief: Literal::Atom {

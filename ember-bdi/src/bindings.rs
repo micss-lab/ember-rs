@@ -3,8 +3,8 @@ use core::marker::PhantomData;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
-use crate::term::view::{StructureView, TermView};
 use crate::term::Term;
+use crate::term::view::{StructureView, TermView};
 use crate::unification::constraint::BindingConstraint;
 use crate::unification::error::UnificationError;
 use crate::variable::{Variable, VariableId};
@@ -106,7 +106,7 @@ impl OwnedBindings {
     }
 }
 
-pub(crate) trait BindingLookup {
+pub trait BindingLookup {
     fn lookup<'a>(&'a self, variable: &Variable) -> Option<TermView<'a>>
     where
         Self: 'a;

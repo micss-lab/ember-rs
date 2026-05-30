@@ -2,11 +2,12 @@ use alloc::collections::{BTreeMap, VecDeque};
 
 use derive_where::derive_where;
 
-use crate::bindings::Bindings;
+use crate::bindings::{BindingLookup, Bindings, OwnedBindings};
 use crate::context::Context;
 use crate::plan::Plan;
 
-use super::{Intention, IntentionId, IntentionRunResult};
+use super::result::*;
+use super::{Intention, IntentionId};
 
 #[derive(Debug)]
 #[derive_where(Default)]
@@ -42,37 +43,62 @@ impl<A: Clone> IntentionQueue<A> {
         }
     }
 
-    pub(crate) fn step<S: Scheduler<A>>(&mut self, scheduler: &mut S, context: &mut Context<A>) {
-        if let Some(intention) = self.next_intention(scheduler) {
-            if let IntentionRunResult::Done = intention.step(context) {
-                let id = intention.id;
-                // Remove the intention from the queue and from the intention-base.
-                let idx = self
-                    .queue
-                    .iter()
-                    .enumerate()
-                    .find_map(|(i, e)| (*e == id).then_some(i))
-                    .expect("intention id should exist");
+    pub(crate) fn step<'a, S: Scheduler<A>>(
+        &'a mut self,
+        scheduler: &mut S,
+        context: &mut Context<A>,
+    ) -> impl BindingLookup + 'a {
+        let Some(id) = scheduler.select_intention(&self.queue, &self.intentions) else {
+            return ReadOnlyBindings::Owned(OwnedBindings::empty());
+        };
 
-                let removed_id = self.queue.swap_remove_front(idx);
-                debug_assert!(removed_id == Some(id));
-
-                self.intentions
-                    .remove(&id)
-                    .expect("intention id should exist");
-            }
-        }
-    }
-}
-
-impl<A> IntentionQueue<A> {
-    fn next_intention<S: Scheduler<A>>(&mut self, scheduler: &mut S) -> Option<&mut Intention<A>> {
-        let id = scheduler.select_intention(&self.queue, &self.intentions)?;
-        Some(
-            self.intentions
+        let is_done = {
+            let intention = self
+                .intentions
                 .get_mut(&id)
-                .expect("intention id should exist"),
-        )
+                .expect("intention id should exist");
+
+            match intention.step(context) {
+                Ok(StepOk::Pending) => false,
+                Ok(StepOk::Done) => true,
+                Err(_) => unimplemented!("report intention execution error to user"),
+            }
+        };
+
+        if is_done {
+            let intention = self
+                .intentions
+                .get_mut(&id)
+                .expect("intention id should exist");
+
+            let id = intention.id;
+            // Remove the intention from the queue and from the intention-base.
+            let idx = self
+                .queue
+                .iter()
+                .enumerate()
+                .find_map(|(i, e)| (*e == id).then_some(i))
+                .expect("intention id should exist");
+
+            let removed_id = self.queue.swap_remove_front(idx);
+            debug_assert!(removed_id == Some(id));
+
+            let mut intention = self
+                .intentions
+                .remove(&id)
+                .expect("intention id should exist");
+
+            ReadOnlyBindings::Owned(intention.take_last_bindings())
+        } else {
+            // TODO: Polonius (the new borrow checker) will fix the NLL limitation that prevents returning the
+            // reference directly from the match arm above. Remove this lookup then.
+            let intention = self.intentions.get(&id).expect("intention id should exist");
+
+            intention
+                .get_last_bindings()
+                .map(ReadOnlyBindings::Borrowed)
+                .unwrap_or_else(|| ReadOnlyBindings::Owned(OwnedBindings::empty()))
+        }
     }
 }
 
