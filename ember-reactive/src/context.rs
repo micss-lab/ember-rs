@@ -34,7 +34,7 @@ impl<E> Context<'_, E> {
 }
 
 impl<'ctx, E> Context<'ctx, E> {
-    pub fn new(environment: &'ctx mut Environment, agent: &'ctx mut AgentContext) -> Self {
+    pub(crate) fn new(environment: &'ctx mut Environment, agent: &'ctx mut AgentContext) -> Self {
         Self {
             environment,
             agent,
@@ -51,6 +51,20 @@ impl<'ctx, E> Context<'ctx, E> {
             agent: self.agent,
             local: LocalContext::default(),
         }
+    }
+}
+
+impl<E> core::ops::Deref for Context<'_, E> {
+    type Target = Environment;
+
+    fn deref(&self) -> &Self::Target {
+        self.environment
+    }
+}
+
+impl<E> core::ops::DerefMut for Context<'_, E> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.environment
     }
 }
 

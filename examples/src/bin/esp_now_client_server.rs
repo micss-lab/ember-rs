@@ -2,15 +2,18 @@
 #![cfg_attr(target_os = "none", no_main)]
 #![cfg_attr(not(target_os = "none"), allow(unused))]
 
-use alloc::format;
-use core::str::FromStr;
-
-use ember::behaviour::{Context, CyclicBehaviour, TickerBehaviour};
-use ember::message::{Content, Message, MessageEnvelope, Performative, Receiver};
-use ember::{Agent, Aid, Container};
 use ember_examples::setup_example;
 
 setup_example!();
+
+use alloc::format;
+use core::str::FromStr;
+
+use ember::Container;
+use ember::agent::Aid;
+use ember::agent::reactive::ReactiveAgent;
+use ember::agent::reactive::behaviour::{Context, CyclicBehaviour, TickerBehaviour};
+use ember::message::{Content, Message, MessageEnvelope, Performative, Receiver};
 
 const VALUES: [Metrics; 10] = [
     Metrics {

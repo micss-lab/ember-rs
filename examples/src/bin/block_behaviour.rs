@@ -5,8 +5,9 @@ use ember_examples::setup_example;
 
 setup_example!();
 
-use ember::behaviour::{Context, CyclicBehaviour, OneShotBehaviour};
-use ember::{Agent, Container};
+use ember::Container;
+use ember::agent::reactive::ReactiveAgent;
+use ember::agent::reactive::behaviour::{Context, CyclicBehaviour, OneShotBehaviour};
 
 struct InformationPrinter;
 
@@ -43,7 +44,7 @@ impl CyclicBehaviour for MessageChecker {
 
 fn example() {
     let container = Container::default().with_agent(
-        Agent::new("messaging-agent", ())
+        ReactiveAgent::new("messaging-agent", ())
             .with_behaviour(InformationPrinter)
             .with_behaviour(MessageChecker),
     );

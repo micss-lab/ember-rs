@@ -5,10 +5,9 @@ use ember_examples::setup_example;
 
 setup_example!();
 
-use ember::{
-    Agent, Container,
-    behaviour::{Context, OneShotBehaviour},
-};
+use ember::Container;
+use ember::agent::reactive::ReactiveAgent;
+use ember::agent::reactive::behaviour::{Context, OneShotBehaviour};
 
 struct Stopper;
 
@@ -25,7 +24,7 @@ impl OneShotBehaviour for Stopper {
 
 fn example() {
     let container = Container::default()
-        .with_agent(Agent::new("agent-0", ()).with_behaviour(Stopper))
-        .with_agent(Agent::new("agent-1", ()).with_behaviour(Stopper));
+        .with_agent(ReactiveAgent::new("agent-0", ()).with_behaviour(Stopper))
+        .with_agent(ReactiveAgent::new("agent-1", ()).with_behaviour(Stopper));
     container.start().unwrap();
 }
