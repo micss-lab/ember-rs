@@ -5,8 +5,9 @@ use ember_examples::setup_example;
 
 setup_example!();
 
-use ember::behaviour::{Context, CyclicBehaviour, OneShotBehaviour};
-use ember::{Agent, Container};
+use ember::Container;
+use ember::agent::reactive::ReactiveAgent;
+use ember::agent::reactive::behaviour::{Context, CyclicBehaviour, OneShotBehaviour};
 
 const MESSAGE_AMOUNT: usize = 10;
 
@@ -43,7 +44,7 @@ impl CyclicBehaviour for MessagePrinter {
         log::info!("Hello there!");
         if self.is_finished() {
             // Stop the container instead of only finishing this behaviour.
-            ctx.stop_container()
+            ctx.stop_platform()
         }
     }
 
@@ -54,7 +55,7 @@ impl CyclicBehaviour for MessagePrinter {
 
 fn example() {
     let container = Container::default().with_agent(
-        Agent::new("messaging-agent", ())
+        ReactiveAgent::new("messaging-agent", ())
             .with_behaviour(InformationPrinter)
             .with_behaviour(MessagePrinter::new(MESSAGE_AMOUNT)),
     );

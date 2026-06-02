@@ -3,8 +3,7 @@
 extern crate alloc;
 
 pub mod agent;
-pub mod behaviour;
-pub mod context;
+pub mod environment;
 pub mod message;
 
 pub mod util;

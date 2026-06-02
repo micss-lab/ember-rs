@@ -3,10 +3,8 @@ use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::ops::{Deref, DerefMut};
 
-use crate::agent::AmsAgent;
-use ember_core::agent::Agent;
 use ember_core::agent::aid::Aid;
-use ember_core::context::MessageStore;
+use ember_core::environment::MessageStore;
 use ember_core::message::MessageEnvelope;
 
 #[derive(Debug, Clone)]
@@ -15,7 +13,7 @@ pub(crate) enum AgentReference {
     Proxy(Aid),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub(crate) struct LocalAgentReference {
     pub(crate) inbox: Vec<MessageEnvelope>,
 }
@@ -32,11 +30,16 @@ impl Deref for Adt {
 }
 
 impl Adt {
-    pub(super) fn new(ams: &AmsAgent) -> Self {
-        Self(BTreeMap::from([(
-            ams.get_name().to_string(),
-            AgentReference::Local(LocalAgentReference { inbox: Vec::new() }),
-        )]))
+    pub(super) fn new<S>(existing: impl IntoIterator<Item = S>) -> Self
+    where
+        S: ToString,
+    {
+        Self(BTreeMap::from_iter(existing.into_iter().map(|e| {
+            (
+                e.to_string(),
+                AgentReference::Local(LocalAgentReference::default()),
+            )
+        })))
     }
 
     pub(crate) fn agent_has_message(&self, agent_name: impl AsRef<str>) -> bool {

@@ -23,7 +23,7 @@ pub trait BehaviourScheduler<'a, S, E> {
     fn is_finished(&self) -> bool;
 
     fn action(&mut self, ctx: &mut Context<E>, agent_state: &mut S) -> bool {
-        if ctx.container.new_messages {
+        if ctx.environment.new_messages {
             // Unblock all previously blocked behaviours.
             self.unblock_all();
         }

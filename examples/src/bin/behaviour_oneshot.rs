@@ -5,8 +5,9 @@ use ember_examples::setup_example;
 
 setup_example!();
 
-use ember::behaviour::{Context, OneShotBehaviour};
-use ember::{Agent, Container};
+use ember::Container;
+use ember::agent::reactive::ReactiveAgent;
+use ember::agent::reactive::behaviour::{Context, OneShotBehaviour};
 
 struct HelloWorld;
 
@@ -29,13 +30,13 @@ impl OneShotBehaviour for Responder {
 
     fn action(&self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         log::info!("I am good!");
-        ctx.stop_container()
+        ctx.stop_platform()
     }
 }
 
 fn example() {
     let container = Container::default()
-        .with_agent(Agent::new("hello-world-agent", ()).with_behaviour(HelloWorld))
-        .with_agent(Agent::new("responder-agent", ()).with_behaviour(Responder));
+        .with_agent(ReactiveAgent::new("hello-world-agent", ()).with_behaviour(HelloWorld))
+        .with_agent(ReactiveAgent::new("responder-agent", ()).with_behaviour(Responder));
     container.start().unwrap();
 }

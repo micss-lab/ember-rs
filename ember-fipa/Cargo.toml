@@ -1,0 +1,10 @@
+[package]
+name = "ember-fipa"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ember-core = { workspace = true }
+
+log = { workspace = true }
+lazy_static = "1.5"

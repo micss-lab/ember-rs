@@ -1,13 +1,14 @@
+use alloc::boxed::Box;
+
+use ember_util::sync::AtomicU32;
+
+pub use crate::context::Context;
+
 pub use self::complex::ComplexBehaviour;
 pub use self::complex::{fsm, parallel, sequential};
 pub use self::simple::cyclic::CyclicBehaviour;
 pub use self::simple::oneshot::OneShotBehaviour;
 pub use self::simple::ticker::TickerBehaviour;
-pub use crate::context::Context;
-
-use alloc::boxed::Box;
-
-use crate::util::sync::AtomicU32;
 
 pub mod complex;
 pub mod simple;

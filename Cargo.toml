@@ -5,7 +5,10 @@ members = [
     "ember-acc",
     "ember-bdi",
     "ember-core",
+    "ember-fipa",
+    "ember-reactive",
     "ember-time",
+    "ember-util",
 
     "examples",
 ]
@@ -14,7 +17,15 @@ members = [
 ember = { path = "./ember" }
 ember-acc = { path = "./ember-acc" }
 ember-core = { path = "./ember-core" }
+ember-fipa = { path = "./ember-fipa" }
+ember-reactive = { path = "./ember-reactive" }
 ember-time = { path = "./ember-time" }
+ember-util = { path = "./ember-util" }
+
+critical-section = "1.2"
+derive-where = "1.6"
+derive_more = { version = "2.1", default-features = false }
+log = { version = "0.4", default-features = false }
 
 [profile.release]
 panic = "abort"
