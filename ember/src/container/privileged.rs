@@ -1,12 +1,12 @@
 use std::borrow::Cow;
 
-use ember_core::agent::{Agent, Aid};
+use ember_core::agent::Agent;
 use ember_core::environment::Environment;
 use ember_fipa::agent::ams::AmsAgent;
 
 use crate::adt::Adt;
 
-use super::{Container, Mts};
+use super::Mts;
 
 /// Privileged agents able to modify the container/platform directly.
 pub(super) trait PrivilegedAgent: Agent {
@@ -69,7 +69,7 @@ mod ams {
 
     use ember_core::agent::Agent;
     use ember_core::agent::aid::Aid;
-    use ember_core::environment::{self, Environment};
+    use ember_core::environment::Environment;
     use ember_fipa::agent::ams::AmsAgent;
     use ember_fipa::ontology::AmsAgentDescription;
 
@@ -89,7 +89,7 @@ mod ams {
             use ember_fipa::ontology::ActionKind::*;
             while let Some(action) = self.actions.pop_front() {
                 match action {
-                    Register(r) => register_agent(r.ams, r.agent, &mut container.ladt),
+                    Register(r) => register_agent(r.ams, r.agent, container.ladt),
                 }
             }
         }

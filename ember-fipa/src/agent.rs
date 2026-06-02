@@ -58,7 +58,7 @@ impl FipaAgent {
                         content: RegisterAction {
                             ams: AmsAgentDescription { name: None },
                             agent: AmsAgentDescription {
-                                name: Some(format!("{}@local", agent_name)),
+                                name: Some(format!("{agent_name}@local")),
                             },
                         }
                         .into_content()
@@ -66,7 +66,7 @@ impl FipaAgent {
                     }
                     .wrap_with_envolope(),
                 );
-                log::debug!("Sending ams register request for agent `{}`.", agent_name);
+                log::debug!("Sending ams register request for agent `{agent_name}`.");
                 self.registered = true;
             }
             Initiated => (),

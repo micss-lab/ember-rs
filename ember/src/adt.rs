@@ -2,13 +2,10 @@ use alloc::collections::btree_map::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::ops::{Deref, DerefMut};
-use std::borrow::Cow;
 
-use ember_core::agent::Agent;
 use ember_core::agent::aid::Aid;
 use ember_core::environment::MessageStore;
 use ember_core::message::MessageEnvelope;
-use ember_fipa::agent::ams::AmsAgent;
 
 #[derive(Debug, Clone)]
 pub(crate) enum AgentReference {

@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 use alloc::string::ToString;
@@ -7,8 +5,6 @@ use alloc::vec::Vec;
 
 #[cfg(feature = "acc-espnow")]
 use esp_wifi::esp_now;
-
-use ember_fipa::agent::ams::AmsAgent;
 
 use ember_core::agent::Agent;
 use ember_core::agent::aid::Aid;
@@ -18,7 +14,7 @@ use ember_core::message::MessageEnvelope;
 use crate::adt::{Adt, AgentReference};
 
 use self::mts::Mts;
-use self::privileged::{ContainerView, PrivilegedAgent, PrivilegedAgents};
+use self::privileged::{ContainerView, PrivilegedAgents};
 
 mod mts;
 mod privileged;
@@ -87,10 +83,6 @@ impl Container<'_, '_> {
         }
 
         Ok(false)
-    }
-
-    fn agent_has_message(&self, agent_name: impl AsRef<str>) -> bool {
-        self.ladt.agent_has_message(agent_name)
     }
 
     fn messages_for_agent(&mut self, agent_name: impl AsRef<str>) -> Option<Vec<MessageEnvelope>> {
