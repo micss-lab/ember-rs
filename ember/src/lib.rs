@@ -4,20 +4,20 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-pub use ember_core as core;
+pub mod _crates {
+    pub use ember_acc as acc;
+    pub use ember_core as core;
+    pub use ember_fipa as fipa;
+    pub use ember_reactive as reactive;
+}
 
-pub use ember_core::agent::aid::Aid;
-pub use ember_core::behaviour;
-pub use ember_core::message;
+pub mod agent {
+    pub use ember_core::agent::aid::Aid;
 
-pub use self::agent::Agent;
-pub use self::container::Container;
-
-pub mod channels {
-    pub use ember_acc::Acc;
+    pub mod reactive {
+        pub use ember_reactive::agent::*;
+    }
 }
 
 mod adt;
-mod agent;
 mod container;
-mod fipa;

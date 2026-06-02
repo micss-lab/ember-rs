@@ -6,10 +6,10 @@ use ember_core::message::content::codec::*;
 use ember_core::message::content::{AgentAction, Concept, ConceptParameters, Term};
 use ember_core::message::{Content, Message};
 
-pub struct ManagementOntology;
+pub struct AgentManagementOntology;
 
-impl ManagementOntology {
-    pub fn name() -> &'static str {
+impl AgentManagementOntology {
+    pub const fn name() -> &'static str {
         "FIPA-Agent-Management"
     }
 }
@@ -27,8 +27,8 @@ pub enum DecodeAsOntologyError {
     Decode(DecodeError),
 }
 
-impl ManagementOntology {
-    pub(crate) fn decode_message(message: Message) -> Result<ActionKind, DecodeAsOntologyError> {
+impl AgentManagementOntology {
+    pub fn decode_message(message: Message) -> Result<ActionKind, DecodeAsOntologyError> {
         if message.ontology.is_none_or(|o| o != Self::name()) {
             return Err(DecodeAsOntologyError::UnexpectedOntology);
         }
@@ -53,11 +53,11 @@ impl ManagementOntology {
     }
 }
 
-pub(crate) struct RegisterAction {
+pub struct RegisterAction {
     /// The ams to register with.
-    pub(crate) ams: AmsAgentDescription,
+    pub ams: AmsAgentDescription,
     /// The agent being registered.
-    pub(crate) agent: AmsAgentDescription,
+    pub agent: AmsAgentDescription,
 }
 
 struct Register {
@@ -120,8 +120,8 @@ impl AgentActionCodec for RegisterAction {
     }
 }
 
-pub(crate) struct AmsAgentDescription {
-    pub(crate) name: Option<String>,
+pub struct AmsAgentDescription {
+    pub name: Option<String>,
 }
 
 impl ConceptCodec for AmsAgentDescription {

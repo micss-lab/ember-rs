@@ -57,24 +57,23 @@ where
 
     fn action(
         &mut self,
-        ctx: &mut Context<Self::Event>,
+        context: &mut Context<Self::Event>,
         agent_state: &mut Self::AgentState,
     ) -> bool {
-        let mut context = Context::from_upper(&mut *ctx);
+        let mut child_context = context.fresh_local();
 
         // 1. Execute next scheduled behaviour.
-        self.inner.scheduler().action(&mut context, agent_state);
+        self.inner
+            .scheduler()
+            .action(&mut child_context, agent_state);
 
         // 2. Handle events the behaviour produced.
-        while let Some(event) = context.local.events.pop() {
+        while let Some(event) = child_context.local.events.pop() {
             self.inner.handle_child_event(event);
         }
 
-        // 3. Update the parent context.
-        ctx.merge(context);
-
-        // 4. Run user defined actions for this complex behaviour.
-        self.inner.after_child_action(ctx, agent_state);
+        // 3. Run user defined actions for this complex behaviour.
+        self.inner.after_child_action(context, agent_state);
 
         self.inner.scheduler().is_finished()
     }

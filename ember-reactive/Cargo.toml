@@ -1,0 +1,13 @@
+[package]
+name = "ember-reactive"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ember-core = { workspace = true }
+ember-fipa = { workspace = true }
+ember-time = { workspace = true }
+ember-util = { workspace = true }
+
+derive-where = { workspace = true }
+log = { workspace = true }
