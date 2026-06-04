@@ -10,7 +10,7 @@ use crate::context::Context;
 use crate::term::Term;
 
 pub trait Execute: Sized {
-    type Agent;
+    type State;
     /// The action stored in the context. In almost all cases, this can just be `Self`.
     type Action;
 
@@ -18,7 +18,7 @@ pub trait Execute: Sized {
         self,
         bindings: &impl BindingLookup,
         context: &mut Context<Self::Action>,
-        agent: &mut Self::Agent,
+        state: &mut Self::State,
     );
 }
 
@@ -28,22 +28,22 @@ pub enum Action<A> {
     User(A),
 }
 
-impl<Agent, A> Execute for Action<A>
+impl<State, A> Execute for Action<A>
 where
-    A: Execute<Agent = Agent, Action = A>,
+    A: Execute<State = State, Action = A>,
 {
-    type Agent = Agent;
+    type State = State;
     type Action = A;
 
     fn execute(
         self,
         bindings: &impl BindingLookup,
         context: &mut Context<Self::Action>,
-        agent: &mut Self::Agent,
+        state: &mut Self::State,
     ) {
         match self {
             Action::Builtin(action) => action.execute(bindings, context),
-            Action::User(action) => action.execute(bindings, context, agent),
+            Action::User(action) => action.execute(bindings, context, state),
         }
     }
 }

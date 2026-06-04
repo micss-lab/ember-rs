@@ -205,13 +205,13 @@ mod tests {
 
         // Plan for test(1)
         store.add(Plan {
-            trigger: trigger("test", vec![n(1.0)], Some(GoalKind::Achieve)),
+            trigger: trigger("test", vec![number(1.0)], Some(GoalKind::Achieve)),
             context: None,
             body: Box::new([]),
         });
 
         // Event for test(2)
-        let event = trigger("test", vec![n(2.0)], Some(GoalKind::Achieve));
+        let event = trigger("test", vec![number(2.0)], Some(GoalKind::Achieve));
         let mut selection = PlanSelection::select_from_library(&event, &store);
 
         assert!(
@@ -225,22 +225,22 @@ mod tests {
         let mut store = PlanLibrary::<()>::default();
         let bb = BeliefBase::default();
 
-        let x = v();
+        let x = variable();
         // Plan: +!greet(Name)
         store.add(Plan {
-            trigger: trigger("greet", vec![vt(&x)], Some(GoalKind::Achieve)),
+            trigger: trigger("greet", vec![variable_term(&x)], Some(GoalKind::Achieve)),
             context: None,
             body: Box::new([]),
         });
 
         // Event: !greet("Alice")
-        let event = trigger("greet", vec![s("Alice")], Some(GoalKind::Achieve));
+        let event = trigger("greet", vec![string("Alice")], Some(GoalKind::Achieve));
         let mut selection = PlanSelection::select_from_library(&event, &store);
 
         let (_, bindings) = selection.next_plan(&bb).expect("Should unify");
 
         // Check that X was correctly bound to "Alice"
-        assert_eq!(bindings.get(&x), Some(&s("Alice").as_view()));
+        assert_eq!(bindings.get(&x), Some(&string("Alice").as_view()));
     }
 
     #[test]
@@ -263,29 +263,29 @@ mod tests {
             negated: false,
             structure: crate::term::Structure {
                 functor: Atom("colour".into()),
-                arguments: Some(Box::new([s("circle"), s("red")])),
+                arguments: Some(Box::new([string("circle"), string("red")])),
             },
         }
         .try_into_ground()
         .expect("belief should be ground literal");
         bb.assert_no_event(colour_belief);
 
-        let x = v();
+        let x = variable();
         // Plan: +!check(Obj) : colour(Obj, red) <- ...
         store.add(Plan {
-            trigger: trigger("check", vec![vt(&x)], Some(GoalKind::Achieve)),
+            trigger: trigger("check", vec![variable_term(&x)], Some(GoalKind::Achieve)),
             context: Some(crate::plan::QueryFormula::Literal(Literal::Atom {
                 negated: false,
                 structure: crate::term::Structure {
                     functor: Atom("colour".into()),
-                    arguments: Some(Box::new([vt(&x), s("red")])),
+                    arguments: Some(Box::new([variable_term(&x), string("red")])),
                 },
             })),
             body: Box::new([]),
         });
 
         // Event: !check("circle")
-        let event = trigger("check", vec![s("circle")], Some(GoalKind::Achieve));
+        let event = trigger("check", vec![string("circle")], Some(GoalKind::Achieve));
         let mut selection = PlanSelection::select_from_library(&event, &store);
 
         let result = selection.next_plan(&bb);
@@ -299,65 +299,79 @@ mod tests {
     fn test_full_binding_propagation_pipeline() {
         let mut store = PlanLibrary::<()>::default();
         let mut bb = BeliefBase::default();
-        assert_belief(&mut bb, "color", vec![s("apple"), s("red")]);
+        assert_belief(&mut bb, "color", vec![string("apple"), string("red")]);
 
-        let (x, y) = (v(), v());
+        let (x, y) = (variable(), variable());
         store.add(Plan {
-            trigger: trigger("check", vec![vt(&x)], Some(GoalKind::Achieve)),
-            context: Some(literal_formula("color", vec![vt(&x), vt(&y)])),
+            trigger: trigger("check", vec![variable_term(&x)], Some(GoalKind::Achieve)),
+            context: Some(literal_formula(
+                "color",
+                vec![variable_term(&x), variable_term(&y)],
+            )),
             body: Box::new([]),
         });
 
-        let event = trigger("check", vec![s("apple")], Some(GoalKind::Achieve));
+        let event = trigger("check", vec![string("apple")], Some(GoalKind::Achieve));
         let mut selection = PlanSelection::select_from_library(&event, &store);
         let (_, bindings) = selection.next_plan(&bb).expect("Binding pipe failed");
 
-        assert_eq!(bindings.get(&x), Some(&s("apple").as_view()));
-        assert_eq!(bindings.get(&y), Some(&s("red").as_view()));
+        assert_eq!(bindings.get(&x), Some(&string("apple").as_view()));
+        assert_eq!(bindings.get(&y), Some(&string("red").as_view()));
     }
 
     #[test]
     fn test_variable_aliasing_event_to_context() {
         let mut store = PlanLibrary::<()>::default();
         let mut bb = BeliefBase::default();
-        assert_belief(&mut bb, "linked", vec![s("a"), s("b")]);
+        assert_belief(&mut bb, "linked", vec![string("a"), string("b")]);
 
-        let (event_var, plan_var) = (v(), v());
+        let (event_var, plan_var) = (variable(), variable());
         store.add(Plan {
-            trigger: trigger("connect", vec![vt(&plan_var)], Some(GoalKind::Achieve)),
+            trigger: trigger(
+                "connect",
+                vec![variable_term(&plan_var)],
+                Some(GoalKind::Achieve),
+            ),
             context: Some(literal_formula(
                 "linked",
-                vec![vt(&plan_var), Term::Variable(NonGround(v()))],
+                vec![
+                    variable_term(&plan_var),
+                    Term::Variable(NonGround(variable())),
+                ],
             )),
             body: Box::new([]),
         });
 
-        let event = trigger("connect", vec![vt(&event_var)], Some(GoalKind::Achieve));
+        let event = trigger(
+            "connect",
+            vec![variable_term(&event_var)],
+            Some(GoalKind::Achieve),
+        );
         let mut selection = PlanSelection::select_from_library(&event, &store);
         let (_, bindings) = selection.next_plan(&bb).expect("Aliasing failed");
 
-        assert_eq!(bindings.get(&event_var), Some(&s("a").as_view()));
+        assert_eq!(bindings.get(&event_var), Some(&string("a").as_view()));
     }
 
     #[test]
     fn test_backtracking_on_context_failure() {
         let mut store = PlanLibrary::<()>::default();
         let mut bb = BeliefBase::default();
-        assert_belief(&mut bb, "is_broken", vec![s("bolt")]);
+        assert_belief(&mut bb, "is_broken", vec![string("bolt")]);
 
-        let x = v();
+        let x = variable();
         store.add(Plan {
-            trigger: trigger("fix", vec![vt(&x)], Some(GoalKind::Achieve)),
-            context: Some(literal_formula("is_tool", vec![vt(&x)])), // Fails
+            trigger: trigger("fix", vec![variable_term(&x)], Some(GoalKind::Achieve)),
+            context: Some(literal_formula("is_tool", vec![variable_term(&x)])), // Fails
             body: Box::new([]),
         });
         store.add(Plan {
-            trigger: trigger("fix", vec![vt(&x)], Some(GoalKind::Achieve)),
-            context: Some(literal_formula("is_broken", vec![vt(&x)])), // Succeeds
+            trigger: trigger("fix", vec![variable_term(&x)], Some(GoalKind::Achieve)),
+            context: Some(literal_formula("is_broken", vec![variable_term(&x)])), // Succeeds
             body: Box::new([]),
         });
 
-        let event = trigger("fix", vec![s("bolt")], Some(GoalKind::Achieve));
+        let event = trigger("fix", vec![string("bolt")], Some(GoalKind::Achieve));
         let (plan, _) = PlanSelection::select_from_library(&event, &store)
             .next_plan(&bb)
             .unwrap();
@@ -373,26 +387,26 @@ mod tests {
     fn test_context_negation_with_event_bindings() {
         let mut bb = BeliefBase::default();
         let mut store = PlanLibrary::<()>::default();
-        assert_belief(&mut bb, "blocked", vec![s("north")]);
+        assert_belief(&mut bb, "blocked", vec![string("north")]);
 
-        let dir = v();
+        let dir = variable();
         store.add(Plan {
-            trigger: trigger("move", vec![vt(&dir)], Some(GoalKind::Achieve)),
+            trigger: trigger("move", vec![variable_term(&dir)], Some(GoalKind::Achieve)),
             context: Some(QueryFormula::Not(Box::new(literal_formula(
                 "blocked",
-                vec![vt(&dir)],
+                vec![variable_term(&dir)],
             )))),
             body: Box::new([]),
         });
 
-        let event_north = trigger("move", vec![s("north")], Some(GoalKind::Achieve));
+        let event_north = trigger("move", vec![string("north")], Some(GoalKind::Achieve));
         assert!(
             PlanSelection::select_from_library(&event_north, &store)
                 .next_plan(&bb)
                 .is_none()
         );
 
-        let event_south = trigger("move", vec![s("south")], Some(GoalKind::Achieve));
+        let event_south = trigger("move", vec![string("south")], Some(GoalKind::Achieve));
         assert!(
             PlanSelection::select_from_library(&event_south, &store)
                 .next_plan(&bb)

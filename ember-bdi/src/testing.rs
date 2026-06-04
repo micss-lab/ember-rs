@@ -1,6 +1,9 @@
+use alloc::collections::vec_deque::VecDeque;
 use alloc::vec::Vec;
+use ember_core::environment::Environment;
 
 use crate::bindings::Bindings;
+use crate::context::Context;
 use crate::knowledge::store::BeliefBase;
 use crate::literal::Literal;
 use crate::plan::{Formula, GoalKind, Plan, QueryFormula, Trigger, TriggeringEvent};
@@ -8,19 +11,19 @@ use crate::term::view::TermView;
 use crate::term::{Atom, NonGround, Structure, Term};
 use crate::variable::Variable;
 
-pub fn v() -> Variable {
+pub fn variable() -> Variable {
     Variable::new()
 }
 
-pub fn vt(var: &Variable) -> Term {
+pub fn variable_term(var: &Variable) -> Term {
     Term::Variable(NonGround(var.clone()))
 }
 
-pub fn s(str: &str) -> Term {
+pub fn string(str: &str) -> Term {
     Term::String(str.into())
 }
 
-pub fn n(num: f32) -> Term {
+pub fn number(num: f32) -> Term {
     Term::Number(num.into())
 }
 pub fn trigger(functor: &str, args: Vec<Term>, goal: Option<GoalKind>) -> TriggeringEvent {
@@ -55,8 +58,20 @@ pub fn literal(functor: &str, args: Vec<Term>) -> Literal {
     }
 }
 
+pub fn literal_variable(var: &Variable) -> Literal {
+    Literal::Variable(NonGround(var.clone()))
+}
+
 pub fn literal_formula(functor: &str, args: Vec<Term>) -> QueryFormula {
     QueryFormula::Literal(literal(functor, args))
+}
+
+pub fn bindings<'a>(list: Vec<(Variable, TermView<'a>)>) -> Bindings<'a> {
+    let pairs = list
+        .into_iter()
+        .map(|(v, tv)| (v.id, Some(tv)))
+        .collect::<Vec<_>>();
+    Bindings::new(pairs, crate::bindings::AliasMap::empty())
 }
 
 pub fn assert_belief(bb: &mut BeliefBase, functor: &str, args: Vec<Term>) {
@@ -78,14 +93,10 @@ pub fn plan<A>(
     }
 }
 
-pub fn literal_variable(var: &Variable) -> Literal {
-    Literal::Variable(NonGround(var.clone()))
-}
-
-pub fn bindings<'a>(list: Vec<(Variable, TermView<'a>)>) -> Bindings<'a> {
-    let pairs = list
-        .into_iter()
-        .map(|(v, tv)| (v.id, Some(tv)))
-        .collect::<Vec<_>>();
-    Bindings::new(pairs, crate::bindings::AliasMap::empty())
+/// Returns a context for use during testing without an environment initialised. Calling any method
+/// that accesses or mutates the environment is undefined behaviour.
+pub unsafe fn new_context_without_environment<A>() -> Context<'static, A> {
+    let mut environment = Environment::new(VecDeque::with_capacity(0));
+    // The context should never be used during testing. of the
+    Context::new(unsafe { core::mem::transmute(&mut environment) })
 }

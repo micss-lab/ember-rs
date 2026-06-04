@@ -139,7 +139,6 @@ mod tests {
     use alloc::vec;
 
     use crate::bindings::Bindings;
-    use crate::context::Context;
     use crate::plan::{Action, Formula, Trigger};
 
     use crate::testing::*;
@@ -149,7 +148,8 @@ mod tests {
     #[test]
     fn test_intention_step_empty() {
         let mut intention: Intention<()> = Intention::default();
-        let mut context = Context::new();
+        // SAFETY: The environment on the context remains untouched,
+        let mut context = unsafe { new_context_without_environment() };
 
         // Step with no frames returns Done
         assert!(matches!(
@@ -161,7 +161,8 @@ mod tests {
     #[test]
     fn test_intention_push_and_step() {
         let mut intention: Intention<()> = Intention::default();
-        let mut context = Context::new();
+        // SAFETY: The environment on the context remains untouched,
+        let mut context = unsafe { new_context_without_environment() };
 
         let trigger = trigger("event", vec![], None);
         let plan = plan(trigger.clone(), None, vec![]);
@@ -180,7 +181,8 @@ mod tests {
     #[test]
     fn test_intention_step_with_actions() {
         let mut intention: Intention<&'static str> = Intention::default();
-        let mut context = Context::new();
+        // SAFETY: The environment on the context remains untouched,
+        let mut context = unsafe { new_context_without_environment() };
 
         let trigger = trigger("event", vec![], None);
         let plan = plan(
@@ -215,7 +217,8 @@ mod tests {
     #[test]
     fn test_intention_step_with_beliefs_and_goals() {
         let mut intention: Intention<()> = Intention::default();
-        let mut context = Context::new();
+        // SAFETY: The environment on the context remains untouched,
+        let mut context = unsafe { new_context_without_environment() };
 
         let trigger = trigger("event", vec![], None);
         let plan = plan(

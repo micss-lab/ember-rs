@@ -1,8 +1,8 @@
 use alloc::borrow::Cow;
 
 use alloc::boxed::Box;
-use ember_core::agent::Agent as EmberAgent;
-use ember_core::context::ContainerContext;
+use ember_core::agent::Agent;
+use ember_core::environment::Environment;
 
 use crate::context::Context;
 use crate::event::EventSource;
@@ -17,9 +17,9 @@ use crate::plan::{Trigger, TriggeringEvent};
 use crate::sensor::{Percept, Sensor};
 
 #[derive(Debug)]
-pub struct BdiAgent<'s, Agent, Action, Percept> {
+pub struct BdiAgent<'s, State, Action, Percept> {
     name: Cow<'static, str>,
-    agent: Agent,
+    state: State,
     beliefs: BeliefBase,
     plans: PlanLibrary<Action>,
     intentions: IntentionQueue<Action>,
@@ -27,13 +27,13 @@ pub struct BdiAgent<'s, Agent, Action, Percept> {
     sensors: Box<[Sensor<'s, Percept>]>,
 }
 
-impl<'s, Agent, Action, Percept> BdiAgent<'s, Agent, Action, Percept>
+impl<'s, State, Action, Percept> BdiAgent<'s, State, Action, Percept>
 where
     Action: Clone,
 {
     pub fn new(
         name: impl Into<Cow<'static, str>>,
-        agent: Agent,
+        state: State,
         sensors: impl Into<Box<[Sensor<'s, Percept>]>>,
         beliefs: Option<BeliefBase>,
         plans: PlanLibrary<Action>,
@@ -41,7 +41,7 @@ where
     ) -> Self {
         let mut this = Self {
             name: name.into(),
-            agent,
+            state,
             beliefs: beliefs.unwrap_or_default(),
             plans,
             intentions: IntentionQueue::default(),
@@ -81,15 +81,13 @@ where
     }
 }
 
-impl<Agent, Action, P> EmberAgent for BdiAgent<'_, Agent, Action, P>
+impl<State, Action, P> Agent for BdiAgent<'_, State, Action, P>
 where
-    Action: Execute<Agent = Agent, Action = Action> + Clone,
+    Action: Execute<State = State, Action = Action> + Clone,
     P: Percept,
 {
-    fn update(&mut self, _context: &mut ContainerContext) -> bool {
-        // TODO: Implement interaction with the ember framework.
-        //
-        let mut context = Context::new();
+    fn update(&mut self, environment: &mut Environment) -> bool {
+        let mut context = Context::new(environment);
 
         for sensor in self.sensors.iter_mut() {
             let Some(percept) = sensor.percept() else {
@@ -114,7 +112,7 @@ where
             use crate::plan::Action::*;
             match action {
                 Builtin(action) => action.execute(&bindings, &mut context),
-                User(action) => action.execute(&bindings, &mut context, &mut self.agent),
+                User(action) => action.execute(&bindings, &mut context, &mut self.state),
             }
         }
 

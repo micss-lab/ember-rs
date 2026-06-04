@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 ember-core = { workspace = true }
+ember-util = { workspace = true }
 
 bstr = { version = "1.12", default-features = false, features = ["alloc"] }
 derive-where = "1.6.1"

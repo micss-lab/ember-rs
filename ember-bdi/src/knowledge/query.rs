@@ -844,40 +844,40 @@ mod tests {
     #[test]
     fn shared_variable_conjunction() {
         let mut bb = BeliefBase::default();
-        bb.assert_no_event(belief("parent", vec![s("alice"), s("bob")]));
-        bb.assert_no_event(belief("parent", vec![s("bob"), s("charlie")]));
+        bb.assert_no_event(belief("parent", vec![string("alice"), string("bob")]));
+        bb.assert_no_event(belief("parent", vec![string("bob"), string("charlie")]));
 
-        let (x, y) = (v(), v());
+        let (x, y) = (variable(), variable());
         let formula = and(vec![
-            literal("parent", vec![s("alice"), vt(&x)]),
-            literal("parent", vec![vt(&x), vt(&y)]),
+            literal("parent", vec![string("alice"), variable_term(&x)]),
+            literal("parent", vec![variable_term(&x), variable_term(&y)]),
         ]);
 
         let mut query = (&formula).into_query(&bb);
         let bindings = query.next_bindings(None).expect("Should find bindings");
 
-        assert_eq!(bindings.get(&x), Some(&s("bob").as_view()));
-        assert_eq!(bindings.get(&y), Some(&s("charlie").as_view()));
+        assert_eq!(bindings.get(&x), Some(&string("bob").as_view()));
+        assert_eq!(bindings.get(&y), Some(&string("charlie").as_view()));
     }
 
     #[test]
     fn backtracking_across_operands() {
         let mut bb = BeliefBase::default();
-        bb.assert_no_event(belief("p", vec![n(1.0), n(10.0)]));
-        bb.assert_no_event(belief("p", vec![n(1.0), n(20.0)]));
-        bb.assert_no_event(belief("q", vec![n(20.0), n(30.0)]));
+        bb.assert_no_event(belief("p", vec![number(1.0), number(10.0)]));
+        bb.assert_no_event(belief("p", vec![number(1.0), number(20.0)]));
+        bb.assert_no_event(belief("q", vec![number(20.0), number(30.0)]));
 
-        let (x, y) = (v(), v());
+        let (x, y) = (variable(), variable());
         let formula = and(vec![
-            literal("p", vec![n(1.0), vt(&x)]),
-            literal("q", vec![vt(&x), vt(&y)]),
+            literal("p", vec![number(1.0), variable_term(&x)]),
+            literal("q", vec![variable_term(&x), variable_term(&y)]),
         ]);
 
         let mut query = (&formula).into_query(&bb);
         let bindings = query.next_bindings(None).expect("Should backtrack to X=20");
 
-        assert_eq!(bindings.get(&x), Some(&n(20.0).as_view()));
-        assert_eq!(bindings.get(&y), Some(&n(30.0).as_view()));
+        assert_eq!(bindings.get(&x), Some(&number(20.0).as_view()));
+        assert_eq!(bindings.get(&y), Some(&number(30.0).as_view()));
     }
 
     #[test]
@@ -895,59 +895,65 @@ mod tests {
     #[test]
     fn disjunction_and_flattening() {
         let mut bb = BeliefBase::default();
-        bb.assert_no_event(belief("a", vec![n(1.0)]));
-        bb.assert_no_event(belief("b", vec![n(2.0)]));
-        bb.assert_no_event(belief("c", vec![n(2.0)]));
+        bb.assert_no_event(belief("a", vec![number(1.0)]));
+        bb.assert_no_event(belief("b", vec![number(2.0)]));
+        bb.assert_no_event(belief("c", vec![number(2.0)]));
 
-        let x = v();
+        let x = variable();
         // (a(X) | b(X)) & c(X) -> Should bind X=2
         let formula = and(vec![
-            or(vec![literal("a", vec![vt(&x)]), literal("b", vec![vt(&x)])]),
-            literal("c", vec![vt(&x)]),
+            or(vec![
+                literal("a", vec![variable_term(&x)]),
+                literal("b", vec![variable_term(&x)]),
+            ]),
+            literal("c", vec![variable_term(&x)]),
         ]);
 
         let mut query = (&formula).into_query(&bb);
         let bindings = query.next_bindings(None).expect("Should match X=2");
-        assert_eq!(bindings.get(&x), Some(&n(2.0).as_view()));
+        assert_eq!(bindings.get(&x), Some(&number(2.0).as_view()));
         assert!(query.next_bindings(None).is_none());
     }
 
     #[test]
     fn relational_comparison() {
         let mut bb = BeliefBase::default();
-        bb.assert_no_event(belief("val", vec![n(5.0)]));
-        bb.assert_no_event(belief("val", vec![n(15.0)]));
+        bb.assert_no_event(belief("val", vec![number(5.0)]));
+        bb.assert_no_event(belief("val", vec![number(15.0)]));
 
-        let x = v();
+        let x = variable();
         // val(X) & X > 10
         let formula = and(vec![
-            literal("val", vec![vt(&x)]),
+            literal("val", vec![variable_term(&x)]),
             cmp(
-                expr(vt(&x)),
+                expr(variable_term(&x)),
                 CompareOperator::GreaterThan,
                 false,
-                expr(n(10.0)),
+                expr(number(10.0)),
             ),
         ]);
 
         let mut query = (&formula).into_query(&bb);
         let bindings = query.next_bindings(None).expect("Should find X=15");
-        assert_eq!(bindings.get(&x), Some(&n(15.0).as_view()));
+        assert_eq!(bindings.get(&x), Some(&number(15.0).as_view()));
         assert!(query.next_bindings(None).is_none());
     }
 
     #[test]
     fn relational_unification_math() {
         let mut bb = BeliefBase::default();
-        bb.assert_no_event(belief("base", vec![n(10.0)]));
+        bb.assert_no_event(belief("base", vec![number(10.0)]));
 
-        let (x, y) = (v(), v());
+        let (x, y) = (variable(), variable());
         // base(X) & Y = X * 2
         let formula = and(vec![
-            literal("base", vec![vt(&x)]),
+            literal("base", vec![variable_term(&x)]),
             unify(
-                expr(vt(&y)),
-                math(ArithmeticOperator::Mul, vec![expr(vt(&x)), expr(n(2.0))]),
+                expr(variable_term(&y)),
+                math(
+                    ArithmeticOperator::Mul,
+                    vec![expr(variable_term(&x)), expr(number(2.0))],
+                ),
             ),
         ]);
 
@@ -959,18 +965,21 @@ mod tests {
     #[test]
     fn arithmetic_division_by_zero_fails_gracefully() {
         let mut bb = BeliefBase::default();
-        bb.assert_no_event(belief("val", vec![n(0.0)]));
-        bb.assert_no_event(belief("val", vec![n(2.0)]));
+        bb.assert_no_event(belief("val", vec![number(0.0)]));
+        bb.assert_no_event(belief("val", vec![number(2.0)]));
 
-        let x = v();
+        let x = variable();
         // val(X) & (10 / X) == 5
         let formula = and(vec![
-            literal("val", vec![vt(&x)]),
+            literal("val", vec![variable_term(&x)]),
             cmp(
-                math(ArithmeticOperator::Div, vec![expr(n(10.0)), expr(vt(&x))]),
+                math(
+                    ArithmeticOperator::Div,
+                    vec![expr(number(10.0)), expr(variable_term(&x))],
+                ),
                 CompareOperator::EqualTo,
                 true,
-                expr(n(5.0)),
+                expr(number(5.0)),
             ),
         ]);
 
@@ -979,24 +988,24 @@ mod tests {
         let bindings = query
             .next_bindings(None)
             .expect("Should recover and find X=2");
-        assert_eq!(bindings.get(&x), Some(&n(2.0).as_view()));
+        assert_eq!(bindings.get(&x), Some(&number(2.0).as_view()));
         assert!(query.next_bindings(None).is_none());
     }
 
     #[test]
     fn type_mismatch_fails_gracefully() {
         let mut bb = BeliefBase::default();
-        bb.assert_no_event(belief("val", vec![s("not_a_number")]));
+        bb.assert_no_event(belief("val", vec![string("not_a_number")]));
 
-        let x = v();
+        let x = variable();
         // val(X) & X > 0
         let formula = and(vec![
-            literal("val", vec![vt(&x)]),
+            literal("val", vec![variable_term(&x)]),
             cmp(
-                expr(vt(&x)),
+                expr(variable_term(&x)),
                 CompareOperator::GreaterThan,
                 false,
-                expr(n(0.0)),
+                expr(number(0.0)),
             ),
         ]);
 
@@ -1007,13 +1016,13 @@ mod tests {
     #[test]
     fn complex_de_morgan_resolution() {
         let mut bb = BeliefBase::default();
-        bb.assert_no_event(belief("p", vec![n(1.0)]));
-        bb.assert_no_event(belief("q", vec![n(1.0)]));
+        bb.assert_no_event(belief("p", vec![number(1.0)]));
+        bb.assert_no_event(belief("q", vec![number(1.0)]));
 
         // !( !p(1) | !q(1) ) => p(1) & q(1)
         let formula = not(or(vec![
-            not(literal("p", vec![n(1.0)])),
-            not(literal("q", vec![n(1.0)])),
+            not(literal("p", vec![number(1.0)])),
+            not(literal("q", vec![number(1.0)])),
         ]));
 
         let mut query = (&formula).into_query(&bb);

@@ -512,6 +512,7 @@ dependencies = [
  "derive-where",
  "derive_more",
  "ember-core",
+ "ember-util",
  "log",
 ]
 

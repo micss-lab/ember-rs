@@ -147,7 +147,7 @@ mod tests {
     #[test]
     fn test_resolve_ground_atom_unchanged() {
         let bindings: Bindings<'_> = Bindings::empty();
-        let literal = literal("parent", vec![s("alice"), s("bob")]);
+        let literal = literal("parent", vec![string("alice"), string("bob")]);
 
         let resolved = literal
             .clone()
@@ -160,7 +160,7 @@ mod tests {
     #[test]
     fn test_resolve_unbound_variable_literal_remains_variable() {
         let bindings: Bindings<'_> = Bindings::empty();
-        let var = v();
+        let var = variable();
         let literal = literal_variable(&var);
 
         let resolved = literal
@@ -177,7 +177,7 @@ mod tests {
         let target_atom = literal("sunny", vec![]);
         let target_view = TermView::from(&target_atom);
 
-        let var = v();
+        let var = variable();
         let bindings = bindings(vec![(var.clone(), target_view)]);
         let literal = literal_variable(&var);
 
@@ -191,15 +191,15 @@ mod tests {
 
     #[test]
     fn test_resolve_variable_to_invalid_kind_fails() {
-        let var_num = v();
+        let var_num = variable();
         let num_bindings = bindings(vec![(var_num.clone(), TermView::Number(42.0.into()))]);
         let lit_num = literal_variable(&var_num);
 
         let result_num = lit_num.resolve(&num_bindings);
         assert!(matches!(result_num, Err(ResolveFailure::IncorrectKind)));
 
-        let var_str = v();
-        let term_str = s("hello");
+        let var_str = variable();
+        let term_str = string("hello");
         let str_bindings = bindings(vec![(var_str.clone(), TermView::Term(&term_str))]);
         let lit_str = literal_variable(&var_str);
 
@@ -209,14 +209,14 @@ mod tests {
 
     #[test]
     fn test_resolve_nested_variables_inside_atom() {
-        let (x, y) = (v(), v());
+        let (x, y) = (variable(), variable());
         let bindings = bindings(vec![
             (x.clone(), TermView::Number(10.0.into())),
             (y.clone(), TermView::Variable(&x)), // Chained view referencing X
         ]);
 
         // p(X, Y)
-        let literal = literal("p", vec![vt(&x), vt(&y)]);
+        let literal = literal("p", vec![variable_term(&x), variable_term(&y)]);
         let resolved_view = literal
             .resolve_as_view(&bindings)
             .expect("literal should resolve");
@@ -237,7 +237,7 @@ mod tests {
         let target_atom = literal("raining", vec![]);
         let target_view = TermView::from(&target_atom);
 
-        let var = v();
+        let var = variable();
         let bindings = bindings(vec![(var.clone(), target_view)]);
 
         // A negated variable literal
@@ -258,14 +258,14 @@ mod tests {
 
     #[test]
     fn test_deeply_nested_literal_term_resolution() {
-        let x = v();
-        let term_num = n(31.5);
+        let x = variable();
+        let term_num = number(31.5);
         let bindings = bindings(vec![(x.clone(), TermView::Term(&term_num))]);
 
         // Embedded structure: inner_lit(X)
         let inner_structure = Structure {
             functor: Atom("inner_lit".into()),
-            arguments: Some(vec![vt(&x)].into_boxed_slice()),
+            arguments: Some(vec![variable_term(&x)].into_boxed_slice()),
         };
 
         // Term wrapper around structural literal: Term::Literal { ... }
@@ -297,7 +297,7 @@ mod tests {
                 .expect("Should have inner args");
             assert_eq!(
                 inner_args[0],
-                n(31.5),
+                number(31.5),
                 "Nested variable X should be resolved to 31.5"
             );
         } else {

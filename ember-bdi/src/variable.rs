@@ -1,5 +1,6 @@
 use core::marker::PhantomData;
-use ember_core::util::sync::AtomicU32;
+
+use ember_util::sync::AtomicU32;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct VariableId(VarID);
