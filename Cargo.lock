@@ -471,6 +471,7 @@ name = "ember"
 version = "0.1.0"
 dependencies = [
  "ember-acc",
+ "ember-bdi",
  "ember-core",
  "ember-fipa",
  "ember-reactive",
@@ -537,8 +538,6 @@ version = "0.1.0"
 dependencies = [
  "critical-section",
  "ember",
- "ember-bdi",
- "ember-core",
  "env_logger",
  "esp-alloc",
  "esp-backtrace",

@@ -5,30 +5,25 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec;
 
-use ember_bdi::bindings::BindingLookup;
-use ember_bdi::plan::action::Execute;
-use log::{debug, info};
+use log::info;
 
-use ember_core::agent::Agent as EmberAgent;
-use ember_core::context::ContainerContext;
-
-use ember_bdi::agent::BdiAgent;
-use ember_bdi::knowledge::belief::Belief;
-use ember_bdi::knowledge::store::BeliefBase;
-use ember_bdi::literal::Literal;
-use ember_bdi::plan::library::PlanLibrary;
-use ember_bdi::plan::{
+use ember::Container;
+use ember::agent::bdi::BdiAgent;
+use ember::agent::bdi::bindings::BindingLookup;
+use ember::agent::bdi::knowledge::belief::Belief;
+use ember::agent::bdi::knowledge::store::BeliefBase;
+use ember::agent::bdi::literal::Literal;
+use ember::agent::bdi::plan::action::Execute;
+use ember::agent::bdi::plan::library::PlanLibrary;
+use ember::agent::bdi::plan::{
     Action, BuiltinAction, Formula, GoalKind, Plan, QueryFormula, Trigger, TriggeringEvent,
 };
-use ember_bdi::term::{NonGround, Structure, Term};
-use ember_bdi::variable::Variable;
+use ember::agent::bdi::term::{NonGround, Structure, Term};
+use ember::agent::bdi::variable::Variable;
 
 use ember_examples::setup_example;
 
 setup_example!();
-
-#[derive(Debug)]
-struct CoffeeAgent;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum AgentAction {
@@ -37,15 +32,15 @@ enum AgentAction {
 }
 
 impl Execute for AgentAction {
-    type Agent = CoffeeAgent;
+    type State = ();
 
     type Action = Self;
 
     fn execute(
         self,
         bindings: &impl BindingLookup,
-        _context: &mut ember_bdi::context::Context<Self::Action>,
-        _agent: &mut Self::Agent,
+        _context: &mut ember::agent::bdi::context::Context<Self::Action>,
+        _state: &mut Self::State,
     ) {
         match self {
             AgentAction::Move { from, to } => {
@@ -120,9 +115,9 @@ fn example() {
     info!("🎯 Initial Goal: +!make_coffee\n");
 
     // 5. Create the BdiAgent instance.
-    let mut bdi_agent = BdiAgent::<_, _, ()>::new(
+    let bdi_agent = BdiAgent::<_, _, ()>::new(
         "coffee-maker",
-        CoffeeAgent,
+        (),
         [],
         Some(belief_base),
         plan_library,
@@ -130,23 +125,12 @@ fn example() {
     );
 
     // 6. Run the agent's execution cycle.
-    info!("🚀 Starting agent execution loop...\n");
-    let mut container_context = ContainerContext::default();
-    let mut step = 0;
-    const MAX_STEPS: u32 = 15;
+    info!("🚀 Starting agent container...\n");
 
-    while step < MAX_STEPS {
-        info!("--- Agent update: Step {} ---", step + 1);
-        if bdi_agent.update(&mut container_context) {
-            info!("\n✅ Agent has completed its tasks.");
-            break;
-        }
-        step += 1;
-        if step == MAX_STEPS {
-            debug!("{bdi_agent:#?}");
-            info!("\n⚠️ Agent reached max steps without completing tasks.");
-        }
-    }
+    Container::new()
+        .with_agent(bdi_agent)
+        .start()
+        .expect("container encountered an error");
 
     info!("\n====================================================");
     info!("☕ BDI Agent demo finished. ☕");
@@ -241,11 +225,23 @@ fn define_plans() -> PlanLibrary<AgentAction> {
             ),
             QueryFormula::literal(false, "have", Some([Term::String("coffee_beans".into())])),
         ])),
-        body: Box::new([Formula::Action(Action::Builtin(BuiltinAction::Log(
-            log::Level::Info,
-            "[ACTION] 💬 Enjoying a fresh cup of coffee!".into(),
-            None,
-        )))]),
+        body: Box::new([
+            Formula::Action(Action::Builtin(BuiltinAction::Log(
+                log::Level::Info,
+                "[ACTION] 💬 Enjoying a fresh cup of coffee!".into(),
+                None,
+            ))),
+            Formula::Belief {
+                trigger: Trigger::Addition,
+                belief: Literal::Atom {
+                    negated: false,
+                    structure: Structure {
+                        functor: "done".into(),
+                        arguments: None,
+                    },
+                },
+            },
+        ]),
     });
 
     // Plan B: Sub-goaling plan to make coffee if conditions are not met.
@@ -446,6 +442,24 @@ fn define_plans() -> PlanLibrary<AgentAction> {
                 },
             },
         ]),
+    });
+
+    lib.add(Plan {
+        trigger: TriggeringEvent {
+            trigger: Trigger::Addition,
+            goal: None,
+            event: Literal::Atom {
+                negated: false,
+                structure: Structure {
+                    functor: "done".into(),
+                    arguments: None,
+                },
+            },
+        },
+        context: None,
+        body: Box::new([Formula::Action(Action::Builtin(
+            BuiltinAction::StopPlatform,
+        ))]),
     });
 
     lib

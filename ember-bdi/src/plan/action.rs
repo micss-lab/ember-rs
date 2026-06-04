@@ -51,12 +51,14 @@ where
 #[derive(derive_more::Debug, Clone, PartialEq, Eq)]
 pub enum BuiltinAction {
     Log(Level, Cow<'static, str>, Option<Box<[Term]>>),
+    StopPlatform,
 }
 
 impl BuiltinAction {
-    pub(crate) fn execute<A>(self, bindings: &impl BindingLookup, _context: &mut Context<A>) {
+    pub(crate) fn execute<A>(self, bindings: &impl BindingLookup, context: &mut Context<A>) {
+        use BuiltinAction::*;
         match self {
-            BuiltinAction::Log(level, text, Some(terms)) => {
+            Log(level, text, Some(terms)) => {
                 let terms = terms
                     .into_iter()
                     .map(|t| t.resolve(bindings))
@@ -64,9 +66,10 @@ impl BuiltinAction {
                     .expect("failed to resolve log arguments");
                 log!(level, "{} {:?}", text, terms)
             }
-            BuiltinAction::Log(level, text, None) => {
+            Log(level, text, None) => {
                 log!(level, "{}", text)
             }
+            StopPlatform => context.stop_platform(),
         }
     }
 }

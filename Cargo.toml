@@ -16,6 +16,7 @@ members = [
 [workspace.dependencies]
 ember = { path = "./ember" }
 ember-acc = { path = "./ember-acc" }
+ember-bdi = { path = "./ember-bdi" }
 ember-core = { path = "./ember-core" }
 ember-fipa = { path = "./ember-fipa" }
 ember-reactive = { path = "./ember-reactive" }

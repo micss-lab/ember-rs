@@ -31,6 +31,10 @@ pub struct Container<'a, 'c> {
 }
 
 impl Container<'_, '_> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn start(mut self) -> Result<(), Box<dyn core::error::Error>> {
         loop {
             let should_stop = self.poll()?;
