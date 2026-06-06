@@ -1,0 +1,8 @@
+[package]
+name = "ember-bdi-macros"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+peg = "0.8"
+proc-macro2 = "1.0"

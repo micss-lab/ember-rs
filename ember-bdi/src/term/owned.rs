@@ -10,6 +10,7 @@ use super::{Ground, NonGround};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Term<Groundness = NonGround> {
+    // TODO: Support full arithmetic formulas here.
     Number(TotalCmpF32),
     String(BString),
     Variable(Groundness),
