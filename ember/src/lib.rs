@@ -26,6 +26,7 @@ pub mod agent {
 
     pub mod bdi {
         pub use ember_bdi::agent::BdiAgent;
+        pub use ember_bdi::bdi_agent;
 
         pub use ember_bdi::{bindings, context, knowledge, literal, plan, sensor, term, variable};
     }

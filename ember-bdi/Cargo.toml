@@ -4,8 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ember-core = { workspace = true }
 ember-bdi-macros = { path = "./macros" }
+
+ember-core = { workspace = true }
+ember-util = { workspace = true }
 
 bstr = { version = "1.12", default-features = false, features = ["alloc"] }
 derive-where = "1.6.1"

@@ -1,7 +1,7 @@
 #[derive(Debug)]
 pub(crate) struct Program {
     pub(crate) beliefs: Box<[Belief]>,
-    pub(crate) initial: Box<[InitGoal]>,
+    pub(crate) goals: Box<[Goal]>,
     pub(crate) plans: Box<[Plan]>,
 }
 
@@ -17,12 +17,12 @@ pub(crate) struct Literal {
 #[derive(Debug)]
 pub(crate) struct AtomicFormula {
     pub(crate) functor: AtomOrVar,
-    pub(crate) arguments: Box<[Term]>,
+    pub(crate) arguments: Option<Box<[Term]>>,
 }
 
 #[derive(Debug)]
 pub(crate) enum AtomOrVar {
-    Var(Variable),
+    Variable(Variable),
     Atom(Atom),
 }
 
@@ -35,13 +35,13 @@ pub(crate) struct Atom(pub(crate) String);
 #[derive(Debug)]
 pub(crate) enum Term {
     Literal(Literal),
-    Var(Variable),
+    Variable(Variable),
     Number(f32),
     String(String),
 }
 
 #[derive(Debug)]
-pub(crate) struct InitGoal(pub(crate) Literal);
+pub(crate) struct Goal(pub(crate) Literal);
 
 #[derive(Debug)]
 pub(crate) struct Plan {
@@ -53,7 +53,7 @@ pub(crate) struct Plan {
 #[derive(Debug)]
 pub(crate) struct TriggeringEvent {
     pub(crate) trigger: Trigger,
-    pub(crate) goal: Option<Goal>,
+    pub(crate) goal: Option<EventGoal>,
     pub(crate) event: Literal,
 }
 
@@ -64,7 +64,7 @@ pub(crate) enum Trigger {
 }
 
 #[derive(Debug)]
-pub(crate) enum Goal {
+pub(crate) enum EventGoal {
     Achieve,
     Query,
 }
@@ -76,8 +76,8 @@ pub(crate) struct Context(pub(crate) LogicalExpression);
 pub(crate) enum LogicalExpression {
     Simple(SimpleLogicalExpression),
     Not(Box<LogicalExpression>),
-    And(Box<(SimpleLogicalExpression, LogicalExpression)>),
-    Or(Box<(SimpleLogicalExpression, LogicalExpression)>),
+    And((SimpleLogicalExpression, Box<LogicalExpression>)),
+    Or((SimpleLogicalExpression, Box<LogicalExpression>)),
 }
 
 #[derive(Debug)]
@@ -110,8 +110,8 @@ pub(crate) enum RelationalTerm {
 
 #[derive(Debug)]
 pub(crate) struct ArithmeticExpression {
-    pub(crate) operator: PlusMin,
-    pub(crate) operands: (ArithmeticTerm, Option<Box<ArithmeticExpression>>),
+    pub(crate) lhs: ArithmeticTerm,
+    pub(crate) rhs: Option<(PlusMin, Box<ArithmeticExpression>)>,
 }
 
 #[derive(Debug)]
@@ -122,8 +122,8 @@ pub(crate) enum PlusMin {
 
 #[derive(Debug)]
 pub(crate) struct ArithmeticTerm {
-    pub(crate) operator: DivMul,
-    pub(crate) operands: (ArithmeticFactor, Option<Box<ArithmeticTerm>>),
+    pub(crate) lhs: ArithmeticFactor,
+    pub(crate) rhs: Option<(DivMul, Box<ArithmeticTerm>)>,
 }
 
 #[derive(Debug)]
@@ -135,7 +135,7 @@ pub(crate) enum DivMul {
 #[derive(Debug)]
 pub(crate) enum ArithmeticFactor {
     Number(f32),
-    Var(Variable),
+    Variable(Variable),
     Neg(Box<ArithmeticFactor>),
     Group(Box<ArithmeticExpression>),
 }

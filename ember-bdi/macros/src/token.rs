@@ -1,6 +1,6 @@
 //! Represent a [`proc_macro2::TokenStream`] as a parsable peg token stream.
 //!
-//! Taken from https://github.com/kevinmehall/rust-peg/blob/3453b34e8dcf0482c650f917e60d43ed944a71e2/peg-macros/tokens.rs.
+//! Taken and modified from https://github.com/kevinmehall/rust-peg/blob/3453b34e8dcf0482c650f917e60d43ed944a71e2/peg-macros/tokens.rs.
 
 use peg::{Parse, ParseElem, ParseLiteral, ParseSlice, RuleResult};
 use proc_macro2::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
@@ -87,6 +87,15 @@ impl FlatTokenStream {
         match self.tokens.get(pos) {
             Some(Token::Begin(g, n)) if g.delimiter() == delim => {
                 RuleResult::Matched(*n, g.clone())
+            }
+            _ => RuleResult::Failed,
+        }
+    }
+
+    pub(crate) fn punct(&self, pos: usize, punct: char) -> RuleResult<Punct> {
+        match self.tokens.get(pos) {
+            Some(Token::Punct(p)) if p.as_char() == punct => {
+                RuleResult::Matched(pos + 1, p.clone())
             }
             _ => RuleResult::Failed,
         }

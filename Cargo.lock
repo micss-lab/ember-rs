@@ -514,6 +514,7 @@ dependencies = [
  "derive_more",
  "ember-bdi-macros",
  "ember-core",
+ "ember-util",
  "log",
 ]
 
@@ -523,6 +524,8 @@ version = "0.1.0"
 dependencies = [
  "peg 0.8.6",
  "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]
