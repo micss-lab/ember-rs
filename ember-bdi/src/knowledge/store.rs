@@ -81,6 +81,19 @@ impl BeliefBase {
     }
 }
 
+impl<B> FromIterator<B> for BeliefBase
+where
+    B: Into<Belief>,
+{
+    fn from_iter<T: IntoIterator<Item = B>>(iter: T) -> Self {
+        let mut this = Self::default();
+        iter.into_iter().for_each(|b| {
+            this.assert_no_event(b);
+        });
+        this
+    }
+}
+
 /// A collection of normalized beliefs. Beliefs are always stored normalized with additional
 /// metadata on how to construct their original version.
 #[derive(Debug, Default)]

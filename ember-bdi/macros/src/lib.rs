@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use quote::{quote, quote_spanned};
-use syn::Token;
 use syn::parse::{Parse, ParseStream};
+use syn::{DeriveInput, Token, parse_macro_input};
 
 use crate::token::FlatTokenStream;
 
@@ -12,7 +12,7 @@ mod token;
 
 #[proc_macro_attribute]
 pub fn bdi_agent(args: TokenStream, input: TokenStream) -> TokenStream {
-    let input: proc_macro2::TokenStream = input.into();
+    let input = parse_macro_input!(input as DeriveInput);
 
     let args = match syn::parse::<BdiAgentArgs>(args) {
         Ok(args) => args,
@@ -30,7 +30,7 @@ pub fn bdi_agent(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     };
 
-    let program = compiler::compile_asl(&program);
+    let program = compiler::compile_asl(&program, "bdi-agent", &input.ident);
 
     quote! {
         #input

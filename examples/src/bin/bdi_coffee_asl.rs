@@ -25,7 +25,6 @@ use ember_examples::setup_example;
 
 setup_example!();
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 #[bdi_agent(asl = {
     at(agent, home).
     at(coffee_machine, kitchen).
@@ -59,6 +58,10 @@ setup_example!();
     +done
       <- action(stop).
 })]
+struct CoffeeAgent;
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+
 enum AgentAction {
     Move { from: Variable, to: Variable },
     Buy(String),

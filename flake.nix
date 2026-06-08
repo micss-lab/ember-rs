@@ -46,6 +46,7 @@
             pkgs.espup
             pkgs.bacon
             pkgs.cargo-flamegraph
+            pkgs.cargo-expand
 
             pkgs.arduino-cli
             pkgs.arduino
