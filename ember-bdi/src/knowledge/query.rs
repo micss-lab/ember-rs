@@ -151,9 +151,9 @@ impl RelationalQueryFormula {
 pub(crate) mod formula {
     use alloc::boxed::Box;
 
+    use crate::knowledge::store::BeliefBase;
     use crate::literal::Literal;
-    use crate::term::{Atom, Term};
-    use crate::{knowledge::store::BeliefBase, term::Structure};
+    use crate::term::{Atom, Structure, Term};
 
     use super::{IntoQuery, Query};
 
@@ -224,7 +224,7 @@ pub(crate) mod formula {
     #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
     pub struct RelationalQueryFormula {
         pub operator: RelationalOperator,
-        pub operands: Box<(ArithmeticExpression, ArithmeticExpression)>,
+        pub operands: (ArithmeticExpression, ArithmeticExpression),
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -553,10 +553,10 @@ pub(crate) mod formula {
                         operator: CompareOperator::EqualTo,
                         equal: true,
                     },
-                    operands: Box::new((
+                    operands: (
                         ArithmeticExpression::Term(Term::Number(0.0.into())),
                         ArithmeticExpression::Term(Term::Number(0.0.into())),
-                    )),
+                    ),
                 }
             }
 
@@ -828,14 +828,14 @@ mod tests {
                 operator: op,
                 equal: eq,
             },
-            operands: Box::new((l, r)),
+            operands: (l, r),
         })
     }
 
     fn unify(l: ArithmeticExpression, r: ArithmeticExpression) -> QueryFormula {
         QueryFormula::Relational(RelationalQueryFormula {
             operator: RelationalOperator::Unify,
-            operands: Box::new((l, r)),
+            operands: (l, r),
         })
     }
 

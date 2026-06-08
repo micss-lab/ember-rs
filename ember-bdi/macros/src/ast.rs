@@ -1,38 +1,34 @@
-#[derive(Debug)]
+use crate::action::SystemAction;
+
+#[derive(Debug, Clone)]
 pub(crate) struct Program {
     pub(crate) beliefs: Box<[Belief]>,
     pub(crate) goals: Box<[Goal]>,
     pub(crate) plans: Box<[Plan]>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Belief(pub(crate) Literal);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Literal {
     pub(crate) negated: bool,
     pub(crate) formula: AtomicFormula,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct AtomicFormula {
-    pub(crate) functor: AtomOrVar,
+    pub(crate) functor: Atom,
     pub(crate) arguments: Option<Box<[Term]>>,
 }
 
-#[derive(Debug)]
-pub(crate) enum AtomOrVar {
-    Variable(Variable),
-    Atom(Atom),
-}
-
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Variable(pub(crate) String);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Atom(pub(crate) String);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum Term {
     Literal(Literal),
     Variable(Variable),
@@ -40,58 +36,58 @@ pub(crate) enum Term {
     String(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Goal(pub(crate) Literal);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Plan {
     pub(crate) event: TriggeringEvent,
     pub(crate) context: Option<Context>,
     pub(crate) body: Body,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct TriggeringEvent {
     pub(crate) trigger: Trigger,
     pub(crate) goal: Option<EventGoal>,
     pub(crate) event: Literal,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum Trigger {
     Addition,
     Deletion,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum EventGoal {
     Achieve,
     Query,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Context(pub(crate) LogicalExpression);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum LogicalExpression {
     Simple(SimpleLogicalExpression),
-    Not(Box<LogicalExpression>),
     And((SimpleLogicalExpression, Box<LogicalExpression>)),
     Or((SimpleLogicalExpression, Box<LogicalExpression>)),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum SimpleLogicalExpression {
     Literal(Literal),
+    Not(Box<LogicalExpression>),
     Rel(RelationalExpression),
 }
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct RelationalExpression {
     pub(crate) operator: RelationalOperator,
     pub(crate) operands: (RelationalTerm, RelationalTerm),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum RelationalOperator {
     Smaller,
     Larger,
@@ -102,37 +98,37 @@ pub(crate) enum RelationalOperator {
     Unify,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum RelationalTerm {
     Literal(Literal),
     Arithm(ArithmeticExpression),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct ArithmeticExpression {
     pub(crate) lhs: ArithmeticTerm,
     pub(crate) rhs: Option<(PlusMin, Box<ArithmeticExpression>)>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum PlusMin {
     Plus,
     Min,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct ArithmeticTerm {
     pub(crate) lhs: ArithmeticFactor,
     pub(crate) rhs: Option<(DivMul, Box<ArithmeticTerm>)>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum DivMul {
     Division,
     Multiplication,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum ArithmeticFactor {
     Number(f32),
     Variable(Variable),
@@ -140,23 +136,28 @@ pub(crate) enum ArithmeticFactor {
     Group(Box<ArithmeticExpression>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Body(pub(crate) Box<[BodyFormula]>);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum BodyFormula {
     BeliefOrGoal {
         trigger: BodyFormulaTrigger,
         literal: Literal,
     },
-    Atomic(AtomicFormula),
+    Action(Action),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum BodyFormulaTrigger {
     Add,
     Remove,
-    Update,
     Achieve,
     Query,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum Action {
+    System(SystemAction),
+    User(AtomicFormula),
 }

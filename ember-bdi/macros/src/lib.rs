@@ -5,6 +5,7 @@ use syn::{DeriveInput, Token, parse_macro_input};
 
 use crate::token::FlatTokenStream;
 
+mod action;
 mod ast;
 mod compiler;
 mod parser;
