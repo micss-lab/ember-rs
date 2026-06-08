@@ -99,18 +99,12 @@ fn example() {
 
     let plan_library = define_plans();
 
-    let initial_goal = {
-        TriggeringEvent {
-            trigger: Trigger::Addition,
-            goal: Some(GoalKind::Achieve),
-            event: Literal::Atom {
-                negated: false,
-                structure: Structure {
-                    functor: "make_coffee".into(),
-                    arguments: None,
-                },
-            },
-        }
+    let initial_goal = Literal::Atom {
+        negated: false,
+        structure: Structure {
+            functor: "make_coffee".into(),
+            arguments: None,
+        },
     };
     info!("🎯 Initial Goal: +!make_coffee\n");
 

@@ -10,10 +10,11 @@ use crate::event::queue::EventQueue;
 use crate::event::selector::FirstEvent;
 use crate::intention::queue::{Fifo, IntentionQueue};
 use crate::knowledge::store::BeliefBase;
+use crate::literal::Literal;
 use crate::plan::action::Execute;
 use crate::plan::library::PlanLibrary;
 use crate::plan::selector::FirstApplicable;
-use crate::plan::{Trigger, TriggeringEvent};
+use crate::plan::{GoalKind, Trigger, TriggeringEvent};
 use crate::sensor::{Percept, Sensor};
 
 #[derive(Debug)]
@@ -37,7 +38,7 @@ where
         sensors: impl Into<Box<[Sensor<'s, Percept>]>>,
         beliefs: Option<BeliefBase>,
         plans: PlanLibrary<Action>,
-        initial_goals: impl IntoIterator<Item = TriggeringEvent>,
+        initial_goals: impl IntoIterator<Item = Literal>,
     ) -> Self {
         let mut this = Self {
             name: name.into(),
@@ -48,9 +49,16 @@ where
             event_queue: EventQueue::default(),
             sensors: sensors.into(),
         };
-        initial_goals
-            .into_iter()
-            .for_each(|g| this.handle_event(g, EventSource::External));
+        initial_goals.into_iter().for_each(|g| {
+            this.handle_event(
+                TriggeringEvent {
+                    trigger: Trigger::Addition,
+                    event: g,
+                    goal: Some(GoalKind::Achieve),
+                },
+                EventSource::External,
+            )
+        });
         this
     }
 
