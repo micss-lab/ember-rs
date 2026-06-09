@@ -1,8 +1,8 @@
 use alloc::boxed::Box;
 
 use crate::bindings::BindingLookup;
-use crate::bindings::resolver::ResolveFailure;
 use crate::literal::Literal;
+use crate::resolve::ResolveFailure;
 
 pub use crate::event::{GoalKind, Trigger, TriggeringEvent};
 pub use crate::knowledge::query::formula::*;
@@ -87,7 +87,7 @@ impl<A> Formula<A> {
         self,
         bindings: &B,
     ) -> Result<Self, ResolveFailure> {
-        use crate::bindings::resolver::Resolve;
+        use crate::resolve::Resolve;
 
         Ok(match self {
             Formula::Belief { trigger, belief } => Formula::Belief {

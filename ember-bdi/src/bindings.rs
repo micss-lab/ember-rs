@@ -11,7 +11,6 @@ use crate::unification::constraint::BindingConstraint;
 use crate::unification::error::UnificationError;
 use crate::variable::{Variable, VariableId};
 
-pub(crate) mod resolver;
 pub(crate) mod solver;
 
 #[derive(Debug, Clone, Default)]

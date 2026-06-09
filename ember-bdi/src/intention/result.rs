@@ -1,5 +1,5 @@
-use crate::bindings::resolver::ResolveFailure;
 use crate::bindings::{BindingLookup, OwnedBindings};
+use crate::resolve::ResolveFailure;
 use crate::term::view::TermView;
 use crate::variable::Variable;
 

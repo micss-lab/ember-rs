@@ -2,6 +2,7 @@ use core::convert::Infallible;
 
 use crate::variable::Variable;
 
+pub use self::from::{FromTerm, FromTermError};
 pub use self::owned::{Atom, Structure, Term, TotalCmpF32};
 
 pub mod from;

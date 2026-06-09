@@ -1,11 +1,10 @@
 use alloc::vec::Vec;
 
+use crate::bindings::BindingLookup;
 use crate::literal::Literal;
 use crate::term::Structure;
 use crate::term::view::{StructureView, TermView};
 use crate::term::{NonGround, Term};
-
-use super::BindingLookup;
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ResolveFailure {

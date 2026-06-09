@@ -5,8 +5,8 @@ use alloc::vec::Vec;
 use log::{Level, log};
 
 use crate::bindings::BindingLookup;
-use crate::bindings::resolver::Resolve;
 use crate::context::Context;
+use crate::resolve::Resolve;
 use crate::term::Term;
 
 pub trait Execute: Sized {
