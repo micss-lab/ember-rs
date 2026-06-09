@@ -222,8 +222,10 @@ fn define_plans() -> PlanLibrary<AgentAction> {
         body: Box::new([
             Formula::Action(Action::Builtin(BuiltinAction::Log(
                 log::Level::Info,
-                "[ACTION] 💬 Enjoying a fresh cup of coffee!".into(),
-                None,
+                [Term::String(
+                    "[ACTION] 💬 Enjoying a fresh cup of coffee!".into(),
+                )]
+                .into(),
             ))),
             Formula::Belief {
                 trigger: Trigger::Addition,
@@ -317,8 +319,11 @@ fn define_plans() -> PlanLibrary<AgentAction> {
         )),
         body: Box::new([Formula::Action(Action::Builtin(BuiltinAction::Log(
             log::Level::Info,
-            "[ACTION] 💬 Already at".into(),
-            Some(Box::new([Term::Variable(NonGround(v_dest.clone()))])),
+            [
+                Term::String("[ACTION] 💬 Already at".into()),
+                Term::Variable(NonGround(v_dest.clone())),
+            ]
+            .into(),
         )))]),
     });
 
@@ -403,8 +408,10 @@ fn define_plans() -> PlanLibrary<AgentAction> {
         )),
         body: Box::new([Formula::Action(Action::Builtin(BuiltinAction::Log(
             log::Level::Info,
-            "[ACTION] 💬 Found coffee beans in the pantry.".into(),
-            None,
+            [Term::String(
+                "[ACTION] 💬 Found coffee beans in the pantry.".into(),
+            )]
+            .into(),
         )))]),
     });
 

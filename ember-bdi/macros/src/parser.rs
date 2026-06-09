@@ -1,4 +1,4 @@
-use crate::action::SystemAction;
+use crate::action::BuiltinAction;
 use crate::ast::*;
 use crate::token::FlatTokenStream;
 
@@ -42,10 +42,10 @@ peg::parser! {
         }
 
         rule atomic_formula() -> AtomicFormula
-            = functor:ATOM() arguments:( "(" args:term() ++ "," ")" { args.into_boxed_slice() })? {
+            = functor:ATOM() arguments:( "(" args:term() ** "," ")" { if args.is_empty() { None } else { Some(args.into_boxed_slice()) } })? {
             AtomicFormula {
                 functor,
-                arguments,
+                arguments: arguments.flatten(),
             }
         }
 
@@ -131,7 +131,7 @@ peg::parser! {
             = trigger:BODY_FORMULA_TRIGGER() literal:literal() { BodyFormula::BeliefOrGoal { trigger, literal } }
             / period:"."? formula:atomic_formula() {?
                 Ok(BodyFormula::Action(if period.is_some() {
-                    Action::System(SystemAction::try_from(formula)
+                    Action::Builtin(BuiltinAction::try_from(formula)
                 .map_err(|_| "a valid system action (e.g. `.print`, `.message`, etc.)")?)
                 } else {
                     Action::User(formula)

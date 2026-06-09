@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use proc_macro2::{Ident, TokenStream};
 use quote::{ToTokens, format_ident, quote};
 
-use crate::action::SystemAction;
+use crate::action::BuiltinAction;
 use crate::ast::*;
 
 pub(crate) mod actions;
@@ -373,29 +373,15 @@ impl AstVisitor {
 
     fn visit_action(&mut self, action: &Action) -> impl ToTokens {
         match action {
-            Action::System(action) => {
-                let action = self.visit_system_action(action);
+            Action::Builtin(action) => {
+                let action = self.visit_builtin_action(action);
                 quote! {
-                    ::ember::agent::bdi::action::Action::System(#action)
+                    ::ember::agent::bdi::plan::action::Action::Builtin(#action)
                 }
             }
-            Action::User(atomic_formula) => {
-                let mut actual_functor = &atomic_formula.functor;
-                let mut actual_args = atomic_formula.arguments.as_deref();
-
-                if actual_functor.0 == "action" {
-                    if let Some(args) = actual_args {
-                        if args.len() == 1 {
-                            if let Term::Literal(crate::ast::Literal { formula, .. }) = &args[0] {
-                                actual_functor = &formula.functor;
-                                actual_args = formula.arguments.as_deref();
-                            }
-                        }
-                    }
-                }
-
-                let factory_ident = format_ident!("{}_action", actual_functor.0.as_str());
-                let args_tokens = match actual_args {
+            Action::User(AtomicFormula { functor, arguments }) => {
+                let factory_ident = format_ident!("{}_action", functor.0.as_str());
+                let args_tokens = match arguments {
                     Some(args) => {
                         let args = args
                             .into_iter()
@@ -407,16 +393,31 @@ impl AstVisitor {
                 };
                 let agent_ident = &self.agent_ident;
                 quote! {
-                    ::ember::agent::bdi::plan::Action::User(#agent_ident::#factory_ident(#args_tokens))
+                    ::ember::agent::bdi::plan::action::Action::User(#agent_ident::#factory_ident(#args_tokens))
                 }
             }
         }
     }
 
-    fn visit_system_action(&mut self, action: &SystemAction) -> impl ToTokens {
-        match *action {}
-
-        quote! {}
+    fn visit_builtin_action(&mut self, action: &BuiltinAction) -> impl ToTokens {
+        match action {
+            BuiltinAction::Log(level, terms) => {
+                let terms = terms
+                    .into_iter()
+                    .map(|t| self.visit_term(t).to_token_stream());
+                quote! {
+                    ::ember::agent::bdi::plan::action::BuiltinAction::Log(
+                        #level.parse().expect("failed to parse log level"),
+                        Box::new([#(#terms),*])
+                    )
+                }
+            }
+            BuiltinAction::StopPlatform => {
+                quote! {
+                    ::ember::agent::bdi::plan::action::BuiltinAction::StopPlatform
+                }
+            }
+        }
     }
 }
 

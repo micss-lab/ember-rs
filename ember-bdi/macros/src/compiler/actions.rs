@@ -155,22 +155,6 @@ fn extract_bdi_action_name(attrs: &mut Vec<syn::Attribute>) -> syn::Result<Optio
     Ok(custom_name)
 }
 
-fn to_pascal_case(s: &str, span: proc_macro2::Span) -> Ident {
-    let mut pascal = String::new();
-    let mut capitalize = true;
-    for c in s.chars() {
-        if c == '_' {
-            capitalize = true;
-        } else if capitalize {
-            pascal.push(c.to_ascii_uppercase());
-            capitalize = false;
-        } else {
-            pascal.push(c);
-        }
-    }
-    Ident::new(&pascal, span)
-}
-
 #[derive(Default)]
 struct ActionParams {
     variant_fields: Vec<TokenStream>,

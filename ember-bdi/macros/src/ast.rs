@@ -1,4 +1,4 @@
-use crate::action::SystemAction;
+use crate::action::BuiltinAction;
 
 #[derive(Debug, Clone)]
 pub(crate) struct Program {
@@ -158,6 +158,6 @@ pub(crate) enum BodyFormulaTrigger {
 
 #[derive(Debug, Clone)]
 pub(crate) enum Action {
-    System(SystemAction),
+    Builtin(BuiltinAction),
     User(AtomicFormula),
 }

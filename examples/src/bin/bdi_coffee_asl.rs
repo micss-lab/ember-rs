@@ -48,7 +48,7 @@ impl FromTerm<'_> for Item {
     !make_coffee.
 
     +!make_coffee : at(agent, Loc) & at(coffee_machine, Loc) & have(coffee_beans)
-      <- action(print_msg("Enjoying a fresh cup of coffee!"));
+      <- .log("info", "Enjoying a fresh cup of coffee!");
          +done.
 
     +!make_coffee
@@ -57,22 +57,22 @@ impl FromTerm<'_> for Item {
          !make_coffee.
 
     +!go_to(Dest) : at(agent, Dest)
-      <- action(print_loc("Already at ", Dest)).
+      <- print_loc("Already at ", Dest).
 
     +!go_to(Dest) : at(agent, From)
-      <- action(move_location(From, Dest));
+      <- move_location(From, Dest);
          -at(agent, From);
          +at(agent, Dest).
 
     +!get_beans : have(coffee_beans)
-      <- action(print_msg("Found coffee beans in the pantry.")).
+      <- .log("info", "Found coffee beans in the pantry.").
 
     +!get_beans
-      <- action(buy(coffee_beans));
+      <- buy(coffee_beans);
          +have(coffee_beans).
 
     +done
-      <- action(stop_action).
+      <- .stop_platform().
 })]
 struct CoffeeAgent;
 

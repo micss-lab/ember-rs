@@ -1,4 +1,3 @@
-use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
@@ -48,9 +47,9 @@ where
     }
 }
 
-#[derive(derive_more::Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BuiltinAction {
-    Log(Level, Cow<'static, str>, Option<Box<[Term]>>),
+    Log(Level, Box<[Term]>),
     StopPlatform,
 }
 
@@ -58,16 +57,15 @@ impl BuiltinAction {
     pub(crate) fn execute<A>(self, bindings: &impl BindingLookup, context: &mut Context<A>) {
         use BuiltinAction::*;
         match self {
-            Log(level, text, Some(terms)) => {
-                let terms = terms
+            Log(level, terms) => {
+                match terms
                     .into_iter()
                     .map(|t| t.resolve(bindings))
                     .collect::<Result<Vec<_>, _>>()
-                    .expect("failed to resolve log arguments");
-                log!(level, "{} {:?}", text, terms)
-            }
-            Log(level, text, None) => {
-                log!(level, "{}", text)
+                {
+                    Ok(terms) => log!(level, "{:?}", terms),
+                    Err(_) => log::error!("failed to resolve log arguments"),
+                }
             }
             StopPlatform => context.stop_platform(),
         }
