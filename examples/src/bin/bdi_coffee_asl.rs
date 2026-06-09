@@ -1,34 +1,44 @@
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
 
-use alloc::boxed::Box;
-use alloc::string::String;
-use alloc::vec;
+use alloc::string::{String, ToString};
 
-use ember::agent::bdi::context::Context;
 use log::info;
 
 use ember::Container;
-use ember::agent::bdi::bindings::BindingLookup;
-use ember::agent::bdi::literal::Literal;
-use ember::agent::bdi::plan::action::Execute;
-use ember::agent::bdi::plan::library::PlanLibrary;
-use ember::agent::bdi::plan::{
-    Action, BuiltinAction, Formula, GoalKind, Plan, QueryFormula, Trigger, TriggeringEvent,
-};
-use ember::agent::bdi::term::{NonGround, Structure, Term};
-use ember::agent::bdi::variable::Variable;
-use ember::agent::bdi::{BdiAgent, bdi_agent};
+use ember::agent::bdi::context::Context;
+use ember::agent::bdi::term::reference::TermRef;
+use ember::agent::bdi::term::{FromTerm, FromTermError};
+use ember::agent::bdi::{bdi_actions, bdi_agent};
 
 use ember_examples::setup_example;
 
 setup_example!();
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-struct TermOrVariable;
+pub struct Location(String);
 
-impl Resolve for TermOrVariable {
-    todo!()
+impl FromTerm<'_> for Location {
+    fn from_term(term: TermRef<'_>) -> Result<Self, FromTermError> {
+        match term {
+            TermRef::String(s) => Ok(Location(s.to_string())),
+            TermRef::Literal { functor, .. } => Ok(Location(functor.0.clone())),
+            _ => Err(FromTermError::InvalidType(Some("location"))),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Item(String);
+
+impl FromTerm<'_> for Item {
+    fn from_term(term: TermRef<'_>) -> Result<Self, FromTermError> {
+        match term {
+            TermRef::String(s) => Ok(Item(s.to_string())),
+            TermRef::Literal { functor, .. } => Ok(Item(functor.0.clone())),
+            _ => Err(FromTermError::InvalidType(Some("item"))),
+        }
+    }
 }
 
 #[bdi_agent(asl = {
@@ -38,7 +48,7 @@ impl Resolve for TermOrVariable {
     !make_coffee.
 
     +!make_coffee : at(agent, Loc) & at(coffee_machine, Loc) & have(coffee_beans)
-      <- .print("Enjoying a fresh cup of coffee!");
+      <- action(print_msg("Enjoying a fresh cup of coffee!"));
          +done.
 
     +!make_coffee
@@ -47,94 +57,46 @@ impl Resolve for TermOrVariable {
          !make_coffee.
 
     +!go_to(Dest) : at(agent, Dest)
-      <- .print("Already at", Dest).
+      <- action(print_loc("Already at ", Dest)).
 
     +!go_to(Dest) : at(agent, From)
-      <- action(move(From, Dest));
+      <- action(move_location(From, Dest));
          -at(agent, From);
          +at(agent, Dest).
 
     +!get_beans : have(coffee_beans)
-      <- .print("Found coffee beans in the pantry.").
+      <- action(print_msg("Found coffee beans in the pantry.")).
 
     +!get_beans
       <- action(buy(coffee_beans));
          +have(coffee_beans).
 
     +done
-      <- action(stop).
+      <- action(stop_action).
 })]
 struct CoffeeAgent;
 
-/// ```rust
-///     #[bdi_actions]
-///     impl CoffeeAgent {
-///         fn move_location(&mut self, _context: &mut Context<CoffeeAgentAction>, from: Location, to: Location) {
-///
-///             info!("[ACTION] 🏃 Moving from {:?} to {:?}", from, to);
-///         }
-///
-///         fn buy(&mut self, _context: &mut Context<CoffeeAgentAction>, item: Item) {
-///             info!("[ACTION] 🛒 Buying {}", item);
-///         }
-///     }
-/// ```
-// 1. The original impl block is emitted, plus your action factories
+#[bdi_actions]
 impl CoffeeAgent {
-    fn move_location(&mut self, context: &mut Context<CoffeeAgentAction>, from: Location, to: Location) {
-        info!("[ACTION] 🏃 Moving from {:?} to {:?}", from, to);
+    fn print_msg(&mut self, msg: Item) {
+        info!("[ACTION] {}", msg.0);
     }
 
-    // Generated factory: makes it easy for the ASL parser to instantiate actions
-    // without knowing the enum structure.
-    pub fn move_location_action(from: TermOrVariable, to: TermOrVariable) -> CoffeeAgentAction {
-        CoffeeAgentAction::MoveLocation { from, to }
+    fn print_loc(&mut self, msg: Item, loc: Location) {
+        info!("[ACTION] {} {:?}", msg.0, loc.0);
     }
 
-	// fn buy(&mut self, ...) { ... }
+    fn move_location(&mut self, from: Location, to: Location) {
+        info!("[ACTION] 🏃 Moving from {:?} to {:?}", from.0, to.0);
+    }
 
-	// pub fn buy_action(...) -> CoffeeAgentAction { ... }
-}
+    fn buy(&mut self, item: Item) {
+        info!("[ACTION] 🛒 Buying {:?}", item.0);
+    }
 
-// 2. The generated Enum
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum CoffeeAgentAction {
-    MoveLocation { from: TermOrVariable, to: TermOrVariable },
-    Buy { item: TermOrVariable },
-}
-
-// 3. The generated Execute impl
-impl Execute for CoffeeAgentAction {
-    type State = CoffeeAgent;
-    type Action = Self;
-
-    fn execute(
-        self,
-        bindings: &impl BindingLookup,
-        context: &mut Context<Self::Action>,
-        state: &mut Self::State,
-    ) {
-        match self {
-            CoffeeAgentAction::MoveLocation { from, to } => {
-                // Step 1: Resolve BDI variables
-                let from_resolved = from.resolve(bindings); 
-                let to_resolved = to.resolve(bindings);
-
-                // Step 2: User's custom FromTerm trait 
-                // (You'll need to decide how to handle conversion failures here)
-                let from_typed = Location::from_term(from_resolved);
-                let to_typed = Location::from_term(to_resolved);
-
-                // Step 3: Invoke the user's original method!
-                state.move_location(context, from_typed, to_typed);
-            }
-            CoffeeAgentAction::Buy { item } => {
-                let item_resolved = item.resolve(bindings);
-                let item_typed = Item::from_term(item_resolved);
-                
-                state.buy(context, item_typed);
-            }
-        }
+    fn stop_action(&mut self, context: &mut Context<CoffeeAgentAction>) {
+        info!("[ACTION] 🛑 Stopping platform...");
+        context.stop_platform();
     }
 }
 
@@ -148,11 +110,10 @@ fn example() {
 
     info!("🎯 Initial Goal: !make_coffee\n");
 
-    // 6. Run the agent's execution cycle.
     info!("🚀 Starting agent container...\n");
 
     Container::new()
-        .with_agent(BdiAgent::from(CoffeeAgent))
+        .with_agent(CoffeeAgent.into_agent())
         .start()
         .expect("container encountered an error");
 

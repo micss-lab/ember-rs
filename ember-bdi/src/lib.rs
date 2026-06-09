@@ -2,7 +2,7 @@
 
 extern crate alloc;
 
-pub use ember_bdi_macros::bdi_agent;
+pub use ember_bdi_macros::{bdi_actions, bdi_agent};
 
 pub mod agent;
 pub mod bindings;

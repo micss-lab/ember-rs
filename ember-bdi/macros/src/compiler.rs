@@ -3,125 +3,25 @@ use std::collections::HashMap;
 use proc_macro2::{Ident, TokenStream};
 use quote::{ToTokens, format_ident, quote};
 
-use crate::{action::SystemAction, ast::*};
+use crate::action::SystemAction;
+use crate::ast::*;
 
-pub(crate) fn compile_asl(asl: &Program, agent_name: &str, agent_ident: &Ident) -> TokenStream {
-    let Program {
-        beliefs,
-        goals,
-        plans,
-    } = asl;
+pub(crate) mod actions;
+pub(crate) mod asl;
 
-    let beliefbase = generate_beliefbase(beliefs);
-    let initial_goals = generate_initial_goals(goals);
-    let plan_library = generate_plan_library(plans);
-
-    quote! {
-        impl From<#agent_ident> for ::ember::agent::bdi::BdiAgent<'static, #agent_ident, (), ()>  {
-            fn from(agent: #agent_ident) -> Self {
-                let beliefbase = #beliefbase;
-                let initial_goals = #initial_goals;
-                let plan_library = #plan_library;
-
-                ::ember::agent::bdi::BdiAgent::new(
-                    #agent_name,
-                    agent,
-                    [],
-                    Some(beliefbase),
-                    plan_library,
-                    initial_goals,
-                )
-            }
-        }
-    }
-}
-
-fn generate_beliefbase(beliefs: &[Belief]) -> impl ToTokens {
-    let beliefs = beliefs.into_iter().map(|b| {
-        let mut visitor = AstVisitor::default();
-        let belief = visitor.visit_belief(b).into_token_stream();
-        let variables = visitor
-            .variable_map
-            .into_values()
-            .map(|v| {
-                quote! {
-                    let #v = ::ember::agent::bdi::variable::Variable::new();
-                }
-            })
-            .collect::<Vec<_>>();
-
-        quote! { {
-            #(#variables)*
-            #belief
-        } }
-    });
-
-    quote! {
-        ::ember::agent::bdi::knowledge::store::BeliefBase::from_iter([
-            #(#beliefs),*
-        ])
-    }
-}
-
-fn generate_initial_goals(goals: &[Goal]) -> impl ToTokens {
-    let goals = goals.into_iter().map(|g| {
-        let mut visitor = AstVisitor::default();
-        let goal = visitor.visit_goal(g).into_token_stream();
-        let variables = visitor
-            .variable_map
-            .into_values()
-            .map(|v| {
-                quote! {
-                    let #v = ::ember::agent::bdi::variable::Variable::new();
-                }
-            })
-            .collect::<Vec<_>>();
-
-        quote! { {
-            #(#variables)*
-            #goal
-        } }
-    });
-
-    quote! {
-        ::alloc::vec::Vec::from([
-            #(#goals),*
-        ])
-    }
-}
-
-fn generate_plan_library(plans: &[Plan]) -> impl ToTokens {
-    let plans = plans.into_iter().map(|p| {
-        let mut visitor = AstVisitor::default();
-        let plan = visitor.visit_plan(p).into_token_stream();
-        let variables = visitor.variable_map.into_values().map(|v| {
-            quote! {
-                let #v = ::ember::agent::bdi::variable::Variable::new();
-            }
-        });
-
-        quote! { {
-            #(#variables)*
-            #plan
-        } }
-    });
-
-    quote! { {
-        let mut plans = ::ember::agent::bdi::plan::library::PlanLibrary::default();
-        #(
-            plans.add(#plans);
-        )*
-        plans
-    } }
-}
-
-#[derive(Default)]
 struct AstVisitor {
     /// Maps from a `Variable` name to the ident name of the generated rust variable.
     variable_map: HashMap<String, Ident>,
+    agent_ident: Ident,
 }
 
 impl AstVisitor {
+    fn new(agent_ident: Ident) -> Self {
+        Self {
+            variable_map: HashMap::new(),
+            agent_ident,
+        }
+    }
     fn visit_belief(&mut self, Belief(literal): &Belief) -> impl ToTokens {
         let literal = self.visit_literal(literal);
         quote! {
@@ -432,7 +332,7 @@ impl AstVisitor {
             },
             Term::String(string) => {
                 quote! {
-                    ::ember::agent::bdi::term::owned::Term::String(#string)
+                    ::ember::agent::bdi::term::owned::Term::String(#string.into())
                 }
             }
         }
@@ -479,9 +379,37 @@ impl AstVisitor {
                     ::ember::agent::bdi::action::Action::System(#action)
                 }
             }
-            Action::User(atomic_formula) => quote! {
-                compile_error!("not implemented")
-            },
+            Action::User(atomic_formula) => {
+                let mut actual_functor = &atomic_formula.functor;
+                let mut actual_args = atomic_formula.arguments.as_deref();
+
+                if actual_functor.0 == "action" {
+                    if let Some(args) = actual_args {
+                        if args.len() == 1 {
+                            if let Term::Literal(crate::ast::Literal { formula, .. }) = &args[0] {
+                                actual_functor = &formula.functor;
+                                actual_args = formula.arguments.as_deref();
+                            }
+                        }
+                    }
+                }
+
+                let factory_ident = format_ident!("{}_action", actual_functor.0.as_str());
+                let args_tokens = match actual_args {
+                    Some(args) => {
+                        let args = args
+                            .into_iter()
+                            .map(|a| self.visit_term(a).into_token_stream())
+                            .collect::<Vec<_>>();
+                        quote! { #(#args),* }
+                    }
+                    None => quote! {},
+                };
+                let agent_ident = &self.agent_ident;
+                quote! {
+                    ::ember::agent::bdi::plan::Action::User(#agent_ident::#factory_ident(#args_tokens))
+                }
+            }
         }
     }
 

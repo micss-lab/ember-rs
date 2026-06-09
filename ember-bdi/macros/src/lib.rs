@@ -1,7 +1,7 @@
 use proc_macro::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::parse::{Parse, ParseStream};
-use syn::{DeriveInput, Token, parse_macro_input};
+use syn::{DeriveInput, ItemImpl, Token, parse_macro_input};
 
 use crate::token::FlatTokenStream;
 
@@ -13,15 +13,8 @@ mod token;
 
 #[proc_macro_attribute]
 pub fn bdi_agent(args: TokenStream, input: TokenStream) -> TokenStream {
+    let args = parse_macro_input!(args as BdiAgentArgs);
     let input = parse_macro_input!(input as DeriveInput);
-
-    let args = match syn::parse::<BdiAgentArgs>(args) {
-        Ok(args) => args,
-        Err(e) => {
-            let err = e.to_compile_error();
-            return quote! { #input #err }.into();
-        }
-    };
 
     let program = match parser::asl_token_stream::program(&FlatTokenStream::new(args.asl)) {
         Ok(p) => p,
@@ -31,7 +24,7 @@ pub fn bdi_agent(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     };
 
-    let program = compiler::compile_asl(&program, "bdi-agent", &input.ident);
+    let program = compiler::asl::expand(&program, "bdi-agent", &input.ident);
 
     quote! {
         #input
@@ -68,5 +61,15 @@ impl Parse for BdiAgentArgs {
         }
 
         Ok(BdiAgentArgs { asl })
+    }
+}
+
+#[proc_macro_attribute]
+pub fn bdi_actions(_args: TokenStream, input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as ItemImpl);
+
+    match compiler::actions::expand(input) {
+        Ok(token_stream) => token_stream.into(),
+        Err(err) => err.to_compile_error().into(),
     }
 }
