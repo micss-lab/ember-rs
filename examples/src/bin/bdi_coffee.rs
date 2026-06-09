@@ -45,10 +45,10 @@ impl Execute for AgentAction {
         match self {
             AgentAction::Move { from, to } => {
                 let from = bindings
-                    .lookup(&from)
+                    .lookup_view(&from)
                     .expect("failed to lookup from in bindings");
                 let to = bindings
-                    .lookup(&to)
+                    .lookup_view(&to)
                     .expect("failed to lookup to in bindings");
 
                 info!("[ACTION] 🏃 Moving from {:?} to {:?}", from, to);

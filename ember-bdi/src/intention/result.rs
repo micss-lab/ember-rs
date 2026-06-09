@@ -10,13 +10,10 @@ pub(crate) enum ReadOnlyBindings<'a> {
 }
 
 impl<'a> BindingLookup for ReadOnlyBindings<'a> {
-    fn lookup<'b>(&'b self, variable: &Variable) -> Option<TermView<'b>>
-    where
-        Self: 'b,
-    {
+    fn lookup_view<'b>(&'b self, variable: &Variable) -> Option<TermView<'b>> {
         match self {
-            ReadOnlyBindings::Owned(bindings) => bindings.lookup(variable),
-            ReadOnlyBindings::Borrowed(bindings) => bindings.lookup(variable),
+            ReadOnlyBindings::Owned(bindings) => bindings.lookup_view(variable),
+            ReadOnlyBindings::Borrowed(bindings) => bindings.lookup_view(variable),
         }
     }
 }

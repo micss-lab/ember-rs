@@ -4,6 +4,8 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use crate::term::Term;
+use crate::term::from::{FromTerm, FromTermError};
+use crate::term::reference::TermRef;
 use crate::term::view::{StructureView, TermView};
 use crate::unification::constraint::BindingConstraint;
 use crate::unification::error::UnificationError;
@@ -43,7 +45,7 @@ impl<'a> Bindings<'a, TermView<'a>> {
 }
 
 impl<'a> Bindings<'a, TermView<'a>> {
-    pub fn get(&self, variable: &Variable) -> Option<&TermView<'a>> {
+    pub(crate) fn get_view(&self, variable: &Variable) -> Option<&TermView<'a>> {
         self.bindings.as_ref()?.get(&variable.id)?.as_ref()
     }
 
@@ -107,25 +109,30 @@ impl OwnedBindings {
 }
 
 pub trait BindingLookup {
-    fn lookup<'a>(&'a self, variable: &Variable) -> Option<TermView<'a>>
+    fn lookup_view<'a>(&'a self, variable: &Variable) -> Option<TermView<'a>>;
+
+    /// Lookup the term bound to the given variable.
+    fn lookup<'a>(&'a self, variable: &Variable) -> Option<TermRef<'a>> {
+        self.lookup_view(variable).map(Into::into)
+    }
+
+    /// Loopup the term bound to the give variable and parse the term into the required type.
+    fn lookup_as_type<'a, T>(&'a self, variable: &Variable) -> Option<Result<T, FromTermError>>
     where
-        Self: 'a;
+        T: FromTerm<'a>,
+    {
+        self.lookup(variable).map(T::from_term)
+    }
 }
 
 impl BindingLookup for Bindings<'_> {
-    fn lookup<'a>(&'a self, variable: &Variable) -> Option<TermView<'a>>
-    where
-        Self: 'a,
-    {
-        self.get(variable).cloned()
+    fn lookup_view<'a>(&'a self, variable: &Variable) -> Option<TermView<'a>> {
+        self.get_view(variable).cloned()
     }
 }
 
 impl BindingLookup for OwnedBindings {
-    fn lookup<'a>(&'a self, variable: &Variable) -> Option<TermView<'a>>
-    where
-        Self: 'a,
-    {
+    fn lookup_view<'a>(&'a self, variable: &Variable) -> Option<TermView<'a>> {
         self.bindings
             .as_ref()?
             .get(&variable.id)?

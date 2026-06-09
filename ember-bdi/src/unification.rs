@@ -47,7 +47,7 @@ mod tests {
         let (x, val) = (variable(), number(100.0));
 
         let result = x.unify(&val, None).expect("Unification failed");
-        let binding = result.get(&x).expect("Variable 1 should be bound");
+        let binding = result.get_view(&x).expect("Variable 1 should be bound");
         assert_eq!(binding, &number(100.0).as_view());
     }
 
@@ -60,7 +60,7 @@ mod tests {
         let t2 = literal(false, "f", vec![number(1.0), number(2.0)]);
 
         let result = t1.unify(&t2, None).expect("Unification failed");
-        assert_eq!(result.get(&x), Some(number(1.0).as_view()).as_ref());
+        assert_eq!(result.get_view(&x), Some(number(1.0).as_view()).as_ref());
     }
 
     #[test]
@@ -74,8 +74,8 @@ mod tests {
         let t2 = literal(false, "pair", vec![variable_term(&y), number(42.0)]);
 
         let result = t1.unify(&t2, None).expect("Unification failed");
-        assert_eq!(result.get(&x), Some(&number(42.0).as_view()));
-        assert_eq!(result.get(&y), Some(&number(42.0).as_view()));
+        assert_eq!(result.get_view(&x), Some(&number(42.0).as_view()));
+        assert_eq!(result.get_view(&y), Some(&number(42.0).as_view()));
     }
 
     // --- Edge Cases & Failures ---
@@ -179,7 +179,7 @@ mod tests {
             .unify(&belief, None)
             .expect("Complex resolution failed");
 
-        let x_binding = result.get(&x).expect("X should be bound");
+        let x_binding = result.get_view(&x).expect("X should be bound");
         let (g, n) = (Atom("g".into()), number(1.0));
         let expected_x = TermView::Literal {
             negated: false,
@@ -253,7 +253,7 @@ mod tests {
 
         let result = t1.unify(&t2, None).expect("Deep chain failed");
         for v in [a, b, c, d] {
-            assert_eq!(result.get(&v), Some(&number(100.0).as_view()));
+            assert_eq!(result.get_view(&v), Some(&number(100.0).as_view()));
         }
     }
 
@@ -268,10 +268,10 @@ mod tests {
             .unify(&t2, None)
             .expect("Unification with free vars failed");
 
-        assert_eq!(result.get(&x), Some(&number(1.0).as_view()));
+        assert_eq!(result.get_view(&x), Some(&number(1.0).as_view()));
 
-        assert_eq!(result.get(&y), None);
-        assert_eq!(result.get(&z), None);
+        assert_eq!(result.get_view(&y), None);
+        assert_eq!(result.get_view(&z), None);
     }
 
     #[test]
@@ -285,7 +285,7 @@ mod tests {
         let t2 = literal(false, "f", vec![number(1.0)]);
 
         let result = t1.unify(&t2, Some(&existing)).expect("Should succeed");
-        assert_eq!(result.get(&x), Some(&number(1.0).as_view()));
+        assert_eq!(result.get_view(&x), Some(&number(1.0).as_view()));
     }
 
     #[test]
@@ -316,8 +316,8 @@ mod tests {
         let t2 = number(10.0);
 
         let result = t1.unify(&t2, Some(&existing)).expect("Aliasing failed");
-        assert_eq!(result.get(&x), Some(&number(10.0).as_view()));
-        assert_eq!(result.get(&y), Some(&number(10.0).as_view()));
+        assert_eq!(result.get_view(&x), Some(&number(10.0).as_view()));
+        assert_eq!(result.get_view(&y), Some(&number(10.0).as_view()));
     }
 
     #[test]
@@ -337,7 +337,7 @@ mod tests {
             .unify(term_g_y.clone(), None)
             .expect("Initial binding failed");
 
-        assert_eq!(existing.get(&x), Some(term_g_y).as_ref());
+        assert_eq!(existing.get_view(&x), Some(term_g_y).as_ref());
 
         let t1 = literal(false, "f", vec![variable_term(&y)]);
         let t2 = literal(false, "f", vec![number(10.0)]);
@@ -356,9 +356,11 @@ mod tests {
             },
         };
 
-        let x_res = final_bindings.get(&x).expect("X should still be bound");
+        let x_res = final_bindings
+            .get_view(&x)
+            .expect("X should still be bound");
         assert_eq!(x_res, &expected_x);
 
-        assert_eq!(final_bindings.get(&y), Some(&n.as_view()));
+        assert_eq!(final_bindings.get_view(&y), Some(&n.as_view()));
     }
 }

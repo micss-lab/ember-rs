@@ -392,7 +392,7 @@ pub(crate) mod formula {
         fn resolve_to_f32(term: &Term, bindings: &Bindings) -> Result<f32, EvaluationError> {
             match term {
                 Term::Number(n) => Ok(**n),
-                Term::Variable(NonGround(v)) => match bindings.get(v) {
+                Term::Variable(NonGround(v)) => match bindings.get_view(v) {
                     Some(TermView::Term(t)) => resolve_to_f32(t, bindings),
                     Some(TermView::Variable(v)) => {
                         resolve_to_f32(&Term::Variable(NonGround((*v).clone())), bindings)
@@ -856,8 +856,8 @@ mod tests {
         let mut query = (&formula).into_query(&bb);
         let bindings = query.next_bindings(None).expect("Should find bindings");
 
-        assert_eq!(bindings.get(&x), Some(&string("bob").as_view()));
-        assert_eq!(bindings.get(&y), Some(&string("charlie").as_view()));
+        assert_eq!(bindings.get_view(&x), Some(&string("bob").as_view()));
+        assert_eq!(bindings.get_view(&y), Some(&string("charlie").as_view()));
     }
 
     #[test]
@@ -876,8 +876,8 @@ mod tests {
         let mut query = (&formula).into_query(&bb);
         let bindings = query.next_bindings(None).expect("Should backtrack to X=20");
 
-        assert_eq!(bindings.get(&x), Some(&number(20.0).as_view()));
-        assert_eq!(bindings.get(&y), Some(&number(30.0).as_view()));
+        assert_eq!(bindings.get_view(&x), Some(&number(20.0).as_view()));
+        assert_eq!(bindings.get_view(&y), Some(&number(30.0).as_view()));
     }
 
     #[test]
@@ -911,7 +911,7 @@ mod tests {
 
         let mut query = (&formula).into_query(&bb);
         let bindings = query.next_bindings(None).expect("Should match X=2");
-        assert_eq!(bindings.get(&x), Some(&number(2.0).as_view()));
+        assert_eq!(bindings.get_view(&x), Some(&number(2.0).as_view()));
         assert!(query.next_bindings(None).is_none());
     }
 
@@ -935,7 +935,7 @@ mod tests {
 
         let mut query = (&formula).into_query(&bb);
         let bindings = query.next_bindings(None).expect("Should find X=15");
-        assert_eq!(bindings.get(&x), Some(&number(15.0).as_view()));
+        assert_eq!(bindings.get_view(&x), Some(&number(15.0).as_view()));
         assert!(query.next_bindings(None).is_none());
     }
 
@@ -959,7 +959,7 @@ mod tests {
 
         let mut query = (&formula).into_query(&bb);
         let bindings = query.next_bindings(None).expect("Should unify Y to 20");
-        assert_eq!(bindings.get(&y), Some(&TermView::Number(20.0.into())));
+        assert_eq!(bindings.get_view(&y), Some(&TermView::Number(20.0.into())));
     }
 
     #[test]
@@ -988,7 +988,7 @@ mod tests {
         let bindings = query
             .next_bindings(None)
             .expect("Should recover and find X=2");
-        assert_eq!(bindings.get(&x), Some(&number(2.0).as_view()));
+        assert_eq!(bindings.get_view(&x), Some(&number(2.0).as_view()));
         assert!(query.next_bindings(None).is_none());
     }
 

@@ -74,7 +74,7 @@ impl Resolve for Literal {
                 structure: structure.resolve_as_view(bindings)?,
             },
             Literal::Variable(NonGround(ref v)) => {
-                bindings.lookup(v).unwrap_or(TermView::Variable(v))
+                bindings.lookup_view(v).unwrap_or(TermView::Variable(v))
             }
         })
     }
@@ -93,7 +93,9 @@ impl Resolve for Term {
     ) -> Result<TermView<'a>, ResolveFailure> {
         Ok(match *self {
             Term::Number(_) | Term::String(_) => TermView::Term(self),
-            Term::Variable(NonGround(ref v)) => bindings.lookup(v).unwrap_or(TermView::Variable(v)),
+            Term::Variable(NonGround(ref v)) => {
+                bindings.lookup_view(v).unwrap_or(TermView::Variable(v))
+            }
             Term::Literal {
                 negated,
                 ref structure,

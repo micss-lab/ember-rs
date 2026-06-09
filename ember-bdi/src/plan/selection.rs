@@ -240,7 +240,7 @@ mod tests {
         let (_, bindings) = selection.next_plan(&bb).expect("Should unify");
 
         // Check that X was correctly bound to "Alice"
-        assert_eq!(bindings.get(&x), Some(&string("Alice").as_view()));
+        assert_eq!(bindings.get_view(&x), Some(&string("Alice").as_view()));
     }
 
     #[test]
@@ -315,8 +315,8 @@ mod tests {
         let mut selection = PlanSelection::select_from_library(&event, &store);
         let (_, bindings) = selection.next_plan(&bb).expect("Binding pipe failed");
 
-        assert_eq!(bindings.get(&x), Some(&string("apple").as_view()));
-        assert_eq!(bindings.get(&y), Some(&string("red").as_view()));
+        assert_eq!(bindings.get_view(&x), Some(&string("apple").as_view()));
+        assert_eq!(bindings.get_view(&y), Some(&string("red").as_view()));
     }
 
     #[test]
@@ -350,7 +350,7 @@ mod tests {
         let mut selection = PlanSelection::select_from_library(&event, &store);
         let (_, bindings) = selection.next_plan(&bb).expect("Aliasing failed");
 
-        assert_eq!(bindings.get(&event_var), Some(&string("a").as_view()));
+        assert_eq!(bindings.get_view(&event_var), Some(&string("a").as_view()));
     }
 
     #[test]
