@@ -1,10 +1,24 @@
 use crate::action::BuiltinAction;
 
 #[derive(Debug, Clone)]
+pub(crate) struct Spanned<T> {
+    pub(crate) node: T,
+    pub(crate) span: proc_macro2::Span,
+}
+
+impl<T> core::ops::Deref for Spanned<T> {
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.node
+    }
+}
+
+#[derive(Debug, Clone)]
 pub(crate) struct Program {
-    pub(crate) beliefs: Box<[Belief]>,
-    pub(crate) goals: Box<[Goal]>,
-    pub(crate) plans: Box<[Plan]>,
+    pub(crate) beliefs: Box<[Spanned<Belief>]>,
+    pub(crate) goals: Box<[Spanned<Goal>]>,
+    pub(crate) plans: Box<[Spanned<Plan>]>,
 }
 
 #[derive(Debug, Clone)]
@@ -13,7 +27,7 @@ pub(crate) struct Belief(pub(crate) Literal);
 #[derive(Debug, Clone)]
 pub(crate) struct Literal {
     pub(crate) negated: bool,
-    pub(crate) formula: AtomicFormula,
+    pub(crate) formula: Spanned<AtomicFormula>,
 }
 
 #[derive(Debug, Clone)]
@@ -137,7 +151,7 @@ pub(crate) enum ArithmeticFactor {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Body(pub(crate) Box<[BodyFormula]>);
+pub(crate) struct Body(pub(crate) Box<[Spanned<BodyFormula>]>);
 
 #[derive(Debug, Clone)]
 pub(crate) enum BodyFormula {
@@ -145,7 +159,7 @@ pub(crate) enum BodyFormula {
         trigger: BodyFormulaTrigger,
         literal: Literal,
     },
-    Action(Action),
+    Action(Spanned<Action>),
 }
 
 #[derive(Debug, Clone)]
@@ -159,5 +173,5 @@ pub(crate) enum BodyFormulaTrigger {
 #[derive(Debug, Clone)]
 pub(crate) enum Action {
     Builtin(BuiltinAction),
-    User(AtomicFormula),
+    User(Spanned<AtomicFormula>),
 }

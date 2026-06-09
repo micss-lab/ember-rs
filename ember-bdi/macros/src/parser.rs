@@ -9,13 +9,27 @@ enum BeliefOrGoal {
 
 peg::parser! {
     pub grammar asl_token_stream() for FlatTokenStream {
+        rule span() -> proc_macro2::Span = #{|input, pos| input.next_span(pos)}
+
+        rule spanned<T>(r: rule<T>) -> Spanned<T>
+            = span:span() node:r() {
+                Spanned { node, span }
+            }
+
+        rule belief_or_goal() -> Spanned<BeliefOrGoal>
+            = span:span() belief:belief() "." { Spanned { node: BeliefOrGoal::Belief(belief), span } }
+            / span:span() goal:goal() "." { Spanned { node: BeliefOrGoal::Goal(goal), span } }
+
         pub rule program() -> Program
             = "{" beliefs_or_goals:belief_or_goal()* plans:plan()* "}" {
             let (beliefs, goals) = {
                 let (mut beliefs, mut goals) = (Vec::new(), Vec::new());
-                beliefs_or_goals.into_iter().for_each(|bg| match bg {
-                    BeliefOrGoal::Belief(belief) => beliefs.push(belief),
-                    BeliefOrGoal::Goal(goal) => goals.push(goal),
+                beliefs_or_goals.into_iter().for_each(|bg| {
+                    let span = bg.span;
+                    match bg.node {
+                        BeliefOrGoal::Belief(belief) => beliefs.push(Spanned { node: belief, span }),
+                        BeliefOrGoal::Goal(goal) => goals.push(Spanned { node: goal, span }),
+                    }
                 });
                 (beliefs.into_boxed_slice(), goals.into_boxed_slice())
             };
@@ -28,10 +42,6 @@ peg::parser! {
             }
         }
 
-        rule belief_or_goal() -> BeliefOrGoal
-            = belief:belief() "." { BeliefOrGoal::Belief(belief) }
-            / goal:goal() "." { BeliefOrGoal::Goal(goal) }
-
         rule belief() -> Belief = lit:literal() { Belief(lit) }
 
         rule goal() -> Goal = "!" lit:literal() { Goal(lit) }
@@ -41,11 +51,14 @@ peg::parser! {
             Literal { negated: neg.is_some(), formula }
         }
 
-        rule atomic_formula() -> AtomicFormula
-            = functor:ATOM() arguments:( "(" args:term() ** "," ")" { if args.is_empty() { None } else { Some(args.into_boxed_slice()) } })? {
-            AtomicFormula {
-                functor,
-                arguments: arguments.flatten(),
+        rule atomic_formula() -> Spanned<AtomicFormula>
+            = span:span() functor:ATOM() arguments:( "(" args:term() ** "," ")" { if args.is_empty() { None } else { Some(args.into_boxed_slice()) } })? {
+            Spanned {
+                node: AtomicFormula {
+                    functor,
+                    arguments: arguments.flatten(),
+                },
+                span
             }
         }
 
@@ -55,12 +68,15 @@ peg::parser! {
             / num:NUMBER() { Term::Number(num) }
             / string:STRING() { Term::String(string) }
 
-        rule plan() -> Plan
-            = event:triggering_event() context:( ":" c:context() { c })? "<-" body:body() {
-            Plan {
-                event,
-                context,
-                body,
+        rule plan() -> Spanned<Plan>
+            = span:span() event:triggering_event() context:( ":" c:context() { c })? "<-" body:body() {
+            Spanned {
+                node: Plan {
+                    event,
+                    context,
+                    body,
+                },
+                span
             }
         }
 
@@ -127,15 +143,21 @@ peg::parser! {
             Body(formulae.into_boxed_slice())
         }
 
-        rule body_formula() -> BodyFormula
-            = trigger:BODY_FORMULA_TRIGGER() literal:literal() { BodyFormula::BeliefOrGoal { trigger, literal } }
-            / period:"."? formula:atomic_formula() {?
-                Ok(BodyFormula::Action(if period.is_some() {
-                    Action::Builtin(BuiltinAction::try_from(formula)
-                .map_err(|_| "a valid system action (e.g. `.print`, `.message`, etc.)")?)
-                } else {
-                    Action::User(formula)
-                }))
+        rule body_formula() -> Spanned<BodyFormula>
+            = span:span() trigger:BODY_FORMULA_TRIGGER() literal:literal() { Spanned { node: BodyFormula::BeliefOrGoal { trigger, literal }, span } }
+            / span:span() period:"."? formula:atomic_formula() {?
+                Ok(Spanned {
+                    span,
+                    node: BodyFormula::Action(Spanned {
+                        span: formula.span,
+                        node: if period.is_some() {
+                            Action::Builtin(BuiltinAction::try_from(formula.node)
+                                .map_err(|_| "a valid system action (e.g. `.print`, `.message`, etc.)")?)
+                        } else {
+                            Action::User(formula)
+                        }
+                    })
+                })
             }
 
         rule VARIABLE() -> Variable = v:TOKEN_IDENT() {?

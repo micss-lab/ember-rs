@@ -1,5 +1,5 @@
 use proc_macro::TokenStream;
-use quote::{quote, quote_spanned};
+use quote::quote;
 use syn::parse::{Parse, ParseStream};
 use syn::{DeriveInput, ItemImpl, Token, parse_macro_input};
 
@@ -20,7 +20,13 @@ pub fn bdi_agent(args: TokenStream, input: TokenStream) -> TokenStream {
         Ok(p) => p,
         Err(err) => {
             let msg = format!("expected {}", err.expected);
-            return quote_spanned!(err.location.0=> #input compile_error!(#msg);).into();
+            let span = err.location.0;
+            let compile_err = syn::Error::new(span, msg).to_compile_error();
+            return quote! {
+                #input
+                #compile_err
+            }
+            .into();
         }
     };
 

@@ -82,37 +82,6 @@ impl FlatTokenStream {
             _ => RuleResult::Failed,
         }
     }
-
-    pub(crate) fn group(&self, pos: usize, delim: Delimiter) -> RuleResult<Group> {
-        match self.tokens.get(pos) {
-            Some(Token::Begin(g, n)) if g.delimiter() == delim => {
-                RuleResult::Matched(*n, g.clone())
-            }
-            _ => RuleResult::Failed,
-        }
-    }
-
-    pub(crate) fn punct(&self, pos: usize, punct: char) -> RuleResult<Punct> {
-        match self.tokens.get(pos) {
-            Some(Token::Punct(p)) if p.as_char() == punct => {
-                RuleResult::Matched(pos + 1, p.clone())
-            }
-            _ => RuleResult::Failed,
-        }
-    }
-
-    pub(crate) fn eat_until(&self, initial_pos: usize, end: char) -> RuleResult<()> {
-        let mut pos = initial_pos;
-        loop {
-            match self.tokens.get(pos) {
-                Some(Token::Begin(_, n)) => pos = *n,
-                Some(Token::Ident(_)) | Some(Token::Literal(_)) => pos += 1,
-                Some(Token::Punct(p)) if p.as_char() != end => pos += 1,
-                _ if pos != initial_pos => return RuleResult::Matched(pos, ()),
-                _ => return RuleResult::Failed,
-            }
-        }
-    }
 }
 
 #[derive(Debug, Clone)]

@@ -379,7 +379,10 @@ impl AstVisitor {
                     ::ember::agent::bdi::plan::action::Action::Builtin(#action)
                 }
             }
-            Action::User(AtomicFormula { functor, arguments }) => {
+            Action::User(crate::ast::Spanned {
+                node: AtomicFormula { functor, arguments },
+                ..
+            }) => {
                 let factory_ident = format_ident!("{}_action", functor.0.as_str());
                 let args_tokens = match arguments {
                     Some(args) => {
