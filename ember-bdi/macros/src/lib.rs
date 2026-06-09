@@ -24,7 +24,7 @@ pub fn bdi_agent(args: TokenStream, input: TokenStream) -> TokenStream {
         }
     };
 
-    let program = compiler::asl::expand(&program, "bdi-agent", &input.ident);
+    let program = compiler::asl::expand(&program, &input.ident);
 
     quote! {
         #input

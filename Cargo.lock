@@ -522,6 +522,7 @@ dependencies = [
 name = "ember-bdi-macros"
 version = "0.1.0"
 dependencies = [
+ "heck",
  "peg 0.8.6",
  "proc-macro2",
  "quote",

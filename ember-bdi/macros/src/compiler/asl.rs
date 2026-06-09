@@ -4,7 +4,9 @@ use quote::{ToTokens, format_ident, quote};
 use crate::ast::{Belief, Goal, Plan, Program};
 use crate::compiler::AstVisitor;
 
-pub(crate) fn expand(asl: &Program, agent_name: &str, agent_ident: &Ident) -> TokenStream {
+pub(crate) fn expand(asl: &Program, agent_ident: &Ident) -> TokenStream {
+    use heck::ToKebabCase;
+
     let Program {
         beliefs,
         goals,
@@ -15,6 +17,7 @@ pub(crate) fn expand(asl: &Program, agent_name: &str, agent_ident: &Ident) -> To
     let initial_goals = generate_initial_goals(goals, agent_ident);
     let plan_library = generate_plan_library(plans, agent_ident);
 
+    let agent_name = agent_ident.to_string().to_kebab_case();
     let agent_action = format_ident!("{}Action", agent_ident);
 
     quote! {

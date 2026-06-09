@@ -83,11 +83,13 @@ impl GeneratedActions {
         action_enum_ident: &Ident,
         new_items: &mut Vec<ImplItem>,
     ) -> syn::Result<()> {
+        use heck::ToPascalCase;
+
         let action_name = extract_bdi_action_name(&mut method.attrs)?;
         let method_ident = &method.sig.ident;
         let method_name_str = action_name.unwrap_or_else(|| method_ident.to_string());
 
-        let variant_ident = to_pascal_case(&method_name_str, method.sig.ident.span());
+        let variant_ident = Ident::new(&method_name_str.to_pascal_case(), method.sig.ident.span());
         let factory_ident = format_ident!("{}_action", method_name_str);
 
         let ActionParams {
