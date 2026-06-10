@@ -27,3 +27,17 @@ pub fn bdi_actions(_args: TokenStream, input: TokenStream) -> TokenStream {
         Err(err) => err.to_compile_error().into(),
     }
 }
+
+#[proc_macro_derive(IntoLiteral)]
+pub fn derive_into_literal(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    macros::derive::into_literal::expand(input).into()
+}
+
+#[proc_macro_derive(Percept)]
+pub fn derive_percept(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    macros::derive::percept::expand(input).into()
+}

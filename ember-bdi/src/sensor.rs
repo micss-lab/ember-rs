@@ -3,6 +3,8 @@ use alloc::boxed::Box;
 use crate::knowledge::belief::Belief;
 use crate::plan::Trigger;
 
+pub use ember_bdi_macros::Percept;
+
 /// Abstraction over anything that can percept the environment of the agent.
 pub trait Perceptor {
     type Percept: Percept;

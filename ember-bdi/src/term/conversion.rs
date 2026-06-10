@@ -6,9 +6,9 @@ use bstr::BString;
 use crate::literal::{IntoLiteral, Literal};
 use crate::variable::Variable;
 
-use super::NonGround;
 use super::owned::Term;
 use super::reference::TermRef;
+use super::{Ground, NonGround};
 
 pub trait FromTerm<'a>: Sized {
     fn from_term(term: TermRef<'a>) -> Result<Self, FromTermError>;
@@ -57,25 +57,25 @@ impl FromTerm<'_> for BString {
     }
 }
 
-impl From<f32> for Term {
+impl<G> From<f32> for Term<G> {
     fn from(number: f32) -> Self {
         Self::Number(number.into())
     }
 }
 
-impl From<String> for Term {
+impl<G> From<String> for Term<G> {
     fn from(string: String) -> Self {
         Self::String(string.into())
     }
 }
 
-impl From<BString> for Term {
+impl<G> From<BString> for Term<G> {
     fn from(string: BString) -> Self {
         Self::String(string)
     }
 }
 
-impl<L> From<L> for Term
+impl<L> From<L> for Term<Ground>
 where
     L: IntoLiteral,
 {
@@ -87,7 +87,7 @@ where
     }
 }
 
-impl From<Variable> for Term {
+impl From<Variable> for Term<NonGround> {
     fn from(variable: Variable) -> Self {
         Self::Variable(NonGround(variable))
     }

@@ -5,6 +5,8 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec;
 
+use ember::agent::bdi::sensor::{Percept, Perceptor};
+use ember::agent::bdi::term::reference::TermRef;
 use log::info;
 
 use ember::Container;
@@ -12,18 +14,76 @@ use ember::agent::bdi::BdiAgent;
 use ember::agent::bdi::bindings::BindingLookup;
 use ember::agent::bdi::knowledge::belief::Belief;
 use ember::agent::bdi::knowledge::store::BeliefBase;
-use ember::agent::bdi::literal::Literal;
+use ember::agent::bdi::literal::{IntoLiteral, Literal};
 use ember::agent::bdi::plan::action::Execute;
 use ember::agent::bdi::plan::library::PlanLibrary;
 use ember::agent::bdi::plan::{
     Action, BuiltinAction, Formula, GoalKind, Plan, QueryFormula, Trigger, TriggeringEvent,
 };
-use ember::agent::bdi::term::{NonGround, Structure, Term};
+use ember::agent::bdi::term::{FromTerm, FromTermError, Ground, NonGround, Structure, Term};
 use ember::agent::bdi::variable::Variable;
 
 use ember_examples::setup_example;
 
 setup_example!();
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Location(String);
+
+impl FromTerm<'_> for Location {
+    fn from_term(term: TermRef<'_>) -> Result<Self, FromTermError> {
+        match term {
+            TermRef::String(s) => Ok(Location(s.to_string())),
+            TermRef::Literal { functor, .. } => Ok(Location(functor.0.clone())),
+            _ => Err(FromTermError::InvalidType(Some("location"))),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Item(String);
+
+impl FromTerm<'_> for Item {
+    fn from_term(term: TermRef<'_>) -> Result<Self, FromTermError> {
+        match term {
+            TermRef::String(s) => Ok(Item(s.to_string())),
+            TermRef::Literal { functor, .. } => Ok(Item(functor.0.clone())),
+            _ => Err(FromTermError::InvalidType(Some("item"))),
+        }
+    }
+}
+
+struct Thermometer(/* Some sensor pin */);
+
+impl Perceptor for Thermometer {
+    type Percept = SensorReading;
+
+    fn percept(&mut self) -> Option<Self::Percept> {
+        Some(SensorReading { temperature: 0.0 })
+    }
+}
+
+struct SensorReading {
+    temperature: f32,
+}
+
+impl IntoLiteral for SensorReading {
+    fn into_literal(self) -> Literal<Ground> {
+        Literal::Atom {
+            negated: false,
+            structure: Structure {
+                functor: "temperature".into(),
+                arguments: Some(Box::new([Term::Number(self.temperature.into())])),
+            },
+        }
+    }
+}
+
+impl Percept for SensorReading {
+    fn into_beliefs(self) -> impl IntoIterator<Item = (Trigger, Belief)> {
+        [(Trigger::Addition, Belief::from(self.into_literal()))]
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum AgentAction {
@@ -109,14 +169,14 @@ fn example() {
     info!("🎯 Initial Goal: +!make_coffee\n");
 
     // 5. Create the BdiAgent instance.
-    let bdi_agent = BdiAgent::<_, _, ()>::new(
+    let bdi_agent = BdiAgent::<_, _, SensorReading>::new(
         "coffee-maker",
         (),
-        [],
         Some(belief_base),
         plan_library,
         vec![initial_goal],
-    );
+    )
+    .with_sensor(Thermometer());
 
     // 6. Run the agent's execution cycle.
     info!("🚀 Starting agent container...\n");

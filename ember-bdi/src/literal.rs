@@ -1,5 +1,7 @@
 use crate::term::{Ground, NonGround, Structure};
 
+pub use ember_bdi_macros::IntoLiteral;
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Literal<Groundness = NonGround> {
     Atom {
@@ -36,5 +38,5 @@ impl Literal<NonGround> {
 }
 
 pub trait IntoLiteral: Sized {
-    fn into_literal(self) -> Literal;
+    fn into_literal(self) -> Literal<Ground>;
 }

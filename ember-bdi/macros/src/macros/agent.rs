@@ -325,7 +325,6 @@ pub(crate) fn expand(args: BdiAgentArgs, input: DeriveInput) -> TokenStream {
                 ::ember::agent::bdi::BdiAgent::new(
                     #agent_name,
                     agent,
-                    [],
                     Some(beliefbase),
                     plan_library,
                     initial_goals,

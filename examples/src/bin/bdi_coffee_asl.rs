@@ -3,10 +3,12 @@
 
 use alloc::string::{String, ToString};
 
+use ember::agent::bdi::literal::IntoLiteral;
 use log::info;
 
 use ember::Container;
 use ember::agent::bdi::context::Context;
+use ember::agent::bdi::sensor::{Percept, Perceptor};
 use ember::agent::bdi::term::reference::TermRef;
 use ember::agent::bdi::term::{FromTerm, FromTermError};
 use ember::agent::bdi::{bdi_actions, bdi_agent};
@@ -41,39 +43,57 @@ impl FromTerm<'_> for Item {
     }
 }
 
-#[bdi_agent(asl = {
-    at(agent, home).
-    at(coffee_machine, kitchen).
+struct Thermometer(/* Some sensor pin */);
 
-    !make_coffee.
+impl Perceptor for Thermometer {
+    type Percept = SensorReading;
 
-    +!make_coffee : at(agent, Loc) & at(coffee_machine, Loc) & have(coffee_beans)
-      <- .log("info", "Enjoying a fresh cup of coffee!");
-         +done.
+    fn percept(&mut self) -> Option<Self::Percept> {
+        Some(SensorReading { temperature: 0.0 })
+    }
+}
 
-    +!make_coffee
-      <- !go_to(kitchen);
-         !get_beans;
-         !make_coffee.
+#[derive(IntoLiteral, Percept)]
+struct SensorReading {
+    temperature: f32,
+}
 
-    +!go_to(Dest) : at(agent, Dest)
-      <- print_loc("Already at ", Dest).
+#[bdi_agent(
+    percept_type = SensorReading,
+    asl = {
+        at(agent, home).
+        at(coffee_machine, kitchen).
 
-    +!go_to(Dest) : at(agent, From)
-      <- move_location(From, Dest);
-         -at(agent, From);
-         +at(agent, Dest).
+        !make_coffee.
 
-    +!get_beans : have(coffee_beans)
-      <- .log("info", "Found coffee beans in the pantry.").
+        +!make_coffee : at(agent, Loc) & at(coffee_machine, Loc) & have(coffee_beans)
+          <- .log("info", "Enjoying a fresh cup of coffee!");
+             +done.
 
-    +!get_beans
-      <- buy(coffee_beans);
-         +have(coffee_beans).
+        +!make_coffee
+          <- !go_to(kitchen);
+             !get_beans;
+             !make_coffee.
 
-    +done
-      <- .stop_platform().
-})]
+        +!go_to(Dest) : at(agent, Dest)
+          <- print_loc("Already at ", Dest).
+
+        +!go_to(Dest) : at(agent, From)
+          <- move_location(From, Dest);
+             -at(agent, From);
+             +at(agent, Dest).
+
+        +!get_beans : have(coffee_beans)
+          <- .log("info", "Found coffee beans in the pantry.").
+
+        +!get_beans
+          <- buy(coffee_beans);
+             +have(coffee_beans).
+
+        +done
+          <- .stop_platform().
+    }
+)]
 struct CoffeeAgent;
 
 #[bdi_actions]
@@ -113,7 +133,7 @@ fn example() {
     info!("🚀 Starting agent container...\n");
 
     Container::new()
-        .with_agent(CoffeeAgent.into_agent())
+        .with_agent(CoffeeAgent.into_agent().with_sensor(Thermometer()))
         .start()
         .expect("container encountered an error");
 

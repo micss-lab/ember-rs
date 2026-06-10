@@ -1,6 +1,6 @@
 use alloc::borrow::Cow;
+use alloc::vec::Vec;
 
-use alloc::boxed::Box;
 use ember_core::agent::Agent;
 use ember_core::environment::Environment;
 
@@ -15,7 +15,7 @@ use crate::plan::action::Execute;
 use crate::plan::library::PlanLibrary;
 use crate::plan::selector::FirstApplicable;
 use crate::plan::{GoalKind, Trigger, TriggeringEvent};
-use crate::sensor::{Percept, Sensor};
+use crate::sensor::{Percept, Perceptor, Sensor};
 
 #[derive(Debug)]
 pub struct BdiAgent<'s, State, Action, Percept> {
@@ -25,7 +25,7 @@ pub struct BdiAgent<'s, State, Action, Percept> {
     plans: PlanLibrary<Action>,
     intentions: IntentionQueue<Action>,
     event_queue: EventQueue,
-    sensors: Box<[Sensor<'s, Percept>]>,
+    sensors: Option<Vec<Sensor<'s, Percept>>>,
 }
 
 impl<'s, State, Action, Percept> BdiAgent<'s, State, Action, Percept>
@@ -35,7 +35,6 @@ where
     pub fn new(
         name: impl Into<Cow<'static, str>>,
         state: State,
-        sensors: impl Into<Box<[Sensor<'s, Percept>]>>,
         beliefs: Option<BeliefBase>,
         plans: PlanLibrary<Action>,
         initial_goals: impl IntoIterator<Item = Literal>,
@@ -47,7 +46,7 @@ where
             plans,
             intentions: IntentionQueue::default(),
             event_queue: EventQueue::default(),
-            sensors: sensors.into(),
+            sensors: None,
         };
         initial_goals.into_iter().for_each(|g| {
             this.handle_event(
@@ -89,6 +88,28 @@ where
     }
 }
 
+impl<'a, State, Action, P> BdiAgent<'a, State, Action, P>
+where
+    P: Percept,
+{
+    pub fn with_sensor<S>(mut self, sensor: S) -> Self
+    where
+        S: Perceptor<Percept = P> + 'a,
+    {
+        self.add_sensor(sensor);
+        self
+    }
+
+    pub fn add_sensor<S>(&mut self, sensor: S)
+    where
+        S: Perceptor<Percept = P> + 'a,
+    {
+        self.sensors
+            .get_or_insert_default()
+            .push(Sensor::new(sensor));
+    }
+}
+
 impl<State, Action, P> Agent for BdiAgent<'_, State, Action, P>
 where
     Action: Execute<State = State, Action = Action> + Clone,
@@ -97,16 +118,18 @@ where
     fn update(&mut self, environment: &mut Environment) -> bool {
         let mut context = Context::new(environment);
 
-        for sensor in self.sensors.iter_mut() {
-            let Some(percept) = sensor.percept() else {
-                continue;
-            };
-
-            for (trigger, belief) in percept.into_beliefs().into_iter() {
-                let _ = match trigger {
-                    Trigger::Addition => self.beliefs.assert(belief, &mut context),
-                    Trigger::Deletion => self.beliefs.remove(belief, &mut context),
+        if let Some(sensors) = self.sensors.as_mut() {
+            for sensor in sensors.iter_mut() {
+                let Some(percept) = sensor.percept() else {
+                    continue;
                 };
+
+                for (trigger, belief) in percept.into_beliefs().into_iter() {
+                    let _ = match trigger {
+                        Trigger::Addition => self.beliefs.assert(belief, &mut context),
+                        Trigger::Deletion => self.beliefs.remove(belief, &mut context),
+                    };
+                }
             }
         }
 
