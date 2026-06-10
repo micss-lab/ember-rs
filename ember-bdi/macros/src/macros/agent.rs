@@ -1,6 +1,67 @@
-use crate::action::BuiltinAction;
+use proc_macro2::{Span, TokenStream};
+use quote::{ToTokens, format_ident, quote};
+use syn::parse::{Parse, ParseStream};
+use syn::{DeriveInput, Ident, Token, Type, TypeTuple};
+
+use crate::BdiAgentArgs;
 use crate::ast::*;
 use crate::token::FlatTokenStream;
+
+impl Parse for BdiAgentArgs {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        if input.is_empty() {
+            return Err(input.error("expected `asl = ...`"));
+        }
+
+        let (mut asl, mut percept_type) = (None, None);
+
+        while !input.is_empty() {
+            let ident: syn::Ident = input.parse()?;
+            match ident.to_string().as_str() {
+                "asl" => {
+                    input.parse::<Token![=]>()?;
+
+                    if asl.is_some() {
+                        return Err(syn::Error::new_spanned(
+                            ident,
+                            "can only use argument `asl` once",
+                        ));
+                    }
+
+                    asl = Some(input.parse()?);
+                }
+                "percept_type" => {
+                    input.parse::<Token![=]>()?;
+
+                    if percept_type.is_some() {
+                        return Err(syn::Error::new_spanned(
+                            ident,
+                            "can only use argument `percept_type` once",
+                        ));
+                    }
+
+                    percept_type = Some(input.parse()?)
+                }
+                _ => {
+                    return Err(syn::Error::new_spanned(
+                        ident,
+                        "unknown argument, expected `asl = ...`",
+                    ));
+                }
+            }
+
+            if !input.is_empty() {
+                input.parse::<Token![,]>()?;
+            }
+        }
+
+        let Some(asl) = asl else {
+            return Err(input.error("expected required arguments: (`asl`)"));
+        };
+
+        Ok(BdiAgentArgs { asl, percept_type })
+    }
+}
 
 enum BeliefOrGoal {
     Belief(Belief),
@@ -8,7 +69,7 @@ enum BeliefOrGoal {
 }
 
 peg::parser! {
-    pub grammar asl_token_stream() for FlatTokenStream {
+    pub grammar asl_parser() for FlatTokenStream {
         rule belief_or_goal() -> Spanned<BeliefOrGoal>
             = span:span() belief:belief() "." { Spanned { node: BeliefOrGoal::Belief(belief), span } }
             / span:span() goal:goal() "." { Spanned { node: BeliefOrGoal::Goal(goal), span } }
@@ -215,4 +276,161 @@ peg::parser! {
             / "+" { BodyFormulaTrigger::Add }
             / "-" { BodyFormulaTrigger::Remove }
     }
+}
+
+pub(crate) fn expand(args: BdiAgentArgs, input: DeriveInput) -> TokenStream {
+    use heck::ToKebabCase;
+
+    let Program {
+        beliefs,
+        goals,
+        plans,
+    } = match asl_parser::program(&FlatTokenStream::new(args.asl)) {
+        Ok(p) => p,
+        Err(err) => {
+            let msg = format!("expected {}", err.expected);
+            let span = err.location.0;
+            let compile_err = syn::Error::new(span, msg).to_compile_error();
+            return quote! {
+                #input
+                #compile_err
+            }
+            .into();
+        }
+    };
+
+    let agent_ident = &input.ident;
+    let percept_type = args.percept_type.unwrap_or_else(|| {
+        // Unit type.
+        Type::Tuple(TypeTuple {
+            paren_token: syn::token::Paren(Span::call_site()),
+            elems: syn::punctuated::Punctuated::new(),
+        })
+    });
+
+    let beliefbase = generate_beliefbase(&beliefs, agent_ident);
+    let initial_goals = generate_initial_goals(&goals, agent_ident);
+    let plan_library = generate_plan_library(&plans, agent_ident);
+
+    let agent_name = agent_ident.to_string().to_kebab_case();
+    let agent_action = format_ident!("{}Action", agent_ident);
+
+    let impl_ = quote! {
+        impl From<#agent_ident> for ::ember::agent::bdi::BdiAgent<'static, #agent_ident, #agent_action, #percept_type> {
+            fn from(agent: #agent_ident) -> Self {
+                let beliefbase = #beliefbase;
+                let initial_goals = #initial_goals;
+                let plan_library = #plan_library;
+
+                ::ember::agent::bdi::BdiAgent::new(
+                    #agent_name,
+                    agent,
+                    [],
+                    Some(beliefbase),
+                    plan_library,
+                    initial_goals,
+                )
+            }
+        }
+
+        impl #agent_ident {
+            fn into_agent(self) -> ::ember::agent::bdi::BdiAgent<'static, #agent_ident, #agent_action, #percept_type> {
+                self.into()
+            }
+        }
+    };
+
+    quote! {
+        #input
+        #impl_
+    }
+}
+
+fn generate_beliefbase(beliefs: &[Spanned<Belief>], agent_ident: &Ident) -> impl ToTokens {
+    let beliefs = beliefs.into_iter().map(|b| {
+        let span = b.span;
+        let mut visitor = AstVisitor::new(agent_ident.clone());
+        let belief = visitor.visit_belief(&b.node).into_token_stream();
+        let variables = visitor
+            .variable_map
+            .into_values()
+            .map(|v| {
+                quote! {
+                    let #v = ::ember::agent::bdi::variable::Variable::new();
+                }
+            })
+            .collect::<Vec<_>>();
+
+        quote::quote_spanned! { span=>
+            let _belief = {
+                #(#variables)*
+                #belief
+            };
+            ::ember::agent::bdi::knowledge::store::BeliefBase::assert_no_event(&mut beliefbase, _belief);
+        }
+    });
+
+    quote! { {
+        let mut beliefbase = ::ember::agent::bdi::knowledge::store::BeliefBase::default();
+        #(#beliefs)*
+        beliefbase
+    } }
+}
+
+fn generate_initial_goals(goals: &[Spanned<Goal>], agent_ident: &Ident) -> impl ToTokens {
+    let goals = goals.into_iter().map(|g| {
+        let span = g.span;
+        let mut visitor = AstVisitor::new(agent_ident.clone());
+        let goal = visitor.visit_goal(&g.node).into_token_stream();
+        let variables = visitor
+            .variable_map
+            .into_values()
+            .map(|v| {
+                quote! {
+                    let #v = ::ember::agent::bdi::variable::Variable::new();
+                }
+            })
+            .collect::<Vec<_>>();
+
+        quote::quote_spanned! { span=>
+            let _goal = {
+                #(#variables)*
+                #goal
+            };
+            goals.push(_goal);
+        }
+    });
+
+    quote! { {
+        let mut goals = ::alloc::vec::Vec::new();
+        #(#goals)*
+        goals
+    } }
+}
+
+fn generate_plan_library(plans: &[Spanned<Plan>], agent_ident: &Ident) -> impl ToTokens {
+    let plans = plans.into_iter().map(|p| {
+        let span = p.span;
+        let mut visitor = AstVisitor::new(agent_ident.clone());
+        let plan = visitor.visit_plan(&p.node).into_token_stream();
+        let variables = visitor.variable_map.into_values().map(|v| {
+            quote! {
+                let #v = ::ember::agent::bdi::variable::Variable::new();
+            }
+        });
+
+        quote::quote_spanned! { span=>
+            let _plan = {
+                #(#variables)*
+                #plan
+            };
+            plans.add(_plan);
+        }
+    });
+
+    quote! { {
+        let mut plans = ::ember::agent::bdi::plan::library::PlanLibrary::default();
+        #(#plans)*
+        plans
+    } }
 }
