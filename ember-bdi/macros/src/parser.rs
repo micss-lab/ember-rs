@@ -9,13 +9,6 @@ enum BeliefOrGoal {
 
 peg::parser! {
     pub grammar asl_token_stream() for FlatTokenStream {
-        rule span() -> proc_macro2::Span = #{|input, pos| input.next_span(pos)}
-
-        rule spanned<T>(r: rule<T>) -> Spanned<T>
-            = span:span() node:r() {
-                Spanned { node, span }
-            }
-
         rule belief_or_goal() -> Spanned<BeliefOrGoal>
             = span:span() belief:belief() "." { Spanned { node: BeliefOrGoal::Belief(belief), span } }
             / span:span() goal:goal() "." { Spanned { node: BeliefOrGoal::Goal(goal), span } }
@@ -159,6 +152,8 @@ peg::parser! {
                     })
                 })
             }
+
+        rule span() -> proc_macro2::Span = #{|input, pos| input.next_span(pos)}
 
         rule VARIABLE() -> Variable = v:TOKEN_IDENT() {?
             let v = v.to_string();
