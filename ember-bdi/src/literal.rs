@@ -34,3 +34,7 @@ impl Literal<NonGround> {
         }
     }
 }
+
+pub trait IntoLiteral: Sized {
+    fn into_literal(self) -> Literal;
+}

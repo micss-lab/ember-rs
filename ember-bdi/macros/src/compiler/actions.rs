@@ -202,7 +202,7 @@ fn extract_action_params(inputs: &syn::punctuated::Punctuated<FnArg, Token![,]>)
                                 return;
                             }
                         };
-                        let #clean_ident = match <#ty as ::ember::agent::bdi::term::from::FromTerm>::from_term(#clean_ident.into()) {
+                        let #clean_ident = match <#ty as ::ember::agent::bdi::term::conversion::FromTerm>::from_term(#clean_ident.into()) {
                             Ok(val) => val,
                             Err(_) => {
                                 ::log::error!("{}", #err_msg_conv);

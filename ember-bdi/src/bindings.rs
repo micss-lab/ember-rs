@@ -4,7 +4,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use crate::term::Term;
-use crate::term::from::{FromTerm, FromTermError};
+use crate::term::conversion::{FromTerm, FromTermError};
 use crate::term::reference::TermRef;
 use crate::term::view::{StructureView, TermView};
 use crate::unification::constraint::BindingConstraint;

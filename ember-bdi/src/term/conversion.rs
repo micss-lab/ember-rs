@@ -1,7 +1,13 @@
 use alloc::format;
+use alloc::string::String;
 
 use bstr::BString;
 
+use crate::literal::{IntoLiteral, Literal};
+use crate::variable::Variable;
+
+use super::NonGround;
+use super::owned::Term;
 use super::reference::TermRef;
 
 pub trait FromTerm<'a>: Sized {
@@ -48,5 +54,41 @@ impl FromTerm<'_> for BString {
             TermRef::String(s) => Ok(s.clone()),
             _ => Err(FromTermError::InvalidType(Some("string"))),
         }
+    }
+}
+
+impl From<f32> for Term {
+    fn from(number: f32) -> Self {
+        Self::Number(number.into())
+    }
+}
+
+impl From<String> for Term {
+    fn from(string: String) -> Self {
+        Self::String(string.into())
+    }
+}
+
+impl From<BString> for Term {
+    fn from(string: BString) -> Self {
+        Self::String(string)
+    }
+}
+
+impl<L> From<L> for Term
+where
+    L: IntoLiteral,
+{
+    fn from(literal: L) -> Self {
+        match literal.into_literal() {
+            Literal::Atom { negated, structure } => Self::Literal { negated, structure },
+            Literal::Variable(v) => Self::Variable(v),
+        }
+    }
+}
+
+impl From<Variable> for Term {
+    fn from(variable: Variable) -> Self {
+        Self::Variable(NonGround(variable))
     }
 }
