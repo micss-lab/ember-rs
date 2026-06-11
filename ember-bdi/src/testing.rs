@@ -97,6 +97,8 @@ pub fn plan<A>(
 /// that accesses or mutates the environment is undefined behaviour.
 pub unsafe fn new_context_without_environment<A>() -> Context<'static, A> {
     let mut environment = Environment::new(VecDeque::with_capacity(0));
-    // The context should never be used during testing. of the
-    Context::new(unsafe { core::mem::transmute(&mut environment) })
+    // SAFETY: The context should never be used during testing.
+    Context::new(unsafe {
+        core::mem::transmute::<&mut Environment, &'static mut Environment>(&mut environment)
+    })
 }

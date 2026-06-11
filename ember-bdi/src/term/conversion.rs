@@ -34,7 +34,7 @@ impl core::fmt::Display for FromTermError {
             "from term error: {}",
             match *self {
                 FromTermError::InvalidType(expected) => match expected {
-                    Some(expected) => format!("invalid type: expected {}", expected),
+                    Some(expected) => format!("invalid type: expected {expected}"),
                     None => "invalid type".into(),
                 },
                 FromTermError::IncorrectConversion(ref e) => e.to_string(),

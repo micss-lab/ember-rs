@@ -35,6 +35,25 @@ impl Literal<NonGround> {
             Literal::Variable(NonGround(_)) => None,
         }
     }
+
+    pub(crate) fn variables(&self) -> alloc::vec::Vec<crate::variable::VariableId> {
+        let mut vars = alloc::vec::Vec::new();
+        self.collect_variables(&mut vars);
+        vars
+    }
+
+    fn collect_variables(&self, vars: &mut alloc::vec::Vec<crate::variable::VariableId>) {
+        match self {
+            Literal::Atom { structure, .. } => {
+                if let Some(args) = &structure.arguments {
+                    for arg in args.iter() {
+                        arg.collect_variables(vars);
+                    }
+                }
+            }
+            Literal::Variable(NonGround(v)) => vars.push(v.id),
+        }
+    }
 }
 
 pub trait IntoLiteral: Sized {

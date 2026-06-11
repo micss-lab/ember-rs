@@ -35,9 +35,13 @@ impl<A: Clone> IntentionQueue<A> {
         plan: &'_ Plan<A>,
         bindings: Bindings<'_>,
         existing_intention: Option<IntentionId>,
+        event: crate::plan::TriggeringEvent,
     ) {
         let id = existing_intention.unwrap_or_else(|| self.next_id());
-        self.intentions.entry(id).or_default().push(plan, bindings);
+        self.intentions
+            .entry(id)
+            .or_default()
+            .push(plan, bindings, event);
         if !self.queue.contains(&id) {
             self.queue.push_back(id);
         }

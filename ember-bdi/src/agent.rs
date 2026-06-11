@@ -84,7 +84,8 @@ where
             EventSource::Internal(intention) => Some(intention),
             EventSource::External => None,
         };
-        self.intentions.push(plan, bindings, existing_intention);
+        self.intentions
+            .push(plan, bindings, existing_intention, event.clone());
     }
 }
 

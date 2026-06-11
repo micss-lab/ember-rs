@@ -28,11 +28,9 @@ impl<'a, T> Bindings<'a, T> {
             lifetime_: PhantomData,
         }
     }
-}
 
-impl<'a> Bindings<'a, TermView<'a>> {
     pub(crate) fn new(
-        bindings: impl IntoIterator<Item = (VariableId, Option<TermView<'a>>)>,
+        bindings: impl IntoIterator<Item = (VariableId, Option<T>)>,
         aliases: AliasMap,
     ) -> Self {
         Self {

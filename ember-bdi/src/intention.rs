@@ -27,7 +27,7 @@ impl<A> Intention<A> {
         };
 
         let bindings = match frame.step(context)? {
-            StepOk::Done => frame.take_bindings(),
+            StepOk::Done => frame.take_filtered_bindings(),
             StepOk::Pending => return StepOk::pending(),
         };
 
@@ -53,14 +53,19 @@ impl<A> Intention<A> {
     pub(crate) fn take_last_bindings(&mut self) -> OwnedBindings {
         self.stack
             .last_mut()
-            .map(|f| f.take_bindings())
+            .map(|f| f.take_filtered_bindings())
             .unwrap_or_else(OwnedBindings::empty)
     }
 }
 
 impl<A: Clone> Intention<A> {
-    fn push(&mut self, plan: &'_ Plan<A>, bindings: Bindings<'_>) {
-        self.stack.push(Frame::new(plan, bindings, self.id))
+    pub(crate) fn push(
+        &mut self,
+        plan: &'_ Plan<A>,
+        bindings: Bindings<'_>,
+        event: TriggeringEvent,
+    ) {
+        self.stack.push(Frame::new(plan, bindings, self.id, event))
     }
 }
 
@@ -69,8 +74,8 @@ struct Frame<A> {
     /// The id of the intention this frame belongs to.
     intention_id: IntentionId,
     /// The event that triggered the creation of this frame. Used to stop the execution of
-    /// plans.
-    _event: TriggeringEvent,
+    /// plans, and to filter bindings.
+    event: TriggeringEvent,
     /// Bindings that this frame is created with and that have been resolved during the
     /// execution of this frame.
     bindings: OwnedBindings,
@@ -79,10 +84,15 @@ struct Frame<A> {
 }
 
 impl<A: Clone> Frame<A> {
-    fn new(plan: &'_ Plan<A>, bindings: Bindings<'_>, intention_id: IntentionId) -> Self {
+    fn new(
+        plan: &'_ Plan<A>,
+        bindings: Bindings<'_>,
+        intention_id: IntentionId,
+        event: TriggeringEvent,
+    ) -> Self {
         Self {
             intention_id,
-            _event: plan.trigger.clone(),
+            event,
             bindings: bindings.into(),
             remaining: plan.body.iter().rev().cloned().collect(),
         }
@@ -129,8 +139,19 @@ impl<A> Frame<A> {
         StepOk::pending()
     }
 
-    fn take_bindings(&mut self) -> OwnedBindings {
-        core::mem::replace(&mut self.bindings, Bindings::empty())
+    fn take_filtered_bindings(&mut self) -> OwnedBindings {
+        let vars = self.event.event.variables();
+        let mut map = alloc::collections::BTreeMap::new();
+
+        if let Some(bindings) = &self.bindings.bindings {
+            for v_id in vars {
+                if let Some(val) = bindings.get(&v_id) {
+                    map.insert(v_id, val.clone());
+                }
+            }
+        }
+
+        OwnedBindings::new(map, crate::bindings::AliasMap::empty())
     }
 }
 
@@ -154,7 +175,7 @@ mod tests {
         // Step with no frames returns Done
         assert!(matches!(
             intention.step(&mut context),
-            Ok(StepOk::Done { .. })
+            Ok(StepOk::Done)
         ));
     }
 
@@ -167,14 +188,14 @@ mod tests {
         let trigger = trigger("event", vec![], None);
         let plan = plan(trigger.clone(), None, vec![]);
 
-        intention.push(&plan, Bindings::empty());
+        intention.push(&plan, Bindings::empty(), trigger);
 
         assert_eq!(intention.stack.len(), 1);
 
         // Plan has no body, so one step should complete the frame, merge bindings, and remove the frame.
         // It returns Done because the intention has no more frames.
         let result = intention.step(&mut context);
-        assert!(matches!(result, Ok(StepOk::Done { .. })));
+        assert!(matches!(result, Ok(StepOk::Done)));
         assert_eq!(intention.stack.len(), 0);
     }
 
@@ -194,16 +215,16 @@ mod tests {
             ],
         );
 
-        intention.push(&plan, Bindings::empty());
+        intention.push(&plan, Bindings::empty(), trigger);
 
         // step 1: executes action1 (because it's popped first)
         let result = intention.step(&mut context);
-        assert!(matches!(result, Ok(StepOk::Pending { .. })));
+        assert!(matches!(result, Ok(StepOk::Pending)));
         assert_eq!(context.actions, &[Action::User("action1")]);
 
         // step 2: executes action2
         let result = intention.step(&mut context);
-        assert!(matches!(result, Ok(StepOk::Pending { .. })));
+        assert!(matches!(result, Ok(StepOk::Pending)));
         assert_eq!(
             context.actions,
             &[Action::User("action1"), Action::User("action2")]
@@ -211,7 +232,7 @@ mod tests {
 
         // step 3: frame done, intention done
         let result = intention.step(&mut context);
-        assert!(matches!(result, Ok(StepOk::Done { .. })));
+        assert!(matches!(result, Ok(StepOk::Done)));
     }
 
     #[test]
@@ -236,12 +257,12 @@ mod tests {
             ],
         );
 
-        intention.push(&plan, Bindings::empty());
+        intention.push(&plan, Bindings::empty(), trigger);
 
         let result = intention.step(&mut context);
-        assert!(matches!(result, Ok(StepOk::Pending { .. })));
+        assert!(matches!(result, Ok(StepOk::Pending)));
 
         let result = intention.step(&mut context);
-        assert!(matches!(result, Ok(StepOk::Pending { .. })));
+        assert!(matches!(result, Ok(StepOk::Pending)));
     }
 }

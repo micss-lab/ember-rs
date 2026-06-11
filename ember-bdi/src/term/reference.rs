@@ -23,11 +23,11 @@ pub enum TermRef<'a> {
 
 impl TermRef<'_> {
     pub fn to_owned(&self) -> Term {
-        match self {
-            &Self::Number(n) => Term::Number(n),
-            &Self::String(s) => Term::String(s.clone()),
-            &Self::Variable(v) => Term::Variable(NonGround(v.clone())),
-            &Self::Literal {
+        match *self {
+            Self::Number(n) => Term::Number(n),
+            Self::String(s) => Term::String(s.clone()),
+            Self::Variable(v) => Term::Variable(NonGround(v.clone())),
+            Self::Literal {
                 negated,
                 functor,
                 ref arguments,

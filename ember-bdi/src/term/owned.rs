@@ -65,6 +65,20 @@ impl Term<NonGround> {
             },
         })
     }
+
+    pub(crate) fn collect_variables(&self, vars: &mut Vec<crate::variable::VariableId>) {
+        match self {
+            Term::Variable(NonGround(v)) => vars.push(v.id),
+            Term::Literal { structure, .. } => {
+                if let Some(args) = &structure.arguments {
+                    for arg in args.iter() {
+                        arg.collect_variables(vars);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]

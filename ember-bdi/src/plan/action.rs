@@ -63,7 +63,7 @@ impl BuiltinAction {
                     .map(|t| t.resolve(bindings))
                     .collect::<Result<Vec<_>, _>>()
                 {
-                    Ok(terms) => log!(level, "{:?}", terms),
+                    Ok(terms) => log!(level, "{terms:?}"),
                     Err(_) => log::error!("failed to resolve log arguments"),
                 }
             }
