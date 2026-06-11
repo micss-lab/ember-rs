@@ -88,16 +88,18 @@ pub(crate) struct Context(pub(crate) LogicalExpression);
 #[derive(Debug, Clone)]
 pub(crate) enum LogicalExpression {
     Simple(SimpleLogicalExpression),
-    And((SimpleLogicalExpression, Box<LogicalExpression>)),
-    Or((SimpleLogicalExpression, Box<LogicalExpression>)),
+    And(Box<(LogicalExpression, LogicalExpression)>),
+    Or(Box<(LogicalExpression, LogicalExpression)>),
 }
 
 #[derive(Debug, Clone)]
 pub(crate) enum SimpleLogicalExpression {
     Literal(Literal),
-    Not(Box<LogicalExpression>),
     Rel(RelationalExpression),
+    Not(Box<SimpleLogicalExpression>),
+    Group(Box<LogicalExpression>),
 }
+
 #[derive(Debug, Clone)]
 pub(crate) struct RelationalExpression {
     pub(crate) operator: RelationalOperator,
@@ -334,22 +336,13 @@ impl AstVisitor {
 
     fn visit_logical_expression(&mut self, expression: &LogicalExpression) -> impl ToTokens {
         match expression {
-            LogicalExpression::Simple(SimpleLogicalExpression::Literal(literal)) => {
-                let literal = self.visit_literal(literal);
-                quote! { ::ember::agent::bdi::plan::QueryFormula::Literal(#literal) }
+            LogicalExpression::Simple(expression) => {
+                let expression = self.visit_simple_logical_expression(expression);
+                quote! { #expression }
             }
-            LogicalExpression::Simple(SimpleLogicalExpression::Rel(expression)) => {
-                let expression = self.visit_relational_expression(expression);
-                quote! { ::ember::agent::bdi::plan::QueryFormula::Relational(#expression) }
-            }
-            LogicalExpression::Simple(SimpleLogicalExpression::Not(expression)) => {
-                let expression = self.visit_logical_expression(expression);
-                quote! { ::ember::agent::bdi::plan::QueryFormula::Not(alloc::boxed::Box::new(#expression)) }
-            }
-            LogicalExpression::And((lhs, rhs)) => {
-                let lhs = self
-                    .visit_logical_expression(&LogicalExpression::Simple(lhs.clone()))
-                    .into_token_stream();
+            LogicalExpression::And(operands) => {
+                let (lhs, rhs) = operands.as_ref();
+                let lhs = self.visit_logical_expression(lhs).into_token_stream();
                 let rhs = self.visit_logical_expression(rhs);
 
                 quote! {
@@ -359,10 +352,9 @@ impl AstVisitor {
                     }
                 }
             }
-            LogicalExpression::Or((lhs, rhs)) => {
-                let lhs = self
-                    .visit_logical_expression(&LogicalExpression::Simple(lhs.clone()))
-                    .into_token_stream();
+            LogicalExpression::Or(operands) => {
+                let (lhs, rhs) = operands.as_ref();
+                let lhs = self.visit_logical_expression(lhs).into_token_stream();
                 let rhs = self.visit_logical_expression(rhs);
 
                 quote! {
@@ -371,6 +363,30 @@ impl AstVisitor {
                         operands: alloc::boxed::Box::new([#lhs, #rhs]),
                     }
                 }
+            }
+        }
+    }
+
+    fn visit_simple_logical_expression(
+        &mut self,
+        expression: &SimpleLogicalExpression,
+    ) -> impl ToTokens {
+        match expression {
+            SimpleLogicalExpression::Literal(literal) => {
+                let literal = self.visit_literal(literal);
+                quote! { ::ember::agent::bdi::plan::QueryFormula::Literal(#literal) }
+            }
+            SimpleLogicalExpression::Rel(expression) => {
+                let expression = self.visit_relational_expression(expression);
+                quote! { ::ember::agent::bdi::plan::QueryFormula::Relational(#expression) }
+            }
+            SimpleLogicalExpression::Not(expression) => {
+                let expression = self.visit_simple_logical_expression(expression);
+                quote! { ::ember::agent::bdi::plan::QueryFormula::Not(alloc::boxed::Box::new(#expression)) }
+            }
+            SimpleLogicalExpression::Group(expression) => {
+                let expression = self.visit_logical_expression(expression);
+                quote! { #expression }
             }
         }
     }

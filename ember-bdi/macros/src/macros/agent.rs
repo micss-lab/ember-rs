@@ -146,13 +146,16 @@ peg::parser! {
         rule context() -> Context = expr:logical_expression() { Context(expr) }
 
         rule logical_expression() -> LogicalExpression
-            = lhs:simple_logical_expression() "&" rhs:logical_expression() { LogicalExpression::And((lhs, Box::new(rhs))) }
-            / lhs:simple_logical_expression() "|" rhs:logical_expression() { LogicalExpression::Or((lhs, Box::new(rhs))) }
-            / "(" expr:logical_expression() ")" { expr }
+            = lhs:and_expression() "|" rhs:logical_expression() { LogicalExpression::Or(Box::new((lhs, rhs))) }
+            / and_expression()
+
+        rule and_expression() -> LogicalExpression
+            = lhs:simple_logical_expression() "&" rhs:and_expression() { LogicalExpression::And(Box::new((LogicalExpression::Simple(lhs), rhs))) }
             / simple:simple_logical_expression() { LogicalExpression::Simple(simple) }
 
         rule simple_logical_expression() -> SimpleLogicalExpression
-            = "not" expr:logical_expression() { SimpleLogicalExpression::Not(Box::new(expr)) }
+            = "not" expr:simple_logical_expression() { SimpleLogicalExpression::Not(Box::new(expr)) }
+            / "(" expr:logical_expression() ")" { SimpleLogicalExpression::Group(Box::new(expr)) }
             / lit:literal() { SimpleLogicalExpression::Literal(lit) }
             / expr:relational_expression() { SimpleLogicalExpression::Rel(expr) }
 
