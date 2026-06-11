@@ -1,47 +1,30 @@
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
 
-use alloc::string::{String, ToString};
+use alloc::string::String;
 
-use ember::agent::bdi::literal::IntoLiteral;
 use log::info;
 
 use ember::Container;
 use ember::agent::bdi::context::Context;
+use ember::agent::bdi::literal::IntoLiteral;
 use ember::agent::bdi::sensor::{Percept, Perceptor};
-use ember::agent::bdi::term::reference::TermRef;
-use ember::agent::bdi::term::{FromTerm, FromTermError};
+use ember::agent::bdi::term::FromTerm;
 use ember::agent::bdi::{bdi_actions, bdi_agent};
 
 use ember_examples::setup_example;
 
 setup_example!();
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Location(String);
-
-impl FromTerm<'_> for Location {
-    fn from_term(term: TermRef<'_>) -> Result<Self, FromTermError> {
-        match term {
-            TermRef::String(s) => Ok(Location(s.to_string())),
-            TermRef::Literal { functor, .. } => Ok(Location(functor.0.clone())),
-            _ => Err(FromTermError::InvalidType(Some("location"))),
-        }
-    }
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, FromTerm)]
+pub enum Location {
+    Home,
+    Kitchen,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, FromTerm)]
+#[ember(transparent)]
 pub struct Item(String);
-
-impl FromTerm<'_> for Item {
-    fn from_term(term: TermRef<'_>) -> Result<Self, FromTermError> {
-        match term {
-            TermRef::String(s) => Ok(Item(s.to_string())),
-            TermRef::Literal { functor, .. } => Ok(Item(functor.0.clone())),
-            _ => Err(FromTermError::InvalidType(Some("item"))),
-        }
-    }
-}
 
 struct Thermometer(/* Some sensor pin */);
 
@@ -103,11 +86,11 @@ impl CoffeeAgent {
     }
 
     fn print_loc(&mut self, msg: Item, loc: Location) {
-        info!("[ACTION] {} {:?}", msg.0, loc.0);
+        info!("[ACTION] {} {:?}", msg.0, loc);
     }
 
     fn move_location(&mut self, from: Location, to: Location) {
-        info!("[ACTION] 🏃 Moving from {:?} to {:?}", from.0, to.0);
+        info!("[ACTION] 🏃 Moving from {:?} to {:?}", from, to);
     }
 
     fn buy(&mut self, item: Item) {

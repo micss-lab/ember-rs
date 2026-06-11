@@ -1,5 +1,5 @@
 use alloc::format;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 
 use bstr::BString;
 
@@ -9,6 +9,8 @@ use crate::variable::Variable;
 use super::owned::Term;
 use super::reference::TermRef;
 use super::{Ground, NonGround};
+
+pub use ember_bdi_macros::FromTerm;
 
 pub trait FromTerm<'a>: Sized {
     fn from_term(term: TermRef<'a>) -> Result<Self, FromTermError>;
@@ -20,6 +22,9 @@ pub enum FromTermError {
         /// The expected type.
         Option<&'static str>,
     ),
+    /// Failure in converting from the term-native type to the more specialized type. For
+    /// example, `BString` to `String` when the characters are not all UTF-8.
+    IncorrectConversion(ConversionError),
 }
 
 impl core::fmt::Display for FromTermError {
@@ -32,12 +37,30 @@ impl core::fmt::Display for FromTermError {
                     Some(expected) => format!("invalid type: expected {}", expected),
                     None => "invalid type".into(),
                 },
+                FromTermError::IncorrectConversion(ref e) => e.to_string(),
             }
         )
     }
 }
 
 impl core::error::Error for FromTermError {}
+
+#[derive(Debug, Clone)]
+pub enum ConversionError {
+    InvalidUtf8,
+}
+
+impl core::fmt::Display for ConversionError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "coversion error: {}",
+            match *self {
+                ConversionError::InvalidUtf8 => "invalid utf-8",
+            }
+        )
+    }
+}
 
 impl FromTerm<'_> for f32 {
     fn from_term(term: TermRef<'_>) -> Result<Self, FromTermError> {
@@ -52,8 +75,18 @@ impl FromTerm<'_> for BString {
     fn from_term(term: TermRef<'_>) -> Result<Self, FromTermError> {
         match term {
             TermRef::String(s) => Ok(s.clone()),
-            _ => Err(FromTermError::InvalidType(Some("string"))),
+            TermRef::Literal {
+                functor, arguments, ..
+            } if arguments.is_empty() => Ok(BString::from(functor.0.as_bytes())),
+            _ => Err(FromTermError::InvalidType(Some("string or atom"))),
         }
+    }
+}
+
+impl FromTerm<'_> for String {
+    fn from_term(term: TermRef<'_>) -> Result<Self, FromTermError> {
+        String::try_from(BString::from_term(term)?)
+            .map_err(|_| FromTermError::IncorrectConversion(ConversionError::InvalidUtf8))
     }
 }
 

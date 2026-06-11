@@ -9,6 +9,7 @@ use super::NonGround;
 use super::owned::{Atom, Structure, Term, TotalCmpF32};
 use super::view::{StructureView, TermView};
 
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TermRef<'a> {
     Number(TotalCmpF32),
     String(&'a BString),

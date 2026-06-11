@@ -41,3 +41,10 @@ pub fn derive_percept(input: TokenStream) -> TokenStream {
 
     macros::derive::percept::expand(input).into()
 }
+
+#[proc_macro_derive(FromTerm, attributes(ember))]
+pub fn derive_from_term(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+
+    macros::derive::from_term::expand(input).into()
+}
