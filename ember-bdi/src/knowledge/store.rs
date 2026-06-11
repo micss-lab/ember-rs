@@ -1,10 +1,10 @@
-use alloc::collections::btree_map::BTreeMap;
+use alloc::collections::{BTreeMap, BTreeSet};
 
 use crate::context::Context;
 use crate::plan::{Trigger, TriggeringEvent};
 use crate::term::Atom;
 
-use super::belief::{Belief, BeliefMetadata, NormalizedBelief};
+use super::belief::Belief;
 use super::query::{IntoQuery, Query};
 
 #[derive(Debug, Default)]
@@ -73,7 +73,7 @@ impl BeliefBase {
         let Some(beliefs) = self.beliefs.get_mut(&belief.atom_and_arity()) else {
             return false;
         };
-        beliefs.remove(belief)
+        beliefs.remove(&belief)
     }
 
     pub fn query<'a>(&'a self, query: impl IntoQuery<'a>) -> Query<'a> {
@@ -94,40 +94,18 @@ where
     }
 }
 
-/// A collection of normalized beliefs. Beliefs are always stored normalized with additional
-/// metadata on how to construct their original version.
+/// A collection of beliefs not guaranteed to be semantically consistent.
 #[derive(Debug, Default)]
-pub(super) struct BeliefCollection(pub(super) BTreeMap<NormalizedBelief, BeliefMetadata>);
+pub(super) struct BeliefCollection(pub(super) BTreeSet<Belief>);
 
 impl BeliefCollection {
-    /// Stores the belief in the collection returning `true` if the belief was new.
+    /// Stores the belief in the collection returning `true` if the belief is new.
     fn store(&mut self, belief: Belief) -> bool {
-        use alloc::collections::btree_map::Entry;
-
-        let (belief, metadata) = belief.normalize();
-        match self.0.entry(belief) {
-            Entry::Vacant(entry) => {
-                entry.insert(metadata);
-                true
-            }
-            Entry::Occupied(mut entry) => entry.get_mut().update(metadata),
-        }
+        self.0.insert(belief)
     }
 
     /// Removes the belief from the collection if it was previously stored.
-    fn remove(&mut self, belief: Belief) -> bool {
-        use alloc::collections::btree_map::Entry;
-
-        let (belief, metadata) = belief.normalize();
-        match self.0.entry(belief) {
-            Entry::Vacant(_) => false,
-            Entry::Occupied(mut entry) => {
-                let (updated, should_remove) = entry.get_mut().remove(metadata);
-                if should_remove {
-                    entry.remove();
-                }
-                updated || should_remove
-            }
-        }
+    fn remove(&mut self, belief: &Belief) -> bool {
+        self.0.remove(belief)
     }
 }

@@ -1,5 +1,9 @@
-use crate::term::{Ground, NonGround, Structure};
+use crate::{
+    term::{Ground, NonGround, Structure},
+    variable::VariableId,
+};
 
+use alloc::collections::btree_set::BTreeSet;
 pub use ember_bdi_macros::IntoLiteral;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -36,13 +40,13 @@ impl Literal<NonGround> {
         }
     }
 
-    pub(crate) fn variables(&self) -> alloc::vec::Vec<crate::variable::VariableId> {
-        let mut vars = alloc::vec::Vec::new();
+    pub(crate) fn variables(&self) -> BTreeSet<VariableId> {
+        let mut vars = BTreeSet::default();
         self.collect_variables(&mut vars);
         vars
     }
 
-    fn collect_variables(&self, vars: &mut alloc::vec::Vec<crate::variable::VariableId>) {
+    fn collect_variables(&self, vars: &mut BTreeSet<VariableId>) {
         match self {
             Literal::Atom { structure, .. } => {
                 if let Some(args) = &structure.arguments {
@@ -51,7 +55,9 @@ impl Literal<NonGround> {
                     }
                 }
             }
-            Literal::Variable(NonGround(v)) => vars.push(v.id),
+            Literal::Variable(NonGround(v)) => {
+                vars.insert(v.id);
+            }
         }
     }
 }

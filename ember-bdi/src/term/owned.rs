@@ -1,10 +1,12 @@
-use alloc::string::String;
+use alloc::boxed::Box;
+use alloc::collections::BTreeSet;
+use alloc::string::{String, ToString};
 use alloc::vec::Vec;
-use alloc::{boxed::Box, string::ToString};
 
 use bstr::BString;
 
 use crate::literal::Literal;
+use crate::variable::VariableId;
 
 use super::{Ground, NonGround};
 
@@ -66,9 +68,11 @@ impl Term<NonGround> {
         })
     }
 
-    pub(crate) fn collect_variables(&self, vars: &mut Vec<crate::variable::VariableId>) {
+    pub(crate) fn collect_variables(&self, vars: &mut BTreeSet<VariableId>) {
         match self {
-            Term::Variable(NonGround(v)) => vars.push(v.id),
+            Term::Variable(NonGround(v)) => {
+                vars.insert(v.id);
+            }
             Term::Literal { structure, .. } => {
                 if let Some(args) = &structure.arguments {
                     for arg in args.iter() {

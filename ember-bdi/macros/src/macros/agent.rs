@@ -96,7 +96,7 @@ peg::parser! {
             }
         }
 
-        rule belief() -> Belief = lit:literal() { Belief(lit) }
+        rule belief() -> Belief = lit:literal() belief_rule:( ":-" r:logical_expression() { r })? { Belief(lit, belief_rule) }
 
         rule goal() -> Goal = "!" lit:literal() { Goal(lit) }
 

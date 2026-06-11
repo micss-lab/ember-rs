@@ -1,12 +1,12 @@
 use alloc::boxed::Box;
-use alloc::collections::btree_map::Iter;
+use alloc::collections::btree_set::Iter;
 use alloc::vec::Vec;
 
 use crate::bindings::Bindings;
 use crate::literal::Literal;
 use crate::plan::RelationalQueryFormula;
 
-use super::belief::{BeliefMetadata, NormalizedBelief};
+use super::belief::Belief;
 use super::store::BeliefBase;
 
 use self::formula::eval::EvaluationError;
@@ -75,11 +75,14 @@ pub(crate) struct GroundQuery<'a> {
     /// Closed-world principle of "not". If the query is not satisfyable with
     /// any bindings, it succeeds.
     negated: bool,
-    beliefs: Option<Iter<'a, NormalizedBelief, BeliefMetadata>>,
+    beliefs: Option<Iter<'a, Belief>>,
     operand: QueryOperand<'a>,
 
     /// On backtracking, the beliefs it has already tried have to be redone.
-    original: Option<Iter<'a, NormalizedBelief, BeliefMetadata>>,
+    original: Option<Iter<'a, Belief>>,
+
+    /// To resolve rules, the beliefbase has to be queries recursively.
+    knowledge: &'a BeliefBase,
 }
 
 impl<'a> GroundQuery<'a> {
@@ -87,7 +90,7 @@ impl<'a> GroundQuery<'a> {
         match (
             self.negated,
             self.operand
-                .next_bindings(self.beliefs.as_mut(), existing_bindings),
+                .next_bindings(self.beliefs.as_mut(), existing_bindings, self.knowledge),
         ) {
             (false, r) => r,
             (true, Some(_)) => None,
@@ -106,23 +109,80 @@ impl<'a> GroundQuery<'a> {
 
 #[derive(Debug, Clone)]
 pub(crate) enum QueryOperand<'a> {
-    Literal(&'a Literal),
+    Literal {
+        literal: &'a Literal,
+        /// During unification of this literal it might be that we need to query the
+        /// knowledge base again to prove a belief rule. This query has to be
+        /// back-trackable, hence we store it here.
+        belief_to_process: Option<(&'a Literal, Query<'a>)>,
+    },
     Relational(&'a RelationalQueryFormula),
 }
 
 impl<'a> QueryOperand<'a> {
+    fn literal(literal: &'a Literal) -> Self {
+        Self::Literal {
+            literal,
+            belief_to_process: None,
+        }
+    }
+
     fn next_bindings(
         &mut self,
-        beliefs: Option<&mut Iter<'a, NormalizedBelief, BeliefMetadata>>,
+        beliefs: Option<&mut Iter<'a, Belief>>,
         existing_bindings: Option<&Bindings<'a>>,
+        knowledge: &'a BeliefBase,
     ) -> Option<Bindings<'a>> {
-        use QueryOperand::*;
+        use crate::unification::traits::Unify;
+
+        fn next_bindings_for_rule<'b>(
+            belief: &'b Literal,
+            query: &mut Query<'b>,
+            literal: &'b Literal,
+            existing_bindings: Option<&Bindings<'b>>,
+        ) -> Option<Bindings<'b>> {
+            while let Some(mut bindings) = query.next_bindings(existing_bindings) {
+                bindings.retain_variables(belief.variables());
+
+                match belief.unify(literal, Some(&bindings)).ok() {
+                    Some(bindings) => return Some(bindings),
+                    None => continue,
+                }
+            }
+            None
+        }
 
         match self {
-            Literal(literal) => beliefs.and_then(|b| {
-                b.find_map(|(b, m)| b.unify_literal(m, literal, existing_bindings).ok())
-            }),
-            Relational(formula) => formula.verify_bindings(existing_bindings).ok().flatten(),
+            QueryOperand::Literal {
+                literal,
+                belief_to_process,
+            } => belief_to_process
+                .as_mut()
+                .and_then(|(belief, query)| {
+                    next_bindings_for_rule(belief, query, literal, existing_bindings)
+                })
+                .or_else(|| {
+                    beliefs.and_then(|b| {
+                        b.find_map(|belief| {
+                            if let Some(rule) = &belief.rule {
+                                let mut query = knowledge.query(rule);
+                                let result = next_bindings_for_rule(
+                                    &belief.literal,
+                                    &mut query,
+                                    literal,
+                                    existing_bindings,
+                                );
+                                *belief_to_process = Some((&belief.literal, query));
+                                result
+                            } else {
+                                belief.literal.unify(literal, existing_bindings).ok()
+                            }
+                        })
+                    })
+                }),
+            QueryOperand::Relational(formula) => {
+                formula.verify_bindings(existing_bindings).ok().flatten()
+            }
         }
     }
 }
@@ -475,7 +535,7 @@ pub(crate) mod formula {
         ) -> DnfBuilder<'a> {
             match formula {
                 QueryFormula::Literal(lit) => {
-                    let leaf = create_leaf(QueryOperand::Literal(lit), negated, bb);
+                    let leaf = create_leaf(QueryOperand::literal(lit), negated, bb);
                     DnfBuilder(vec![vec![leaf]])
                 }
                 QueryFormula::Relational(rel) => {
@@ -508,7 +568,10 @@ pub(crate) mod formula {
             bb: &'a BeliefBase,
         ) -> GroundQuery<'a> {
             let beliefs = match operand {
-                QueryOperand::Literal(Literal::Atom { structure, .. }) => bb
+                QueryOperand::Literal {
+                    literal: Literal::Atom { structure, .. },
+                    ..
+                } => bb
                     .beliefs
                     .get(&structure.atom_and_arity())
                     .map(|b| b.0.iter()),
@@ -520,6 +583,7 @@ pub(crate) mod formula {
                 beliefs: beliefs.clone(),
                 original: beliefs,
                 operand,
+                knowledge: bb,
             }
         }
 
@@ -573,7 +637,7 @@ pub(crate) mod formula {
                 assert_eq!(query.conjunctions[0].operands.len(), 1);
                 assert!(matches!(
                     query.conjunctions[0].operands[0].operand,
-                    QueryOperand::Literal(_)
+                    QueryOperand::Literal { .. }
                 ));
                 assert!(!query.conjunctions[0].operands[0].negated);
             }
@@ -694,7 +758,7 @@ pub(crate) mod formula {
 
                 // First operand is p (positive)
                 assert!(!ops[0].negated);
-                assert!(matches!(ops[0].operand, QueryOperand::Literal(_)));
+                assert!(matches!(ops[0].operand, QueryOperand::Literal { .. }));
 
                 // Second operand is Relational (negated)
                 assert!(ops[1].negated);

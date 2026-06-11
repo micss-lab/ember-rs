@@ -1,5 +1,3 @@
-pub(crate) use self::error::Result;
-
 pub mod constraint;
 pub mod error;
 pub mod traits;

@@ -25,7 +25,7 @@ pub(crate) struct Program {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Belief(pub(crate) Literal);
+pub(crate) struct Belief(pub(crate) Literal, pub(crate) Option<LogicalExpression>);
 
 #[derive(Debug, Clone)]
 pub(crate) struct Literal {
@@ -236,12 +236,22 @@ impl AstVisitor {
         }
     }
 
-    pub(crate) fn visit_belief(&mut self, Belief(literal): &Belief) -> impl ToTokens {
-        let literal = self.visit_literal(literal);
-        quote! {
-            ::ember::agent::bdi::knowledge::belief::Belief::from(
-                #literal
-            )
+    pub(crate) fn visit_belief(&mut self, Belief(literal, rule): &Belief) -> impl ToTokens {
+        let literal = self.visit_literal(literal).into_token_stream();
+        match rule {
+            Some(rule) => {
+                let rule = self.visit_logical_expression(rule);
+                quote! {
+                    ::ember::agent::bdi::knowledge::belief::Belief::from(
+                        (#literal, #rule)
+                    )
+                }
+            }
+            None => quote! {
+                ::ember::agent::bdi::knowledge::belief::Belief::from(
+                    #literal
+                )
+            },
         }
     }
 

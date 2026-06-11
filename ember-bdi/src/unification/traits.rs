@@ -2,6 +2,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use crate::bindings::Bindings;
+use crate::literal::Literal;
 use crate::term::view::{StructureView, TermView};
 use crate::term::{NonGround, Structure, Term};
 use crate::unification::error::UnificationError;
@@ -219,5 +220,14 @@ impl<'v> Unify<TermView<'v>> for Variable {
         // TODO: Check that the term can be converted to the type of the variable.
 
         Ok(vec![BindingConstraint::new(self.id, other.clone())])
+    }
+}
+
+impl Unify<&Literal> for Literal {
+    fn collect_constraints<'a>(&'a self, other: &'a Self) -> Result<Vec<BindingConstraint<'a>>>
+    where
+        Self: 'a,
+    {
+        TermView::from(self).collect_constraints(TermView::from(other))
     }
 }

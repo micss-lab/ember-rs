@@ -1,6 +1,6 @@
 use core::marker::PhantomData;
 
-use alloc::collections::BTreeMap;
+use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
 
 use crate::term::Term;
@@ -38,6 +38,14 @@ impl<'a, T> Bindings<'a, T> {
             aliases,
             lifetime_: PhantomData,
         }
+    }
+
+    /// Filters the bound variables and only retains those present in the specified set.
+    pub(crate) fn retain_variables(&mut self, variables: BTreeSet<VariableId>) {
+        self.bindings
+            .as_mut()
+            .map(|b| b.retain(|v, _| variables.contains(v)));
+        self.aliases.retain_variables(variables);
     }
 }
 
@@ -152,5 +160,10 @@ impl AliasMap {
 
     pub(crate) fn iter(&self) -> core::slice::Iter<'_, (VariableId, VariableId)> {
         self.0.iter()
+    }
+
+    fn retain_variables(&mut self, variables: BTreeSet<VariableId>) {
+        self.0
+            .retain(|(v1, v2)| variables.contains(v1) && variables.contains(v2));
     }
 }
