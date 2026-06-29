@@ -41,10 +41,13 @@ impl MessageBuilder {
                 })?,
             ),
             // TODO: Fix this when properly supporting sending bytes.
-            Some(b"bytes") => Content::Bytes(hex::decode(content).map_err(|_| {
-                log::error!("failed to parse bytes content from hex");
-                "bytes-content"
-            })?),
+            Some(b"bytes") => {
+                use base64ct::{Base64, Encoding};
+                Content::Bytes(Base64::decode_vec(content.to_str_lossy().as_ref()).map_err(|_| {
+                    log::error!("failed to parse bytes content from base64");
+                    "bytes-content"
+                })?)
+            }
             None => Content::Other {
                 kind: None,
                 content: content.to_string(),

@@ -9,7 +9,7 @@ ember-time = { workspace = true }
 bstr = { version = "1.12", default-features = false, features = ["alloc"] }
 chrono = { version = "0.4", default-features = false, features = ["alloc", "serde"] }
 critical-section = "1.2"
-hex = { version = "0.4", default-features = false, features = ["alloc", "serde"] }
+base64ct = { version = "1.8", default-features = false, features = ["alloc"] }
 libm = "0.2"
 log = { version = "0.4", default-features = false, features = ["serde"] }
 peg = { version = "0.8", default-features = false, git = "https://github.com/kevinmehall/rust-peg.git" }

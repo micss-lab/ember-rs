@@ -20,10 +20,10 @@ impl serde::Serialize for Message {
                 message.serialize_field("content", &format!("\"{c}\""))?;
             }
             Content::Bytes(b) => {
+                use base64ct::{Base64, Encoding};
                 message.serialize_field("language", "bytes")?;
-                // TODO: Encode as regular bytes when parsing support for acl messages is expanded.
                 message
-                    .serialize_field("content", &format!("\"{}\"", hex::encode(b.as_slice())))?;
+                    .serialize_field("content", &format!("\"{}\"", Base64::encode_string(b.as_slice())))?;
             }
             Content::Other { kind, content } => {
                 if let Some(kind) = kind {
