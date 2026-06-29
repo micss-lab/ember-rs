@@ -1,76 +1,35 @@
 use alloc::boxed::Box;
 use alloc::collections::BTreeSet;
 use alloc::string::{String, ToString};
-use alloc::vec::Vec;
 
 use bstr::BString;
 
-use crate::literal::Literal;
-use crate::variable::VariableId;
-
-use super::{Ground, NonGround};
+use crate::variable::{Variable, VariableId};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Term<Groundness = NonGround> {
+pub enum Term {
     // TODO: Support full arithmetic formulas here.
     Number(TotalCmpF32),
     String(BString),
-    Variable(Groundness),
+    Variable(Variable),
     // TODO: Support lists.
     // List(List),
-    Literal {
-        negated: bool,
-        structure: Structure<Groundness>,
-    },
+    Literal { negated: bool, structure: Structure },
 }
 
-impl<G> From<Literal<G>> for Term<G> {
-    fn from(literal: Literal<G>) -> Self {
-        match literal {
-            Literal::Atom { negated, structure } => Self::Literal { negated, structure },
-            Literal::Variable(g) => Self::Variable(g),
-        }
-    }
-}
-
-impl Term<Ground> {
-    pub fn into_non_ground(self) -> Term<NonGround> {
+impl Term {
+    pub fn is_ground(&self) -> bool {
         use Term::*;
         match self {
-            Number(n) => Number(n),
-            String(s) => String(s),
-            Variable(Ground(i)) => {
-                // As the type of I is `Infallible` which is an enum with zero
-                // variants, this is the best way to ensure that a change to this type
-                // would result in a compiler error down the line. Using `unreachable!`
-                // would not trigger an error if the type ever changes.
-                match i {}
-            }
-            Literal { negated, structure } => Literal {
-                negated,
-                structure: structure.into_non_ground(),
-            },
+            Number(_) | String(_) => true,
+            Variable(_) => false,
+            Literal { structure, .. } => structure.is_ground(),
         }
-    }
-}
-
-impl Term<NonGround> {
-    pub fn try_into_ground(self) -> Option<Term<Ground>> {
-        use Term::*;
-        Some(match self {
-            Number(n) => Number(n),
-            String(s) => String(s),
-            Variable(_) => return None,
-            Literal { negated, structure } => Literal {
-                negated,
-                structure: structure.try_into_ground()?,
-            },
-        })
     }
 
     pub(crate) fn collect_variables(&self, vars: &mut BTreeSet<VariableId>) {
         match self {
-            Term::Variable(NonGround(v)) => {
+            Term::Variable(v) => {
                 vars.insert(v.id);
             }
             Term::Literal { structure, .. } => {
@@ -129,43 +88,22 @@ impl PartialEq for TotalCmpF32 {
 impl Eq for TotalCmpF32 {}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Structure<Groundness = NonGround> {
+pub struct Structure {
     pub functor: Atom,
-    pub arguments: Option<Box<[Term<Groundness>]>>,
+    pub arguments: Option<Box<[Term]>>,
 }
 
-impl Structure<Ground> {
-    pub fn into_non_ground(self) -> Structure<NonGround> {
-        let Structure { functor, arguments } = self;
-        Structure {
-            functor,
-            arguments: arguments.map(|a| a.into_iter().map(|t| t.into_non_ground()).collect()),
-        }
+impl Structure {
+    pub fn is_ground(&self) -> bool {
+        let Structure { arguments, .. } = self;
+        arguments
+            .as_ref()
+            .map(|args| args.iter().all(|a| a.is_ground()))
+            .unwrap_or(false)
     }
 }
 
-impl Structure<NonGround> {
-    pub fn try_into_ground(self) -> Option<Structure<Ground>> {
-        let Structure { functor, arguments } = self;
-        Some(Structure {
-            functor,
-            arguments: match arguments {
-                Some(a) => Some(
-                    a.into_iter()
-                        .map(|t| t.try_into_ground())
-                        .collect::<Option<Vec<_>>>()?
-                        .into_boxed_slice(),
-                ),
-                None => None,
-            },
-        })
-    }
-}
-
-impl<G> Structure<G>
-where
-    G: Clone,
-{
+impl Structure {
     pub(crate) fn atom_and_arity(&self) -> (Atom, usize) {
         (
             self.functor.clone(),

@@ -5,8 +5,6 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::vec;
 
-use ember::agent::bdi::sensor::{Percept, Perceptor};
-use ember::agent::bdi::term::reference::TermRef;
 use log::info;
 
 use ember::Container;
@@ -20,7 +18,9 @@ use ember::agent::bdi::plan::library::PlanLibrary;
 use ember::agent::bdi::plan::{
     Action, BuiltinAction, Formula, GoalKind, Plan, QueryFormula, Trigger, TriggeringEvent,
 };
-use ember::agent::bdi::term::{FromTerm, FromTermError, Ground, NonGround, Structure, Term};
+use ember::agent::bdi::sensor::{Percept, Perceptor};
+use ember::agent::bdi::term::reference::TermRef;
+use ember::agent::bdi::term::{FromTerm, FromTermError, Structure, Term};
 use ember::agent::bdi::variable::Variable;
 
 use ember_examples::setup_example;
@@ -68,7 +68,7 @@ struct SensorReading {
 }
 
 impl IntoLiteral for SensorReading {
-    fn into_literal(self) -> Literal<Ground> {
+    fn into_literal(self) -> Literal {
         Literal::Atom {
             negated: false,
             structure: Structure {
@@ -264,18 +264,12 @@ fn define_plans() -> PlanLibrary<AgentAction> {
             QueryFormula::literal(
                 false,
                 "at",
-                Some([
-                    Term::String("agent".into()),
-                    Term::Variable(NonGround(v_loc.clone())),
-                ]),
+                Some([Term::String("agent".into()), Term::Variable(v_loc.clone())]),
             ),
             QueryFormula::literal(
                 false,
                 "at",
-                Some([
-                    Term::String("coffee_machine".into()),
-                    Term::Variable(NonGround(v_loc)),
-                ]),
+                Some([Term::String("coffee_machine".into()), Term::Variable(v_loc)]),
             ),
             QueryFormula::literal(false, "have", Some([Term::String("coffee_beans".into())])),
         ])),
@@ -363,25 +357,20 @@ fn define_plans() -> PlanLibrary<AgentAction> {
                 negated: false,
                 structure: Structure {
                     functor: "go_to".into(),
-                    arguments: Some(
-                        vec![Term::Variable(NonGround(v_dest.clone()))].into_boxed_slice(),
-                    ),
+                    arguments: Some(vec![Term::Variable(v_dest.clone())].into_boxed_slice()),
                 },
             },
         },
         context: Some(QueryFormula::literal(
             false,
             "at",
-            Some([
-                Term::String("agent".into()),
-                Term::Variable(NonGround(v_dest.clone())),
-            ]),
+            Some([Term::String("agent".into()), Term::Variable(v_dest.clone())]),
         )),
         body: Box::new([Formula::Action(Action::Builtin(BuiltinAction::Log(
             log::Level::Info,
             [
                 Term::String("[ACTION] 💬 Already at".into()),
-                Term::Variable(NonGround(v_dest.clone())),
+                Term::Variable(v_dest.clone()),
             ]
             .into(),
         )))]),
@@ -397,19 +386,14 @@ fn define_plans() -> PlanLibrary<AgentAction> {
                 negated: false,
                 structure: Structure {
                     functor: "go_to".into(),
-                    arguments: Some(
-                        vec![Term::Variable(NonGround(v_dest.clone()))].into_boxed_slice(),
-                    ),
+                    arguments: Some(vec![Term::Variable(v_dest.clone())].into_boxed_slice()),
                 },
             },
         },
         context: Some(QueryFormula::literal(
             false,
             "at",
-            Some([
-                Term::String("agent".into()),
-                Term::Variable(NonGround(v_from.clone())),
-            ]),
+            Some([Term::String("agent".into()), Term::Variable(v_from.clone())]),
         )),
         body: Box::new([
             Formula::Action(Action::User(AgentAction::Move {
@@ -424,7 +408,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
                         functor: "at".into(),
                         arguments: Some(Box::new([
                             Term::String("agent".into()),
-                            Term::Variable(NonGround(v_from)),
+                            Term::Variable(v_from),
                         ])),
                     },
                 },
@@ -437,7 +421,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
                         functor: "at".into(),
                         arguments: Some(Box::new([
                             Term::String("agent".into()),
-                            Term::Variable(NonGround(v_dest.clone())),
+                            Term::Variable(v_dest.clone()),
                         ])),
                     },
                 },

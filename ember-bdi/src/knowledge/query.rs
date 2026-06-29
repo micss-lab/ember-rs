@@ -167,15 +167,15 @@ impl<'a> QueryOperand<'a> {
                             if let Some(rule) = &belief.rule {
                                 let mut query = knowledge.query(rule);
                                 let result = next_bindings_for_rule(
-                                    &belief.literal,
+                                    &belief.head,
                                     &mut query,
                                     literal,
                                     existing_bindings,
                                 );
-                                *belief_to_process = Some((&belief.literal, query));
+                                *belief_to_process = Some((&belief.head, query));
                                 result
                             } else {
-                                belief.literal.unify(literal, existing_bindings).ok()
+                                belief.head.unify(literal, existing_bindings).ok()
                             }
                         })
                     })
@@ -323,7 +323,7 @@ pub(crate) mod formula {
     pub(crate) mod eval {
         use crate::bindings::Bindings;
         use crate::term::view::TermView;
-        use crate::term::{NonGround, Term, TotalCmpF32};
+        use crate::term::{Term, TotalCmpF32};
         use crate::unification::traits::UnifyView;
 
         use super::{
@@ -452,10 +452,10 @@ pub(crate) mod formula {
         fn resolve_to_f32(term: &Term, bindings: &Bindings) -> Result<f32, EvaluationError> {
             match term {
                 Term::Number(n) => Ok(**n),
-                Term::Variable(NonGround(v)) => match bindings.get_view(v) {
+                Term::Variable(v) => match bindings.get_view(v) {
                     Some(TermView::Term(t)) => resolve_to_f32(t, bindings),
                     Some(TermView::Variable(v)) => {
-                        resolve_to_f32(&Term::Variable(NonGround((*v).clone())), bindings)
+                        resolve_to_f32(&Term::Variable((*v).clone()), bindings)
                     }
                     Some(TermView::Literal { .. }) => Err(EvaluationError::TypeMismatch),
                     Some(TermView::Number(n)) => Ok(**n),
@@ -845,9 +845,7 @@ mod tests {
                     Some(args.into_boxed_slice())
                 },
             },
-        }
-        .try_into_ground()
-        .expect("belief can only contain ground literals");
+        };
 
         lit.into()
     }

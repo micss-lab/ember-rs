@@ -60,7 +60,7 @@ pub(crate) mod into_literal {
             impl #impl_generics ::ember::agent::bdi::literal::IntoLiteral for #name #ty_generics #where_clause {
                 fn into_literal(
                     self,
-                ) -> ::ember::agent::bdi::literal::Literal<::ember::agent::bdi::term::Ground> {
+                ) -> ::ember::agent::bdi::literal::Literal {
                     #body
                 }
             }

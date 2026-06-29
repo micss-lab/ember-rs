@@ -19,12 +19,12 @@ impl BeliefBase {
     pub fn assert<A>(&mut self, belief: impl Into<Belief>, context: &mut Context<A>) -> bool {
         let belief = belief.into();
         let added = self.assert_no_event(belief.clone());
-        if added {
+        if added && belief.rule.is_none() {
             // TODO: Should this be an external event (no intention id)? I think it does...
             context.emit_event(
                 TriggeringEvent {
                     trigger: Trigger::Addition,
-                    event: belief.into(),
+                    event: belief.head,
                     goal: None,
                 },
                 None,
@@ -49,12 +49,12 @@ impl BeliefBase {
     pub fn remove<A>(&mut self, belief: impl Into<Belief>, context: &mut Context<A>) -> bool {
         let belief = belief.into();
         let removed = self.remove_no_event(belief.clone());
-        if removed {
+        if removed && belief.rule.is_none() {
             // TODO: Should this be an external event (no intention id)? I think it does...
             context.emit_event(
                 TriggeringEvent {
                     trigger: Trigger::Deletion,
-                    event: belief.into(),
+                    event: belief.head,
                     goal: None,
                 },
                 None,

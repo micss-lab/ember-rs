@@ -63,11 +63,7 @@ where
 
     fn handle_event(&mut self, event: TriggeringEvent, source: EventSource) {
         if event.goal.is_none() {
-            let ground = event
-                .event
-                .clone()
-                .try_into_ground()
-                .expect("belief update must be ground");
+            let ground = event.event.clone();
 
             match event.trigger {
                 Trigger::Addition => self.beliefs.assert_no_event(ground),

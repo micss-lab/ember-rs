@@ -8,7 +8,6 @@ use crate::variable::Variable;
 
 use super::owned::Term;
 use super::reference::TermRef;
-use super::{Ground, NonGround};
 
 pub use ember_bdi_macros::FromTerm;
 
@@ -90,25 +89,25 @@ impl FromTerm<'_> for String {
     }
 }
 
-impl<G> From<f32> for Term<G> {
+impl From<f32> for Term {
     fn from(number: f32) -> Self {
         Self::Number(number.into())
     }
 }
 
-impl<G> From<String> for Term<G> {
+impl From<String> for Term {
     fn from(string: String) -> Self {
         Self::String(string.into())
     }
 }
 
-impl<G> From<BString> for Term<G> {
+impl From<BString> for Term {
     fn from(string: BString) -> Self {
         Self::String(string)
     }
 }
 
-impl<L> From<L> for Term<Ground>
+impl<L> From<L> for Term
 where
     L: IntoLiteral,
 {
@@ -120,8 +119,8 @@ where
     }
 }
 
-impl From<Variable> for Term<NonGround> {
+impl From<Variable> for Term {
     fn from(variable: Variable) -> Self {
-        Self::Variable(NonGround(variable))
+        Self::Variable(variable)
     }
 }

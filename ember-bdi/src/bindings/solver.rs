@@ -2,7 +2,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use crate::bindings::{AliasMap, Bindings, StructureView, TermView};
-use crate::term::{NonGround, Term};
+use crate::term::Term;
 use crate::unification::constraint::BindingConstraint;
 use crate::unification::error::{Result, UnificationError};
 use crate::unification::traits::UnifyView;
@@ -192,7 +192,7 @@ impl<'a> EquivalenceClasses<'a> {
                 Term::Number(n) => Ok(TermView::Number(*n)),
                 Term::String(_) => Ok(TermView::Term(term)),
 
-                Term::Variable(NonGround(v)) => {
+                Term::Variable(v) => {
                     let Some(root) = self.root_of(v.id) else {
                         return Ok(TermView::Term(term));
                     };

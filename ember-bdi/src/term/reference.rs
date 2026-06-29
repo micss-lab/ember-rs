@@ -5,7 +5,6 @@ use bstr::BString;
 
 use crate::variable::Variable;
 
-use super::NonGround;
 use super::owned::{Atom, Structure, Term, TotalCmpF32};
 use super::view::{StructureView, TermView};
 
@@ -26,7 +25,7 @@ impl TermRef<'_> {
         match *self {
             Self::Number(n) => Term::Number(n),
             Self::String(s) => Term::String(s.clone()),
-            Self::Variable(v) => Term::Variable(NonGround(v.clone())),
+            Self::Variable(v) => Term::Variable(v.clone()),
             Self::Literal {
                 negated,
                 functor,
@@ -53,7 +52,7 @@ impl<'a> From<&'a Term> for TermRef<'a> {
         match term {
             Term::Number(n) => Self::Number(*n),
             Term::String(s) => Self::String(s),
-            Term::Variable(NonGround(v)) => Self::Variable(v),
+            Term::Variable(v) => Self::Variable(v),
             &Term::Literal {
                 negated,
                 structure:

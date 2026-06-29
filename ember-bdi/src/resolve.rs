@@ -3,8 +3,8 @@ use alloc::vec::Vec;
 use crate::bindings::BindingLookup;
 use crate::literal::Literal;
 use crate::term::Structure;
+use crate::term::Term;
 use crate::term::view::{StructureView, TermView};
-use crate::term::{NonGround, Term};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ResolveFailure {
@@ -54,7 +54,7 @@ impl Resolve for Literal {
                 negated,
                 structure: structure.to_owned(),
             },
-            TermView::Variable(v) => Self::Variable(NonGround(v.clone())),
+            TermView::Variable(v) => Self::Variable(v.clone()),
 
             _ => return Err(ResolveFailure::IncorrectKind),
         })
@@ -72,9 +72,7 @@ impl Resolve for Literal {
                 negated,
                 structure: structure.resolve_as_view(bindings)?,
             },
-            Literal::Variable(NonGround(ref v)) => {
-                bindings.lookup_view(v).unwrap_or(TermView::Variable(v))
-            }
+            Literal::Variable(ref v) => bindings.lookup_view(v).unwrap_or(TermView::Variable(v)),
         })
     }
 }
@@ -92,9 +90,7 @@ impl Resolve for Term {
     ) -> Result<TermView<'a>, ResolveFailure> {
         Ok(match *self {
             Term::Number(_) | Term::String(_) => TermView::Term(self),
-            Term::Variable(NonGround(ref v)) => {
-                bindings.lookup_view(v).unwrap_or(TermView::Variable(v))
-            }
+            Term::Variable(ref v) => bindings.lookup_view(v).unwrap_or(TermView::Variable(v)),
             Term::Literal {
                 negated,
                 ref structure,
@@ -139,7 +135,7 @@ mod tests {
     use crate::bindings::Bindings;
     use crate::literal::Literal;
     use crate::term::view::TermView;
-    use crate::term::{Atom, NonGround, Structure, Term};
+    use crate::term::{Atom, Structure, Term};
 
     use crate::testing::*;
 
@@ -242,7 +238,7 @@ mod tests {
         let bindings = bindings(vec![(var.clone(), target_view)]);
 
         // A negated variable literal
-        let literal = Literal::Variable(NonGround(var));
+        let literal = Literal::Variable(var);
 
         // Ensure that resolve_possible_as_view captures underlying literal aspects,
         // but note that the `negated` value produced matches the variant wrapped by the view.

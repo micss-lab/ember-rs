@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use crate::bindings::Bindings;
 use crate::literal::Literal;
 use crate::term::view::{StructureView, TermView};
-use crate::term::{NonGround, Structure, Term};
+use crate::term::{Structure, Term};
 use crate::unification::error::UnificationError;
 use crate::variable::Variable;
 
@@ -53,7 +53,7 @@ impl Unify<&Term> for Term {
         use Term::*;
 
         match (self, other) {
-            (Variable(NonGround(v)), t) | (t, Variable(NonGround(v))) => v.collect_constraints(t),
+            (Variable(v), t) | (t, Variable(v)) => v.collect_constraints(t),
 
             (Number(n1), Number(n2)) if n1 == n2 => Ok(vec![]),
             (Number(_), Number(_)) => Err(UnificationError::NumberMismatch),
@@ -108,7 +108,7 @@ impl<'v> Unify<TermView<'v>> for Term {
         match (self, other) {
             (_, TermView::Term(other)) => self.collect_constraints(other),
 
-            (Term::Variable(NonGround(v)), other) => v.collect_constraints(other),
+            (Term::Variable(v), other) => v.collect_constraints(other),
             (other, TermView::Variable(v)) => v.collect_constraints(other),
 
             (Term::Literal { negated: n1, .. }, TermView::Literal { negated: n2, .. })

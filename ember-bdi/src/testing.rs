@@ -1,5 +1,6 @@
 use alloc::collections::vec_deque::VecDeque;
 use alloc::vec::Vec;
+
 use ember_core::environment::Environment;
 
 use crate::bindings::Bindings;
@@ -8,7 +9,7 @@ use crate::knowledge::base::BeliefBase;
 use crate::literal::Literal;
 use crate::plan::{Formula, GoalKind, Plan, QueryFormula, Trigger, TriggeringEvent};
 use crate::term::view::TermView;
-use crate::term::{Atom, NonGround, Structure, Term};
+use crate::term::{Atom, Structure, Term};
 use crate::variable::Variable;
 
 pub fn variable() -> Variable {
@@ -16,7 +17,7 @@ pub fn variable() -> Variable {
 }
 
 pub fn variable_term(var: &Variable) -> Term {
-    Term::Variable(NonGround(var.clone()))
+    Term::Variable(var.clone())
 }
 
 pub fn string(str: &str) -> Term {
@@ -59,7 +60,7 @@ pub fn literal(functor: &str, args: Vec<Term>) -> Literal {
 }
 
 pub fn literal_variable(var: &Variable) -> Literal {
-    Literal::Variable(NonGround(var.clone()))
+    Literal::Variable(var.clone())
 }
 
 pub fn literal_formula(functor: &str, args: Vec<Term>) -> QueryFormula {
@@ -75,9 +76,7 @@ pub fn bindings<'a>(list: Vec<(Variable, TermView<'a>)>) -> Bindings<'a> {
 }
 
 pub fn assert_belief(bb: &mut BeliefBase, functor: &str, args: Vec<Term>) {
-    let lit = literal(functor, args)
-        .try_into_ground()
-        .expect("belief should be ground literal");
+    let lit = literal(functor, args);
     bb.assert_no_event(lit);
 }
 

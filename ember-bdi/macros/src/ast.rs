@@ -490,9 +490,7 @@ impl AstVisitor {
             ArithmeticFactor::Variable(variable) => {
                 let variable = self.visit_variable(variable);
                 quote! {
-                    ::ember::agent::bdi::term::owned::Term::Variable(
-                        ::ember::agent::bdi::term::NonGround(#variable)
-                    )
+                    ::ember::agent::bdi::term::owned::Term::Variable(#variable)
                 }
             }
             ArithmeticFactor::Neg(factor) => {
@@ -560,9 +558,7 @@ impl AstVisitor {
             Term::Variable(variable) => {
                 let variable = self.visit_variable(variable);
                 quote! {
-                    ::ember::agent::bdi::term::owned::Term::Variable(
-                        ::ember::agent::bdi::term::NonGround(#variable)
-                    )
+                    ::ember::agent::bdi::term::owned::Term::Variable(#variable)
                 }
             }
             Term::Number(number) => quote! {

@@ -1,42 +1,21 @@
-use crate::{
-    term::{Ground, NonGround, Structure},
-    variable::VariableId,
-};
-
 use alloc::collections::btree_set::BTreeSet;
+
 pub use ember_bdi_macros::IntoLiteral;
 
+use crate::term::Structure;
+use crate::variable::{Variable, VariableId};
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Literal<Groundness = NonGround> {
-    Atom {
-        negated: bool,
-        structure: Structure<Groundness>,
-    },
-    Variable(Groundness),
+pub enum Literal {
+    Atom { negated: bool, structure: Structure },
+    Variable(Variable),
 }
 
-pub type GroundLiteral = Literal<Ground>;
-
-impl Literal<Ground> {
-    pub fn into_non_ground(self) -> Literal<NonGround> {
+impl Literal {
+    pub fn is_ground(&self) -> bool {
         match self {
-            Literal::Atom { negated, structure } => Literal::Atom {
-                negated,
-                structure: structure.into_non_ground(),
-            },
-            Literal::Variable(Ground(i)) => match i {},
-        }
-    }
-}
-
-impl Literal<NonGround> {
-    pub fn try_into_ground(self) -> Option<Literal<Ground>> {
-        match self {
-            Literal::Atom { negated, structure } => Some(Literal::Atom {
-                negated,
-                structure: structure.try_into_ground()?,
-            }),
-            Literal::Variable(NonGround(_)) => None,
+            Literal::Atom { structure, .. } => structure.is_ground(),
+            Literal::Variable(_) => false,
         }
     }
 
@@ -55,7 +34,7 @@ impl Literal<NonGround> {
                     }
                 }
             }
-            Literal::Variable(NonGround(v)) => {
+            Literal::Variable(v) => {
                 vars.insert(v.id);
             }
         }
@@ -63,5 +42,11 @@ impl Literal<NonGround> {
 }
 
 pub trait IntoLiteral: Sized {
-    fn into_literal(self) -> Literal<Ground>;
+    fn into_literal(self) -> Literal;
+}
+
+impl IntoLiteral for Literal {
+    fn into_literal(self) -> Literal {
+        self
+    }
 }

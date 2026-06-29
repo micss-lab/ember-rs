@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use crate::literal::Literal;
 use crate::variable::Variable;
 
-use super::{Atom, NonGround, Structure, Term, TotalCmpF32};
+use super::{Atom, Structure, Term, TotalCmpF32};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TermView<'a> {
@@ -47,7 +47,7 @@ impl<'a> From<&'a Literal> for TermView<'a> {
                 negated: *negated,
                 structure: structure.into(),
             },
-            Literal::Variable(NonGround(v)) => TermView::Variable(v),
+            Literal::Variable(v) => TermView::Variable(v),
         }
     }
 }
@@ -57,7 +57,7 @@ impl<'a> TermView<'a> {
         let Self::Term(term) = self else {
             return None;
         };
-        let Term::Variable(NonGround(v)) = term else {
+        let Term::Variable(v) = term else {
             return None;
         };
         Some(v)
@@ -69,7 +69,7 @@ impl TermView<'_> {
         match *self {
             TermView::Term(term) => term.clone(),
             TermView::Number(n) => Term::Number(n),
-            TermView::Variable(v) => Term::Variable(NonGround(v.clone())),
+            TermView::Variable(v) => Term::Variable(v.clone()),
             TermView::Literal {
                 negated,
                 ref structure,

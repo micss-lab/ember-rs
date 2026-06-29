@@ -110,7 +110,7 @@ mod tests {
     use crate::knowledge::base::BeliefBase;
     use crate::literal::Literal;
     use crate::plan::{GoalKind, QueryFormula};
-    use crate::term::{Atom, NonGround, Term};
+    use crate::term::{Atom, Term};
     use crate::testing::*;
 
     use super::*;
@@ -150,9 +150,7 @@ mod tests {
                 functor: Atom("is_ready".into()),
                 arguments: None,
             },
-        }
-        .try_into_ground()
-        .expect("belief should be ground literal");
+        };
         bb.assert_no_event(ready_belief);
 
         let mut selection2 = PlanSelection::select_from_library(&event, &store);
@@ -265,9 +263,7 @@ mod tests {
                 functor: Atom("colour".into()),
                 arguments: Some(Box::new([string("circle"), string("red")])),
             },
-        }
-        .try_into_ground()
-        .expect("belief should be ground literal");
+        };
         bb.assert_no_event(colour_belief);
 
         let x = variable();
@@ -334,10 +330,7 @@ mod tests {
             ),
             context: Some(literal_formula(
                 "linked",
-                vec![
-                    variable_term(&plan_var),
-                    Term::Variable(NonGround(variable())),
-                ],
+                vec![variable_term(&plan_var), Term::Variable(variable())],
             )),
             body: Box::new([]),
         });

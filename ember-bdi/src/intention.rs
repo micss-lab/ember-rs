@@ -109,12 +109,11 @@ impl<A> Frame<A> {
 
         match formula {
             Formula::Belief { trigger, belief } => {
-                let event = belief
-                    .try_into_ground()
-                    .ok_or(StepError::ResolveIncomplete)?
-                    // TODO: Avoid the extra conversion here by using an `is_ground`
-                    // function.
-                    .into_non_ground();
+                let event = if !belief.is_ground() {
+                    return Err(StepError::ResolveIncomplete);
+                } else {
+                    belief
+                };
 
                 context.emit_event(
                     TriggeringEvent {
@@ -173,10 +172,7 @@ mod tests {
         let mut context = unsafe { new_context_without_environment() };
 
         // Step with no frames returns Done
-        assert!(matches!(
-            intention.step(&mut context),
-            Ok(StepOk::Done)
-        ));
+        assert!(matches!(intention.step(&mut context), Ok(StepOk::Done)));
     }
 
     #[test]
