@@ -50,11 +50,10 @@ impl Resolve for Literal {
     /// created binding is valid in the place it used.
     fn resolve(self, bindings: &impl BindingLookup) -> Result<Self, ResolveFailure> {
         Ok(match self.resolve_as_view(bindings)? {
-            TermView::Literal { negated, structure } => Self::Atom {
+            TermView::Literal { negated, structure } => Self {
                 negated,
                 structure: structure.to_owned(),
             },
-            TermView::Variable(v) => Self::Variable(v.clone()),
 
             _ => return Err(ResolveFailure::IncorrectKind),
         })
@@ -65,14 +64,13 @@ impl Resolve for Literal {
         bindings: &'b impl BindingLookup,
     ) -> Result<TermView<'b>, ResolveFailure> {
         Ok(match *self {
-            Literal::Atom {
+            Literal {
                 negated,
                 ref structure,
             } => TermView::Literal {
                 negated,
                 structure: structure.resolve_as_view(bindings)?,
             },
-            Literal::Variable(ref v) => bindings.lookup_view(v).unwrap_or(TermView::Variable(v)),
         })
     }
 }
@@ -91,13 +89,7 @@ impl Resolve for Term {
         Ok(match *self {
             Term::Number(_) | Term::String(_) => TermView::Term(self),
             Term::Variable(ref v) => bindings.lookup_view(v).unwrap_or(TermView::Variable(v)),
-            Term::Literal {
-                negated,
-                ref structure,
-            } => TermView::Literal {
-                negated,
-                structure: structure.resolve_as_view(bindings)?,
-            },
+            Term::Literal(ref literal) => literal.resolve_as_view(bindings)?,
         })
     }
 }
@@ -155,53 +147,19 @@ mod tests {
     }
 
     #[test]
-    fn test_resolve_unbound_variable_literal_remains_variable() {
-        let bindings: Bindings<'_> = Bindings::empty();
-        let var = variable();
-        let literal = literal_variable(&var);
-
-        let resolved = literal
-            .clone()
-            .resolve(&bindings)
-            .expect("Should resolve successfully");
-
-        assert_eq!(resolved, literal);
-        assert!(matches!(resolved, Literal::Variable(_)));
-    }
-
-    #[test]
     fn test_resolve_variable_to_atom_literal() {
         let target_atom = literal("sunny", vec![]);
         let target_view = TermView::from(&target_atom);
 
         let var = variable();
         let bindings = bindings(vec![(var.clone(), target_view)]);
-        let literal = literal_variable(&var);
+        let literal = variable_term(&var);
 
         let resolved = literal
             .resolve(&bindings)
             .expect("Should resolve successfully");
 
-        assert_eq!(resolved, target_atom);
-        assert!(matches!(resolved, Literal::Atom { .. }));
-    }
-
-    #[test]
-    fn test_resolve_variable_to_invalid_kind_fails() {
-        let var_num = variable();
-        let num_bindings = bindings(vec![(var_num.clone(), TermView::Number(42.0.into()))]);
-        let lit_num = literal_variable(&var_num);
-
-        let result_num = lit_num.resolve(&num_bindings);
-        assert!(matches!(result_num, Err(ResolveFailure::IncorrectKind)));
-
-        let var_str = variable();
-        let term_str = string("hello");
-        let str_bindings = bindings(vec![(var_str.clone(), TermView::Term(&term_str))]);
-        let lit_str = literal_variable(&var_str);
-
-        let result_str = lit_str.resolve(&str_bindings);
-        assert!(matches!(result_str, Err(ResolveFailure::IncorrectKind)));
+        assert_eq!(resolved, Term::Literal(target_atom));
     }
 
     #[test]
@@ -238,7 +196,7 @@ mod tests {
         let bindings = bindings(vec![(var.clone(), target_view)]);
 
         // A negated variable literal
-        let literal = Literal::Variable(var);
+        let literal = Term::Variable(var);
 
         // Ensure that resolve_possible_as_view captures underlying literal aspects,
         // but note that the `negated` value produced matches the variant wrapped by the view.
@@ -246,10 +204,10 @@ mod tests {
             .resolve(&bindings)
             .expect("Should resolve successfully");
 
-        if let Literal::Atom { negated, .. } = resolved {
+        if let Term::Literal(Literal { negated, .. }) = resolved {
             assert!(!negated, "Inner ground atom definition was not negated");
         } else {
-            panic!("Expected a Literal::Atom");
+            panic!("Variable resolved to incorrect term.");
         }
     }
 
@@ -266,10 +224,10 @@ mod tests {
         };
 
         // Term wrapper around structural literal: Term::Literal { ... }
-        let embedded_term = Term::Literal {
+        let embedded_term = Term::Literal(Literal {
             negated: false,
             structure: inner_structure,
-        };
+        });
 
         // Outer wrapper: outer_lit(embedded_term)
         let outer_literal = literal("outer_lit", vec![embedded_term]);
@@ -278,27 +236,26 @@ mod tests {
             .resolve(&bindings)
             .expect("Should recursively map out inner structure terms");
 
-        if let Literal::Atom { structure, .. } = resolved {
-            let outer_args = structure.arguments.expect("Should have outer args");
-            let Term::Literal {
-                structure: inner_struct,
-                ..
-            } = &outer_args[0]
-            else {
-                panic!("Expected a nested Term::Literal wrapper");
-            };
+        let outer_args = resolved
+            .structure
+            .arguments
+            .expect("Should have outer args");
+        let Term::Literal(Literal {
+            structure: inner_struct,
+            ..
+        }) = &outer_args[0]
+        else {
+            panic!("Expected a nested Term::Literal wrapper");
+        };
 
-            let inner_args = inner_struct
-                .arguments
-                .as_ref()
-                .expect("Should have inner args");
-            assert_eq!(
-                inner_args[0],
-                number(31.5),
-                "Nested variable X should be resolved to 31.5"
-            );
-        } else {
-            panic!("Expected a Literal::Atom wrapper");
-        }
+        let inner_args = inner_struct
+            .arguments
+            .as_ref()
+            .expect("Should have inner args");
+        assert_eq!(
+            inner_args[0],
+            number(31.5),
+            "Nested variable X should be resolved to 31.5"
+        );
     }
 }

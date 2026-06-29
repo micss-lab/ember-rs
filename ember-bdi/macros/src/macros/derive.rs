@@ -97,7 +97,7 @@ pub(crate) mod into_literal {
         };
 
         quote! {
-            ::ember::agent::bdi::literal::Literal::Atom {
+            ::ember::agent::bdi::literal::Literal {
                 negated: false,
                 structure: ::ember::agent::bdi::term::owned::Structure {
                     functor: ::ember::agent::bdi::term::owned::Atom(
@@ -139,7 +139,7 @@ pub(crate) mod into_literal {
         };
 
         quote! {
-            ::ember::agent::bdi::literal::Literal::Atom {
+            ::ember::agent::bdi::literal::Literal {
                 negated: false,
                 structure: ::ember::agent::bdi::term::owned::Structure {
                     functor: ::ember::agent::bdi::term::owned::Atom(
@@ -171,14 +171,12 @@ pub(crate) mod percept {
                 ) -> impl ::core::iter::IntoIterator<
                     Item = (
                         ::ember::agent::bdi::event::Trigger,
-                        ::ember::agent::bdi::knowledge::belief::Belief,
+                        ::ember::agent::bdi::literal::Literal,
                     ),
                 > {
                     [(
                         ::ember::agent::bdi::event::Trigger::Addition,
-                        ::ember::agent::bdi::knowledge::belief::Belief::from(
-                            ::ember::agent::bdi::literal::IntoLiteral::into_literal(self),
-                        ),
+                        ::ember::agent::bdi::literal::IntoLiteral::into_literal(self),
                     )]
                 }
             }

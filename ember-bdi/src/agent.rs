@@ -9,7 +9,7 @@ use crate::event::EventSource;
 use crate::event::queue::EventQueue;
 use crate::event::selector::FirstEvent;
 use crate::intention::queue::{Fifo, IntentionQueue};
-use crate::knowledge::base::BeliefBase;
+use crate::knowledge::base::KnowledgeBase;
 use crate::literal::Literal;
 use crate::plan::action::Execute;
 use crate::plan::library::PlanLibrary;
@@ -21,7 +21,7 @@ use crate::sensor::{Percept, Perceptor, Sensor};
 pub struct BdiAgent<'s, State, Action, Percept> {
     name: Cow<'static, str>,
     state: State,
-    beliefs: BeliefBase,
+    beliefs: KnowledgeBase,
     plans: PlanLibrary<Action>,
     intentions: IntentionQueue<Action>,
     event_queue: EventQueue,
@@ -35,7 +35,7 @@ where
     pub fn new(
         name: impl Into<Cow<'static, str>>,
         state: State,
-        beliefs: Option<BeliefBase>,
+        beliefs: Option<KnowledgeBase>,
         plans: PlanLibrary<Action>,
         initial_goals: impl IntoIterator<Item = Literal>,
     ) -> Self {

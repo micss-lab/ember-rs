@@ -61,12 +61,8 @@ impl Unify<&Term> for Term {
             (String(s1), String(s2)) if s1 == s2 => Ok(vec![]),
             (String(_), String(_)) => Err(UnificationError::StringMismatch),
 
-            (Literal { negated: n1, .. }, Literal { negated: n2, .. }) if n1 != n2 => {
-                Err(UnificationError::NegationMismatch)
-            }
-            (Literal { structure: s1, .. }, Literal { structure: s2, .. }) => {
-                s1.collect_constraints(s2)
-            }
+            (Literal(l1), Literal(l2)) => l1.collect_constraints(l2),
+
             _ => Err(UnificationError::TypeMismatch),
         }
     }
@@ -111,14 +107,15 @@ impl<'v> Unify<TermView<'v>> for Term {
             (Term::Variable(v), other) => v.collect_constraints(other),
             (other, TermView::Variable(v)) => v.collect_constraints(other),
 
-            (Term::Literal { negated: n1, .. }, TermView::Literal { negated: n2, .. })
+            (Term::Literal(Literal { negated: n1, .. }), TermView::Literal { negated: n2, .. })
                 if *n1 != n2 =>
             {
                 Err(UnificationError::NegationMismatch)
             }
-            (Term::Literal { structure: s1, .. }, TermView::Literal { structure: s2, .. }) => {
-                s1.collect_constraints(s2)
-            }
+            (
+                Term::Literal(Literal { structure: s1, .. }),
+                TermView::Literal { structure: s2, .. },
+            ) => s1.collect_constraints(s2),
 
             (Term::Number(n1), TermView::Number(n2)) => (*n1 == n2)
                 .then(alloc::vec::Vec::new)

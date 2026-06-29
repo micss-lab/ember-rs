@@ -5,7 +5,7 @@ use ember_core::environment::Environment;
 
 use crate::bindings::Bindings;
 use crate::context::Context;
-use crate::knowledge::base::BeliefBase;
+use crate::knowledge::base::KnowledgeBase;
 use crate::literal::Literal;
 use crate::plan::{Formula, GoalKind, Plan, QueryFormula, Trigger, TriggeringEvent};
 use crate::term::view::TermView;
@@ -31,7 +31,7 @@ pub fn trigger(functor: &str, args: Vec<Term>, goal: Option<GoalKind>) -> Trigge
     TriggeringEvent {
         trigger: Trigger::Addition,
         goal,
-        event: Literal::Atom {
+        event: Literal {
             negated: false,
             structure: Structure {
                 functor: Atom(functor.into()),
@@ -46,7 +46,7 @@ pub fn trigger(functor: &str, args: Vec<Term>, goal: Option<GoalKind>) -> Trigge
 }
 
 pub fn literal(functor: &str, args: Vec<Term>) -> Literal {
-    Literal::Atom {
+    Literal {
         negated: false,
         structure: Structure {
             functor: Atom(functor.into()),
@@ -57,10 +57,6 @@ pub fn literal(functor: &str, args: Vec<Term>) -> Literal {
             },
         },
     }
-}
-
-pub fn literal_variable(var: &Variable) -> Literal {
-    Literal::Variable(var.clone())
 }
 
 pub fn literal_formula(functor: &str, args: Vec<Term>) -> QueryFormula {
@@ -75,7 +71,7 @@ pub fn bindings<'a>(list: Vec<(Variable, TermView<'a>)>) -> Bindings<'a> {
     Bindings::new(pairs, crate::bindings::AliasMap::empty())
 }
 
-pub fn assert_belief(bb: &mut BeliefBase, functor: &str, args: Vec<Term>) {
+pub fn assert_belief(bb: &mut KnowledgeBase, functor: &str, args: Vec<Term>) {
     let lit = literal(functor, args);
     bb.assert_no_event(lit);
 }

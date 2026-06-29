@@ -6,8 +6,8 @@ use crate::bindings::Bindings;
 use crate::literal::Literal;
 use crate::plan::RelationalQueryFormula;
 
-use super::base::BeliefBase;
-use super::belief::Belief;
+use super::base::KnowledgeBase;
+use super::belief::Knowledge;
 
 use self::formula::eval::EvaluationError;
 
@@ -75,14 +75,14 @@ pub(crate) struct GroundQuery<'a> {
     /// Closed-world principle of "not". If the query is not satisfyable with
     /// any bindings, it succeeds.
     negated: bool,
-    beliefs: Option<Iter<'a, Belief>>,
+    beliefs: Option<Iter<'a, Knowledge>>,
     operand: QueryOperand<'a>,
 
     /// On backtracking, the beliefs it has already tried have to be redone.
-    original: Option<Iter<'a, Belief>>,
+    original: Option<Iter<'a, Knowledge>>,
 
     /// To resolve rules, the beliefbase has to be queries recursively.
-    knowledge: &'a BeliefBase,
+    knowledge: &'a KnowledgeBase,
 }
 
 impl<'a> GroundQuery<'a> {
@@ -129,9 +129,9 @@ impl<'a> QueryOperand<'a> {
 
     fn next_bindings(
         &mut self,
-        beliefs: Option<&mut Iter<'a, Belief>>,
+        beliefs: Option<&mut Iter<'a, Knowledge>>,
         existing_bindings: Option<&Bindings<'a>>,
-        knowledge: &'a BeliefBase,
+        knowledge_base: &'a KnowledgeBase,
     ) -> Option<Bindings<'a>> {
         use crate::unification::traits::Unify;
 
@@ -163,19 +163,19 @@ impl<'a> QueryOperand<'a> {
                 })
                 .or_else(|| {
                     beliefs.and_then(|b| {
-                        b.find_map(|belief| {
-                            if let Some(rule) = &belief.rule {
-                                let mut query = knowledge.query(rule);
+                        b.find_map(|knowledge| {
+                            if let Some(rule) = &knowledge.rule {
+                                let mut query = knowledge_base.query(rule);
                                 let result = next_bindings_for_rule(
-                                    &belief.head,
+                                    &knowledge.belief,
                                     &mut query,
                                     literal,
                                     existing_bindings,
                                 );
-                                *belief_to_process = Some((&belief.head, query));
+                                *belief_to_process = Some((&knowledge.belief, query));
                                 result
                             } else {
-                                belief.head.unify(literal, existing_bindings).ok()
+                                knowledge.belief.unify(literal, existing_bindings).ok()
                             }
                         })
                     })
@@ -191,7 +191,7 @@ pub trait IntoQuery<'a>
 where
     Self: 'a,
 {
-    fn into_query(self, knowledge: &'a BeliefBase) -> Query<'a>;
+    fn into_query(self, knowledge: &'a KnowledgeBase) -> Query<'a>;
 }
 
 impl RelationalQueryFormula {
@@ -211,7 +211,7 @@ impl RelationalQueryFormula {
 pub(crate) mod formula {
     use alloc::boxed::Box;
 
-    use crate::knowledge::base::BeliefBase;
+    use crate::knowledge::base::KnowledgeBase;
     use crate::literal::Literal;
     use crate::term::{Atom, Structure, Term};
 
@@ -229,7 +229,7 @@ pub(crate) mod formula {
     }
 
     impl<'a> IntoQuery<'a> for &'a QueryFormula {
-        fn into_query(self, knowledge: &'a BeliefBase) -> Query<'a> {
+        fn into_query(self, knowledge: &'a KnowledgeBase) -> Query<'a> {
             self::into_dnf::convert(self, knowledge)
         }
     }
@@ -258,7 +258,7 @@ pub(crate) mod formula {
             functor: impl Into<Atom>,
             arguments: Option<impl Into<Box<[Term]>>>,
         ) -> Self {
-            Literal::Atom {
+            Literal {
                 negated,
                 structure: Structure {
                     functor: functor.into(),
@@ -472,7 +472,7 @@ pub(crate) mod formula {
         use alloc::vec;
         use alloc::vec::Vec;
 
-        use crate::knowledge::base::BeliefBase;
+        use crate::knowledge::base::KnowledgeBase;
         use crate::knowledge::query::{Conjunction, GroundQuery, Query, QueryOperand};
 
         use crate::literal::Literal;
@@ -513,7 +513,7 @@ pub(crate) mod formula {
             }
         }
 
-        pub fn convert<'a>(formula: &'a QueryFormula, bb: &'a BeliefBase) -> Query<'a> {
+        pub fn convert<'a>(formula: &'a QueryFormula, bb: &'a KnowledgeBase) -> Query<'a> {
             let dnf = transform(formula, false, bb);
 
             let conjunctions = dnf
@@ -531,7 +531,7 @@ pub(crate) mod formula {
         fn transform<'a>(
             formula: &'a QueryFormula,
             negated: bool,
-            bb: &'a BeliefBase,
+            bb: &'a KnowledgeBase,
         ) -> DnfBuilder<'a> {
             match formula {
                 QueryFormula::Literal(lit) => {
@@ -565,14 +565,14 @@ pub(crate) mod formula {
         fn create_leaf<'a>(
             operand: QueryOperand<'a>,
             negated: bool,
-            bb: &'a BeliefBase,
+            bb: &'a KnowledgeBase,
         ) -> GroundQuery<'a> {
             let beliefs = match operand {
                 QueryOperand::Literal {
-                    literal: Literal::Atom { structure, .. },
+                    literal: Literal { structure, .. },
                     ..
                 } => bb
-                    .beliefs
+                    .collections
                     .get(&structure.atom_and_arity())
                     .map(|b| b.0.iter()),
                 _ => None,
@@ -602,7 +602,7 @@ pub(crate) mod formula {
             // --- Helpers ---
 
             fn mock_literal(name: &str) -> Literal {
-                Literal::Atom {
+                Literal {
                     negated: false,
                     structure: Structure {
                         functor: Atom(name.into()),
@@ -628,7 +628,7 @@ pub(crate) mod formula {
 
             #[test]
             fn compile_single_literal() {
-                let bb = BeliefBase::default();
+                let bb = KnowledgeBase::default();
                 let formula = QueryFormula::Literal(mock_literal("p"));
 
                 let query = convert(&formula, &bb);
@@ -645,7 +645,7 @@ pub(crate) mod formula {
             #[test]
             fn double_negation_elimination() {
                 // !!p  =>  p
-                let bb = BeliefBase::default();
+                let bb = KnowledgeBase::default();
                 let formula = QueryFormula::Not(Box::new(QueryFormula::Not(Box::new(
                     QueryFormula::Literal(mock_literal("p")),
                 ))));
@@ -662,7 +662,7 @@ pub(crate) mod formula {
             #[test]
             fn de_morgan_not_and() {
                 // !(p & q)  =>  (!p | !q)
-                let bb = BeliefBase::default();
+                let bb = KnowledgeBase::default();
                 let formula = QueryFormula::Not(Box::new(QueryFormula::Logical {
                     operator: LogicalOperator::Conjunction,
                     operands: vec![
@@ -683,7 +683,7 @@ pub(crate) mod formula {
             #[test]
             fn de_morgan_not_or() {
                 // !(p | q)  =>  (!p & !q)
-                let bb = BeliefBase::default();
+                let bb = KnowledgeBase::default();
                 let formula = QueryFormula::Not(Box::new(QueryFormula::Logical {
                     operator: LogicalOperator::Disjunction,
                     operands: vec![
@@ -705,7 +705,7 @@ pub(crate) mod formula {
             #[test]
             fn distributive_law_complex() {
                 // (A | B) & (C | D)  =>  (A&C) | (A&D) | (B&C) | (B&D)
-                let bb = BeliefBase::default();
+                let bb = KnowledgeBase::default();
 
                 let left = QueryFormula::Logical {
                     operator: LogicalOperator::Disjunction,
@@ -740,7 +740,7 @@ pub(crate) mod formula {
             #[test]
             fn nested_relational_negation() {
                 // p & !(x == 0)
-                let bb = BeliefBase::default();
+                let bb = KnowledgeBase::default();
                 let formula = QueryFormula::Logical {
                     operator: LogicalOperator::Conjunction,
                     operands: vec![
@@ -768,7 +768,7 @@ pub(crate) mod formula {
             #[test]
             fn deep_tree_flattening() {
                 // (A & B) | (C & (D | E)) => (A&B) | (C&D) | (C&E)
-                let bb = BeliefBase::default();
+                let bb = KnowledgeBase::default();
 
                 let d_or_e = QueryFormula::Logical {
                     operator: LogicalOperator::Disjunction,
@@ -814,8 +814,8 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
 
-    use crate::knowledge::base::BeliefBase;
-    use crate::knowledge::belief::Belief;
+    use crate::knowledge::base::KnowledgeBase;
+    use crate::knowledge::belief::Knowledge;
     use crate::literal::Literal;
     use crate::plan::{
         ArithmeticExpression, ArithmeticOperator, CompareOperator, LogicalOperator, QueryFormula,
@@ -834,8 +834,8 @@ mod tests {
         QueryFormula::Literal(crate::testing::literal(functor, args))
     }
 
-    fn belief(functor: &str, args: Vec<Term>) -> Belief {
-        let lit = Literal::Atom {
+    fn belief(functor: &str, args: Vec<Term>) -> Knowledge {
+        let lit = Literal {
             negated: false,
             structure: Structure {
                 functor: Atom(functor.into()),
@@ -905,7 +905,7 @@ mod tests {
 
     #[test]
     fn shared_variable_conjunction() {
-        let mut bb = BeliefBase::default();
+        let mut bb = KnowledgeBase::default();
         bb.assert_no_event(belief("parent", vec![string("alice"), string("bob")]));
         bb.assert_no_event(belief("parent", vec![string("bob"), string("charlie")]));
 
@@ -924,7 +924,7 @@ mod tests {
 
     #[test]
     fn backtracking_across_operands() {
-        let mut bb = BeliefBase::default();
+        let mut bb = KnowledgeBase::default();
         bb.assert_no_event(belief("p", vec![number(1.0), number(10.0)]));
         bb.assert_no_event(belief("p", vec![number(1.0), number(20.0)]));
         bb.assert_no_event(belief("q", vec![number(20.0), number(30.0)]));
@@ -944,7 +944,7 @@ mod tests {
 
     #[test]
     fn closed_world_negation() {
-        let mut bb = BeliefBase::default();
+        let mut bb = KnowledgeBase::default();
         bb.assert_no_event(belief("is_raining", vec![]));
 
         let f_sunny = not(literal("is_sunny", vec![]));
@@ -956,7 +956,7 @@ mod tests {
 
     #[test]
     fn disjunction_and_flattening() {
-        let mut bb = BeliefBase::default();
+        let mut bb = KnowledgeBase::default();
         bb.assert_no_event(belief("a", vec![number(1.0)]));
         bb.assert_no_event(belief("b", vec![number(2.0)]));
         bb.assert_no_event(belief("c", vec![number(2.0)]));
@@ -979,7 +979,7 @@ mod tests {
 
     #[test]
     fn relational_comparison() {
-        let mut bb = BeliefBase::default();
+        let mut bb = KnowledgeBase::default();
         bb.assert_no_event(belief("val", vec![number(5.0)]));
         bb.assert_no_event(belief("val", vec![number(15.0)]));
 
@@ -1003,7 +1003,7 @@ mod tests {
 
     #[test]
     fn relational_unification_math() {
-        let mut bb = BeliefBase::default();
+        let mut bb = KnowledgeBase::default();
         bb.assert_no_event(belief("base", vec![number(10.0)]));
 
         let (x, y) = (variable(), variable());
@@ -1026,7 +1026,7 @@ mod tests {
 
     #[test]
     fn arithmetic_division_by_zero_fails_gracefully() {
-        let mut bb = BeliefBase::default();
+        let mut bb = KnowledgeBase::default();
         bb.assert_no_event(belief("val", vec![number(0.0)]));
         bb.assert_no_event(belief("val", vec![number(2.0)]));
 
@@ -1056,7 +1056,7 @@ mod tests {
 
     #[test]
     fn type_mismatch_fails_gracefully() {
-        let mut bb = BeliefBase::default();
+        let mut bb = KnowledgeBase::default();
         bb.assert_no_event(belief("val", vec![string("not_a_number")]));
 
         let x = variable();
@@ -1077,7 +1077,7 @@ mod tests {
 
     #[test]
     fn complex_de_morgan_resolution() {
-        let mut bb = BeliefBase::default();
+        let mut bb = KnowledgeBase::default();
         bb.assert_no_event(belief("p", vec![number(1.0)]));
         bb.assert_no_event(belief("q", vec![number(1.0)]));
 

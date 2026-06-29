@@ -1,5 +1,5 @@
 use crate::bindings::Bindings;
-use crate::knowledge::base::BeliefBase;
+use crate::knowledge::base::KnowledgeBase;
 
 use super::Plan;
 use super::selection::PlanSelection;
@@ -12,7 +12,7 @@ pub trait PlanSelector {
     fn select_plan<'p, 'e, 'b, A>(
         &mut self,
         mut selection: PlanSelection<'p, 'e, A>,
-        knowledge: &'b BeliefBase,
+        knowledge: &'b KnowledgeBase,
     ) -> Option<(&'p Plan<A>, Bindings<'b>)>
     where
         'p: 'b,

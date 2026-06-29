@@ -4,6 +4,7 @@ use alloc::string::{String, ToString};
 
 use bstr::BString;
 
+use crate::literal::Literal;
 use crate::variable::{Variable, VariableId};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -14,7 +15,7 @@ pub enum Term {
     Variable(Variable),
     // TODO: Support lists.
     // List(List),
-    Literal { negated: bool, structure: Structure },
+    Literal(Literal),
 }
 
 impl Term {
@@ -23,7 +24,7 @@ impl Term {
         match self {
             Number(_) | String(_) => true,
             Variable(_) => false,
-            Literal { structure, .. } => structure.is_ground(),
+            Literal(literal) => literal.is_ground(),
         }
     }
 
@@ -32,13 +33,7 @@ impl Term {
             Term::Variable(v) => {
                 vars.insert(v.id);
             }
-            Term::Literal { structure, .. } => {
-                if let Some(args) = &structure.arguments {
-                    for arg in args.iter() {
-                        arg.collect_variables(vars);
-                    }
-                }
-            }
+            Term::Literal(literal) => literal.collect_variables(vars),
             _ => {}
         }
     }
@@ -99,11 +94,16 @@ impl Structure {
         arguments
             .as_ref()
             .map(|args| args.iter().all(|a| a.is_ground()))
-            .unwrap_or(false)
+            .unwrap_or(true)
     }
-}
 
-impl Structure {
+    pub(crate) fn collect_variables(&self, variables: &mut BTreeSet<VariableId>) {
+        self.arguments.as_ref().map(|args| {
+            args.iter()
+                .for_each(|arg| arg.collect_variables(&mut *variables))
+        });
+    }
+
     pub(crate) fn atom_and_arity(&self) -> (Atom, usize) {
         (
             self.functor.clone(),

@@ -1,7 +1,7 @@
 use core::slice::Iter;
 
 use crate::bindings::Bindings;
-use crate::knowledge::base::BeliefBase;
+use crate::knowledge::base::KnowledgeBase;
 use crate::term::view::TermView;
 
 use super::library::PlanLibrary;
@@ -27,7 +27,7 @@ impl<'p, 'e, A> PlanSelection<'p, 'e, A> {
 
     pub fn next_plan<'b>(
         &mut self,
-        knowledge: &'b BeliefBase,
+        knowledge: &'b KnowledgeBase,
     ) -> Option<(&'p Plan<A>, Bindings<'b>)>
     where
         'e: 'b,
@@ -79,7 +79,7 @@ impl<'p, 'e, A> RelevantPlanSelection<'_, 'p, 'e, A> {
 struct ApplicablePlanSelection<'s, 'p, 'e, A>(RelevantPlanSelection<'s, 'p, 'e, A>);
 
 impl<'p, 'e, A> ApplicablePlanSelection<'_, 'p, 'e, A> {
-    fn next_plan<'b>(&mut self, knowledge: &'b BeliefBase) -> Option<(&'p Plan<A>, Bindings<'b>)>
+    fn next_plan<'b>(&mut self, knowledge: &'b KnowledgeBase) -> Option<(&'p Plan<A>, Bindings<'b>)>
     where
         'p: 'e,
         'e: 'b,
@@ -107,7 +107,7 @@ mod tests {
     use alloc::boxed::Box;
     use alloc::vec;
 
-    use crate::knowledge::base::BeliefBase;
+    use crate::knowledge::base::KnowledgeBase;
     use crate::literal::Literal;
     use crate::plan::{GoalKind, QueryFormula};
     use crate::term::{Atom, Term};
@@ -118,12 +118,12 @@ mod tests {
     #[test]
     fn test_relevant_but_not_applicable() {
         let mut store = PlanLibrary::<()>::default();
-        let mut bb = BeliefBase::default();
+        let mut bb = KnowledgeBase::default();
 
         // Plan: +!test : is_ready <- ...
         let plan = Plan {
             trigger: trigger("test", vec![], Some(GoalKind::Achieve)),
-            context: Some(crate::plan::QueryFormula::Literal(Literal::Atom {
+            context: Some(crate::plan::QueryFormula::Literal(Literal {
                 negated: false,
                 structure: crate::term::Structure {
                     functor: Atom("is_ready".into()),
@@ -144,7 +144,7 @@ mod tests {
         );
 
         // 2. Add the belief, now it should be applicable.
-        let ready_belief = Literal::Atom {
+        let ready_belief = Literal {
             negated: false,
             structure: crate::term::Structure {
                 functor: Atom("is_ready".into()),
@@ -163,12 +163,12 @@ mod tests {
     #[test]
     fn test_backtracking_to_second_plan() {
         let mut store = PlanLibrary::<()>::default();
-        let bb = BeliefBase::default();
+        let bb = KnowledgeBase::default();
 
         // Plan 1: +!goal : false_context <- ... (Should fail context)
         store.add(Plan {
             trigger: trigger("goal", vec![], Some(GoalKind::Achieve)),
-            context: Some(crate::plan::QueryFormula::Literal(Literal::Atom {
+            context: Some(crate::plan::QueryFormula::Literal(Literal {
                 negated: false,
                 structure: crate::term::Structure {
                     functor: Atom("never".into()),
@@ -199,7 +199,7 @@ mod tests {
     #[test]
     fn test_unification_failure_in_relevance() {
         let mut store = PlanLibrary::<()>::default();
-        let bb = BeliefBase::default();
+        let bb = KnowledgeBase::default();
 
         // Plan for test(1)
         store.add(Plan {
@@ -221,7 +221,7 @@ mod tests {
     #[test]
     fn test_variable_unification_event_to_plan() {
         let mut store = PlanLibrary::<()>::default();
-        let bb = BeliefBase::default();
+        let bb = KnowledgeBase::default();
 
         let x = variable();
         // Plan: +!greet(Name)
@@ -244,7 +244,7 @@ mod tests {
     #[test]
     fn test_empty_store_returns_none() {
         let store = PlanLibrary::<()>::default();
-        let bb = BeliefBase::default();
+        let bb = KnowledgeBase::default();
         let event = trigger("any", vec![], None);
 
         let mut selection = PlanSelection::select_from_library(&event, &store);
@@ -254,10 +254,10 @@ mod tests {
     #[test]
     fn test_context_uses_trigger_bindings() {
         let mut store = PlanLibrary::<()>::default();
-        let mut bb = BeliefBase::default();
+        let mut bb = KnowledgeBase::default();
 
         // Belief: colour(circle, red)
-        let colour_belief = Literal::Atom {
+        let colour_belief = Literal {
             negated: false,
             structure: crate::term::Structure {
                 functor: Atom("colour".into()),
@@ -270,7 +270,7 @@ mod tests {
         // Plan: +!check(Obj) : colour(Obj, red) <- ...
         store.add(Plan {
             trigger: trigger("check", vec![variable_term(&x)], Some(GoalKind::Achieve)),
-            context: Some(crate::plan::QueryFormula::Literal(Literal::Atom {
+            context: Some(crate::plan::QueryFormula::Literal(Literal {
                 negated: false,
                 structure: crate::term::Structure {
                     functor: Atom("colour".into()),
@@ -294,7 +294,7 @@ mod tests {
     #[test]
     fn test_full_binding_propagation_pipeline() {
         let mut store = PlanLibrary::<()>::default();
-        let mut bb = BeliefBase::default();
+        let mut bb = KnowledgeBase::default();
         assert_belief(&mut bb, "color", vec![string("apple"), string("red")]);
 
         let (x, y) = (variable(), variable());
@@ -318,7 +318,7 @@ mod tests {
     #[test]
     fn test_variable_aliasing_event_to_context() {
         let mut store = PlanLibrary::<()>::default();
-        let mut bb = BeliefBase::default();
+        let mut bb = KnowledgeBase::default();
         assert_belief(&mut bb, "linked", vec![string("a"), string("b")]);
 
         let (event_var, plan_var) = (variable(), variable());
@@ -349,7 +349,7 @@ mod tests {
     #[test]
     fn test_backtracking_on_context_failure() {
         let mut store = PlanLibrary::<()>::default();
-        let mut bb = BeliefBase::default();
+        let mut bb = KnowledgeBase::default();
         assert_belief(&mut bb, "is_broken", vec![string("bolt")]);
 
         let x = variable();
@@ -369,7 +369,7 @@ mod tests {
             .next_plan(&bb)
             .unwrap();
 
-        let QueryFormula::Literal(Literal::Atom { structure, .. }) = plan.context.as_ref().unwrap()
+        let QueryFormula::Literal(Literal { structure, .. }) = plan.context.as_ref().unwrap()
         else {
             unreachable!()
         };
@@ -378,7 +378,7 @@ mod tests {
 
     #[test]
     fn test_context_negation_with_event_bindings() {
-        let mut bb = BeliefBase::default();
+        let mut bb = KnowledgeBase::default();
         let mut store = PlanLibrary::<()>::default();
         assert_belief(&mut bb, "blocked", vec![string("north")]);
 

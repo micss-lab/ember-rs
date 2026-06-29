@@ -2,8 +2,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use crate::bindings::Bindings;
-use crate::knowledge::base::BeliefBase;
-use crate::literal::Literal;
+use crate::knowledge::base::KnowledgeBase;
 use crate::term::Atom;
 
 use super::selection::PlanSelection;
@@ -36,7 +35,7 @@ impl<A> PlanLibrary<A> {
     pub fn select<'p, 'b, 'e, S>(
         &'p mut self,
         event: &'e TriggeringEvent,
-        knowledge: &'b BeliefBase,
+        knowledge: &'b KnowledgeBase,
         mut selector: S,
     ) -> Option<(&'p Plan<A>, Bindings<'b>)>
     where
@@ -67,12 +66,7 @@ impl From<&TriggeringEvent> for PlanKey {
             goal,
         }: &TriggeringEvent,
     ) -> Self {
-        let event = match event {
-            Literal::Atom { structure, .. } => structure.atom_and_arity(),
-            Literal::Variable(_) => unimplemented!(
-                "single variable as triggering event of a plan is not supported (yet)"
-            ),
-        };
+        let event = event.atom_and_arity();
         Self {
             trigger: *trigger,
             event,

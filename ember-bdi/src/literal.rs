@@ -2,21 +2,18 @@ use alloc::collections::btree_set::BTreeSet;
 
 pub use ember_bdi_macros::IntoLiteral;
 
-use crate::term::Structure;
-use crate::variable::{Variable, VariableId};
+use crate::term::{Atom, Structure};
+use crate::variable::VariableId;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Literal {
-    Atom { negated: bool, structure: Structure },
-    Variable(Variable),
+pub struct Literal {
+    pub negated: bool,
+    pub structure: Structure,
 }
 
 impl Literal {
     pub fn is_ground(&self) -> bool {
-        match self {
-            Literal::Atom { structure, .. } => structure.is_ground(),
-            Literal::Variable(_) => false,
-        }
+        self.structure.is_ground()
     }
 
     pub(crate) fn variables(&self) -> BTreeSet<VariableId> {
@@ -25,19 +22,12 @@ impl Literal {
         vars
     }
 
-    fn collect_variables(&self, vars: &mut BTreeSet<VariableId>) {
-        match self {
-            Literal::Atom { structure, .. } => {
-                if let Some(args) = &structure.arguments {
-                    for arg in args.iter() {
-                        arg.collect_variables(vars);
-                    }
-                }
-            }
-            Literal::Variable(v) => {
-                vars.insert(v.id);
-            }
-        }
+    pub(crate) fn collect_variables(&self, vars: &mut BTreeSet<VariableId>) {
+        self.structure.collect_variables(vars)
+    }
+
+    pub(crate) fn atom_and_arity(&self) -> (Atom, usize) {
+        self.structure.atom_and_arity()
     }
 }
 

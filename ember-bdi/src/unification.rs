@@ -8,6 +8,7 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
 
+    use crate::literal::Literal;
     use crate::term::view::{StructureView, TermView};
     use crate::term::{Atom, Structure, Term};
     use crate::unification::error::UnificationError;
@@ -23,10 +24,10 @@ mod tests {
     }
 
     fn literal(negated: bool, functor: &str, args: Vec<Term>) -> Term {
-        Term::Literal {
+        Term::Literal(Literal {
             negated,
             structure: structure(functor, args),
-        }
+        })
     }
 
     // --- Happy Day Scenarios ---

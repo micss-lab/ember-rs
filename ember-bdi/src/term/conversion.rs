@@ -3,7 +3,7 @@ use alloc::string::{String, ToString};
 
 use bstr::BString;
 
-use crate::literal::{IntoLiteral, Literal};
+use crate::literal::Literal;
 use crate::variable::Variable;
 
 use super::owned::Term;
@@ -107,15 +107,9 @@ impl From<BString> for Term {
     }
 }
 
-impl<L> From<L> for Term
-where
-    L: IntoLiteral,
-{
-    fn from(literal: L) -> Self {
-        match literal.into_literal() {
-            Literal::Atom { negated, structure } => Self::Literal { negated, structure },
-            Literal::Variable(v) => Self::Variable(v),
-        }
+impl From<Literal> for Term {
+    fn from(literal: Literal) -> Self {
+        Self::Literal(literal)
     }
 }
 

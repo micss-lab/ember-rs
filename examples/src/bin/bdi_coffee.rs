@@ -10,8 +10,8 @@ use log::info;
 use ember::Container;
 use ember::agent::bdi::BdiAgent;
 use ember::agent::bdi::bindings::BindingLookup;
-use ember::agent::bdi::knowledge::base::BeliefBase;
-use ember::agent::bdi::knowledge::belief::Belief;
+use ember::agent::bdi::knowledge::base::KnowledgeBase;
+use ember::agent::bdi::knowledge::belief::Knowledge;
 use ember::agent::bdi::literal::{IntoLiteral, Literal};
 use ember::agent::bdi::plan::action::Execute;
 use ember::agent::bdi::plan::library::PlanLibrary;
@@ -69,7 +69,7 @@ struct SensorReading {
 
 impl IntoLiteral for SensorReading {
     fn into_literal(self) -> Literal {
-        Literal::Atom {
+        Literal {
             negated: false,
             structure: Structure {
                 functor: "temperature".into(),
@@ -80,8 +80,8 @@ impl IntoLiteral for SensorReading {
 }
 
 impl Percept for SensorReading {
-    fn into_beliefs(self) -> impl IntoIterator<Item = (Trigger, Belief)> {
-        [(Trigger::Addition, Belief::from(self.into_literal()))]
+    fn into_beliefs(self) -> impl IntoIterator<Item = (Trigger, Literal)> {
+        [(Trigger::Addition, self.into_literal())]
     }
 }
 
@@ -124,9 +124,9 @@ fn example() {
     info!("☕ Starting BDI Agent demo: The Coffee Maker ☕");
     info!("====================================================\n");
 
-    let mut belief_base = BeliefBase::default();
+    let mut belief_base = KnowledgeBase::default();
     let beliefs = vec![
-        Belief::from(Literal::Atom {
+        Knowledge::from(Literal {
             negated: false,
             structure: Structure {
                 functor: "at".into(),
@@ -136,7 +136,7 @@ fn example() {
                 ])),
             },
         }),
-        Belief::from(Literal::Atom {
+        Knowledge::from(Literal {
             negated: false,
             structure: Structure {
                 functor: "at".into(),
@@ -159,7 +159,7 @@ fn example() {
 
     let plan_library = define_plans();
 
-    let initial_goal = Literal::Atom {
+    let initial_goal = Literal {
         negated: false,
         structure: Structure {
             functor: "make_coffee".into(),
@@ -252,7 +252,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
         trigger: TriggeringEvent {
             trigger: Trigger::Addition,
             goal: Some(GoalKind::Achieve),
-            event: Literal::Atom {
+            event: Literal {
                 negated: false,
                 structure: Structure {
                     functor: "make_coffee".into(),
@@ -283,7 +283,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
             ))),
             Formula::Belief {
                 trigger: Trigger::Addition,
-                belief: Literal::Atom {
+                belief: Literal {
                     negated: false,
                     structure: Structure {
                         functor: "done".into(),
@@ -300,7 +300,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
         trigger: TriggeringEvent {
             trigger: Trigger::Addition,
             goal: Some(GoalKind::Achieve),
-            event: Literal::Atom {
+            event: Literal {
                 negated: false,
                 structure: Structure {
                     functor: "make_coffee".into(),
@@ -312,7 +312,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
         body: Box::new([
             Formula::Goal {
                 kind: GoalKind::Achieve,
-                goal: Literal::Atom {
+                goal: Literal {
                     negated: false,
                     structure: Structure {
                         functor: "go_to".into(),
@@ -322,7 +322,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
             },
             Formula::Goal {
                 kind: GoalKind::Achieve,
-                goal: Literal::Atom {
+                goal: Literal {
                     negated: false,
                     structure: Structure {
                         functor: "get_beans".into(),
@@ -332,7 +332,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
             },
             Formula::Goal {
                 kind: GoalKind::Achieve,
-                goal: Literal::Atom {
+                goal: Literal {
                     negated: false,
                     structure: Structure {
                         functor: "make_coffee".into(),
@@ -353,7 +353,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
         trigger: TriggeringEvent {
             trigger: Trigger::Addition,
             goal: Some(GoalKind::Achieve),
-            event: Literal::Atom {
+            event: Literal {
                 negated: false,
                 structure: Structure {
                     functor: "go_to".into(),
@@ -382,7 +382,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
         trigger: TriggeringEvent {
             trigger: Trigger::Addition,
             goal: Some(GoalKind::Achieve),
-            event: Literal::Atom {
+            event: Literal {
                 negated: false,
                 structure: Structure {
                     functor: "go_to".into(),
@@ -402,7 +402,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
             })),
             Formula::Belief {
                 trigger: Trigger::Deletion,
-                belief: Literal::Atom {
+                belief: Literal {
                     negated: false,
                     structure: Structure {
                         functor: "at".into(),
@@ -415,7 +415,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
             },
             Formula::Belief {
                 trigger: Trigger::Addition,
-                belief: Literal::Atom {
+                belief: Literal {
                     negated: false,
                     structure: Structure {
                         functor: "at".into(),
@@ -437,7 +437,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
         trigger: TriggeringEvent {
             trigger: Trigger::Addition,
             goal: Some(GoalKind::Achieve),
-            event: Literal::Atom {
+            event: Literal {
                 negated: false,
                 structure: Structure {
                     functor: "get_beans".into(),
@@ -465,7 +465,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
         trigger: TriggeringEvent {
             trigger: Trigger::Addition,
             goal: Some(GoalKind::Achieve),
-            event: Literal::Atom {
+            event: Literal {
                 negated: false,
                 structure: Structure {
                     functor: "get_beans".into(),
@@ -478,7 +478,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
             Formula::Action(Action::User(AgentAction::Buy("coffee_beans".into()))),
             Formula::Belief {
                 trigger: Trigger::Addition,
-                belief: Literal::Atom {
+                belief: Literal {
                     negated: false,
                     structure: Structure {
                         functor: "have".into(),
@@ -493,7 +493,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
         trigger: TriggeringEvent {
             trigger: Trigger::Addition,
             goal: None,
-            event: Literal::Atom {
+            event: Literal {
                 negated: false,
                 structure: Structure {
                     functor: "done".into(),

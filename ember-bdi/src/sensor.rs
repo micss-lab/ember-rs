@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 
-use crate::knowledge::belief::Belief;
+use crate::literal::Literal;
 use crate::plan::Trigger;
 
 pub use ember_bdi_macros::Percept;
@@ -14,12 +14,12 @@ pub trait Perceptor {
 }
 
 pub trait Percept: Sized {
-    fn into_beliefs(self) -> impl IntoIterator<Item = (Trigger, Belief)>;
+    fn into_beliefs(self) -> impl IntoIterator<Item = (Trigger, Literal)>;
 }
 
 // Implementation needed for users with an agent that does not percept the environment.
 impl Percept for () {
-    fn into_beliefs(self) -> impl IntoIterator<Item = (Trigger, Belief)> {
+    fn into_beliefs(self) -> impl IntoIterator<Item = (Trigger, Literal)> {
         []
     }
 }

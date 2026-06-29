@@ -2,6 +2,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use crate::bindings::{AliasMap, Bindings, StructureView, TermView};
+use crate::literal::Literal;
 use crate::term::Term;
 use crate::unification::constraint::BindingConstraint;
 use crate::unification::error::{Result, UnificationError};
@@ -200,10 +201,10 @@ impl<'a> EquivalenceClasses<'a> {
                         .resolve_root(root, visiting)?
                         .unwrap_or(TermView::Term(term)))
                 }
-                Term::Literal {
+                Term::Literal(Literal {
                     negated: n,
                     structure: s,
-                } => {
+                }) => {
                     let args = match &s.arguments {
                         Some(args) => {
                             let mut resolved_args = Vec::with_capacity(args.len());

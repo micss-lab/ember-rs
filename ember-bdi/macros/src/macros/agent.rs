@@ -368,12 +368,12 @@ fn generate_beliefbase(beliefs: &[Spanned<Belief>], agent_ident: &Ident) -> impl
                 #(#variables)*
                 #belief
             };
-            ::ember::agent::bdi::knowledge::base::BeliefBase::assert_no_event(&mut beliefbase, _belief);
+            ::ember::agent::bdi::knowledge::base::KnowledgeBase::assert_no_event(&mut beliefbase, _belief);
         }
     });
 
     quote! { {
-        let mut beliefbase = ::ember::agent::bdi::knowledge::base::BeliefBase::default();
+        let mut beliefbase = ::ember::agent::bdi::knowledge::base::KnowledgeBase::default();
         #(#beliefs)*
         beliefbase
     } }

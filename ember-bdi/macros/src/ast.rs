@@ -242,13 +242,13 @@ impl AstVisitor {
             Some(rule) => {
                 let rule = self.visit_logical_expression(rule);
                 quote! {
-                    ::ember::agent::bdi::knowledge::belief::Belief::from(
+                    ::ember::agent::bdi::knowledge::belief::Knowledge::from(
                         (#literal, #rule)
                     )
                 }
             }
             None => quote! {
-                ::ember::agent::bdi::knowledge::belief::Belief::from(
+                ::ember::agent::bdi::knowledge::belief::Knowledge::from(
                     #literal
                 )
             },
@@ -511,7 +511,7 @@ impl AstVisitor {
     fn visit_literal(&mut self, Literal { negated, formula }: &Literal) -> impl ToTokens {
         let structure = self.visit_atomic_formula(formula);
         quote! {
-            ::ember::agent::bdi::literal::Literal::Atom {
+            ::ember::agent::bdi::literal::Literal {
                 negated: #negated,
                 structure: #structure
             }
@@ -546,13 +546,11 @@ impl AstVisitor {
 
     fn visit_term(&mut self, term: &Term) -> impl ToTokens {
         match term {
-            Term::Literal(Literal { negated, formula }) => {
-                let formula = self.visit_atomic_formula(formula);
+            Term::Literal(literal) => {
+                let literal = self.visit_literal(literal);
+
                 quote! {
-                    ::ember::agent::bdi::term::owned::Term::Literal {
-                        negated: #negated,
-                        structure: #formula,
-                    }
+                    ::ember::agent::bdi::term::owned::Term::Literal(#literal)
                 }
             }
             Term::Variable(variable) => {

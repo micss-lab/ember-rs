@@ -3,6 +3,7 @@ use alloc::vec::Vec;
 
 use bstr::BString;
 
+use crate::literal::Literal;
 use crate::variable::Variable;
 
 use super::owned::{Atom, Structure, Term, TotalCmpF32};
@@ -30,7 +31,7 @@ impl TermRef<'_> {
                 negated,
                 functor,
                 ref arguments,
-            } => Term::Literal {
+            } => Term::Literal(Literal {
                 negated,
                 structure: Structure {
                     functor: functor.clone(),
@@ -42,7 +43,7 @@ impl TermRef<'_> {
                             .into_boxed_slice()
                     }),
                 },
-            },
+            }),
         }
     }
 }
@@ -53,14 +54,14 @@ impl<'a> From<&'a Term> for TermRef<'a> {
             Term::Number(n) => Self::Number(*n),
             Term::String(s) => Self::String(s),
             Term::Variable(v) => Self::Variable(v),
-            &Term::Literal {
+            &Term::Literal(Literal {
                 negated,
                 structure:
                     Structure {
                         ref functor,
                         ref arguments,
                     },
-            } => Self::Literal {
+            }) => Self::Literal {
                 negated,
                 functor,
                 arguments: arguments

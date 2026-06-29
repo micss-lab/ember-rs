@@ -41,13 +41,10 @@ impl<'a> From<&'a Term> for TermView<'a> {
 }
 
 impl<'a> From<&'a Literal> for TermView<'a> {
-    fn from(literal: &'a Literal) -> Self {
-        match literal {
-            Literal::Atom { negated, structure } => TermView::Literal {
-                negated: *negated,
-                structure: structure.into(),
-            },
-            Literal::Variable(v) => TermView::Variable(v),
+    fn from(Literal { negated, structure }: &'a Literal) -> Self {
+        TermView::Literal {
+            negated: *negated,
+            structure: structure.into(),
         }
     }
 }
@@ -73,10 +70,10 @@ impl TermView<'_> {
             TermView::Literal {
                 negated,
                 ref structure,
-            } => Term::Literal {
+            } => Term::Literal(Literal {
                 negated,
                 structure: structure.to_owned(),
-            },
+            }),
         }
     }
 }
