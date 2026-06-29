@@ -4,7 +4,7 @@ use ember_core::environment::Environment;
 
 use crate::bindings::Bindings;
 use crate::context::Context;
-use crate::knowledge::store::BeliefBase;
+use crate::knowledge::base::BeliefBase;
 use crate::literal::Literal;
 use crate::plan::{Formula, GoalKind, Plan, QueryFormula, Trigger, TriggeringEvent};
 use crate::term::view::TermView;

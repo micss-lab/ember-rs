@@ -1,5 +1,5 @@
 use crate::bindings::Bindings;
-use crate::knowledge::store::BeliefBase;
+use crate::knowledge::base::BeliefBase;
 
 use super::Plan;
 use super::selection::PlanSelection;

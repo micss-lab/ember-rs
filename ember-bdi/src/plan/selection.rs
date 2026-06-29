@@ -1,7 +1,7 @@
 use core::slice::Iter;
 
 use crate::bindings::Bindings;
-use crate::knowledge::store::BeliefBase;
+use crate::knowledge::base::BeliefBase;
 use crate::term::view::TermView;
 
 use super::library::PlanLibrary;
@@ -107,7 +107,7 @@ mod tests {
     use alloc::boxed::Box;
     use alloc::vec;
 
-    use crate::knowledge::store::BeliefBase;
+    use crate::knowledge::base::BeliefBase;
     use crate::literal::Literal;
     use crate::plan::{GoalKind, QueryFormula};
     use crate::term::{Atom, NonGround, Term};

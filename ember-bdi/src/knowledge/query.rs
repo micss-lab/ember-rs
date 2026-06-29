@@ -6,8 +6,8 @@ use crate::bindings::Bindings;
 use crate::literal::Literal;
 use crate::plan::RelationalQueryFormula;
 
+use super::base::BeliefBase;
 use super::belief::Belief;
-use super::store::BeliefBase;
 
 use self::formula::eval::EvaluationError;
 
@@ -211,7 +211,7 @@ impl RelationalQueryFormula {
 pub(crate) mod formula {
     use alloc::boxed::Box;
 
-    use crate::knowledge::store::BeliefBase;
+    use crate::knowledge::base::BeliefBase;
     use crate::literal::Literal;
     use crate::term::{Atom, Structure, Term};
 
@@ -472,8 +472,8 @@ pub(crate) mod formula {
         use alloc::vec;
         use alloc::vec::Vec;
 
+        use crate::knowledge::base::BeliefBase;
         use crate::knowledge::query::{Conjunction, GroundQuery, Query, QueryOperand};
-        use crate::knowledge::store::BeliefBase;
 
         use crate::literal::Literal;
 
@@ -814,8 +814,8 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
 
+    use crate::knowledge::base::BeliefBase;
     use crate::knowledge::belief::Belief;
-    use crate::knowledge::store::BeliefBase;
     use crate::literal::Literal;
     use crate::plan::{
         ArithmeticExpression, ArithmeticOperator, CompareOperator, LogicalOperator, QueryFormula,

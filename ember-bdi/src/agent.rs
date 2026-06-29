@@ -9,7 +9,7 @@ use crate::event::EventSource;
 use crate::event::queue::EventQueue;
 use crate::event::selector::FirstEvent;
 use crate::intention::queue::{Fifo, IntentionQueue};
-use crate::knowledge::store::BeliefBase;
+use crate::knowledge::base::BeliefBase;
 use crate::literal::Literal;
 use crate::plan::action::Execute;
 use crate::plan::library::PlanLibrary;

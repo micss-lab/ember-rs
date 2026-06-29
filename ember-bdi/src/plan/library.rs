@@ -2,7 +2,7 @@ use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 
 use crate::bindings::Bindings;
-use crate::knowledge::store::BeliefBase;
+use crate::knowledge::base::BeliefBase;
 use crate::literal::Literal;
 use crate::term::Atom;
 
