@@ -688,37 +688,37 @@ impl ToTokens for RelationalOperator {
         tokens.extend(match self {
             RelationalOperator::Smaller => quote! {
                 ::ember::bdi::agent::plan::RelationalOperator::Compare {
-                    operator: ::ember::bdi::agen::plan::CompareOperator::LessThan,
+                    operator: ::ember::bdi::agent::plan::CompareOperator::LessThan,
                     equal: false,
                 }
             },
             RelationalOperator::Larger => quote! {
                 ::ember::bdi::agent::plan::RelationalOperator::Compare {
-                    operator: ::ember::bdi::agen::plan::CompareOperator::GreaterThan,
+                    operator: ::ember::bdi::agent::plan::CompareOperator::GreaterThan,
                     equal: false,
                 }
             },
             RelationalOperator::SmallerEq => quote! {
                 ::ember::bdi::agent::plan::RelationalOperator::Compare {
-                    operator: ::ember::bdi::agen::plan::CompareOperator::LessThan,
+                    operator: ::ember::bdi::agent::plan::CompareOperator::LessThan,
                     equal: true,
                 }
             },
             RelationalOperator::LargerEq => quote! {
                 ::ember::bdi::agent::plan::RelationalOperator::Compare {
-                    operator: ::ember::bdi::agen::plan::CompareOperator::GreaterThan,
+                    operator: ::ember::bdi::agent::plan::CompareOperator::GreaterThan,
                     equal: true,
                 }
             },
             RelationalOperator::Equal => quote! {
                 ::ember::bdi::agent::plan::RelationalOperator::Compare {
-                    operator: ::ember::bdi::agen::plan::CompareOperator::EqualTo,
+                    operator: ::ember::bdi::agent::plan::CompareOperator::EqualTo,
                     equal: true,
                 }
             },
             RelationalOperator::NotEqual => quote! {
                 ::ember::bdi::agent::plan::RelationalOperator::Compare {
-                    operator: ::ember::bdi::agen::plan::CompareOperator::EqualTo,
+                    operator: ::ember::bdi::agent::plan::CompareOperator::EqualTo,
                     equal: false,
                 }
             },
