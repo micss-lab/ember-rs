@@ -1,0 +1,21 @@
+error: macros that expand to items must be delimited with braces or followed by a semicolon
+ --> tests/macros/compile-fail/from_term_transparent_empty_tuple.rs:4:10
+  |
+4 | #[derive(FromTerm)]
+  |          ^^^^^^^^
+  |
+  = note: this error originates in the derive macro `FromTerm` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: proc-macro derive produced unparsable tokens
+ --> tests/macros/compile-fail/from_term_transparent_empty_tuple.rs:4:10
+  |
+4 | #[derive(FromTerm)]
+  |          ^^^^^^^^
+
+error: #[ember(transparent)] is only supported on single-element tuple structs
+ --> tests/macros/compile-fail/from_term_transparent_empty_tuple.rs:4:10
+  |
+4 | #[derive(FromTerm)]
+  |          ^^^^^^^^
+  |
+  = note: this error originates in the derive macro `FromTerm` (in Nightly builds, run with -Z macro-backtrace for more info)

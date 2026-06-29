@@ -1,0 +1,5 @@
+error: expected one of ".", ";"
+ --> tests/macros/compile-fail/bdi_agent_invalid_syntax.rs:6:1
+  |
+6 | })]
+  | ^

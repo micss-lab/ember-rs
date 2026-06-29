@@ -490,13 +490,15 @@ impl AstVisitor {
             ArithmeticFactor::Variable(variable) => {
                 let variable = self.visit_variable(variable);
                 quote! {
-                    ::ember::agent::bdi::term::owned::Term::Variable(#variable)
+                    ::ember::agent::bdi::plan::ArithmeticExpression::Term(
+                        ::ember::agent::bdi::term::owned::Term::Variable(#variable)
+                    )
                 }
             }
             ArithmeticFactor::Neg(factor) => {
                 let factor = self.visit_arithmetic_factor(factor);
                 quote! {
-                    ::ember::agent::bdi::plan::ArithmeticExpression {
+                    ::ember::agent::bdi::plan::ArithmeticExpression::Operation {
                         operator: ::ember::agent::bdi::plan::ArithmeticOperator::Min,
                         operands: ::alloc::boxed::Box::new([#factor]),
                     }
@@ -687,43 +689,43 @@ impl ToTokens for RelationalOperator {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         tokens.extend(match self {
             RelationalOperator::Smaller => quote! {
-                ::ember::bdi::agent::plan::RelationalOperator::Compare {
-                    operator: ::ember::bdi::agent::plan::CompareOperator::LessThan,
+                ::ember::agent::bdi::plan::RelationalOperator::Compare {
+                    operator: ::ember::agent::bdi::plan::CompareOperator::LessThan,
                     equal: false,
                 }
             },
             RelationalOperator::Larger => quote! {
-                ::ember::bdi::agent::plan::RelationalOperator::Compare {
-                    operator: ::ember::bdi::agent::plan::CompareOperator::GreaterThan,
+                ::ember::agent::bdi::plan::RelationalOperator::Compare {
+                    operator: ::ember::agent::bdi::plan::CompareOperator::GreaterThan,
                     equal: false,
                 }
             },
             RelationalOperator::SmallerEq => quote! {
-                ::ember::bdi::agent::plan::RelationalOperator::Compare {
-                    operator: ::ember::bdi::agent::plan::CompareOperator::LessThan,
+                ::ember::agent::bdi::plan::RelationalOperator::Compare {
+                    operator: ::ember::agent::bdi::plan::CompareOperator::LessThan,
                     equal: true,
                 }
             },
             RelationalOperator::LargerEq => quote! {
-                ::ember::bdi::agent::plan::RelationalOperator::Compare {
-                    operator: ::ember::bdi::agent::plan::CompareOperator::GreaterThan,
+                ::ember::agent::bdi::plan::RelationalOperator::Compare {
+                    operator: ::ember::agent::bdi::plan::CompareOperator::GreaterThan,
                     equal: true,
                 }
             },
             RelationalOperator::Equal => quote! {
-                ::ember::bdi::agent::plan::RelationalOperator::Compare {
-                    operator: ::ember::bdi::agent::plan::CompareOperator::EqualTo,
+                ::ember::agent::bdi::plan::RelationalOperator::Compare {
+                    operator: ::ember::agent::bdi::plan::CompareOperator::EqualTo,
                     equal: true,
                 }
             },
             RelationalOperator::NotEqual => quote! {
-                ::ember::bdi::agent::plan::RelationalOperator::Compare {
-                    operator: ::ember::bdi::agent::plan::CompareOperator::EqualTo,
+                ::ember::agent::bdi::plan::RelationalOperator::Compare {
+                    operator: ::ember::agent::bdi::plan::CompareOperator::EqualTo,
                     equal: false,
                 }
             },
             RelationalOperator::Unify => quote! {
-                ::ember::bdi::agent::plan::RelationalOperator::Unify
+                ::ember::agent::bdi::plan::RelationalOperator::Unify
             },
         });
     }

@@ -1,0 +1,5 @@
+error: expected EOF
+ --> tests/macros/compile-fail/bdi_agent_duplicate_percept_type.rs:9:21
+  |
+9 | #[bdi_agent(asl = {}, percept_type = MyPercept, percept_type = MyPercept)]
+  |                     ^

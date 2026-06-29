@@ -1,0 +1,5 @@
+error: expected EOF
+ --> tests/macros/compile-fail/bdi_agent_duplicate_asl.rs:4:21
+  |
+4 | #[bdi_agent(asl = {}, asl = {})]
+  |                     ^
