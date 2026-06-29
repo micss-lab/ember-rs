@@ -10,6 +10,7 @@ use serde::ser::SerializeStruct;
 use tiny_http::Server;
 
 use ember_core::agent::aid::Aid;
+use ember_core::message::repr;
 use ember_core::message::{AclRepresentation, Message, MessageEnvelope, MessageKind};
 
 use super::Acc;
@@ -105,7 +106,7 @@ impl Acc for HttpChannel {
         log::trace!("Read acl message of length {} bytes", len);
         log::debug!("Acl message: `{}`", bstr::BString::from(buf.trim_ascii()));
 
-        let message = match Message::try_from_bytes(buf.as_slice()) {
+        let message = match repr::string::decode(buf.as_slice()) {
             Ok(message) => message,
             Err(_e) => {
                 log::error!("Error parsing acl message");
@@ -224,7 +225,7 @@ impl HttpEnvelopeDe {
             to,
             from,
             date: chrono::DateTime::<chrono::Utc>::MIN_UTC.into(),
-            acl_representation: AclRepresentation::BitEfficient,
+            acl_representation: AclRepresentation::String,
             parameters: BTreeMap::new(),
             message: MessageKind::Parsed(message),
         }

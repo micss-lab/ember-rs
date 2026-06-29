@@ -1,1 +1,1 @@
-pub mod human;
+pub mod string;

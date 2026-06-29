@@ -45,6 +45,7 @@ pub mod de {
     use serde::de::Unexpected;
 
     use ember_core::agent::aid::Aid;
+    use ember_core::message::repr;
     use ember_core::message::{AclRepresentation, Message, MessageEnvelope, MessageKind};
 
     pub struct EspNowMessageDe {
@@ -150,7 +151,7 @@ pub mod de {
                     E: serde::de::Error,
                 {
                     Ok(EspNowContentDe {
-                        message: Message::try_from_bytes(v)
+                        message: repr::string::decode(v)
                             .map_err(|_| E::invalid_value(Unexpected::Bytes(v), &self))?,
                     })
                 }
@@ -166,7 +167,7 @@ pub mod de {
                 to: self.envelope.to,
                 from: self.envelope.from,
                 date: chrono::DateTime::<chrono::Utc>::MIN_UTC.into(),
-                acl_representation: AclRepresentation::BitEfficient,
+                acl_representation: AclRepresentation::String,
                 parameters: BTreeMap::new(),
                 message: MessageKind::Parsed(self.content.message),
             }

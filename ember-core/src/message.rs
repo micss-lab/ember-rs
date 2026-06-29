@@ -13,8 +13,6 @@ pub mod content;
 pub mod filter;
 pub mod repr;
 
-mod ser;
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct MessageEnvelope {
     pub to: Vec<Aid>,
@@ -34,7 +32,8 @@ pub enum MessageKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AclRepresentation {
-    BitEfficient,
+    String,       // FIPA SC00070
+    BitEfficient, // FIPA SC00069
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -99,28 +98,17 @@ impl Message {
             to,
             from,
             date: DateTime::<Utc>::MIN_UTC.into(),
-            acl_representation: AclRepresentation::BitEfficient,
+            acl_representation: AclRepresentation::String,
             parameters: BTreeMap::new(),
             message: MessageKind::Parsed(self),
         }
     }
 }
 
-// TODO: Remove the need for these by using serialize directly.
-mod todo {
-    use super::Message;
-
-    impl core::fmt::Display for Message {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            f.write_str(&super::repr::human::to_string(&self))
-        }
-    }
-
-    impl Message {
-        #[allow(unused)]
-        pub fn try_from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, ()> {
-            super::repr::human::try_from_bytes(bytes)
-        }
+impl core::fmt::Display for Message {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let bytes = repr::string::encode(self);
+        f.write_str(core::str::from_utf8(&bytes).map_err(|_| core::fmt::Error)?)
     }
 }
 
