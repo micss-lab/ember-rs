@@ -321,9 +321,11 @@ pub(crate) mod formula {
     }
 
     pub(crate) mod eval {
+        use ember_util::cmp::TotalCmpF32;
+
         use crate::bindings::Bindings;
+        use crate::term::Term;
         use crate::term::view::TermView;
-        use crate::term::{Term, TotalCmpF32};
         use crate::unification::traits::UnifyView;
 
         use super::{

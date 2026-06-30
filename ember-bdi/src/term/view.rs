@@ -1,10 +1,12 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
+use ember_util::cmp::TotalCmpF32;
+
 use crate::literal::Literal;
 use crate::variable::Variable;
 
-use super::{Atom, Structure, Term, TotalCmpF32};
+use super::{Atom, Structure, Term};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TermView<'a> {

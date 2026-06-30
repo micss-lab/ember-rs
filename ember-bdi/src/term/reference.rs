@@ -2,11 +2,12 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 
 use bstr::BString;
+use ember_util::cmp::TotalCmpF32;
 
 use crate::literal::Literal;
 use crate::variable::Variable;
 
-use super::owned::{Atom, Structure, Term, TotalCmpF32};
+use super::owned::{Atom, Structure, Term};
 use super::view::{StructureView, TermView};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
