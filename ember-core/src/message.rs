@@ -35,8 +35,8 @@ pub enum MessageKind {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AclRepresentation {
-    String,       // FIPA SC00070
-    BitEfficient, // FIPA SC00069
+    String,
+    BitEfficient,
 }
 
 #[derive(Debug, Clone, PartialEq)]
