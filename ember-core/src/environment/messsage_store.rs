@@ -1,11 +1,12 @@
-use alloc::{borrow::Cow, collections::vec_deque::VecDeque};
+use alloc::borrow::Cow;
+use alloc::collections::VecDeque;
 
+use crate::message::Message;
 use crate::message::filter::MessageFilter;
-use crate::message::{Message, MessageEnvelope};
 
 #[derive(Default, Debug, Clone)]
 pub struct MessageStore {
-    messages: VecDeque<MessageEnvelope>,
+    messages: VecDeque<Message>,
 }
 
 impl MessageStore {
@@ -17,25 +18,15 @@ impl MessageStore {
     }
 
     /// Find the first message that matches the filter and remove it from the store.
-    pub fn find_and_take_as_message(
-        &mut self,
-        filter: Option<Cow<'_, MessageFilter>>,
-    ) -> Option<Message> {
-        use crate::message::MessageKind;
+    pub fn find_and_take(&mut self, filter: Option<Cow<'_, MessageFilter>>) -> Option<Message> {
         let filter = filter.unwrap_or_else(|| Cow::Owned(MessageFilter::all()));
         self.messages
             .iter()
-            .map(|m| match m.message {
-                MessageKind::Parsed(ref m) => m,
-            })
             .position(|m| filter.matches(m))
             .map(|p| {
                 self.messages
                     .remove(p)
                     .expect("message should be in the list")
-            })
-            .map(|m| match m.message {
-                MessageKind::Parsed(m) => m,
             })
     }
 
@@ -44,8 +35,8 @@ impl MessageStore {
     }
 }
 
-impl FromIterator<MessageEnvelope> for MessageStore {
-    fn from_iter<T: IntoIterator<Item = MessageEnvelope>>(iter: T) -> Self {
+impl FromIterator<Message> for MessageStore {
+    fn from_iter<T: IntoIterator<Item = Message>>(iter: T) -> Self {
         Self {
             messages: iter.into_iter().collect(),
         }
@@ -53,9 +44,9 @@ impl FromIterator<MessageEnvelope> for MessageStore {
 }
 
 impl IntoIterator for MessageStore {
-    type Item = MessageEnvelope;
+    type Item = Message;
 
-    type IntoIter = <VecDeque<MessageEnvelope> as IntoIterator>::IntoIter;
+    type IntoIter = <VecDeque<Message> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.messages.into_iter()
@@ -64,7 +55,7 @@ impl IntoIterator for MessageStore {
 
 impl<V> From<V> for MessageStore
 where
-    V: Into<VecDeque<MessageEnvelope>>,
+    V: Into<VecDeque<Message>>,
 {
     fn from(value: V) -> Self {
         Self {

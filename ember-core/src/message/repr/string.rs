@@ -2,8 +2,8 @@ use alloc::vec::Vec;
 
 use crate::message::Message;
 
+mod decode;
 mod encode;
-mod parser;
 
 pub fn encode(message: &Message) -> alloc::vec::Vec<u8> {
     let mut result = Vec::new();
@@ -12,6 +12,6 @@ pub fn encode(message: &Message) -> alloc::vec::Vec<u8> {
 }
 
 pub fn decode(bytes: &[u8]) -> Result<Message, ()> {
-    parser::messsage::message(&bstr::BStr::new(bytes).into())
+    decode::messsage::message(&bstr::BStr::new(bytes).into())
         .map_err(|e| log::error!("failed to parse string repr: {e}"))
 }

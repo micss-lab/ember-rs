@@ -9,7 +9,7 @@ use alloc::boxed::Box;
 use core::marker::PhantomData;
 
 use ember_core::agent::aid::Aid;
-use ember_core::message::MessageEnvelope;
+use ember_core::message::TransportMessage;
 
 #[cfg(feature = "espnow")]
 use self::espnow::*;
@@ -43,9 +43,9 @@ pub mod util {
 }
 
 pub trait Acc {
-    fn send(&mut self, aid: &Aid, message: MessageEnvelope) -> Result<(), ()>;
+    fn send(&mut self, aid: &Aid, message: TransportMessage) -> Result<(), ()>;
 
-    fn receive(&mut self) -> Option<MessageEnvelope>;
+    fn receive(&mut self) -> Option<TransportMessage>;
 }
 
 #[derive(Default)]
@@ -99,7 +99,7 @@ impl<'c> Channels<'c> {
 }
 
 impl Acc for Channels<'_> {
-    fn send(&mut self, address: &Aid, message: MessageEnvelope) -> Result<(), ()> {
+    fn send(&mut self, address: &Aid, message: TransportMessage) -> Result<(), ()> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "http")] {
                 self.http
@@ -116,7 +116,7 @@ impl Acc for Channels<'_> {
         }
     }
 
-    fn receive(&mut self) -> Option<MessageEnvelope> {
+    fn receive(&mut self) -> Option<TransportMessage> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "http")] {
                 self.http.as_mut()?.receive()

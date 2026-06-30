@@ -216,12 +216,12 @@ impl ConstantCodec for i32 {
 impl ConstantCodec for f32 {
     fn from_constant(constant: Constant) -> Result<Self, DecodeError> {
         match constant {
-            Constant::Number(Number::Float(f)) => Ok(f),
+            Constant::Number(Number::Float(f)) => Ok(f.0),
             _ => Err(DecodeError::InvalidType),
         }
     }
 
     fn into_constant(self) -> Constant {
-        Constant::Number(Number::Float(self))
+        Constant::Number(Number::Float(self.into()))
     }
 }

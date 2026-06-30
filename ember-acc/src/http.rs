@@ -1,4 +1,3 @@
-use std::collections::BTreeMap;
 use std::format;
 use std::string::{String, ToString};
 use std::time::Duration;
@@ -10,8 +9,8 @@ use serde::ser::SerializeStruct;
 use tiny_http::Server;
 
 use ember_core::agent::aid::Aid;
-use ember_core::message::repr;
-use ember_core::message::{AclRepresentation, Message, MessageEnvelope, MessageKind};
+use ember_core::message::{AclRepresentation, Message, MessageEnvelope, Payload};
+use ember_core::message::{MessageEnvelopes, TransportMessage, repr};
 
 use super::Acc;
 
@@ -28,7 +27,7 @@ impl HttpChannel {
 }
 
 impl Acc for HttpChannel {
-    fn send(&mut self, address: &Aid, message: MessageEnvelope) -> Result<(), ()> {
+    fn send(&mut self, address: &Aid, message: TransportMessage) -> Result<(), ()> {
         use rand::RngCore;
         let mut boundary = [0u8; 16];
         rand::rng().fill_bytes(&mut boundary);
@@ -61,7 +60,7 @@ impl Acc for HttpChannel {
         Ok(())
     }
 
-    fn receive(&mut self) -> Option<MessageEnvelope> {
+    fn receive(&mut self) -> Option<TransportMessage> {
         use std::io::Read;
 
         let mut req = self.server.try_recv().expect("receiving message failed")?;
@@ -219,22 +218,31 @@ impl<'de> serde::Deserialize<'de> for HttpEnvelopeDe {
 }
 
 impl HttpEnvelopeDe {
-    fn with_content(self, message: Message) -> MessageEnvelope {
+    fn with_content(self, message: Message) -> TransportMessage {
         let Self { to, from } = self;
-        MessageEnvelope {
+        let envelope = MessageEnvelope {
             to,
             from,
             date: chrono::DateTime::<chrono::Utc>::MIN_UTC.into(),
             acl_representation: AclRepresentation::String,
-            parameters: BTreeMap::new(),
-            message: MessageKind::Parsed(message),
+            other: None,
+        };
+        TransportMessage {
+            envelopes: MessageEnvelopes {
+                base: envelope,
+                others: Vec::with_capacity(0),
+            },
+            payload: Payload::AclMessage(message),
         }
     }
 }
 
-fn encode_message(message: MessageEnvelope, boundary: &[u8; 16]) -> Bytes {
+fn encode_message(message: TransportMessage, boundary: &[u8; 16]) -> Bytes {
     let boundary = hex::encode(boundary);
     let mut body = BytesMut::new();
+
+    let envelope = message.envelopes.base;
+    let message = message.payload;
 
     // Preamble.
     body.put_slice(b"This is not part of the MIME multipart encoded message.");
@@ -252,7 +260,7 @@ fn encode_message(message: MessageEnvelope, boundary: &[u8; 16]) -> Bytes {
 
     // Message Envelope.
     body.put(
-        &*serde_bencode::to_bytes(&HttpEnvelopeSer(&message))
+        &*serde_bencode::to_bytes(&HttpEnvelopeSer(&envelope))
             .expect("failed to serialize message to bencode"),
     );
     body.put_slice(b"\r\n");
@@ -270,8 +278,9 @@ fn encode_message(message: MessageEnvelope, boundary: &[u8; 16]) -> Bytes {
     body.put_slice(b"\r\n");
 
     // Message Body.
-    match message.message {
-        MessageKind::Parsed(m) => body.put_slice(m.to_string().as_bytes()),
+    match message {
+        Payload::AclMessage(m) => body.put_slice(m.to_string().as_bytes()),
+        Payload::Bytes(_) => unimplemented!(),
     }
     body.put_slice(b"\r\n");
     body.put_slice(b"\r\n");

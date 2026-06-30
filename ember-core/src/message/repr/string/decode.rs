@@ -1,4 +1,6 @@
-use alloc::string::ToString;
+use alloc::collections::BTreeMap;
+use alloc::string::String;
+use alloc::vec::Vec;
 
 use bstr::{BString, ByteSlice};
 
@@ -12,65 +14,68 @@ enum MessageField {
     Receiver(Receiver),
     Language(BString),
     Content(BString),
-    Ontology(BString),
+    Ontology(String),
+    // TODO: Use these.
+    #[allow(unused)]
+    Other(String, BString),
 }
 
 #[derive(Default)]
 struct MessageBuilder {
     receiver: Option<Receiver>,
     language: Option<BString>,
-    ontology: Option<BString>,
+    ontology: Option<String>,
+    other: Vec<(String, BString)>,
     content: Option<BString>,
 }
 
 impl MessageBuilder {
     fn build(self, performative: Performative) -> Result<Message> {
-        let Some(receiver) = self.receiver else {
-            return Err("receiver");
-        };
-        let ontology = self.ontology.map(|o| o.to_str_lossy().to_string());
-        let Some(content) = self.content else {
-            return Err("content");
-        };
-
-        let content = match self.language.as_ref().map(|l| l.as_slice()) {
-            Some(b"fipa-sl0") => {
-                Content::FipaSl0(Sl0Content::try_from_sl(content.as_bstr()).map_err(|e| {
-                    log::error!("failed to parse content as sl0: {e}");
-                    "content"
-                })?)
-            }
-            Some(b"bytes") => {
-                use base64ct::{Base64, Encoding};
-                Content::Bytes(Base64::decode_vec(content.to_str_lossy().as_ref()).map_err(
-                    |_| {
-                        log::error!("failed to parse bytes content from base64");
-                        "bytes-content"
-                    },
-                )?)
-            }
-            None => Content::Other {
-                kind: None,
-                content: content.into(),
-            },
-            Some(l) => {
-                log::warn!(
-                    "unrecognised content language `{}`, treating as opaque string",
-                    bstr::BStr::new(l)
-                );
-                Content::Other {
+        let content = if let Some(content) = self.content {
+            Some(match self.language.as_ref().map(|l| l.as_slice()) {
+                Some(b"fipa-sl0") => {
+                    Content::FipaSl0(Sl0Content::try_from_sl(content.as_bstr()).map_err(|e| {
+                        log::error!("failed to parse content as sl0: {e}");
+                        "content"
+                    })?)
+                }
+                Some(b"bytes") => {
+                    use base64ct::{Base64, Encoding};
+                    Content::Bytes(Base64::decode_vec(content.to_str_lossy().as_ref()).map_err(
+                        |_| {
+                            log::error!("failed to parse bytes content from base64");
+                            "bytes-content"
+                        },
+                    )?)
+                }
+                None => Content::Other {
                     kind: None,
                     content: content.into(),
+                },
+                Some(l) => {
+                    log::warn!(
+                        "unrecognised content language `{}`, treating as opaque string",
+                        bstr::BStr::new(l)
+                    );
+                    Content::Other {
+                        kind: None,
+                        content: content.into(),
+                    }
                 }
-            }
+            })
+        } else {
+            None
         };
+
+        let other = (!self.other.is_empty())
+            .then(|| BTreeMap::from_iter(self.other))
+            .or(None);
 
         Ok(Message {
             performative,
-            sender: None,
-            receiver,
-            reply_to: None,
-            ontology,
+            receiver: self.receiver,
+            ontology: self.ontology,
+            other,
             content,
         })
     }
@@ -96,11 +101,15 @@ impl MessageBuilder {
         Ok(())
     }
 
-    fn set_ontology(&mut self, ontology: BString) -> Result<()> {
+    fn set_ontology(&mut self, ontology: String) -> Result<()> {
         if self.ontology.replace(ontology).is_some() {
             return Err("set_ontology");
         }
         Ok(())
+    }
+
+    fn add_other_field(&mut self, name: String, value: BString) {
+        self.other.push((name, value));
     }
 }
 
@@ -151,6 +160,7 @@ peg::parser! {
                     MessageField::Language(l) => builder.set_language(l)?,
                     MessageField::Ontology(o) => builder.set_ontology(o)?,
                     MessageField::Content(c) => builder.set_content(c)?,
+                    MessageField::Other(n, v) => builder.add_other_field(n, v),
                 }
             }
             builder.build(p)
@@ -162,8 +172,18 @@ peg::parser! {
         rule message_field() -> MessageField
             = ":receiver" _ r:receiver() { MessageField::Receiver(r) }
             / ":language" _ l:word() { MessageField::Language(l) }
-            / ":ontology" _ o:word() { MessageField::Ontology(o) }
+            / ":ontology" _ o:word()
+                {?
+                    let ontology = String::from_utf8(o.into())
+                        .map_err(|_| "utf8 ontology string")?;
+                        Ok(MessageField::Ontology(ontology))
+                }
             / ":content" _ c:string() { MessageField::Content(c)}
+            / ":" _ o:string()
+                {?
+                    // TODO: Implement this.
+                    Err("unimplemented fields in string acl repr decode")
+                }
 
         rule receiver() -> Receiver
             = aid:agent_identifier() { Receiver::Single(aid)}

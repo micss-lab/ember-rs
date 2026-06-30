@@ -41,11 +41,10 @@ mod round_trip_tests {
         let content = SlContent::try_from_sl("(some_proposition)").unwrap();
         round_trip(Message {
             performative: Performative::Inform,
-            sender: Some(aid("alice@local")),
-            receiver: Receiver::Single(aid("bob@local")),
-            reply_to: None,
+            receiver: Some(Receiver::Single(aid("bob@local"))),
             ontology: Some("test-ontology".into()),
-            content: Content::FipaSl0(content),
+            other: None,
+            content: Some(Content::FipaSl0(content)),
         });
     }
 
@@ -53,27 +52,25 @@ mod round_trip_tests {
     fn request_multiple_receivers() {
         round_trip(Message {
             performative: Performative::Request,
-            sender: None,
-            receiver: Receiver::Multiple(BTreeSet::from([
+            receiver: Some(Receiver::Multiple(BTreeSet::from([
                 aid("a@local"),
                 aid("b@remote-platform"),
-            ])),
-            reply_to: None,
+            ]))),
             ontology: None,
-            content: Content::Bytes(alloc::vec![0xDE, 0xAD, 0xBE, 0xEF]),
+            other: None,
+            content: Some(Content::Bytes(alloc::vec![0xDE, 0xAD, 0xBE, 0xEF])),
         });
     }
 
     #[test]
-    fn cfp_no_sender_no_ontology() {
+    fn cfp_no_ontology() {
         let content = SlContent::try_from_sl("(true)").unwrap();
         round_trip(Message {
             performative: Performative::Cfp,
-            sender: None,
-            receiver: Receiver::Single(aid("agent@local")),
-            reply_to: None,
+            receiver: Some(Receiver::Single(aid("agent@local"))),
             ontology: None,
-            content: Content::FipaSl0(content),
+            other: None,
+            content: Some(Content::FipaSl0(content)),
         });
     }
 
@@ -108,11 +105,10 @@ mod round_trip_tests {
         for perf in perfs {
             let msg = Message {
                 performative: perf,
-                sender: None,
-                receiver: Receiver::Single(aid("x@local")),
-                reply_to: None,
+                receiver: Some(Receiver::Single(aid("x@local"))),
                 ontology: None,
-                content: Content::FipaSl0(content.clone()),
+                other: None,
+                content: Some(Content::FipaSl0(content.clone())),
             };
             let encoded = encode(&msg);
             let decoded = decode(&encoded).expect("decode failed");

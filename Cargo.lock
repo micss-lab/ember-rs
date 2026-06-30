@@ -552,6 +552,7 @@ dependencies = [
  "chrono",
  "critical-section",
  "ember-time",
+ "ember-util",
  "libm",
  "log",
  "peg 0.8.5",

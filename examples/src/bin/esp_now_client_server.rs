@@ -13,7 +13,7 @@ use ember::Container;
 use ember::agent::Aid;
 use ember::agent::reactive::ReactiveAgent;
 use ember::agent::reactive::behaviour::{Context, CyclicBehaviour, TickerBehaviour};
-use ember::message::{Content, Message, MessageEnvelope, Performative, Receiver};
+use ember::message::{Content, Message, Performative, Receiver};
 
 const VALUES: [Metrics; 10] = [
     Metrics {
@@ -83,7 +83,7 @@ impl CyclicBehaviour for MetricsReceiver {
             ctx.block_behaviour();
             return;
         };
-        let metrics = Metrics::from(message.content);
+        let metrics = Metrics::from(message.content.expect("message has no content"));
         log::info!("Received metrics: {metrics:?}");
     }
 
@@ -212,19 +212,17 @@ impl FromStr for Metrics {
     }
 }
 
-impl From<Metrics> for MessageEnvelope {
+impl From<Metrics> for Message {
     fn from(value: Metrics) -> Self {
         Message {
             performative: Performative::Inform,
-            sender: None,
-            receiver: Receiver::Single(Aid::general("server", "ffffffffffff")),
-            reply_to: None,
+            receiver: Some(Receiver::Single(Aid::general("server", "ffffffffffff"))),
             ontology: None,
-            content: Content::Other {
+            other: None,
+            content: Some(Content::Other {
                 kind: None,
                 content: format!("{},{},{}", value.temperature, value.humidity, value.light).into(),
-            },
+            }),
         }
-        .wrap_with_envolope()
     }
 }

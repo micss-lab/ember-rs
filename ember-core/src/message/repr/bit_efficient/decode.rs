@@ -1,8 +1,8 @@
-use alloc::collections::BTreeSet;
-use alloc::string::ToString;
+use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::string::String;
 use alloc::vec::Vec;
 
-use bstr::ByteSlice;
+use bstr::{BString, ByteSlice};
 
 use crate::agent::aid::Aid;
 use crate::message::content::fipa_sl::Sl0Content;
@@ -14,76 +14,76 @@ pub(super) fn decode(bytes: &[u8]) -> Result<Message, ()> {
 }
 
 enum MessageField {
-    Sender(Aid),
     Receiver(Vec<Aid>),
-    Language(Vec<u8>),
+    Language(BString),
+    Ontology(String),
+    Other(String, BString),
     Content(Vec<u8>),
-    Ontology(Vec<u8>),
 }
 
 fn build_message(
     perf: Performative,
     fields: Vec<Option<MessageField>>,
 ) -> Result<Message, &'static str> {
-    let mut sender: Option<Aid> = None;
     let mut receiver: Option<Vec<Aid>> = None;
-    let mut language: Option<Vec<u8>> = None;
-    let mut content_bytes: Option<Vec<u8>> = None;
-    let mut ontology_bytes: Option<Vec<u8>> = None;
+    let mut language: Option<BString> = None;
+    let mut ontology: Option<String> = None;
+    let mut other_fields = Vec::new();
+    let mut content: Option<Vec<u8>> = None;
 
     for field in fields.into_iter().flatten() {
         match field {
-            MessageField::Sender(a) => sender = Some(a),
             MessageField::Receiver(aids) => receiver = Some(aids),
             MessageField::Language(l) => language = Some(l),
-            MessageField::Content(c) => content_bytes = Some(c),
-            MessageField::Ontology(o) => ontology_bytes = Some(o),
+            MessageField::Ontology(o) => ontology = Some(o),
+            MessageField::Other(n, v) => other_fields.push((n, v)),
+            MessageField::Content(c) => content = Some(c),
         }
     }
 
-    let aids = receiver.ok_or("missing :receiver")?;
-    let receiver = match aids.len() {
-        1 => Receiver::Single(aids.into_iter().next().unwrap()),
-        _ => Receiver::Multiple(BTreeSet::from_iter(aids)),
-    };
+    let receiver = receiver.map(|mut r| match r.len() {
+        1 => Receiver::Single(r.pop().expect("receiver should be of length 1")),
+        _ => Receiver::Multiple(BTreeSet::from_iter(r)),
+    });
 
-    let content_bytes = content_bytes.ok_or("missing :content")?;
-
-    let content = match language.as_deref() {
-        Some(b"fipa-sl0") => {
-            let parsed = Sl0Content::try_from_sl(content_bytes.as_bstr()).map_err(|e| {
-                log::error!("failed to parse SL0 content: {e}");
-                "sl0-content"
-            })?;
-            Content::FipaSl0(parsed)
-        }
-        Some(b"bytes") => Content::Bytes(content_bytes),
-        None => Content::Other {
-            kind: None,
-            content: content_bytes.into(),
-        },
-        Some(l) => {
-            log::warn!(
-                "unrecognised content language `{}`, treating as opaque",
-                bstr::BStr::new(l)
-            );
-            Content::Other {
-                kind: None,
-                content: content_bytes.into(),
+    let content = if let Some(content) = content {
+        Some(match language.as_ref().map(|l| l.as_bytes()) {
+            Some(b"fipa-sl0") => {
+                let parsed = Sl0Content::try_from_sl(content.as_bstr()).map_err(|e| {
+                    log::error!("failed to parse SL0 content: {e}");
+                    "sl0-content"
+                })?;
+                Content::FipaSl0(parsed)
             }
-        }
+            Some(b"bytes") => Content::Bytes(content),
+            None => Content::Other {
+                kind: None,
+                content: content.into(),
+            },
+            Some(l) => {
+                log::warn!(
+                    "unrecognised content language `{}`, treating as opaque",
+                    bstr::BStr::new(l)
+                );
+                Content::Other {
+                    kind: None,
+                    content: content.into(),
+                }
+            }
+        })
+    } else {
+        None
     };
 
-    let ontology = ontology_bytes
-        .map(|b| core::str::from_utf8(&b).unwrap_or_default().to_string())
-        .filter(|s| !s.is_empty());
+    let other = (!other_fields.is_empty())
+        .then(|| BTreeMap::from_iter(other_fields))
+        .or(None);
 
     Ok(Message {
         performative: perf,
-        sender,
         receiver,
-        reply_to: None,
         ontology,
+        other,
         content,
     })
 }
@@ -105,19 +105,31 @@ peg::parser! {
             }
 
         rule message_parameter() -> Option<MessageField>
-            = [KW_SENDER]          a:agent_identifier()               { Some(MessageField::Sender(a)) }
-            / [KW_RECEIVER]        aids:agent_identifier_collection() { Some(MessageField::Receiver(aids)) }
-            / [KW_CONTENT]         s:bin_string()                     { Some(MessageField::Content(s)) }
-            / [KW_REPLY_WITH]      bin_expression_skip()              { None }
-            / [KW_REPLY_BY]        bin_datetime_skip()                { None }
-            / [KW_IN_REPLY_TO]     bin_expression_skip()              { None }
-            / [KW_REPLY_TO]        agent_identifier_collection()      { None }
-            / [KW_LANGUAGE]        s:bin_expression_bytes()           { Some(MessageField::Language(s)) }
-            / [KW_ENCODING]        bin_expression_skip()              { None }
-            / [KW_ONTOLOGY]        s:bin_expression_bytes()           { Some(MessageField::Ontology(s)) }
-            / [KW_PROTOCOL]        bin_word_skip()                    { None }
-            / [KW_CONVERSATION_ID] bin_expression_skip()              { None }
-            / [0x00]               bin_word_skip() bin_expression_skip() { None }
+            = [KW_SENDER] agent_identifier_skip() { None }
+            / [KW_RECEIVER] aids:agent_identifier_collection() { Some(MessageField::Receiver(aids)) }
+            / [KW_CONTENT] s:bin_string() { Some(MessageField::Content(s)) }
+            / [KW_REPLY_WITH] bin_expression_skip() { None }
+            / [KW_REPLY_BY] bin_datetime_skip() { None }
+            / [KW_IN_REPLY_TO] bin_expression_skip() { None }
+            / [KW_REPLY_TO] agent_identifier_collection() { None }
+            / [KW_LANGUAGE] s:bin_expression_bytes() { Some(MessageField::Language(s.into())) }
+            / [KW_ENCODING] bin_expression_skip() { None }
+            / [KW_ONTOLOGY] s:bin_expression_bytes()
+                {?
+                    Ok(Some(
+                        MessageField::Ontology(
+                            String::from_utf8(s)
+                                .map_err(|_| "utf8 ontology string")?
+                        )
+                    ))
+                }
+            / [KW_PROTOCOL] bin_word_skip() { None }
+            / [KW_CONVERSATION_ID] bin_expression_skip() { None }
+            / [0x00] n:bin_word() v:bin_expression_bytes()
+                {?
+                    let name = String::from_utf8(n).map_err(|_| "utf8 parameter name")?;
+                    Ok(Some(MessageField::Other(name, v.into())))
+                }
 
 
         rule bin_word() -> Vec<u8>
@@ -218,6 +230,9 @@ peg::parser! {
         rule agent_identifier_collection() -> Vec<Aid>
             = aids:agent_identifier()* eoc() { aids }
 
+        rule agent_identifier_collection_skip()
+            = agent_identifier_skip()* eoc()
+
         rule agent_identifier() -> Aid
             = [0x02]
               name:bin_word()
@@ -229,6 +244,14 @@ peg::parser! {
                 let s = core::str::from_utf8(&name).map_err(|_| "AID name not UTF-8")?;
                 s.parse::<Aid>().map_err(|_| "bad AID")
             }
+
+        rule agent_identifier_skip()
+            = [0x02]
+              bin_word_skip()
+              ([AID_TAG_ADDRESSES] url_collection_skip())?
+              ([AID_TAG_RESOLVERS] agent_identifier_collection_skip())?
+              ([AID_TAG_USER_DEF] bin_word_skip() bin_expression_skip())*
+              eoc()
 
         rule performative() -> Performative
             = [PERF_ACCEPT_PROPOSAL] { Performative::AcceptProposal }

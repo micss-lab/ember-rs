@@ -9,15 +9,15 @@ use crate::message::{Content, Message, OtherLanguage, Receiver};
 pub(super) fn encode(message: &Message, out: &mut Vec<u8>) -> fmt::Result {
     let mut result = String::new();
     write!(result, "({}", message.performative.as_str())?;
-    if let Some(sender) = &message.sender {
-        result.push_str(" :sender ");
-        encode_aid(sender, &mut result)?;
+    if let Some(ref receiver) = message.receiver {
+        result.push_str(" :receiver ");
+        encode_receiver(receiver, &mut result)?;
     }
-    result.push_str(" :receiver ");
-    encode_receiver(&message.receiver, &mut result)?;
-    encode_content(&message.content, &mut result)?;
-    if let Some(ontology) = &message.ontology {
+    if let Some(ref ontology) = message.ontology {
         write!(result, " :ontology {ontology}")?;
+    }
+    if let Some(ref content) = message.content {
+        encode_content_and_language(content, &mut result)?;
     }
     result.push(')');
     out.extend(result.into_bytes());
@@ -43,7 +43,7 @@ fn encode_receiver(receiver: &Receiver, out: &mut String) -> fmt::Result {
     }
 }
 
-fn encode_content(content: &Content, out: &mut String) -> fmt::Result {
+fn encode_content_and_language(content: &Content, out: &mut String) -> fmt::Result {
     match content {
         Content::FipaSl0(c) => {
             write!(out, " :language fipa-sl0 :content \"{c}\"")
@@ -52,15 +52,25 @@ fn encode_content(content: &Content, out: &mut String) -> fmt::Result {
             use base64ct::{Base64, Encoding};
             write!(
                 out,
-                " :language bytes :content \"{}\"",
+                " :language bytes :X-content-encoding base64 :content \"{}\"",
                 Base64::encode_string(b)
             )
         }
         Content::Other { kind, content } => {
+            use bstr::ByteSlice;
             if let Some(kind) = kind {
                 write!(out, " :language {}", language_name(kind))?;
             }
-            write!(out, " :content \"{content}\"")
+            if content.is_utf8() {
+                write!(out, " :content \"{content}\"")
+            } else {
+                use base64ct::{Base64, Encoding};
+                write!(
+                    out,
+                    " :X-content-encoding bytes :content \"{}\"",
+                    Base64::encode_string(content)
+                )
+            }
         }
     }
 }

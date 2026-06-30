@@ -11,32 +11,29 @@ pub(super) fn encode(message: &Message, out: &mut Vec<u8>) {
     out.push(VERSION_1_0);
     out.push(performative_code(message.performative));
 
-    if let Some(sender) = &message.sender {
-        out.push(KW_SENDER);
-        push_aid(sender, out);
+    if let Some(ref receiver) = message.receiver {
+        out.push(KW_RECEIVER);
+        push_recipient_expr(receiver, out);
     }
-
-    out.push(KW_RECEIVER);
-    push_recipient_expr(&message.receiver, out);
-
-    push_content(&message.content, out);
 
     if let Some(ontology) = &message.ontology {
         out.push(KW_ONTOLOGY);
         push_bin_word(ontology.as_bytes(), out);
     }
 
+    if let Some(ref content) = message.content {
+        push_content_and_language(content, out);
+    }
+
     out.push(END_OF_COLLECTION);
 }
 
-// AgentIdentifier = 0x02 AgentName EndOfCollection   (no addresses/resolvers)
 fn push_aid(aid: &Aid, out: &mut Vec<u8>) {
     out.push(0x02);
     push_bin_word(aid.to_string().as_bytes(), out);
     out.push(END_OF_COLLECTION);
 }
 
-// RecipientExpr = AgentIdentifierCollection = AgentIdentifier* EndOfCollection
 fn push_recipient_expr(receiver: &Receiver, out: &mut Vec<u8>) {
     match receiver {
         Receiver::Single(aid) => {
@@ -51,7 +48,7 @@ fn push_recipient_expr(receiver: &Receiver, out: &mut Vec<u8>) {
     out.push(END_OF_COLLECTION);
 }
 
-fn push_content(content: &Content, out: &mut Vec<u8>) {
+fn push_content_and_language(content: &Content, out: &mut Vec<u8>) {
     match content {
         Content::FipaSl0(c) => {
             out.push(KW_LANGUAGE);
@@ -76,14 +73,12 @@ fn push_content(content: &Content, out: &mut Vec<u8>) {
     }
 }
 
-// BinWord = 0x10 Word 0x00
 fn push_bin_word(word: &[u8], out: &mut Vec<u8>) {
     out.push(BIN_WORD);
     out.extend_from_slice(word);
     out.push(0x00);
 }
 
-// BinString: 0x17 Len16 ByteSeq  or  0x19 Len32 ByteSeq
 fn push_bin_string(bytes: &[u8], out: &mut Vec<u8>) {
     if bytes.len() <= u16::MAX as usize {
         out.push(BIN_STR_16);

@@ -7,13 +7,14 @@ use alloc::vec::Vec;
 
 use bstr::ByteSlice;
 use chrono::{DateTime, FixedOffset};
+use ember_util::cmp::TotalCmpF32;
 
 use crate::util::parsing::BStr;
 
 pub mod codec;
 
 /// List of expressions to form the SL0 content of an ACL message.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Sl0Content(pub Vec<ContentElement>);
 
 impl Sl0Content {
@@ -23,13 +24,13 @@ impl Sl0Content {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ContentElement {
     AgentAction(AgentAction),
     Predicate(Predicate),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Concept {
     /// Type defining the concept.
     pub symbol: bstr::BString,
@@ -37,7 +38,7 @@ pub struct Concept {
     pub parameters: ConceptParameters,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AgentAction {
     /// Agent performing the action.
     pub agent: Term,
@@ -45,7 +46,7 @@ pub struct AgentAction {
     pub action: Term,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Predicate {
     Regular {
         symbol: bstr::BString,
@@ -62,7 +63,7 @@ pub enum Predicate {
 }
 
 /// Recursive structure defining the concept of a term.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Term {
     Constant(Constant),
     Set(Set),
@@ -72,7 +73,7 @@ pub enum Term {
 }
 
 /// Parameters part of a functional term.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConceptParameters {
     Positional(Vec<Term>),
     ByName(Vec<(bstr::BString, Term)>),
@@ -92,7 +93,7 @@ impl ConceptParameters {
 }
 
 /// Numerical, string, and time-related constants.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Constant {
     Number(Number),
     String(bstr::BString),
@@ -100,10 +101,10 @@ pub enum Constant {
 }
 
 /// Numerical constant.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Number {
     Int(i32),
-    Float(f32),
+    Float(TotalCmpF32),
 }
 
 pub type Set = Collection<collection::SetLike>;
@@ -117,7 +118,7 @@ pub type Seq = Collection<collection::SeqLike>;
 ///
 /// [`BTreeSet`]: alloc::collections::btree_set::BTreeSet
 /// [`Ord`]: core::cmp::Ord
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Collection<C> {
     /// Items in the collection.
     items: Vec<Term>,
@@ -125,9 +126,9 @@ pub struct Collection<C> {
     _marker: PhantomData<C>,
 }
 mod collection {
-    #[derive(Debug, Clone, PartialEq)]
+    #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct SetLike;
-    #[derive(Debug, Clone, PartialEq)]
+    #[derive(Debug, Clone, PartialEq, Eq)]
     pub struct SeqLike;
 }
 
@@ -288,7 +289,7 @@ peg::parser! {
         /// Numerical constant.
         rule number() -> Number
             = i:int() { Number::Int(i) }
-            / f:float() { Number::Float(f)}
+            / f:float() { Number::Float(f.into())}
 
         // ====================
         //       Strings
@@ -523,7 +524,7 @@ impl core::fmt::Display for Number {
         use Number::*;
         match self {
             Int(i) => write!(f, "{i}"),
-            Float(fl) => write!(f, "{fl}"),
+            Float(fl) => write!(f, "{}", fl),
         }
     }
 }

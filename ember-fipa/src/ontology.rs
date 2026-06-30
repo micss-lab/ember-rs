@@ -32,7 +32,7 @@ impl AgentManagementOntology {
         if message.ontology.is_none_or(|o| o != Self::name()) {
             return Err(DecodeAsOntologyError::UnexpectedOntology);
         }
-        let Content::FipaSl0(content) = message.content else {
+        let Some(Content::FipaSl0(content)) = message.content else {
             return Err(DecodeAsOntologyError::UnexpectedLanguage);
         };
         let mut agent_action: AgentAction =

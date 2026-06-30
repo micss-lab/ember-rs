@@ -1,5 +1,5 @@
 pub mod ser {
-    use ember_core::message::{MessageEnvelope, MessageKind};
+    use ember_core::message::{MessageEnvelope, Payload};
 
     pub struct EspNowMessageSer<'a>(pub &'a MessageEnvelope);
     struct EspNowEnvelopeSer<'a>(&'a MessageEnvelope);
@@ -15,7 +15,7 @@ pub mod ser {
             let mut message = serializer.serialize_struct("message", 2)?;
             message.serialize_field("envelope", &EspNowEnvelopeSer(self.0))?;
             match &self.0.message {
-                MessageKind::Parsed(m) => {
+                Payload::AclMessage(m) => {
                     message.serialize_field("content", m.to_string().as_bytes())?
                 }
             }
@@ -46,7 +46,7 @@ pub mod de {
 
     use ember_core::agent::aid::Aid;
     use ember_core::message::repr;
-    use ember_core::message::{AclRepresentation, Message, MessageEnvelope, MessageKind};
+    use ember_core::message::{AclRepresentation, Message, MessageEnvelope, Payload};
 
     pub struct EspNowMessageDe {
         envelope: EspNowEnvelopeDe,
@@ -168,8 +168,8 @@ pub mod de {
                 from: self.envelope.from,
                 date: chrono::DateTime::<chrono::Utc>::MIN_UTC.into(),
                 acl_representation: AclRepresentation::String,
-                parameters: BTreeMap::new(),
-                message: MessageKind::Parsed(self.content.message),
+                other: BTreeMap::new(),
+                message: Payload::AclMessage(self.content.message),
             }
         }
     }
