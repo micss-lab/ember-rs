@@ -3,8 +3,8 @@ use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
 
-use crate::message::content::{
-    AgentAction, Concept, Constant, Content, ContentElement, Number, Predicate, Seq, Set, Term,
+use super::{
+    AgentAction, Concept, Constant, ContentElement, Number, Predicate, Seq, Set, Sl0Content, Term,
 };
 
 #[derive(Debug)]
@@ -29,7 +29,7 @@ pub trait AgentActionCodec: Sized {
         }
     }
 
-    fn from_content(content: Content) -> Result<Self, DecodeError> {
+    fn from_content(content: Sl0Content) -> Result<Self, DecodeError> {
         use ContentElement::*;
         let Some(first) = content.0.into_iter().next() else {
             return Err(DecodeError::InvalidLength(0));
@@ -48,8 +48,8 @@ pub trait AgentActionCodec: Sized {
         ContentElement::AgentAction(self.into_agent_action())
     }
 
-    fn into_content(self) -> Content {
-        Content(vec![self.into_content_element()])
+    fn into_content(self) -> Sl0Content {
+        Sl0Content(vec![self.into_content_element()])
     }
 }
 
@@ -58,7 +58,7 @@ pub trait PredicateCodec: Sized {
 
     fn from_predicate(predicate: Predicate) -> Result<Self, DecodeError>;
 
-    fn from_content(content: Content) -> Result<Self, DecodeError> {
+    fn from_content(content: Sl0Content) -> Result<Self, DecodeError> {
         let Some(first) = content.0.into_iter().next() else {
             return Err(DecodeError::InvalidLength(0));
         };
@@ -76,8 +76,8 @@ pub trait PredicateCodec: Sized {
         ContentElement::Predicate(self.into_predicate())
     }
 
-    fn into_content(self) -> Content {
-        Content(vec![self.into_content_element()])
+    fn into_content(self) -> Sl0Content {
+        Sl0Content(vec![self.into_content_element()])
     }
 }
 

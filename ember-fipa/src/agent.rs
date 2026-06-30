@@ -4,7 +4,7 @@ use alloc::format;
 use alloc::string::ToString;
 use ember_core::agent::aid::Aid;
 use ember_core::environment::Environment;
-use ember_core::message::content::codec::AgentActionCodec;
+use ember_core::message::content::fipa_sl::codec::AgentActionCodec;
 use ember_core::message::{Message, Performative};
 
 use crate::ontology::{AgentManagementOntology, AmsAgentDescription, RegisterAction};

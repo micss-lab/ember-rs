@@ -1,58 +1,66 @@
 use alloc::string::String;
-use core::fmt::Write;
+use alloc::vec::Vec;
+
+use core::fmt::{self, Write};
 
 use crate::agent::aid::Aid;
 use crate::message::{Content, Message, OtherLanguage, Receiver};
 
-pub(super) fn encode(message: &Message) -> alloc::vec::Vec<u8> {
-    let mut out = String::new();
-    write!(out, "({}", message.performative.as_str()).unwrap();
+pub(super) fn encode(message: &Message, out: &mut Vec<u8>) -> fmt::Result {
+    let mut result = String::new();
+    write!(result, "({}", message.performative.as_str())?;
     if let Some(sender) = &message.sender {
-        out.push_str(" :sender ");
-        encode_aid(sender, &mut out);
+        result.push_str(" :sender ");
+        encode_aid(sender, &mut result)?;
     }
-    out.push_str(" :receiver ");
-    encode_receiver(&message.receiver, &mut out);
-    encode_content(&message.content, &mut out);
+    result.push_str(" :receiver ");
+    encode_receiver(&message.receiver, &mut result)?;
+    encode_content(&message.content, &mut result)?;
     if let Some(ontology) = &message.ontology {
-        write!(out, " :ontology {ontology}").unwrap();
+        write!(result, " :ontology {ontology}")?;
     }
-    out.push(')');
-    out.into_bytes()
+    result.push(')');
+    out.extend(result.into_bytes());
+    Ok(())
 }
 
-fn encode_aid(aid: &Aid, out: &mut String) {
-    write!(out, "(agent-identifier :name {aid})").unwrap();
+fn encode_aid(aid: &Aid, out: &mut String) -> fmt::Result {
+    write!(out, "(agent-identifier :name {aid})")
 }
 
-fn encode_receiver(receiver: &Receiver, out: &mut String) {
+fn encode_receiver(receiver: &Receiver, out: &mut String) -> fmt::Result {
     match receiver {
         Receiver::Single(aid) => encode_aid(aid, out),
         Receiver::Multiple(aids) => {
             out.push_str("(sequence");
             for aid in aids {
                 out.push(' ');
-                encode_aid(aid, out);
+                encode_aid(aid, out)?;
             }
             out.push(')');
+            Ok(())
         }
     }
 }
 
-fn encode_content(content: &Content, out: &mut String) {
+fn encode_content(content: &Content, out: &mut String) -> fmt::Result {
     match content {
-        Content::Structured(c) => {
-            write!(out, " :language fipa-sl0 :content \"{c}\"").unwrap();
+        Content::FipaSl0(c) => {
+            write!(out, " :language fipa-sl0 :content \"{c}\"")
         }
         Content::Bytes(b) => {
             use base64ct::{Base64, Encoding};
-            write!(out, " :language bytes :content \"{}\"", Base64::encode_string(b)).unwrap();
+            write!(
+                out,
+                " :language bytes :content \"{}\"",
+                Base64::encode_string(b)
+            )
         }
         Content::Other { kind, content } => {
             if let Some(kind) = kind {
-                write!(out, " :language {}", language_name(kind)).unwrap();
+                write!(out, " :language {}", language_name(kind))?;
             }
-            write!(out, " :content \"{content}\"").unwrap();
+            write!(out, " :content \"{content}\"")
         }
     }
 }

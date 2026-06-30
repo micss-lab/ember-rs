@@ -2,8 +2,8 @@ use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
 
-use ember_core::message::content::codec::*;
-use ember_core::message::content::{AgentAction, Concept, ConceptParameters, Term};
+use ember_core::message::content::fipa_sl::codec::*;
+use ember_core::message::content::fipa_sl::{AgentAction, Concept, ConceptParameters, Term};
 use ember_core::message::{Content, Message};
 
 pub struct AgentManagementOntology;
@@ -32,7 +32,7 @@ impl AgentManagementOntology {
         if message.ontology.is_none_or(|o| o != Self::name()) {
             return Err(DecodeAsOntologyError::UnexpectedOntology);
         }
-        let Content::Structured(content) = message.content else {
+        let Content::FipaSl0(content) = message.content else {
             return Err(DecodeAsOntologyError::UnexpectedLanguage);
         };
         let mut agent_action: AgentAction =

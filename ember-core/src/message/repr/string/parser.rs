@@ -3,7 +3,7 @@ use alloc::string::ToString;
 use bstr::{BString, ByteSlice};
 
 use crate::agent::aid::Aid;
-use crate::message::content::lang::sl::sl0_parser;
+use crate::message::content::fipa_sl::Sl0Content;
 use crate::message::{Content, Message, Performative, Receiver};
 
 type Result<T> = core::result::Result<T, &'static str>;
@@ -34,25 +34,35 @@ impl MessageBuilder {
         };
 
         let content = match self.language.as_ref().map(|l| l.as_slice()) {
-            Some(b"fipa-sl0") => Content::Structured(
-                sl0_parser::content(&content.as_bstr().into()).map_err(|e| {
+            Some(b"fipa-sl0") => {
+                Content::FipaSl0(Sl0Content::try_from_sl(content.as_bstr()).map_err(|e| {
                     log::error!("failed to parse content as sl0: {e}");
                     "content"
-                })?,
-            ),
-            // TODO: Fix this when properly supporting sending bytes.
+                })?)
+            }
             Some(b"bytes") => {
                 use base64ct::{Base64, Encoding};
-                Content::Bytes(Base64::decode_vec(content.to_str_lossy().as_ref()).map_err(|_| {
-                    log::error!("failed to parse bytes content from base64");
-                    "bytes-content"
-                })?)
+                Content::Bytes(Base64::decode_vec(content.to_str_lossy().as_ref()).map_err(
+                    |_| {
+                        log::error!("failed to parse bytes content from base64");
+                        "bytes-content"
+                    },
+                )?)
             }
             None => Content::Other {
                 kind: None,
-                content: content.to_string(),
+                content: content.into(),
             },
-            _ => todo!(),
+            Some(l) => {
+                log::warn!(
+                    "unrecognised content language `{}`, treating as opaque string",
+                    bstr::BStr::new(l)
+                );
+                Content::Other {
+                    kind: None,
+                    content: content.into(),
+                }
+            }
         };
 
         Ok(Message {

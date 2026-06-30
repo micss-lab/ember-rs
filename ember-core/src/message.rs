@@ -1,11 +1,14 @@
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
+use bstr::BString;
 use core::str::FromStr;
 
 use chrono::{DateTime, Utc};
 
 use crate::agent::aid::Aid;
+
+use self::content::fipa_sl::Sl0Content;
 
 pub use self::filter::MessageFilter;
 
@@ -73,17 +76,21 @@ pub enum OtherLanguage {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Content {
-    Structured(self::content::Content),
+    FipaSl0(Sl0Content),
     Bytes(Vec<u8>),
     Other {
         kind: Option<OtherLanguage>,
-        content: String,
+        /// Direct bytes (possibly utf-8) from the message not decoded in any way.
+        ///
+        /// The difference with [`Content::Bytes`] is that the latter is (en/de)coded in
+        /// transit.
+        content: BString,
     },
 }
 
-impl From<self::content::Content> for Content {
-    fn from(content: self::content::Content) -> Self {
-        Self::Structured(content)
+impl From<Sl0Content> for Content {
+    fn from(content: Sl0Content) -> Self {
+        Self::FipaSl0(content)
     }
 }
 
@@ -136,7 +143,6 @@ pub enum Performative {
     Subscribe,
     Proxy,
     Propagate,
-    Unknown,
 }
 
 impl Performative {
@@ -165,7 +171,6 @@ impl Performative {
             Subscribe => "subscribe",
             Proxy => "proxy",
             Propagate => "propagate",
-            Unknown => "unknown",
         }
     }
 }
@@ -198,9 +203,6 @@ impl FromStr for Performative {
             "subscribe" => Subscribe,
             "proxy" => Proxy,
             "propagate" => Propagate,
-
-            // TODO: Should the error case become the unknown performative?
-            "unknown" => Unknown,
             _ => return Err(()),
         })
     }

@@ -1,12 +1,155 @@
 use core::fmt::Write;
+use core::marker::PhantomData;
+
+use alloc::boxed::Box;
+use alloc::string::{String, ToString};
+use alloc::vec::Vec;
 
 use bstr::ByteSlice;
+use chrono::{DateTime, FixedOffset};
 
-use crate::message::content::*;
 use crate::util::parsing::BStr;
 
+pub mod codec;
+
+/// List of expressions to form the SL0 content of an ACL message.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Sl0Content(pub Vec<ContentElement>);
+
+impl Sl0Content {
+    pub fn try_from_sl(input: impl AsRef<bstr::BStr>) -> Result<Self, String> {
+        sl0_parser::content(&crate::util::parsing::BStr::from(input.as_ref()))
+            .map_err(|e| e.to_string())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ContentElement {
+    AgentAction(AgentAction),
+    Predicate(Predicate),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Concept {
+    /// Type defining the concept.
+    pub symbol: bstr::BString,
+    /// Parameters belonging to the concept.
+    pub parameters: ConceptParameters,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AgentAction {
+    /// Agent performing the action.
+    pub agent: Term,
+    /// The action to be performed.
+    pub action: Term,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Predicate {
+    Regular {
+        symbol: bstr::BString,
+        terms: Vec<Term>,
+    },
+    Result {
+        lhs: Term,
+        rhs: Term,
+    },
+    Done {
+        action: AgentAction,
+    },
+    Bool(bool),
+}
+
+/// Recursive structure defining the concept of a term.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Term {
+    Constant(Constant),
+    Set(Set),
+    Sequence(Seq),
+    Concept(Concept),
+    Action(Box<AgentAction>),
+}
+
+/// Parameters part of a functional term.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConceptParameters {
+    Positional(Vec<Term>),
+    ByName(Vec<(bstr::BString, Term)>),
+}
+
+impl ConceptParameters {
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Positional(p) => p.len(),
+            Self::ByName(p) => p.len(),
+        }
+    }
+}
+
+/// Numerical, string, and time-related constants.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Constant {
+    Number(Number),
+    String(bstr::BString),
+    Datatime(DateTime<FixedOffset>),
+}
+
+/// Numerical constant.
+#[derive(Debug, Clone, PartialEq)]
+pub enum Number {
+    Int(i32),
+    Float(f32),
+}
+
+pub type Set = Collection<collection::SetLike>;
+pub type Seq = Collection<collection::SeqLike>;
+
+/// General collection type.
+///
+/// Note: A set cannot be stored in a [`BTreeSet`] as it requires the
+/// items to be [`Ord`]. They cannot be as this would require evaluating
+/// the terms before storing them.
+///
+/// [`BTreeSet`]: alloc::collections::btree_set::BTreeSet
+/// [`Ord`]: core::cmp::Ord
+#[derive(Debug, Clone, PartialEq)]
+pub struct Collection<C> {
+    /// Items in the collection.
+    items: Vec<Term>,
+    /// Semantics behind the collection.
+    _marker: PhantomData<C>,
+}
+mod collection {
+    #[derive(Debug, Clone, PartialEq)]
+    pub struct SetLike;
+    #[derive(Debug, Clone, PartialEq)]
+    pub struct SeqLike;
+}
+
+impl<C> core::ops::Deref for Collection<C> {
+    type Target = [Term];
+
+    fn deref(&self) -> &Self::Target {
+        &self.items
+    }
+}
+
+impl<C> FromIterator<Term> for Collection<C> {
+    fn from_iter<T: IntoIterator<Item = Term>>(iter: T) -> Self {
+        Self {
+            items: iter.into_iter().collect(),
+            _marker: PhantomData,
+        }
+    }
+}
+
 peg::parser! {
-    pub grammar sl0_parser<'a>() for BStr<'a> {
+    grammar sl0_parser<'a>() for BStr<'a> {
         use alloc::boxed::Box;
         use alloc::vec::Vec;
         use alloc::vec;
@@ -19,8 +162,8 @@ peg::parser! {
 
         rule _ = [c if c.is_ascii_whitespace()]?
 
-        pub rule content() -> Content
-            = lbrace() _ c:(c:content_expression() _ { c })+ _ rbrace() { Content(c) }
+        pub rule content() -> Sl0Content
+            = lbrace() _ c:(c:content_expression() _ { c })+ _ rbrace() { Sl0Content(c) }
 
         rule content_expression() -> ContentElement
             = a:action_expression() { ContentElement::AgentAction(a) }
@@ -245,7 +388,7 @@ peg::parser! {
     }
 }
 
-impl core::fmt::Display for Content {
+impl core::fmt::Display for Sl0Content {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.write_char('(')?;
         for e in self.0.iter() {
@@ -359,7 +502,7 @@ impl core::fmt::Display for Concept {
 
 impl core::fmt::Display for Constant {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        use crate::message::content::Constant::*;
+        use Constant::*;
         match self {
             Number(n) => write!(f, "{n}"),
             String(s) => {
@@ -377,7 +520,7 @@ impl core::fmt::Display for Constant {
 
 impl core::fmt::Display for Number {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        use crate::message::content::Number::*;
+        use Number::*;
         match self {
             Int(i) => write!(f, "{i}"),
             Float(fl) => write!(f, "{fl}"),

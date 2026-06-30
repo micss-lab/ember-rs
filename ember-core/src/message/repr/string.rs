@@ -1,10 +1,14 @@
-mod encode;
-mod parser;
+use alloc::vec::Vec;
 
 use crate::message::Message;
 
+mod encode;
+mod parser;
+
 pub fn encode(message: &Message) -> alloc::vec::Vec<u8> {
-    encode::encode(message)
+    let mut result = Vec::new();
+    encode::encode(message, &mut result).expect("failed to encode acl using string representation");
+    result
 }
 
 pub fn decode(bytes: &[u8]) -> Result<Message, ()> {
