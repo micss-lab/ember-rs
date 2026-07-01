@@ -37,7 +37,7 @@ pub struct MessageEnvelopes {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MessageEnvelope {
     pub to: Vec<Aid>,
-    pub from: Option<Aid>,
+    pub from: Aid,
     pub date: chrono::DateTime<chrono::FixedOffset>,
     pub acl_representation: AclRepresentation,
     pub other: Option<BTreeMap<String, bstr::BString>>,
@@ -89,7 +89,8 @@ impl Message {
         };
         let envelope = MessageEnvelope {
             to,
-            from: None,
+            // TODO: This is very wrong :)
+            from: Aid::ams(),
             date: DateTime::<Utc>::MIN_UTC.into(),
             acl_representation: AclRepresentation::BitEfficient,
             other: None,
