@@ -4,6 +4,7 @@ members = [
     "ember",
     "ember-acc",
     "ember-bdi",
+    "ember-bdi/bdil",
     "ember-core",
     "ember-fipa",
     "ember-reactive",
@@ -18,6 +19,7 @@ ember = { path = "./ember" }
 ember-acc = { path = "./ember-acc" }
 ember-bdi = { path = "./ember-bdi" }
 ember-core = { path = "./ember-core" }
+ember-credo = { path = "./ember-bdi/bdil" }
 ember-fipa = { path = "./ember-fipa" }
 ember-reactive = { path = "./ember-reactive" }
 ember-time = { path = "./ember-time" }
