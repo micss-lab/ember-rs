@@ -129,7 +129,7 @@ pub enum Content {
     FipaSl0(Sl0Content),
     Bytes(Vec<u8>),
     Other {
-        kind: Option<OtherLanguage>,
+        language: Option<String>,
         /// Direct bytes (possibly utf-8) from the message not decoded in any way.
         ///
         /// The difference with [`Content::Bytes`] is that the latter is (en/de)coded in
@@ -142,13 +142,6 @@ impl From<Sl0Content> for Content {
     fn from(content: Sl0Content) -> Self {
         Self::FipaSl0(content)
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OtherLanguage {
-    Ccl,
-    Kif,
-    Rdf,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

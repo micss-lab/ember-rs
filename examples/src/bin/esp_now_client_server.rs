@@ -220,7 +220,7 @@ impl From<Metrics> for Message {
             ontology: None,
             other: None,
             content: Some(Content::Other {
-                kind: None,
+                language: None,
                 content: format!("{},{},{}", value.temperature, value.humidity, value.light).into(),
             }),
         }

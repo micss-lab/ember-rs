@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::fmt::{self, Write};
 
 use crate::agent::aid::Aid;
-use crate::message::{Content, Message, OtherLanguage, Receiver};
+use crate::message::{Content, Message, Receiver};
 
 pub(super) fn encode(message: &Message, out: &mut Vec<u8>) -> fmt::Result {
     let mut result = String::new();
@@ -56,10 +56,10 @@ fn encode_content_and_language(content: &Content, out: &mut String) -> fmt::Resu
                 Base64::encode_string(b)
             )
         }
-        Content::Other { kind, content } => {
+        Content::Other { language, content } => {
             use bstr::ByteSlice;
-            if let Some(kind) = kind {
-                write!(out, " :language {}", language_name(kind))?;
+            if let Some(kind) = language {
+                write!(out, " :language {}", kind)?;
             }
             if content.is_utf8() {
                 write!(out, " :content \"{content}\"")
@@ -72,13 +72,5 @@ fn encode_content_and_language(content: &Content, out: &mut String) -> fmt::Resu
                 )
             }
         }
-    }
-}
-
-fn language_name(lang: &OtherLanguage) -> &'static str {
-    match lang {
-        OtherLanguage::Ccl => "fipa-ccl",
-        OtherLanguage::Kif => "fipa-kif",
-        OtherLanguage::Rdf => "fipa-rdf",
     }
 }

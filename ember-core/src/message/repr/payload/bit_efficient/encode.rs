@@ -2,7 +2,7 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use crate::agent::aid::Aid;
-use crate::message::{Content, OtherLanguage, Performative, Receiver};
+use crate::message::{Content, Performative, Receiver};
 
 use super::codec::*;
 
@@ -40,10 +40,10 @@ pub(super) fn push_content_and_language(content: &Content, out: &mut Vec<u8>) {
             out.push(KW_CONTENT);
             push_bin_string(b, out);
         }
-        Content::Other { kind, content } => {
-            if let Some(kind) = kind {
+        Content::Other { language, content } => {
+            if let Some(kind) = language {
                 out.push(KW_LANGUAGE);
-                push_bin_word(language_name(kind).as_bytes(), out);
+                push_bin_word(kind.as_bytes(), out);
             }
             out.push(KW_CONTENT);
             push_bin_string(content.as_slice(), out);
@@ -66,14 +66,6 @@ fn push_bin_string(bytes: &[u8], out: &mut Vec<u8>) {
         out.extend_from_slice(&(bytes.len() as u32).to_be_bytes());
     }
     out.extend_from_slice(bytes);
-}
-
-fn language_name(lang: &OtherLanguage) -> &'static str {
-    match lang {
-        OtherLanguage::Ccl => "fipa-ccl",
-        OtherLanguage::Kif => "fipa-kif",
-        OtherLanguage::Rdf => "fipa-rdf",
-    }
 }
 
 pub(super) fn performative_code(p: Performative) -> u8 {

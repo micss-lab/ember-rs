@@ -49,17 +49,23 @@ mod builder {
                             })?,
                         )
                     }
-                    None => Content::Other {
-                        kind: None,
-                        content: content.into(),
-                    },
+                    None => {
+                        log::warn!("message has no content language parameter");
+                        Content::Other {
+                            language: None,
+                            content: content.into(),
+                        }
+                    }
                     Some(l) => {
                         log::warn!(
                             "unrecognised content language `{}`, treating as opaque string",
                             bstr::BStr::new(l)
                         );
                         Content::Other {
-                            kind: None,
+                            language: Some(String::from_utf8(l.to_vec()).map_err(|e| {
+                                log::error!("failed to parse message language param as utf-8: {e}");
+                                "language"
+                            })?),
                             content: content.into(),
                         }
                     }
