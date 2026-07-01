@@ -1,17 +1,42 @@
+use alloc::vec::Vec;
+
+use crate::message::Message;
+
+use super::builder;
+
+use self::codec::*;
+
 mod codec;
 mod decode;
 mod encode;
 
-use crate::message::Message;
+pub fn encode(message: &Message) -> Vec<u8> {
+    let mut out = Vec::new();
+    out.push(MESSAGE_ID);
+    out.push(VERSION_1_0);
+    out.push(encode::performative_code(message.performative));
 
-pub fn encode(message: &Message) -> alloc::vec::Vec<u8> {
-    let mut result = alloc::vec::Vec::new();
-    encode::encode(message, &mut result);
-    result
+    if let Some(ref receiver) = message.receiver {
+        out.push(KW_RECEIVER);
+        encode::push_recipient_expr(receiver, &mut out);
+    }
+
+    if let Some(ontology) = &message.ontology {
+        out.push(KW_ONTOLOGY);
+        encode::push_bin_word(ontology.as_bytes(), &mut out);
+    }
+
+    if let Some(ref content) = message.content {
+        encode::push_content_and_language(content, &mut out);
+    }
+
+    out.push(END_OF_COLLECTION);
+    out
 }
 
 pub fn decode(bytes: &[u8]) -> Result<Message, ()> {
-    decode::decode(bytes)
+    let input = crate::util::parsing::BStr::from(bstr::BStr::new(bytes));
+    decode::parser::message(&input).map_err(|e| log::error!("bit-efficient decode error: {e}"))
 }
 
 #[cfg(all(test, not(target_os = "none")))]

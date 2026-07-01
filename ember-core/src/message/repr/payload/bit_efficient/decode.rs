@@ -1,98 +1,16 @@
-use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::collections::BTreeSet;
 use alloc::string::String;
+use alloc::vec;
 use alloc::vec::Vec;
 
-use bstr::{BString, ByteSlice};
-
 use crate::agent::aid::Aid;
-use crate::message::content::fipa_sl::Sl0Content;
-use crate::message::{Content, Message, Performative, Receiver};
+use crate::message::repr::payload::bit_efficient::codec::*;
+use crate::message::{Message, Performative, Receiver};
 
-pub(super) fn decode(bytes: &[u8]) -> Result<Message, ()> {
-    let input = crate::util::parsing::BStr::from(bstr::BStr::new(bytes));
-    parser::message(&input).map_err(|e| log::error!("bit-efficient decode error: {e}"))
-}
-
-enum MessageField {
-    Receiver(Vec<Aid>),
-    Language(BString),
-    Ontology(String),
-    Other(String, BString),
-    Content(Vec<u8>),
-}
-
-fn build_message(
-    perf: Performative,
-    fields: Vec<Option<MessageField>>,
-) -> Result<Message, &'static str> {
-    let mut receiver: Option<Vec<Aid>> = None;
-    let mut language: Option<BString> = None;
-    let mut ontology: Option<String> = None;
-    let mut other_fields = Vec::new();
-    let mut content: Option<Vec<u8>> = None;
-
-    for field in fields.into_iter().flatten() {
-        match field {
-            MessageField::Receiver(aids) => receiver = Some(aids),
-            MessageField::Language(l) => language = Some(l),
-            MessageField::Ontology(o) => ontology = Some(o),
-            MessageField::Other(n, v) => other_fields.push((n, v)),
-            MessageField::Content(c) => content = Some(c),
-        }
-    }
-
-    let receiver = receiver.map(|mut r| match r.len() {
-        1 => Receiver::Single(r.pop().expect("receiver should be of length 1")),
-        _ => Receiver::Multiple(BTreeSet::from_iter(r)),
-    });
-
-    let content = if let Some(content) = content {
-        Some(match language.as_ref().map(|l| l.as_bytes()) {
-            Some(b"fipa-sl0") => {
-                let parsed = Sl0Content::try_from_sl(content.as_bstr()).map_err(|e| {
-                    log::error!("failed to parse SL0 content: {e}");
-                    "sl0-content"
-                })?;
-                Content::FipaSl0(parsed)
-            }
-            Some(b"bytes") => Content::Bytes(content),
-            None => Content::Other {
-                kind: None,
-                content: content.into(),
-            },
-            Some(l) => {
-                log::warn!(
-                    "unrecognised content language `{}`, treating as opaque",
-                    bstr::BStr::new(l)
-                );
-                Content::Other {
-                    kind: None,
-                    content: content.into(),
-                }
-            }
-        })
-    } else {
-        None
-    };
-
-    let other = (!other_fields.is_empty())
-        .then(|| BTreeMap::from_iter(other_fields))
-        .or(None);
-
-    Ok(Message {
-        performative: perf,
-        receiver,
-        ontology,
-        other,
-        content,
-    })
-}
+use super::builder::{MessageBuilder, MessageField};
 
 peg::parser! {
     pub(super) grammar parser<'a>() for crate::util::parsing::BStr<'a> {
-        use alloc::vec;
-        use alloc::vec::Vec;
-        use crate::message::repr::bit_efficient::codec::*;
 
         pub rule message() -> Message
             = message_id()
@@ -101,13 +19,31 @@ peg::parser! {
               fields:message_parameter()*
               eoc()
             {?
-                build_message(p, fields)
+                let mut builder = MessageBuilder::default();
+                for field in fields.into_iter().flatten() {
+                    match field {
+                        MessageField::Receiver(r) => builder.set_receiver(r)?,
+                        MessageField::Language(l) => builder.set_language(l)?,
+                        MessageField::Ontology(o) => builder.set_ontology(o)?,
+                        MessageField::Content(c) => builder.set_content(c)?,
+                        MessageField::Other(n, v) => builder.add_other_field(n, v),
+                    }
+                }
+                builder.build(p)
             }
 
         rule message_parameter() -> Option<MessageField>
             = [KW_SENDER] agent_identifier_skip() { None }
-            / [KW_RECEIVER] aids:agent_identifier_collection() { Some(MessageField::Receiver(aids)) }
-            / [KW_CONTENT] s:bin_string() { Some(MessageField::Content(s)) }
+            / [KW_RECEIVER] aids:agent_identifier_collection()
+                {
+                    let mut aids = aids;
+                    let receiver = match aids.len() {
+                        1 => Receiver::Single(aids.pop().expect("aids should be length 1")),
+                        _ => Receiver::Multiple(BTreeSet::from_iter(aids)),
+                    };
+                    Some(MessageField::Receiver(receiver))
+                }
+            / [KW_CONTENT] s:bin_string() { Some(MessageField::Content(s.into())) }
             / [KW_REPLY_WITH] bin_expression_skip() { None }
             / [KW_REPLY_BY] bin_datetime_skip() { None }
             / [KW_IN_REPLY_TO] bin_expression_skip() { None }

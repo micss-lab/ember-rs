@@ -2,39 +2,17 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use crate::agent::aid::Aid;
-use crate::message::{Content, Message, OtherLanguage, Performative, Receiver};
+use crate::message::{Content, OtherLanguage, Performative, Receiver};
 
 use super::codec::*;
 
-pub(super) fn encode(message: &Message, out: &mut Vec<u8>) {
-    out.push(MESSAGE_ID);
-    out.push(VERSION_1_0);
-    out.push(performative_code(message.performative));
-
-    if let Some(ref receiver) = message.receiver {
-        out.push(KW_RECEIVER);
-        push_recipient_expr(receiver, out);
-    }
-
-    if let Some(ontology) = &message.ontology {
-        out.push(KW_ONTOLOGY);
-        push_bin_word(ontology.as_bytes(), out);
-    }
-
-    if let Some(ref content) = message.content {
-        push_content_and_language(content, out);
-    }
-
-    out.push(END_OF_COLLECTION);
-}
-
-fn push_aid(aid: &Aid, out: &mut Vec<u8>) {
+pub(super) fn push_aid(aid: &Aid, out: &mut Vec<u8>) {
     out.push(0x02);
     push_bin_word(aid.to_string().as_bytes(), out);
     out.push(END_OF_COLLECTION);
 }
 
-fn push_recipient_expr(receiver: &Receiver, out: &mut Vec<u8>) {
+pub(super) fn push_recipient_expr(receiver: &Receiver, out: &mut Vec<u8>) {
     match receiver {
         Receiver::Single(aid) => {
             push_aid(aid, out);
@@ -48,7 +26,7 @@ fn push_recipient_expr(receiver: &Receiver, out: &mut Vec<u8>) {
     out.push(END_OF_COLLECTION);
 }
 
-fn push_content_and_language(content: &Content, out: &mut Vec<u8>) {
+pub(super) fn push_content_and_language(content: &Content, out: &mut Vec<u8>) {
     match content {
         Content::FipaSl0(c) => {
             out.push(KW_LANGUAGE);
@@ -73,7 +51,7 @@ fn push_content_and_language(content: &Content, out: &mut Vec<u8>) {
     }
 }
 
-fn push_bin_word(word: &[u8], out: &mut Vec<u8>) {
+pub(super) fn push_bin_word(word: &[u8], out: &mut Vec<u8>) {
     out.push(BIN_WORD);
     out.extend_from_slice(word);
     out.push(0x00);
@@ -98,7 +76,7 @@ fn language_name(lang: &OtherLanguage) -> &'static str {
     }
 }
 
-fn performative_code(p: Performative) -> u8 {
+pub(super) fn performative_code(p: Performative) -> u8 {
     match p {
         Performative::AcceptProposal => PERF_ACCEPT_PROPOSAL,
         Performative::Agree => PERF_AGREE,

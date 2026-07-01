@@ -105,7 +105,7 @@ impl Acc for HttpChannel {
         log::trace!("Read acl message of length {} bytes", len);
         log::debug!("Acl message: `{}`", bstr::BString::from(buf.trim_ascii()));
 
-        let message = match repr::string::decode(buf.as_slice()) {
+        let message = match repr::payload::string::decode(buf.as_slice()) {
             Ok(message) => message,
             Err(_e) => {
                 log::error!("Error parsing acl message");
@@ -120,7 +120,7 @@ impl Acc for HttpChannel {
 struct HttpEnvelopeSer<'a>(&'a MessageEnvelope);
 struct HttpEnvelopeDe {
     to: Vec<Aid>,
-    from: Option<Aid>,
+    from: Aid,
 }
 
 impl serde::Serialize for HttpEnvelopeSer<'_> {
@@ -208,6 +208,7 @@ impl<'de> serde::Deserialize<'de> for HttpEnvelopeDe {
                     }
                 }
                 let to = to.ok_or_else(|| serde::de::Error::missing_field("to"))?;
+                let from = from.ok_or_else(|| serde::de::Error::missing_field("from"))?;
                 Ok(HttpEnvelopeDe { to, from })
             }
         }

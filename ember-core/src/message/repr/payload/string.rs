@@ -2,6 +2,8 @@ use alloc::vec::Vec;
 
 use crate::message::Message;
 
+use super::builder;
+
 mod decode;
 mod encode;
 

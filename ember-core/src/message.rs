@@ -106,7 +106,7 @@ impl Message {
 
 impl core::fmt::Display for Message {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let bytes = repr::string::encode(self);
+        let bytes = repr::payload::string::encode(self);
         f.write_str(core::str::from_utf8(&bytes).map_err(|_| core::fmt::Error)?)
     }
 }
