@@ -52,7 +52,7 @@ peg::parser! {
             / [T_FLT] b:$([_]*<4>)
               { Term::Float(TotalCmpF32(f32::from_le_bytes([b[0], b[1], b[2], b[3]]))) }
             / [T_STR] hi:[_] lo:[_] bytes:$([_]*<{(hi as usize) << 8 | lo as usize}>)
-              { Term::Str(BString::from(bytes)) }
+              { Term::String(BString::from(bytes)) }
             / [T_LIT_POS] body:literal_body()
               { let (f, a) = body; Term::Literal(Literal { negated: false, functor: f, arguments: a }) }
             / [T_LIT_NEG] body:literal_body()
@@ -76,8 +76,8 @@ mod tests {
     use super::decode;
 
     fn round_trip(content: BdilContent) {
-        let bytes = encode(&content).expect("encode failed");
-        let decoded = decode(&bytes).expect("decode failed");
+        let bytes = encode(&content);
+        let decoded = decode(&bytes).expect("failed to decode");
         assert_eq!(content, decoded);
     }
 
@@ -146,7 +146,7 @@ mod tests {
             Literal {
                 negated: false,
                 functor: Functor("label".into()),
-                arguments: Some(Box::new([Term::Str(b"hello world".into())])),
+                arguments: Some(Box::new([Term::String(b"hello world".into())])),
             }
             .into(),
         );

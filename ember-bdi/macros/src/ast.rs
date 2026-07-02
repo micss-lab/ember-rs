@@ -185,6 +185,12 @@ pub(crate) enum Action {
 pub enum BuiltinAction {
     Log(String, Box<[Term]>),
     StopPlatform,
+    Send {
+        aid_name: String,
+        aid_platform: Option<String>,
+        trigger: Trigger,
+        literal: Literal,
+    },
 }
 
 impl TryFrom<AtomicFormula> for BuiltinAction {
@@ -194,6 +200,7 @@ impl TryFrom<AtomicFormula> for BuiltinAction {
         match functor.0.as_str() {
             "log" => Self::parse_log(arguments),
             "stop_platform" => Self::parse_stop_platform(arguments),
+            "send" => Self::parse_send(arguments),
             _ => Err(()),
         }
     }
@@ -219,6 +226,48 @@ impl BuiltinAction {
             .is_none_or(|args| args.is_empty())
             .then_some(Self::StopPlatform)
             .ok_or(())
+    }
+
+    fn parse_send(arguments: Option<Box<[Term]>>) -> Result<Self, ()> {
+        let mut args = VecDeque::from_iter(arguments.unwrap_or_default());
+
+        // First arg: Aid string "name@platform" or "name@local", validated at compile time.
+        let aid_str = match args.pop_front() {
+            Some(Term::String(s)) => s,
+            _ => return Err(()),
+        };
+        let (name, platform) = aid_str.split_once('@').ok_or(())?;
+        if name.is_empty() {
+            return Err(());
+        }
+        let aid_name = name.to_string();
+        let aid_platform = match platform {
+            "local" => None,
+            p if !p.is_empty() => Some(p.to_string()),
+            _ => return Err(()),
+        };
+
+        // Second arg: performative string "inform" or "disconfirm".
+        let trigger = match args.pop_front() {
+            Some(Term::String(s)) => match s.as_str() {
+                "inform" => Trigger::Addition,
+                "disconfirm" => Trigger::Deletion,
+                _ => return Err(()),
+            },
+            _ => return Err(()),
+        };
+
+        // Third arg: the literal to send as content.
+        let literal = match args.pop_front() {
+            Some(Term::Literal(lit)) => lit,
+            _ => return Err(()),
+        };
+
+        if !args.is_empty() {
+            return Err(());
+        }
+
+        Ok(Self::Send { aid_name, aid_platform, trigger, literal })
     }
 }
 
@@ -652,6 +701,28 @@ impl AstVisitor {
             BuiltinAction::StopPlatform => {
                 quote! {
                     ::ember::agent::bdi::plan::action::BuiltinAction::StopPlatform
+                }
+            }
+            BuiltinAction::Send { aid_name, aid_platform, trigger, literal } => {
+                let aid = match aid_platform {
+                    None => quote! { ::ember::agent::Aid::local(#aid_name) },
+                    Some(p) => quote! { ::ember::agent::Aid::general(#aid_name, #p) },
+                };
+                let trigger_ts = match trigger {
+                    Trigger::Addition => quote! {
+                        ::ember::agent::bdi::event::Trigger::Addition
+                    },
+                    Trigger::Deletion => quote! {
+                        ::ember::agent::bdi::event::Trigger::Deletion
+                    },
+                };
+                let literal_ts = self.visit_literal(literal).into_token_stream();
+                quote! {
+                    ::ember::agent::bdi::plan::action::BuiltinAction::SendLiteral(
+                        ::ember::message::Receiver::from(#aid),
+                        #trigger_ts,
+                        #literal_ts,
+                    )
                 }
             }
         }

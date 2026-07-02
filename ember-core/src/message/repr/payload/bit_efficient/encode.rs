@@ -27,29 +27,27 @@ pub(super) fn push_recipient_expr(receiver: &Receiver, out: &mut Vec<u8>) {
 }
 
 pub(super) fn push_content_and_language(content: &Content, out: &mut Vec<u8>) {
+    let language = content.language();
     match content {
         Content::FipaSl0(c) => {
             out.push(KW_LANGUAGE);
-            push_bin_word(b"fipa-sl0", out);
+            push_bin_word(language.as_bytes(), out);
             out.push(KW_CONTENT);
             push_bin_string(c.to_string().as_bytes(), out);
         }
         Content::Bytes(b) => {
             out.push(KW_LANGUAGE);
-            push_bin_word(b"bytes", out);
+            push_bin_word(language.as_bytes(), out);
             out.push(KW_CONTENT);
             push_bin_string(b, out);
         }
         Content::Bdil(c) => {
             out.push(KW_LANGUAGE);
-            push_bin_word(b"ember-bdil", out);
+            push_bin_word(language.as_bytes(), out);
             out.push(KW_ENCODING);
             push_bin_word(b"bit-efficient", out);
             out.push(KW_CONTENT);
-            push_bin_string(
-                &ember_bdi_bdil::binary::encode(c).expect("failed to encode bdil payload"),
-                out,
-            );
+            push_bin_string(&ember_bdi_bdil::binary::encode(c), out);
         }
         Content::Other { language, content } => {
             if let Some(kind) = language {

@@ -3,7 +3,7 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 
 use bstr::BString;
 use ember_util::cmp::TotalCmpF32;
@@ -32,9 +32,9 @@ impl From<Literal> for BdilContent {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Functor(pub String);
 
-impl<T: Into<String>> From<T> for Functor {
+impl<T: ToString> From<T> for Functor {
     fn from(s: T) -> Self {
-        Self(s.into())
+        Self(s.to_string())
     }
 }
 
@@ -42,7 +42,7 @@ impl<T: Into<String>> From<T> for Functor {
 pub enum Term {
     Int(i32),
     Float(TotalCmpF32),
-    Str(BString),
+    String(BString),
     Literal(Literal),
     Variable(Variable),
 }

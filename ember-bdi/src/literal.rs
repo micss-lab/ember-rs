@@ -5,6 +5,8 @@ pub use ember_bdi_macros::IntoLiteral;
 use crate::term::{Atom, Structure};
 use crate::variable::VariableId;
 
+mod message;
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Literal {
     pub negated: bool,

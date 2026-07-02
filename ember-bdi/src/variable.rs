@@ -1,7 +1,15 @@
 use ember_util::sync::AtomicU32;
 
+mod message;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct VariableId(VarID);
+
+impl core::fmt::Display for VariableId {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 type VarID = u32;
 

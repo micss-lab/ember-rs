@@ -3,6 +3,8 @@ use alloc::vec::Vec;
 
 use ember_core::agent::Agent;
 use ember_core::environment::Environment;
+use ember_core::message::content::ember_bdil::BdilContent;
+use ember_core::message::{Content, Message, MessageFilter, Performative};
 
 use crate::context::Context;
 use crate::event::EventSource;
@@ -83,6 +85,30 @@ where
         self.intentions
             .push(plan, bindings, existing_intention, event.clone());
     }
+
+    fn handle_message(&mut self, performative: Performative, content: BdilContent) {
+        match content {
+            BdilContent::Literal(l) => {
+                let literal = Literal::from(l);
+                let (trigger, goal) = match performative {
+                    Performative::Inform => (Trigger::Addition, None),
+                    Performative::NotUnderstood => (Trigger::Addition, None),
+                    _ => {
+                        log::error!("unknown performative for bdil message");
+                        return;
+                    }
+                };
+                self.handle_event(
+                    TriggeringEvent {
+                        trigger,
+                        event: literal,
+                        goal,
+                    },
+                    EventSource::External,
+                );
+            }
+        }
+    }
 }
 
 impl<'a, State, Action, P> BdiAgent<'a, State, Action, P>
@@ -128,6 +154,22 @@ where
                     };
                 }
             }
+        }
+
+        while let Some(message) =
+            context.receive_message(Some(MessageFilter::language("ember-bdil").into()))
+        {
+            let Message {
+                performative,
+                content: Some(Content::Bdil(content)),
+                ..
+            } = message
+            else {
+                log::warn!("INTERNAL: bdi agent has incorrect mesage filter");
+                continue;
+            };
+
+            self.handle_message(performative, content);
         }
 
         if let Some((event, source)) = self.event_queue.next_event(FirstEvent) {

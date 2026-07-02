@@ -1,12 +1,16 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
+use ember_core::message::content::ember_bdil::BdilContent;
+use ember_core::message::{Content, Message, Performative, Receiver};
 use log::{Level, log};
 
 use crate::bindings::BindingLookup;
 use crate::context::Context;
+use crate::event::Trigger;
+use crate::literal::Literal;
 use crate::resolve::Resolve;
-use crate::term::Term;
+use crate::term::{Structure, Term};
 
 pub trait Execute: Sized {
     type State;
@@ -51,6 +55,7 @@ where
 pub enum BuiltinAction {
     Log(Level, Box<[Term]>),
     StopPlatform,
+    SendLiteral(Receiver, Trigger, Literal),
 }
 
 impl BuiltinAction {
@@ -68,6 +73,26 @@ impl BuiltinAction {
                 }
             }
             StopPlatform => context.stop_platform(),
+            SendLiteral(receiver, trigger, literal) => {
+                let literal = Literal {
+                    negated: false,
+                    structure: Structure {
+                        functor: "message".into(),
+                        arguments: Some(Box::new([Term::Literal(literal)])),
+                    },
+                };
+                let performative = match trigger {
+                    Trigger::Addition => Performative::Inform,
+                    Trigger::Deletion => Performative::NotUnderstood,
+                };
+                context.send_message(Message {
+                    performative,
+                    receiver: Some(receiver),
+                    ontology: None,
+                    other: None,
+                    content: Some(Content::Bdil(BdilContent::Literal(literal.into()))),
+                });
+            }
         }
     }
 }

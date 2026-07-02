@@ -66,7 +66,7 @@ fn push_term(term: &Term, out: &mut Vec<u8>) -> Result<(), EncodeError> {
             out.push(T_FLT);
             out.extend_from_slice(&f.0.to_le_bytes());
         }
-        Term::Str(s) => {
+        Term::String(s) => {
             out.push(T_STR);
             out.extend_from_slice(&(s.len() as u16).to_be_bytes());
             out.extend_from_slice(s.as_slice());

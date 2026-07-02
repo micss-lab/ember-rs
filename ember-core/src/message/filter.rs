@@ -30,6 +30,8 @@ pub enum FilterLiteral {
     Ontology(Cow<'static, str>),
     /// Performative to match against.
     Performative(Performative),
+    /// Language to match against.
+    Language(Cow<'static, str>),
 }
 
 impl MessageFilter {
@@ -54,10 +56,21 @@ impl MessageFilter {
         }
     }
 
+    /// Creates a message filter that will only match if the ontology of the message content
+    /// matches.
     pub fn ontology(ontology: impl Into<Cow<'static, str>>) -> Self {
         Self::Literal {
             negated: false,
             kind: FilterLiteral::Ontology(ontology.into()),
+        }
+    }
+
+    /// Creates a message filter that will only match if the language of the message content
+    /// matches.
+    pub fn language(language: impl Into<Cow<'static, str>>) -> Self {
+        Self::Literal {
+            negated: false,
+            kind: FilterLiteral::Language(language.into()),
         }
     }
 }
@@ -119,6 +132,11 @@ impl MessageFilter {
                     message.ontology.as_ref().map(|o| mo == o).unwrap_or(false)
                 }
                 FilterLiteral::Performative(p) => message.performative == *p,
+                FilterLiteral::Language(l) => message
+                    .content
+                    .as_ref()
+                    .map(|c| l == c.language())
+                    .unwrap_or(false),
             },
         };
         matches ^ self.is_negated()
@@ -128,5 +146,17 @@ impl MessageFilter {
         match *self {
             Self::Nested { negated, .. } | Self::Literal { negated, .. } => negated,
         }
+    }
+}
+
+impl From<MessageFilter> for Cow<'static, MessageFilter> {
+    fn from(filter: MessageFilter) -> Self {
+        Cow::Owned(filter)
+    }
+}
+
+impl From<&'static MessageFilter> for Cow<'static, MessageFilter> {
+    fn from(filter: &'static MessageFilter) -> Self {
+        Cow::Borrowed(filter)
     }
 }

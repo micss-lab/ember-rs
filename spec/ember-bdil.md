@@ -71,7 +71,7 @@ The BDI event generated on receipt is determined solely by the FIPA performative
 | FIPA Performative | Trigger | Goal Kind | BDI Event |
 |---|---|---|---|
 | `inform` | Addition | — | `+belief(literal)` |
-| `disconfirm` | Deletion | — | `-belief(literal)` |
+| `not-understood` | Deletion | — | `-belief(literal)` |
 
 Future MINOR versions may add new valid performatives (e.g. for goal or query communication). Such additions do not affect the v0.1.0 mapping.
 

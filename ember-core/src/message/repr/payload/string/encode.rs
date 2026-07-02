@@ -44,15 +44,16 @@ fn encode_receiver(receiver: &Receiver, out: &mut String) -> fmt::Result {
 }
 
 fn encode_content_and_language(content: &Content, out: &mut String) -> fmt::Result {
+    let language = content.language();
     match content {
         Content::FipaSl0(c) => {
-            write!(out, " :language fipa-sl0 :content \"{c}\"")
+            write!(out, " :language {language} :content \"{c}\"")
         }
         Content::Bytes(b) => {
             use base64ct::{Base64, Encoding};
             write!(
                 out,
-                " :language bytes :X-content-encoding base64 :content \"{}\"",
+                " :language {language} :X-content-encoding base64 :content \"{}\"",
                 Base64::encode_string(b)
             )
         }
@@ -60,10 +61,8 @@ fn encode_content_and_language(content: &Content, out: &mut String) -> fmt::Resu
             use base64ct::{Base64, Encoding};
             write!(
                 out,
-                " :language ember-bdil :X-content-encoding base64 :encoding bit-efficient :content \"{}\"",
-                Base64::encode_string(
-                    &ember_bdi_bdil::binary::encode(c).expect("failed to encode bdil payload")
-                )
+                " :language {language} :X-content-encoding base64 :encoding bit-efficient :content \"{}\"",
+                Base64::encode_string(&ember_bdi_bdil::binary::encode(c))
             )
         }
         Content::Other { language, content } => {

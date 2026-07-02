@@ -140,6 +140,17 @@ pub enum Content {
     },
 }
 
+impl Content {
+    pub fn language(&self) -> &str {
+        match self {
+            Content::FipaSl0(_) => "fipa-sl0",
+            Content::Bytes(_) => "bytes",
+            Content::Bdil(_) => "ember-bdil",
+            Content::Other { language, .. } => language.as_deref().unwrap_or(""),
+        }
+    }
+}
+
 impl From<Sl0Content> for Content {
     fn from(content: Sl0Content) -> Self {
         Self::FipaSl0(content)
