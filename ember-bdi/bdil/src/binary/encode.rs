@@ -5,15 +5,19 @@ use crate::{BdilContent, Functor, Literal, Term, Variable};
 
 use super::codec::*;
 
-pub fn encode(content: &BdilContent) -> Result<Vec<u8>, EncodeError> {
+pub fn encode(content: &BdilContent) -> Vec<u8> {
     let mut out = Vec::new();
     out.extend_from_slice(&MAGIC);
     out.push(VER_0_1_0);
-    match content {
-        BdilContent::Literal(l) => push_expression(l, &mut out)?,
+    let result = match content {
+        BdilContent::Literal(l) => push_expression(l, &mut out)
+            .map_err(|e| log::error!("failed to encode literal bdil content: {e}")),
+    };
+    if let Err(_) = result {
+        return Vec::with_capacity(0);
     }
     out.push(END);
-    Ok(out)
+    out
 }
 
 fn push_expression(literal: &Literal, out: &mut Vec<u8>) -> Result<(), EncodeError> {

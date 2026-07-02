@@ -9,8 +9,12 @@ mod encode;
 
 pub fn encode(message: &Message) -> alloc::vec::Vec<u8> {
     let mut result = Vec::new();
-    encode::encode(message, &mut result).expect("failed to encode acl using string representation");
-    result
+    encode::encode(message, &mut result)
+        .map(|_| result)
+        .unwrap_or_else(|e| {
+            log::error!("failed to encode acl using string representation: {e}");
+            Vec::with_capacity(0)
+        })
 }
 
 pub fn decode(bytes: &[u8]) -> Result<Message, ()> {

@@ -538,6 +538,7 @@ version = "0.1.0"
 dependencies = [
  "bstr",
  "ember-util",
+ "log",
  "peg 0.8.5",
 ]
 
