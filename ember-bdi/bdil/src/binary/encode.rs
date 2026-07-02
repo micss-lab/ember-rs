@@ -1,15 +1,17 @@
 use alloc::vec::Vec;
 
 use crate::error::EncodeError;
-use crate::{Functor, Literal, Term, Variable};
+use crate::{BdilContent, Functor, Literal, Term, Variable};
 
 use super::codec::*;
 
-pub fn encode(literal: &Literal) -> Result<Vec<u8>, EncodeError> {
+pub fn encode(content: &BdilContent) -> Result<Vec<u8>, EncodeError> {
     let mut out = Vec::new();
     out.extend_from_slice(&MAGIC);
     out.push(VER_0_1_0);
-    push_expression(literal, &mut out)?;
+    match content {
+        BdilContent::Literal(l) => push_expression(l, &mut out)?,
+    }
     out.push(END);
     Ok(out)
 }

@@ -533,6 +533,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ember-bdi-bdil"
+version = "0.1.0"
+dependencies = [
+ "bstr",
+ "ember-util",
+ "peg 0.8.5",
+]
+
+[[package]]
 name = "ember-bdi-macros"
 version = "0.1.0"
 dependencies = [
@@ -551,21 +560,13 @@ dependencies = [
  "bstr",
  "chrono",
  "critical-section",
+ "ember-bdi-bdil",
  "ember-time",
  "ember-util",
  "libm",
  "log",
  "peg 0.8.5",
  "serde",
-]
-
-[[package]]
-name = "ember-credo"
-version = "0.1.0"
-dependencies = [
- "bstr",
- "ember-util",
- "peg 0.8.5",
 ]
 
 [[package]]

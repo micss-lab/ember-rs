@@ -56,6 +56,16 @@ fn encode_content_and_language(content: &Content, out: &mut String) -> fmt::Resu
                 Base64::encode_string(b)
             )
         }
+        Content::Bdil(c) => {
+            use base64ct::{Base64, Encoding};
+            write!(
+                out,
+                " :language ember-bdil :X-content-encoding base64 :encoding bit-efficient :content \"{}\"",
+                Base64::encode_string(
+                    &ember_bdi_bdil::binary::encode(c).expect("failed to encode bdil payload")
+                )
+            )
+        }
         Content::Other { language, content } => {
             use bstr::ByteSlice;
             if let Some(kind) = language {

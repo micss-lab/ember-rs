@@ -3,6 +3,7 @@ use alloc::string::String;
 use alloc::vec::Vec;
 use bstr::BString;
 use core::str::FromStr;
+use ember_bdi_bdil::BdilContent;
 
 use chrono::{DateTime, Utc};
 
@@ -128,6 +129,7 @@ impl From<Aid> for Receiver {
 pub enum Content {
     FipaSl0(Sl0Content),
     Bytes(Vec<u8>),
+    Bdil(BdilContent),
     Other {
         language: Option<String>,
         /// Direct bytes (possibly utf-8) from the message not decoded in any way.

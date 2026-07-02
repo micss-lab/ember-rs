@@ -6,19 +6,19 @@ use bstr::BString;
 use ember_util::cmp::TotalCmpF32;
 
 use crate::error::DecodeError;
-use crate::{Functor, Literal, Term, Variable};
+use crate::{BdilContent, Functor, Literal, Term, Variable};
 
 use super::codec::*;
 use super::parsing::Bytes;
 
-pub fn decode(data: &[u8]) -> Result<Literal, DecodeError> {
+pub fn decode(data: &[u8]) -> Result<BdilContent, DecodeError> {
     parser::frame(&Bytes::from(data)).map_err(|_| DecodeError::ParseFailed)
 }
 
 peg::parser! {
     grammar parser<'a>() for Bytes<'a> {
 
-        pub rule frame() -> Literal
+        pub rule frame() -> BdilContent
             = magic() version() e:expr() [END] ![_] { e }
 
         rule magic()
@@ -29,11 +29,11 @@ peg::parser! {
             / [VER_EXPLICIT] major:[_] [_] [_]
               {? if major == 0 { Ok(()) } else { Err("unsupported version") } }
 
-        rule expr() -> Literal
+        rule expr() -> BdilContent
             = [EXPR_LIT_POS] body:literal_body()
-              { let (f, a) = body; Literal { negated: false, functor: f, arguments: a } }
+              { let (f, a) = body; BdilContent::Literal(Literal { negated: false, functor: f, arguments: a }) }
             / [EXPR_LIT_NEG] body:literal_body()
-              { let (f, a) = body; Literal { negated: true, functor: f, arguments: a } }
+              { let (f, a) = body; BdilContent::Literal(Literal { negated: true, functor: f, arguments: a }) }
 
         rule literal_body() -> (Functor, Option<Box<[Term]>>)
             = f:functor() args:arg_list() { (f, args) }
@@ -71,91 +71,120 @@ mod tests {
     use alloc::boxed::Box;
 
     use crate::binary::encode::encode;
-    use crate::{Functor, Literal, Term, Variable};
+    use crate::{BdilContent, Functor, Literal, Term, Variable};
 
     use super::decode;
 
-    fn round_trip(lit: Literal) {
-        let bytes = encode(&lit).expect("encode failed");
+    fn round_trip(content: BdilContent) {
+        let bytes = encode(&content).expect("encode failed");
         let decoded = decode(&bytes).expect("decode failed");
-        assert_eq!(lit, decoded);
+        assert_eq!(content, decoded);
     }
 
     #[test]
     fn atom() {
-        round_trip(Literal { negated: false, functor: Functor("raining".into()), arguments: None });
+        round_trip(
+            Literal {
+                negated: false,
+                functor: Functor("raining".into()),
+                arguments: None,
+            }
+            .into(),
+        );
     }
 
     #[test]
     fn negated_atom() {
-        round_trip(Literal { negated: true, functor: Functor("sunny".into()), arguments: None });
+        round_trip(
+            Literal {
+                negated: true,
+                functor: Functor("sunny".into()),
+                arguments: None,
+            }
+            .into(),
+        );
     }
 
     #[test]
     fn literal_with_literal_args() {
-        round_trip(Literal {
-            negated: false,
-            functor: Functor("location".into()),
-            arguments: Some(Box::new([
-                Term::Literal(Literal {
-                    negated: false,
-                    functor: Functor("agent1".into()),
-                    arguments: None,
-                }),
-                Term::Literal(Literal {
-                    negated: false,
-                    functor: Functor("room3".into()),
-                    arguments: None,
-                }),
-            ])),
-        });
+        round_trip(
+            Literal {
+                negated: false,
+                functor: Functor("location".into()),
+                arguments: Some(Box::new([
+                    Term::Literal(Literal {
+                        negated: false,
+                        functor: Functor("agent1".into()),
+                        arguments: None,
+                    }),
+                    Term::Literal(Literal {
+                        negated: false,
+                        functor: Functor("room3".into()),
+                        arguments: None,
+                    }),
+                ])),
+            }
+            .into(),
+        );
     }
 
     #[test]
     fn literal_with_int_and_float() {
-        round_trip(Literal {
-            negated: false,
-            functor: Functor("reading".into()),
-            arguments: Some(Box::new([Term::Int(42), Term::Float(3.14f32.into())])),
-        });
+        round_trip(
+            Literal {
+                negated: false,
+                functor: Functor("reading".into()),
+                arguments: Some(Box::new([Term::Int(42), Term::Float(3.14f32.into())])),
+            }
+            .into(),
+        );
     }
 
     #[test]
     fn literal_with_string() {
-        round_trip(Literal {
-            negated: false,
-            functor: Functor("label".into()),
-            arguments: Some(Box::new([Term::Str(b"hello world".into())])),
-        });
+        round_trip(
+            Literal {
+                negated: false,
+                functor: Functor("label".into()),
+                arguments: Some(Box::new([Term::Str(b"hello world".into())])),
+            }
+            .into(),
+        );
     }
 
     #[test]
     fn literal_with_variable() {
-        round_trip(Literal {
-            negated: false,
-            functor: Functor("at".into()),
-            arguments: Some(Box::new([
-                Term::Literal(Literal {
-                    negated: false,
-                    functor: Functor("robot".into()),
-                    arguments: None,
-                }),
-                Term::Variable(Variable { name: "X".into() }),
-            ])),
-        });
+        round_trip(
+            Literal {
+                negated: false,
+                functor: Functor("at".into()),
+                arguments: Some(Box::new([
+                    Term::Literal(Literal {
+                        negated: false,
+                        functor: Functor("robot".into()),
+                        arguments: None,
+                    }),
+                    Term::Variable(Variable { name: "X".into() }),
+                ])),
+            }
+            .into(),
+        );
     }
 
     #[test]
     fn negated_nested_literal() {
-        round_trip(Literal {
-            negated: false,
-            functor: Functor("state".into()),
-            arguments: Some(Box::new([Term::Literal(Literal {
-                negated: true,
-                functor: Functor("broken".into()),
-                arguments: None,
-            })])),
-        });
+        round_trip(
+            Literal {
+                negated: false,
+                functor: Functor("state".into()),
+                arguments: Some(Box::new([Term::Literal(Literal {
+                    negated: true,
+                    functor: Functor("broken".into()),
+                    arguments: None,
+                })])),
+            }
+            .into(),
+        );
     }
 
     #[test]

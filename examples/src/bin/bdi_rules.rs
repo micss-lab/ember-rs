@@ -27,7 +27,6 @@ setup_example!();
 
         // Negation is handled by `not`. We use deep rule chains, disjunctions (`|`),
         // conjunctions (`&`), and negations (`not`) to stress-test the DNF conversion.
-        
 
         pump_a_active :- not pump_a_failed.
         pump_b_active :- not pump_b_failed.

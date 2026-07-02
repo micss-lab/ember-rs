@@ -40,6 +40,17 @@ pub(super) fn push_content_and_language(content: &Content, out: &mut Vec<u8>) {
             out.push(KW_CONTENT);
             push_bin_string(b, out);
         }
+        Content::Bdil(c) => {
+            out.push(KW_LANGUAGE);
+            push_bin_word(b"ember-bdil", out);
+            out.push(KW_ENCODING);
+            push_bin_word(b"bit-efficient", out);
+            out.push(KW_CONTENT);
+            push_bin_string(
+                &ember_bdi_bdil::binary::encode(c).expect("failed to encode bdil payload"),
+                out,
+            );
+        }
         Content::Other { language, content } => {
             if let Some(kind) = language {
                 out.push(KW_LANGUAGE);

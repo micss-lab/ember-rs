@@ -1,5 +1,5 @@
 [package]
-name = "ember-credo"
+name = "ember-bdi-bdil"
 version = "0.1.0"
 edition = "2024"
 
@@ -7,4 +7,4 @@ edition = "2024"
 ember-util = { workspace = true }
 
 bstr = { version = "1.12", default-features = false, features = ["alloc"] }
-peg  = { version = "0.8", default-features = false, git = "https://github.com/kevinmehall/rust-peg.git" }
+peg = { version = "0.8", default-features = false, git = "https://github.com/kevinmehall/rust-peg.git" }
