@@ -527,6 +527,7 @@ dependencies = [
  "ember",
  "ember-bdi-macros",
  "ember-core",
+ "ember-fipa",
  "ember-util",
  "log",
  "trybuild",

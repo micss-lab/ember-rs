@@ -5,6 +5,7 @@ use ember_core::agent::Agent;
 use ember_core::environment::Environment;
 use ember_core::message::content::ember_bdil::BdilContent;
 use ember_core::message::{Content, Message, MessageFilter, Performative};
+use ember_fipa::agent::{ExecutionState, FipaAgent};
 
 use crate::context::Context;
 use crate::event::EventSource;
@@ -28,6 +29,29 @@ pub struct BdiAgent<'s, State, Action, Percept> {
     intentions: IntentionQueue<Action>,
     event_queue: EventQueue,
     sensors: Option<Vec<Sensor<'s, Percept>>>,
+    fipa: FipaAgent,
+}
+
+impl<'a, State, Action, P> BdiAgent<'a, State, Action, P>
+where
+    P: Percept,
+{
+    pub fn with_sensor<S>(mut self, sensor: S) -> Self
+    where
+        S: Perceptor<Percept = P> + 'a,
+    {
+        self.add_sensor(sensor);
+        self
+    }
+
+    pub fn add_sensor<S>(&mut self, sensor: S)
+    where
+        S: Perceptor<Percept = P> + 'a,
+    {
+        self.sensors
+            .get_or_insert_default()
+            .push(Sensor::new(sensor));
+    }
 }
 
 impl<'s, State, Action, Percept> BdiAgent<'s, State, Action, Percept>
@@ -49,6 +73,7 @@ where
             intentions: IntentionQueue::default(),
             event_queue: EventQueue::default(),
             sensors: None,
+            fipa: FipaAgent::default(),
         };
         initial_goals.into_iter().for_each(|g| {
             this.handle_event(
@@ -111,34 +136,12 @@ where
     }
 }
 
-impl<'a, State, Action, P> BdiAgent<'a, State, Action, P>
-where
-    P: Percept,
-{
-    pub fn with_sensor<S>(mut self, sensor: S) -> Self
-    where
-        S: Perceptor<Percept = P> + 'a,
-    {
-        self.add_sensor(sensor);
-        self
-    }
-
-    pub fn add_sensor<S>(&mut self, sensor: S)
-    where
-        S: Perceptor<Percept = P> + 'a,
-    {
-        self.sensors
-            .get_or_insert_default()
-            .push(Sensor::new(sensor));
-    }
-}
-
-impl<State, Action, P> Agent for BdiAgent<'_, State, Action, P>
+impl<State, Action, P> BdiAgent<'_, State, Action, P>
 where
     Action: Execute<State = State, Action = Action> + Clone,
     P: Percept,
 {
-    fn update(&mut self, environment: &mut Environment) -> bool {
+    fn tick(&mut self, environment: &mut Environment) {
         let mut context = Context::new(environment);
 
         if let Some(sensors) = self.sensors.as_mut() {
@@ -189,8 +192,19 @@ where
         context.events.into_iter().for_each(|(source, event)| {
             self.event_queue.push(event, source);
         });
+    }
+}
 
-        drop(bindings);
+impl<State, Action, P> Agent for BdiAgent<'_, State, Action, P>
+where
+    Action: Execute<State = State, Action = Action> + Clone,
+    P: Percept,
+{
+    fn update(&mut self, environment: &mut Environment) -> bool {
+        match self.fipa.update(environment, &self.name) {
+            ExecutionState::Initiated => return false,
+            ExecutionState::Active => self.tick(environment),
+        }
         self.intentions.is_empty()
     }
 

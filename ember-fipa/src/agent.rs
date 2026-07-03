@@ -22,7 +22,7 @@ pub enum ExecutionState {
     // Transit,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct FipaAgent {
     /// Whether the register message has been sent.
     ///
@@ -67,7 +67,7 @@ impl FipaAgent {
                 log::debug!("Sending ams register request for agent `{agent_name}`.");
                 self.registered = true;
             }
-            Initiated => (),
+            Initiated => self.state = ExecutionState::Active,
             Active => (),
         }
         self.state
