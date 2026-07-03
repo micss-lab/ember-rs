@@ -6,4 +6,4 @@ pub mod agent;
 pub mod environment;
 pub mod message;
 
-pub(crate) mod util;
+pub mod util;

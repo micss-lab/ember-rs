@@ -9,7 +9,7 @@ use esp_wifi::esp_now;
 use ember_core::agent::Agent;
 use ember_core::agent::aid::Aid;
 use ember_core::environment::{Environment, MessageStore};
-use ember_core::message::MessageEnvelope;
+use ember_core::message::Message;
 
 use crate::adt::{Adt, AgentReference};
 
@@ -31,6 +31,10 @@ pub struct Container<'a, 'c> {
 }
 
 impl Container<'_, '_> {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn start(mut self) -> Result<(), Box<dyn core::error::Error>> {
         loop {
             let should_stop = self.poll()?;
@@ -85,7 +89,7 @@ impl Container<'_, '_> {
         Ok(false)
     }
 
-    fn messages_for_agent(&mut self, agent_name: impl AsRef<str>) -> Option<Vec<MessageEnvelope>> {
+    fn messages_for_agent(&mut self, agent_name: impl AsRef<str>) -> Option<Vec<Message>> {
         self.ladt.messages_for_agent(agent_name)
     }
 

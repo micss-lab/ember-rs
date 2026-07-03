@@ -1,5 +1,5 @@
 pub mod ser {
-    use ember_core::message::{MessageEnvelope, MessageKind};
+    use ember_core::message::{MessageEnvelope, Payload};
 
     pub struct EspNowMessageSer<'a>(pub &'a MessageEnvelope);
     struct EspNowEnvelopeSer<'a>(&'a MessageEnvelope);
@@ -15,7 +15,7 @@ pub mod ser {
             let mut message = serializer.serialize_struct("message", 2)?;
             message.serialize_field("envelope", &EspNowEnvelopeSer(self.0))?;
             match &self.0.message {
-                MessageKind::Parsed(m) => {
+                Payload::AclMessage(m) => {
                     message.serialize_field("content", m.to_string().as_bytes())?
                 }
             }
@@ -45,7 +45,8 @@ pub mod de {
     use serde::de::Unexpected;
 
     use ember_core::agent::aid::Aid;
-    use ember_core::message::{AclRepresentation, Message, MessageEnvelope, MessageKind};
+    use ember_core::message::repr;
+    use ember_core::message::{AclRepresentation, Message, MessageEnvelope, Payload};
 
     pub struct EspNowMessageDe {
         envelope: EspNowEnvelopeDe,
@@ -150,7 +151,7 @@ pub mod de {
                     E: serde::de::Error,
                 {
                     Ok(EspNowContentDe {
-                        message: Message::try_from_bytes(v)
+                        message: repr::string::decode(v)
                             .map_err(|_| E::invalid_value(Unexpected::Bytes(v), &self))?,
                     })
                 }
@@ -166,9 +167,9 @@ pub mod de {
                 to: self.envelope.to,
                 from: self.envelope.from,
                 date: chrono::DateTime::<chrono::Utc>::MIN_UTC.into(),
-                acl_representation: AclRepresentation::BitEfficient,
-                parameters: BTreeMap::new(),
-                message: MessageKind::Parsed(self.content.message),
+                acl_representation: AclRepresentation::String,
+                other: BTreeMap::new(),
+                message: Payload::AclMessage(self.content.message),
             }
         }
     }

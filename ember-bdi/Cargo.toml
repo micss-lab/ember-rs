@@ -1,0 +1,21 @@
+[package]
+name = "ember-bdi"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ember-bdi-macros = { path = "./macros" }
+
+ember-fipa = { workspace = true }
+ember-core = { workspace = true }
+ember-util = { workspace = true }
+
+bstr = { version = "1.12", default-features = false, features = ["alloc"] }
+derive-where = "1.6.1"
+derive_more = { version = "2.1.1", default-features = false, features = ["debug"] }
+log = "0.4.30"
+
+[dev-dependencies]
+critical-section = { version = "1.2", features = ["std"] }
+ember = { workspace = true }
+trybuild = { version = "1", features = ["diff"] }

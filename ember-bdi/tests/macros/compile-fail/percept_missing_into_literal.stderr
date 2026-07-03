@@ -1,0 +1,8 @@
+error[E0277]: the trait bound `NotLiteral: IntoLiteral` is not satisfied
+ --> tests/macros/compile-fail/percept_missing_into_literal.rs:4:10
+  |
+4 | #[derive(Percept)]
+  |          ^^^^^^^ the trait `IntoLiteral` is not implemented for `NotLiteral`
+  |
+  = help: the trait `IntoLiteral` is implemented for `ember::_crates::ember_bdi::literal::Literal`
+  = note: this error originates in the derive macro `Percept` (in Nightly builds, run with -Z macro-backtrace for more info)

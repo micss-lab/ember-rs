@@ -1,11 +1,15 @@
 use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::string::String;
 use alloc::vec::Vec;
+use bstr::BString;
 use core::str::FromStr;
+use ember_bdi_bdil::BdilContent;
 
 use chrono::{DateTime, Utc};
 
 use crate::agent::aid::Aid;
+
+use self::content::fipa_sl::Sl0Content;
 
 pub use self::filter::MessageFilter;
 
@@ -13,44 +17,100 @@ pub mod content;
 pub mod filter;
 pub mod repr;
 
-mod ser;
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TransportMessage {
+    /// Stack of envelopes belonging to the message.
+    pub envelopes: MessageEnvelopes,
+    /// The payload of the transport message containing the Acl message. The payload can still be
+    /// encrypted, or otherwise unreadable by the current MTS in which case it is stored as raw bytes.
+    pub payload: Payload,
+}
 
-#[derive(Debug, Clone, PartialEq)]
+/// Stack of message envelopes belonging to an Acl message.
+///
+/// Envelopes added after the `base` envelope have to be pushed on top of the stack.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MessageEnvelopes {
+    pub base: MessageEnvelope,
+    pub others: Vec<MessageEnvelope>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MessageEnvelope {
     pub to: Vec<Aid>,
-    pub from: Option<Aid>,
+    pub from: Aid,
     pub date: chrono::DateTime<chrono::FixedOffset>,
     pub acl_representation: AclRepresentation,
-    pub parameters: BTreeMap<String, bstr::BString>,
-    pub message: MessageKind,
+    pub other: Option<BTreeMap<String, bstr::BString>>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum MessageKind {
-    Parsed(Message),
-    // TODO: Support this.
-    // Bytes(bstr::BString),
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Payload {
+    /// The parsed Acl message.
+    AclMessage(Message),
+    /// Bytes representing an Acl message. These could be encrypted or malformed, hence they are
+    /// stored as bytes.
+    Bytes(BString),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AclRepresentation {
+    String,
     BitEfficient,
+    Other(String),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+/// A FIPA Acl Message.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Message {
     pub performative: Performative,
-    pub sender: Option<Aid>,
-    pub receiver: Receiver,
-    pub reply_to: Option<Aid>,
+    pub receiver: Option<Receiver>,
     pub ontology: Option<String>,
-    pub content: Content,
+    // NOTE: This parameter is implicitly encoded in `Content`.
+    // pub language: String,
+    pub other: Option<BTreeMap<String, BString>>,
+    pub content: Option<Content>,
     // TODO: Implement these.
-    // protocol: Option<Protocol>,
-    // conversation_id: Option<String>,
-    // reply_with: Option<String>,
-    // in_reply_to: Option<String>,
-    // reply_by: Option<String>,
+    // pub sender: Option<Aid>,
+    // pub reply_to: Option<Aid>,
+    // pub encoding: Option<Encoding>,
+    // pub protocol: Option<Protocol>,
+    // pub conversation_id: Option<String>,
+    // pub reply_with: Option<String>,
+    // pub in_reply_to: Option<String>,
+    // pub reply_by: Option<String>,
+}
+
+impl Message {
+    pub fn into_transport(self) -> TransportMessage {
+        let to = match &self.receiver {
+            Some(Receiver::Single(aid)) => Vec::from([aid.clone()]),
+            Some(Receiver::Multiple(btree_set)) => Vec::from_iter(btree_set.iter().cloned()),
+            None => Vec::with_capacity(0),
+        };
+        let envelope = MessageEnvelope {
+            to,
+            // TODO: This is very wrong :)
+            from: Aid::ams(),
+            date: DateTime::<Utc>::MIN_UTC.into(),
+            acl_representation: AclRepresentation::BitEfficient,
+            other: None,
+        };
+        TransportMessage {
+            envelopes: MessageEnvelopes {
+                base: envelope,
+                others: Vec::with_capacity(0),
+            },
+            payload: Payload::AclMessage(self),
+        }
+    }
+}
+
+impl core::fmt::Display for Message {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let bytes = repr::payload::string::encode(self);
+        f.write_str(core::str::from_utf8(&bytes).map_err(|_| core::fmt::Error)?)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -65,62 +125,35 @@ impl From<Aid> for Receiver {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum OtherLanguage {
-    Ccl,
-    Kif,
-    Rdf,
-}
-
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Content {
-    Structured(self::content::Content),
+    FipaSl0(Sl0Content),
     Bytes(Vec<u8>),
+    Bdil(BdilContent),
     Other {
-        kind: Option<OtherLanguage>,
-        content: String,
+        language: Option<String>,
+        /// Direct bytes (possibly utf-8) from the message not decoded in any way.
+        ///
+        /// The difference with [`Content::Bytes`] is that the latter is (en/de)coded in
+        /// transit.
+        content: BString,
     },
 }
 
-impl From<self::content::Content> for Content {
-    fn from(content: self::content::Content) -> Self {
-        Self::Structured(content)
-    }
-}
-
-impl Message {
-    pub fn wrap_with_envolope(self) -> MessageEnvelope {
-        let to = match &self.receiver {
-            Receiver::Single(aid) => Vec::from([aid.clone()]),
-            Receiver::Multiple(btree_set) => Vec::from_iter(btree_set.iter().cloned()),
-        };
-        let from = self.sender.clone();
-        MessageEnvelope {
-            to,
-            from,
-            date: DateTime::<Utc>::MIN_UTC.into(),
-            acl_representation: AclRepresentation::BitEfficient,
-            parameters: BTreeMap::new(),
-            message: MessageKind::Parsed(self),
+impl Content {
+    pub fn language(&self) -> &str {
+        match self {
+            Content::FipaSl0(_) => "fipa-sl0",
+            Content::Bytes(_) => "bytes",
+            Content::Bdil(_) => "ember-bdil",
+            Content::Other { language, .. } => language.as_deref().unwrap_or(""),
         }
     }
 }
 
-// TODO: Remove the need for these by using serialize directly.
-mod todo {
-    use super::Message;
-
-    impl core::fmt::Display for Message {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            f.write_str(&super::repr::human::to_string(&self))
-        }
-    }
-
-    impl Message {
-        #[allow(unused)]
-        pub fn try_from_bytes(bytes: impl AsRef<[u8]>) -> Result<Self, ()> {
-            super::repr::human::try_from_bytes(bytes)
-        }
+impl From<Sl0Content> for Content {
+    fn from(content: Sl0Content) -> Self {
+        Self::FipaSl0(content)
     }
 }
 
@@ -148,7 +181,6 @@ pub enum Performative {
     Subscribe,
     Proxy,
     Propagate,
-    Unknown,
 }
 
 impl Performative {
@@ -177,7 +209,6 @@ impl Performative {
             Subscribe => "subscribe",
             Proxy => "proxy",
             Propagate => "propagate",
-            Unknown => "unknown",
         }
     }
 }
@@ -210,9 +241,6 @@ impl FromStr for Performative {
             "subscribe" => Subscribe,
             "proxy" => Proxy,
             "propagate" => Propagate,
-
-            // TODO: Should the error case become the unknown performative?
-            "unknown" => Unknown,
             _ => return Err(()),
         })
     }

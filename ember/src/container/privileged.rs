@@ -1,4 +1,4 @@
-use std::borrow::Cow;
+use alloc::borrow::Cow;
 
 use ember_core::agent::Agent;
 use ember_core::environment::Environment;
@@ -64,8 +64,8 @@ impl PrivilegedAgents {
 }
 
 mod ams {
-    use std::string::ToString;
-    use std::vec::Vec;
+    use alloc::string::ToString;
+    use alloc::vec::Vec;
 
     use ember_core::agent::Agent;
     use ember_core::agent::aid::Aid;

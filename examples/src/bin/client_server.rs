@@ -8,7 +8,7 @@ use ember::Container;
 use ember::agent::Aid;
 use ember::agent::reactive::ReactiveAgent;
 use ember::agent::reactive::behaviour::{Context, CyclicBehaviour, TickerBehaviour};
-use ember::message::{Content, Message, MessageEnvelope, Performative, Receiver};
+use ember::message::{Content, Message, Performative, Receiver};
 
 use ember_examples::setup_example;
 
@@ -82,7 +82,7 @@ impl CyclicBehaviour for MetricsReceiver {
             ctx.block_behaviour();
             return;
         };
-        let metrics = Metrics::from(message.content);
+        let metrics = Metrics::from(message.content.expect("message has no content"));
         log::info!("Received metrics: {metrics:?}");
     }
 
@@ -141,7 +141,10 @@ impl From<Content> for Metrics {
         let Content::Other { content, .. } = content else {
             panic!("message content invalid");
         };
-        content.parse().expect("failed to parse content as metrics")
+        core::str::from_utf8(&**content)
+            .expect("content should be valid utf-8")
+            .parse()
+            .expect("failed to parse content as metrics")
     }
 }
 
@@ -164,19 +167,17 @@ impl FromStr for Metrics {
     }
 }
 
-impl From<Metrics> for MessageEnvelope {
+impl From<Metrics> for Message {
     fn from(value: Metrics) -> Self {
         Message {
             performative: Performative::Inform,
-            sender: None,
-            receiver: Receiver::Single(Aid::local("server")),
-            reply_to: None,
+            receiver: Some(Receiver::Single(Aid::local("server"))),
             ontology: None,
-            content: Content::Other {
-                kind: None,
-                content: format!("{},{},{}", value.temperature, value.humidity, value.light),
-            },
+            other: None,
+            content: Some(Content::Other {
+                language: None,
+                content: format!("{},{},{}", value.temperature, value.humidity, value.light).into(),
+            }),
         }
-        .wrap_with_envolope()
     }
 }

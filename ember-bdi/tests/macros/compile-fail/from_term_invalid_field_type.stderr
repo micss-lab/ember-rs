@@ -1,0 +1,11 @@
+error[E0277]: the trait bound `Vec<f32>: FromTerm<'_>` is not satisfied
+ --> tests/macros/compile-fail/from_term_invalid_field_type.rs:6:15
+  |
+6 |     readings: alloc::vec::Vec<f32>,
+  |               ^^^^^^^^^^^^^^^^^^^^ the trait `FromTerm<'_>` is not implemented for `Vec<f32>`
+  |
+  = help: the following other types implement trait `FromTerm<'a>`:
+            Sensor
+            bstr::bstring::BString
+            f32
+            std::string::String

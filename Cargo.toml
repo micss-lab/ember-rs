@@ -3,6 +3,8 @@ resolver = "2"
 members = [
     "ember",
     "ember-acc",
+    "ember-bdi",
+    "ember-bdi/bdil",
     "ember-core",
     "ember-fipa",
     "ember-reactive",
@@ -15,7 +17,9 @@ members = [
 [workspace.dependencies]
 ember = { path = "./ember" }
 ember-acc = { path = "./ember-acc" }
+ember-bdi = { path = "./ember-bdi" }
 ember-core = { path = "./ember-core" }
+ember-bdi-bdil = { path = "./ember-bdi/bdil" }
 ember-fipa = { path = "./ember-fipa" }
 ember-reactive = { path = "./ember-reactive" }
 ember-time = { path = "./ember-time" }

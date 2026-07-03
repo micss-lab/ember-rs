@@ -5,7 +5,7 @@ use core::ops::{Deref, DerefMut};
 
 use ember_core::agent::aid::Aid;
 use ember_core::environment::MessageStore;
-use ember_core::message::MessageEnvelope;
+use ember_core::message::Message;
 
 #[derive(Debug, Clone)]
 pub(crate) enum AgentReference {
@@ -15,7 +15,7 @@ pub(crate) enum AgentReference {
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct LocalAgentReference {
-    pub(crate) inbox: Vec<MessageEnvelope>,
+    pub(crate) inbox: Vec<Message>,
 }
 
 #[derive(Debug, Clone)]
@@ -50,7 +50,7 @@ impl Adt {
     pub(crate) fn messages_for_agent(
         &mut self,
         agent_name: impl AsRef<str>,
-    ) -> Option<Vec<MessageEnvelope>> {
+    ) -> Option<Vec<Message>> {
         Some(
             core::mem::take(&mut self.get_local_mut(agent_name.as_ref())?.inbox)
                 .into_iter()

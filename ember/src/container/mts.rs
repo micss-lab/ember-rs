@@ -6,7 +6,7 @@ use alloc::collections::BTreeSet;
 use esp_wifi::esp_now;
 
 use ember_acc::{Acc, Channels};
-use ember_core::message::MessageEnvelope;
+use ember_core::message::{Payload, TransportMessage};
 
 use crate::adt::{Adt, AgentReference, LocalAgentReference};
 
@@ -21,7 +21,8 @@ impl Mts<'_> {
         }
     }
 
-    pub(super) fn send_message(&mut self, envelope: MessageEnvelope, adt: &mut Adt) {
+    pub(super) fn send_message(&mut self, message: TransportMessage, adt: &mut Adt) {
+        let envelope = &message.envelopes.base;
         if envelope.to.is_empty() {
             log::error!("Cannot send a message with no receivers");
         } else {
@@ -53,8 +54,13 @@ impl Mts<'_> {
                         }
                     }
                 } {
-                    inbox.push(envelope.clone());
-                } else if self.channels.send(&resolved, envelope.clone()).is_err() {
+                    if let Payload::AclMessage(message) = message.payload.clone() {
+                        inbox.push(message);
+                    } else {
+                        // TODO: Solve this.
+                        log::warn!("Cannot send message that is not a parsed acl message to agent");
+                    }
+                } else if self.channels.send(&resolved, message.clone()).is_err() {
                     log::error!("Failed to send message to agent `{t}`.");
                 }
             }
@@ -63,9 +69,13 @@ impl Mts<'_> {
 
     pub(super) fn receive_messages(&mut self, adt: &mut Adt) {
         while let Some(mut message) = self.channels.receive() {
-            // TODO: Do this according to the fipa spec.
+            let envelope = &mut message.envelopes.base;
+            // TODO: Do this according to the fipa spec by pushing a new envelope.
             // Set the to parameter to the local address of the agent.
-            message.to = message.to.into_iter().map(|t| t.to_local()).collect();
+            envelope.to = core::mem::take(&mut envelope.to)
+                .into_iter()
+                .map(|t| t.to_local())
+                .collect();
 
             // Send the message as if it was to the local agent.
             self.send_message(message, &mut *adt);

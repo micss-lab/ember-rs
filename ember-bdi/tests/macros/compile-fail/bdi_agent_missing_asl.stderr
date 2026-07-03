@@ -1,0 +1,7 @@
+error: unexpected end of input, expected `asl = ...`
+ --> tests/macros/compile-fail/bdi_agent_missing_asl.rs:4:1
+  |
+4 | #[bdi_agent()]
+  | ^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `bdi_agent` (in Nightly builds, run with -Z macro-backtrace for more info)

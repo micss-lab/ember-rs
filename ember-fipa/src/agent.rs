@@ -4,7 +4,7 @@ use alloc::format;
 use alloc::string::ToString;
 use ember_core::agent::aid::Aid;
 use ember_core::environment::Environment;
-use ember_core::message::content::codec::AgentActionCodec;
+use ember_core::message::content::fipa_sl::codec::AgentActionCodec;
 use ember_core::message::{Message, Performative};
 
 use crate::ontology::{AgentManagementOntology, AmsAgentDescription, RegisterAction};
@@ -22,7 +22,7 @@ pub enum ExecutionState {
     // Transit,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct FipaAgent {
     /// Whether the register message has been sent.
     ///
@@ -48,14 +48,13 @@ impl FipaAgent {
                 // First register the agent with the ams.
                 let ams_aid = Aid::local("ams");
 
-                environment.send_message(
-                    Message {
-                        performative: Performative::Request,
-                        sender: None,
-                        receiver: ams_aid.into(),
-                        reply_to: None,
-                        ontology: Some(AgentManagementOntology::name().to_string()),
-                        content: RegisterAction {
+                environment.send_message(Message {
+                    performative: Performative::Request,
+                    receiver: Some(ams_aid.into()),
+                    ontology: Some(AgentManagementOntology::name().to_string()),
+                    other: None,
+                    content: Some(
+                        RegisterAction {
                             ams: AmsAgentDescription { name: None },
                             agent: AmsAgentDescription {
                                 name: Some(format!("{agent_name}@local")),
@@ -63,13 +62,12 @@ impl FipaAgent {
                         }
                         .into_content()
                         .into(),
-                    }
-                    .wrap_with_envolope(),
-                );
+                    ),
+                });
                 log::debug!("Sending ams register request for agent `{agent_name}`.");
                 self.registered = true;
             }
-            Initiated => (),
+            Initiated => self.state = ExecutionState::Active,
             Active => (),
         }
         self.state
