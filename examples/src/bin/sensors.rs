@@ -8,11 +8,12 @@ setup_example!();
 use alloc::boxed::Box;
 use core::time::Duration;
 
-use ember::behaviour::sequential::SequentialBehaviour;
-use ember::behaviour::{
+use ember::Container;
+use ember::agent::reactive::ReactiveAgent;
+use ember::agent::reactive::behaviour::sequential::SequentialBehaviour;
+use ember::agent::reactive::behaviour::{
     Behaviour, ComplexBehaviour, Context, IntoBehaviour, OneShotBehaviour, TickerBehaviour,
 };
-use ember::{Agent, Container};
 
 struct SensorInit;
 
@@ -129,7 +130,7 @@ impl SequentialBehaviour<'static> for MotorMovements {
 
 fn example() {
     let container = Container::default().with_agent(
-        Agent::new("sensor-agent", ())
+        ReactiveAgent::new("sensor-agent", ())
             .with_behaviour(SensorInit)
             .with_behaviour(AgentAliveBroadCast)
             .with_behaviour(SensorValueReader)

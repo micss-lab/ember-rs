@@ -13,3 +13,7 @@ pub mod driver;
 
 pub type Instant = fugit::Instant<u64, 1, TICK_HZ>;
 pub type Duration = fugit::Duration<u64, 1, TICK_HZ>;
+
+pub fn from_core_duration(d: core::time::Duration) -> Duration {
+    Duration::from_ticks(libm::round(d.as_secs_f64() * TICK_HZ as f64) as u64)
+}

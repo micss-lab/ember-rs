@@ -1,6 +1,5 @@
-use alloc::string::{String, ToString};
-use alloc::vec::Vec;
-use core::ops::Not;
+use alloc::borrow::Cow;
+use alloc::boxed::Box;
 
 use crate::message::{Message, Performative};
 
@@ -9,7 +8,7 @@ pub enum MessageFilter {
     Nested {
         negated: bool,
         operator: FilterOperator,
-        filters: Vec<MessageFilter>,
+        filters: Box<[MessageFilter]>,
     },
     Literal {
         negated: bool,
@@ -28,37 +27,52 @@ pub enum FilterLiteral {
     /// Matches with everything.
     All,
     /// Ontology name to match against.
-    Ontology(String),
+    Ontology(Cow<'static, str>),
     /// Performative to match against.
     Performative(Performative),
 }
 
 impl MessageFilter {
     /// Creates a message filter that will match any message.
-    pub const fn all() -> MessageFilter {
-        MessageFilter::Literal {
+    pub const fn all() -> Self {
+        Self::Literal {
             negated: false,
             kind: FilterLiteral::All,
         }
     }
 
     /// Creates a message filter that will not match any message.
-    pub fn none() -> MessageFilter {
-        MessageFilter::all().negated()
+    pub const fn none() -> Self {
+        Self::all().negated()
     }
 
     /// Creates a message filter that will only match if the performative matches.
-    pub fn performative(performative: Performative) -> MessageFilter {
-        MessageFilter::Literal {
+    pub const fn performative(performative: Performative) -> Self {
+        Self::Literal {
             negated: false,
             kind: FilterLiteral::Performative(performative),
         }
     }
 
-    pub fn ontology(ontology: impl ToString) -> MessageFilter {
-        MessageFilter::Literal {
+    pub fn ontology(ontology: impl Into<Cow<'static, str>>) -> Self {
+        Self::Literal {
             negated: false,
-            kind: FilterLiteral::Ontology(ontology.to_string()),
+            kind: FilterLiteral::Ontology(ontology.into()),
+        }
+    }
+}
+
+impl MessageFilter {
+    /// Negates the output of given the message filter.
+    pub const fn negated(mut self) -> Self {
+        self.negate();
+        self
+    }
+
+    /// Negates the output of the message filter.
+    pub const fn negate(&mut self) {
+        match self {
+            Self::Nested { negated, .. } | Self::Literal { negated, .. } => *negated = !*negated,
         }
     }
 }
@@ -66,37 +80,18 @@ impl MessageFilter {
 impl MessageFilter {
     /// Creates a message filter that will only match if all of the given message filters
     /// match.
-    pub fn and(filters: impl Into<Vec<MessageFilter>>) -> MessageFilter {
+    pub fn and(filters: impl Into<Box<[Self]>>) -> Self {
         Self::nested(filters, FilterOperator::And, false)
     }
 
     /// Creates a message filter that will match if any of the given filters match.
     ///
     /// Note: This will stop matching once a single match is found.
-    pub fn or(filters: impl Into<Vec<MessageFilter>>) -> MessageFilter {
+    pub fn or(filters: impl Into<Box<[Self]>>) -> Self {
         Self::nested(filters, FilterOperator::Or, false)
     }
 
-    /// Negates the output of given the message filter.
-    pub fn negated(mut self) -> MessageFilter {
-        self.negate();
-        self
-    }
-
-    /// Negates the output of the message filter.
-    pub fn negate(&mut self) {
-        match self {
-            MessageFilter::Nested { negated, .. } | MessageFilter::Literal { negated, .. } => {
-                *negated = negated.not()
-            }
-        }
-    }
-
-    fn nested(
-        filters: impl Into<Vec<MessageFilter>>,
-        operator: FilterOperator,
-        negated: bool,
-    ) -> Self {
+    fn nested(filters: impl Into<Box<[Self]>>, operator: FilterOperator, negated: bool) -> Self {
         let filters = filters.into();
         Self::Nested {
             negated,
@@ -110,7 +105,7 @@ impl MessageFilter {
     /// Checks if the filter matches with the provided message.
     pub fn matches(&self, message: &Message) -> bool {
         let matches = match self {
-            MessageFilter::Nested {
+            Self::Nested {
                 operator,
                 filters,
                 negated: _,
@@ -118,7 +113,7 @@ impl MessageFilter {
                 FilterOperator::And => filters.iter().all(|f| f.matches(message)),
                 FilterOperator::Or => filters.iter().any(|f| f.matches(message)),
             },
-            MessageFilter::Literal { kind, negated: _ } => match kind {
+            Self::Literal { kind, negated: _ } => match kind {
                 FilterLiteral::All => true,
                 FilterLiteral::Ontology(mo) => {
                     message.ontology.as_ref().map(|o| mo == o).unwrap_or(false)
@@ -131,9 +126,7 @@ impl MessageFilter {
 
     fn is_negated(&self) -> bool {
         match *self {
-            MessageFilter::Nested { negated, .. } | MessageFilter::Literal { negated, .. } => {
-                negated
-            }
+            Self::Nested { negated, .. } | Self::Literal { negated, .. } => negated,
         }
     }
 }

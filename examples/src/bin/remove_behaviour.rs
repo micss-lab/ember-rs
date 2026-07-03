@@ -5,8 +5,9 @@ use ember_examples::setup_example;
 
 setup_example!();
 
-use ember::behaviour::{BehaviourId, Context, CyclicBehaviour, OneShotBehaviour};
-use ember::{Agent, Container};
+use ember::Container;
+use ember::agent::reactive::ReactiveAgent;
+use ember::agent::reactive::behaviour::{BehaviourId, Context, CyclicBehaviour, OneShotBehaviour};
 
 const MESSAGE_AMOUNT: usize = 10;
 
@@ -70,7 +71,7 @@ impl CyclicBehaviour for MessagePrinterStopper {
 }
 
 fn example() {
-    let mut agent = Agent::new("messaging-agent", ()).with_behaviour(InformationPrinter);
+    let mut agent = ReactiveAgent::new("messaging-agent", ()).with_behaviour(InformationPrinter);
     let behavour_id = agent.add_behaviour(MessagePrinter);
     let agent = agent.with_behaviour(MessagePrinterStopper::new(behavour_id, MESSAGE_AMOUNT));
     let container = Container::default().with_agent(agent);

@@ -1,7 +1,6 @@
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
 
-use ember::behaviour::fsm::{Fsm, FsmBehaviour, FsmEvent};
 use ember_examples::setup_example;
 
 setup_example!();
@@ -10,11 +9,13 @@ use alloc::string::String;
 use core::cell::Cell;
 use core::ptr::addr_of_mut;
 
-use ember::behaviour::{
+use ember::Container;
+use ember::agent::reactive::ReactiveAgent;
+use ember::agent::reactive::behaviour::fsm::{Fsm, FsmBehaviour, FsmEvent};
+use ember::agent::reactive::behaviour::{
     ComplexBehaviour, Context, CyclicBehaviour, IntoBehaviourWithId, OneShotBehaviour,
     TickerBehaviour,
 };
-use ember::{Agent, Container};
 
 static mut WORKER_MESSAGE: Option<WorkerMessage> = None;
 static mut MANAGER_MESSAGE: Option<ManagerMessage> = None;
@@ -30,7 +31,7 @@ enum ManagerMessage {
     Finished,
 }
 
-fn manager() -> Agent<'static, (), ()> {
+fn manager() -> ReactiveAgent<'static, (), ()> {
     #[derive(PartialEq, Eq, PartialOrd, Ord)]
     enum ManagerTrigger {
         TaskSent,
@@ -151,10 +152,10 @@ fn manager() -> Agent<'static, (), ()> {
         }
     }
 
-    Agent::new("manager", ()).with_behaviour(ManagerBehaviour)
+    ReactiveAgent::new("manager", ()).with_behaviour(ManagerBehaviour)
 }
 
-fn worker() -> Agent<'static, (), ()> {
+fn worker() -> ReactiveAgent<'static, (), ()> {
     static mut CURRENT_TASK: Option<String> = None;
 
     #[derive(PartialEq, Eq, PartialOrd, Ord)]
@@ -282,7 +283,7 @@ fn worker() -> Agent<'static, (), ()> {
         }
     }
 
-    Agent::new("worker", ()).with_behaviour(WorkerBehaviour)
+    ReactiveAgent::new("worker", ()).with_behaviour(WorkerBehaviour)
 }
 
 fn example() {

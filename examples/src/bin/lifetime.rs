@@ -1,13 +1,13 @@
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
 
-use ember::{
-    Agent, Container,
-    behaviour::{Context, CyclicBehaviour},
-};
 use ember_examples::setup_example;
 
 setup_example!();
+
+use ember::Container;
+use ember::agent::reactive::ReactiveAgent;
+use ember::agent::reactive::behaviour::{Context, CyclicBehaviour};
 
 struct Foo<'a> {
     s: &'a str,
@@ -32,7 +32,7 @@ impl CyclicBehaviour for Foo<'_> {
 
 fn example() {
     let container = Container::default().with_agent(
-        Agent::new("agent-with-lifetime", ()).with_behaviour(Foo { s: "Hello, World!" }),
+        ReactiveAgent::new("agent-with-lifetime", ()).with_behaviour(Foo { s: "Hello, World!" }),
     );
     container.start().unwrap();
 }

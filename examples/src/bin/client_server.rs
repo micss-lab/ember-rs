@@ -4,9 +4,12 @@
 use alloc::format;
 use core::str::FromStr;
 
-use ember::behaviour::{Context, CyclicBehaviour, TickerBehaviour};
+use ember::Container;
+use ember::agent::Aid;
+use ember::agent::reactive::ReactiveAgent;
+use ember::agent::reactive::behaviour::{Context, CyclicBehaviour, TickerBehaviour};
 use ember::message::{Content, Message, MessageEnvelope, Performative, Receiver};
-use ember::{Agent, Aid, Container};
+
 use ember_examples::setup_example;
 
 setup_example!();
@@ -117,9 +120,10 @@ where
 
 fn example() {
     let container = Container::default()
-        .with_agent(Agent::new("server", ()).with_behaviour(MetricsReceiver))
+        .with_agent(ReactiveAgent::new("server", ()).with_behaviour(MetricsReceiver))
         .with_agent(
-            Agent::new("client", ()).with_behaviour(ReadMetrics(VALUES.into_iter().cycle())),
+            ReactiveAgent::new("client", ())
+                .with_behaviour(ReadMetrics(VALUES.into_iter().cycle())),
         );
 
     container.start().expect("container exited with error");

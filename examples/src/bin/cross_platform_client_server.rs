@@ -3,15 +3,18 @@
 // Avoid unused imports on unsupported targets.
 #![cfg_attr(target_os = "none", allow(unused))]
 
-use alloc::format;
-use core::str::FromStr;
-
-use ember::behaviour::{Context, CyclicBehaviour, TickerBehaviour};
-use ember::message::{Content, Message, MessageEnvelope, Performative, Receiver};
-use ember::{Agent, Aid, Container};
 use ember_examples::setup_example;
 
 setup_example!();
+
+use alloc::format;
+use core::str::FromStr;
+
+use ember::Container;
+use ember::agent::Aid;
+use ember::agent::reactive::ReactiveAgent;
+use ember::agent::reactive::behaviour::{Context, CyclicBehaviour, TickerBehaviour};
+use ember::message::{Content, Message, MessageEnvelope, Performative, Receiver};
 
 const VALUES: [Metrics; 10] = [
     Metrics {
@@ -126,15 +129,16 @@ fn example() {
 fn example() {
     let mut client_container = Container::default()
         .with_http(1338)
-        // .with_agent(Agent::new("server").with_behaviour(MetricsReceiver))
+        // .with_agent(ReactiveAgent::new("server").with_behaviour(MetricsReceiver))
         .with_agent(
-            Agent::new("client", ()).with_behaviour(ReadMetrics(VALUES.into_iter().cycle())),
+            ReactiveAgent::new("client", ())
+                .with_behaviour(ReadMetrics(VALUES.into_iter().cycle())),
         );
 
     let mut server_container = Container::default()
         .with_http(1337)
-        // .with_agent(Agent::new("server").with_behaviour(MetricsReceiver))
-        .with_agent(Agent::new("server", ()).with_behaviour(MetricsReceiver));
+        // .with_agent(ReactiveAgent::new("server").with_behaviour(MetricsReceiver))
+        .with_agent(ReactiveAgent::new("server", ()).with_behaviour(MetricsReceiver));
 
     loop {
         server_container

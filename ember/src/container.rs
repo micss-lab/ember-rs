@@ -6,24 +6,24 @@ use alloc::vec::Vec;
 #[cfg(feature = "acc-espnow")]
 use esp_wifi::esp_now;
 
-use ember_core::context::{ContainerContext, MessageStore};
-use ember_core::message::MessageEnvelope;
-
 use ember_core::agent::Agent;
 use ember_core::agent::aid::Aid;
+use ember_core::environment::{Environment, MessageStore};
+use ember_core::message::MessageEnvelope;
 
 use crate::adt::{Adt, AgentReference};
-use crate::agent::AmsAgent;
 
 use self::mts::Mts;
+use self::privileged::{ContainerView, PrivilegedAgents};
 
 mod mts;
+mod privileged;
 
 pub struct Container<'a, 'c> {
     /// Agents managed by this container.
     agents: VecDeque<Box<dyn Agent + 'a>>,
-    /// Ams agent managing this cotainers.
-    ams: AmsAgent,
+    /// Store of privileged agents able to modify the container directly.
+    privileged: PrivilegedAgents,
     /// Register of agents running on this platform.
     ladt: Adt,
     /// Message transport service.
@@ -40,30 +40,6 @@ impl Container<'_, '_> {
         }
     }
 
-    fn poll_associated_agents(&mut self) -> Result<(), Box<dyn core::error::Error>> {
-        if !self.agent_has_message(Aid::ams().local_name()) {
-            // Assume that the ams agent does not have to be scheduled if there is no message for
-            // it available.
-            return Ok(());
-        }
-
-        let mut context = ContainerContext::new(
-            self.messages_for_agent(Aid::ams().local_name())
-                .unwrap_or_default(),
-        );
-        self.ams.update(&mut context);
-        self.ams.perform_platform_actions(&mut self.ladt);
-
-        // Handle all messages the agent wants to send.
-        for message in context.message_outbox.into_iter() {
-            self.mts.send_message(message, &mut self.ladt);
-        }
-
-        self.return_unhandled_messages(Aid::ams().local_name(), context.message_inbox);
-
-        Ok(())
-    }
-
     pub fn poll(&mut self) -> Result<bool, Box<dyn core::error::Error>> {
         // Iterate over all agents once, only rescheduling agents that are not removed.
         let mut amount = self.agents.len();
@@ -71,10 +47,14 @@ impl Container<'_, '_> {
         // Poll the message transport system.
         self.mts.receive_messages(&mut self.ladt);
 
-        while let Some(mut agent) = self.agents.pop_front() {
-            self.poll_associated_agents()?;
+        // Poll privileged agents associated to this container.
+        self.privileged.poll(&mut ContainerView {
+            ladt: &mut self.ladt,
+            mts: &mut self.mts,
+        });
 
-            let mut context = ContainerContext::new(
+        while let Some(mut agent) = self.agents.pop_front() {
+            let mut context = Environment::new(
                 self.messages_for_agent(agent.get_name())
                     .unwrap_or_default(),
             );
@@ -88,7 +68,7 @@ impl Container<'_, '_> {
 
             self.return_unhandled_messages(agent.get_name(), context.message_inbox);
 
-            if context.should_stop {
+            if context.stop_platform {
                 return Ok(true);
             }
 
@@ -103,10 +83,6 @@ impl Container<'_, '_> {
         }
 
         Ok(false)
-    }
-
-    fn agent_has_message(&self, agent_name: impl AsRef<str>) -> bool {
-        self.ladt.agent_has_message(agent_name)
     }
 
     fn messages_for_agent(&mut self, agent_name: impl AsRef<str>) -> Option<Vec<MessageEnvelope>> {
@@ -196,11 +172,11 @@ impl<'c> Container<'_, 'c> {
 
 impl Default for Container<'_, '_> {
     fn default() -> Self {
-        let ams = AmsAgent::new();
-        let ladt = Adt::new(&ams);
+        let privileged = PrivilegedAgents::default();
+        let ladt = Adt::new(privileged.agent_names());
         Self {
             agents: VecDeque::default(),
-            ams,
+            privileged,
             ladt,
             mts: Mts::new(),
         }

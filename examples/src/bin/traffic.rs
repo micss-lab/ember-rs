@@ -1,16 +1,16 @@
 #![cfg_attr(target_os = "none", no_std)]
 #![cfg_attr(target_os = "none", no_main)]
 
-use ember::{
-    Agent, Container,
-    behaviour::{
-        ComplexBehaviour, Context, IntoBehaviour, IntoBehaviourWithId, TickerBehaviour,
-        fsm::{Fsm, FsmBehaviour, FsmEvent},
-    },
-};
 use ember_examples::setup_example;
 
 setup_example!();
+
+use ember::Container;
+use ember::agent::reactive::ReactiveAgent;
+use ember::agent::reactive::behaviour::fsm::{Fsm, FsmBehaviour, FsmEvent};
+use ember::agent::reactive::behaviour::{
+    ComplexBehaviour, Context, IntoBehaviour, IntoBehaviourWithId, TickerBehaviour,
+};
 
 struct TrafficLight;
 
@@ -146,6 +146,6 @@ impl TickerBehaviour for GreenLight {
 
 fn example() {
     let container = Container::default()
-        .with_agent(Agent::new("traffic-light", ()).with_behaviour(TrafficLight));
+        .with_agent(ReactiveAgent::new("traffic-light", ()).with_behaviour(TrafficLight));
     container.start().unwrap();
 }

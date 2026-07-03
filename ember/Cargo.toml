@@ -4,9 +4,12 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ember-core = { workspace = true }
 ember-acc = { workspace = true }
+ember-core = { workspace = true }
+ember-fipa = { workspace = true }
+ember-reactive = { workspace = true }
 ember-time = { workspace = true }
+ember-util = { workspace = true }
 
 log = { version = "0.4", default-features = false }
 

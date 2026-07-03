@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 fugit = "0.3"
+libm = "0.2"
 
 esp32 = { version = "0.35.0", default-features = false, optional = true }
 
