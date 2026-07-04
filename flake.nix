@@ -36,7 +36,6 @@
               bbenoist.nix
               vscodevim.vim
               ms-vscode.cpptools
-              skellock.just
             ];
           };
         in {
@@ -56,7 +55,6 @@
 
             pkgs.espflash
 
-            pkgs.just
             pkgs.jq
 
             vscode

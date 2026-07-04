@@ -1,8 +1,8 @@
-# Credo Content Language Specification
+# `ember-bdil` Content Language Specification
 
 **Version:** 0.1.0  
-**Language identifier (FIPA `:language`):** `credo`  
-**Version location:** Encoded in the binary content frame (§2.3), not in the language identifier string.
+**Language identifier (FIPA `:language`):** `ember-bdil`  
+**Version location:** Encoded in the binary content frame ([§2.3](#23-frame-layout)), not in the language identifier string.
 
 ---
 
@@ -10,7 +10,7 @@
 
 ### 1.1 Purpose
 
-Credo is a FIPA ACL content language for exchanging BDI belief state between agents. A message carries one **content expression** — a single literal representing a belief. The FIPA performative encodes the intent (add or remove the belief); the content language encodes the belief itself.
+`ember-bdil` is a FIPA ACL content language for exchanging BDI belief state between agents. A message carries one **content expression** — a single literal representing a belief. The FIPA performative encodes the intent (add or remove the belief); the content language encodes the belief itself.
 
 ### 1.2 Versioning
 
@@ -22,7 +22,7 @@ Language versions follow Semantic Versioning (MAJOR.MINOR.PATCH):
 | New content expression type | MINOR |
 | Clarification, new pre-coded functor | PATCH |
 
-Receivers must reject messages whose MAJOR version differs from their own. A higher MINOR or PATCH in the received message is a forward-compatibility signal; receivers skip unknown content expression types (see §2.3).
+Receivers must reject messages whose MAJOR version differs from their own. A higher MINOR or PATCH in the received message is a forward-compatibility signal; receivers skip unknown content expression types (see [§2.3](#23-frame-layout)).
 
 ### 1.3 Grammar (v0.1.0)
 
@@ -66,7 +66,7 @@ Variables begin with an uppercase letter or `_`. A variable in a literal is a pl
 
 ### 1.5 Performative Mapping (v0.1.0)
 
-The BDI event generated on receipt is determined solely by the FIPA performative. The mapping is **normative and exhaustive** for v0.1.0. Every performative not listed is a **protocol error** when `:language` is `credo`; receivers must respond with `not-understood`.
+The BDI event generated on receipt is determined solely by the FIPA performative. The mapping is **normative and exhaustive** for v0.1.0. Every performative not listed is a **protocol error** when `:language` is `ember-bdil`; receivers must respond with `not-understood`.
 
 | FIPA Performative | Trigger | Goal Kind | BDI Event |
 |---|---|---|---|
@@ -108,7 +108,7 @@ All bytes not listed below are reserved and must not appear in v0.1.0 frames.
 | `0x11` | `EXPR_LIT-` | `[expr_body]` | Negated literal |
 | `0x12`–`0x1F` | *(reserved)* | — | Future expression types (require MINOR bump) |
 
-Expression bodies are self-delimiting (see §2.4). Receivers that encounter an unknown expression code must reject the frame.
+Expression bodies are self-delimiting (see [§2.4](#24-expression-body-literal-0x10--0x11)). Receivers that encounter an unknown expression code must reject the frame.
 
 #### Functor codes
 
@@ -146,7 +146,7 @@ END      = 0x00
 major, minor, patch  u8 each
 ```
 
-The magic bytes `0xCA 0xED` spell "CA-ED" — short for **C**redo **A**gent **E**xpression **D**ata.
+The magic bytes `0xCA 0xED` are a fixed two-byte prefix identifying an `ember-bdil` frame.
 
 After the magic and version, the parser reads expressions until it encounters `0x00` (END). All expression bodies are self-delimiting; unknown expression codes are a decode error.
 
@@ -240,17 +240,17 @@ CA ED  40
 
 ### 2.9 Embedding in FIPA ACL
 
-The Credo binary frame is placed verbatim in the FIPA ACL `:content` field. The outer FIPA bit-efficient codec wraps it in `BIN_STR_16` or `BIN_STR_32`. The `:language` field is set to `credo`.
+The `ember-bdil` binary frame is placed verbatim in the FIPA ACL `:content` field. The outer FIPA bit-efficient codec wraps it in `BIN_STR_16` or `BIN_STR_32`. The `:language` field is set to `ember-bdil`.
 
 ### 2.10 Rejection Rules
 
 | Condition | Action |
 |---|---|
-| First two bytes ≠ `[0xCA, 0xED]` | Reject: not a Credo frame |
+| First two bytes ≠ `[0xCA, 0xED]` | Reject: not an `ember-bdil` frame |
 | `VERSION_MAJOR` ≠ receiver's MAJOR | Reject: incompatible version |
 | Functor is empty (WORD immediately followed by 0x00) | Reject: malformed functor |
 | Variable name is empty or contains 0x00 | Reject: malformed variable |
 | v0.1.0 frame contains ≠ 1 expression | Reject: malformed content |
 | Unknown expression code (0x12–0x1F) | Reject: unrecognised expression |
 | Unknown term code (0x26–0x2F) | Reject: unrecognised term |
-| `:language credo` with performative other than `inform` or `disconfirm` | Respond `not-understood` |
+| `:language ember-bdil` with performative other than `inform` or `disconfirm` | Respond `not-understood` |
