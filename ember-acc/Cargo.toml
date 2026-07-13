@@ -12,7 +12,7 @@ log = "0.4"
 bstr = { version = "1.12", default-features = false, features = ["alloc", "serde"], optional = true }
 bytes = { version = "1.10", default-features = false, features = ["serde"], optional = true }
 chrono = { version = "0.4", default-features = false, features = ["alloc", "serde"], optional = true }
-serde = { version = "1.0", default-features = false, features = ["alloc"], optional = true }
+serde = { version = "1.0", default-features = false, features = ["alloc", "derive"], optional = true }
 hex = { version = "0.4", default-features = false, features = ["alloc"], optional = true }
 
 multipart = { git = "https://github.com/exellentcoin26/multipart-rs.git", features = ["server", "tiny_http"], optional = true }

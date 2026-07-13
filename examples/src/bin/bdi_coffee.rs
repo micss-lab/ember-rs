@@ -2,7 +2,7 @@
 #![cfg_attr(target_os = "none", no_main)]
 
 use alloc::boxed::Box;
-use alloc::string::String;
+use alloc::string::{String, ToString};
 use alloc::vec;
 
 use log::info;

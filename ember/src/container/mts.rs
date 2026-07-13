@@ -1,3 +1,5 @@
+use core::marker::PhantomData;
+
 #[cfg(feature = "acc-custom")]
 use alloc::boxed::Box;
 use alloc::collections::BTreeSet;
@@ -5,19 +7,24 @@ use alloc::collections::BTreeSet;
 #[cfg(feature = "acc-espnow")]
 use esp_wifi::esp_now;
 
+#[cfg(feature = "acc")]
 use ember_acc::{Acc, Channels};
 use ember_core::message::{Payload, TransportMessage};
 
 use crate::adt::{Adt, AgentReference, LocalAgentReference};
 
 pub(super) struct Mts<'c> {
+    #[cfg(feature = "acc")]
     channels: Channels<'c>,
+    _lifetime: PhantomData<&'c ()>,
 }
 
 impl Mts<'_> {
     pub(super) fn new() -> Self {
         Mts {
+            #[cfg(feature = "acc")]
             channels: Channels::new(),
+            _lifetime: PhantomData,
         }
     }
 
@@ -60,7 +67,12 @@ impl Mts<'_> {
                         // TODO: Solve this.
                         log::warn!("Cannot send message that is not a parsed acl message to agent");
                     }
-                } else if self.channels.send(&resolved, message.clone()).is_err() {
+                } else {
+                    #[cfg(feature = "acc")]
+                    if self.channels.send(&resolved, message.clone()).is_ok() {
+                        continue;
+                    }
+
                     log::error!("Failed to send message to agent `{t}`.");
                 }
             }
@@ -68,6 +80,7 @@ impl Mts<'_> {
     }
 
     pub(super) fn receive_messages(&mut self, adt: &mut Adt) {
+        #[cfg(feature = "acc")]
         while let Some(mut message) = self.channels.receive() {
             let envelope = &mut message.envelopes.base;
             // TODO: Do this according to the fipa spec by pushing a new envelope.
@@ -80,9 +93,11 @@ impl Mts<'_> {
             // Send the message as if it was to the local agent.
             self.send_message(message, &mut *adt);
         }
+        let _ = adt;
     }
 }
 
+#[cfg(feature = "acc")]
 impl<'c> Mts<'c> {
     #[cfg(feature = "acc-http")]
     pub(super) fn enable_http(&mut self, port: u16) {

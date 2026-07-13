@@ -347,7 +347,7 @@ impl AstVisitor {
             .map(|f| self.visit_body_formula(f).into_token_stream());
 
         quote! {
-            alloc::boxed::Box::new([
+            ::alloc::boxed::Box::new([
                 #(#formulae),*
             ])
         }
@@ -419,7 +419,7 @@ impl AstVisitor {
                 quote! {
                     ::ember::agent::bdi::plan::QueryFormula::Logical {
                         operator: ::ember::agent::bdi::plan::LogicalOperator::Disjunction,
-                        operands: alloc::boxed::Box::new([#lhs, #rhs]),
+                        operands: ::alloc::boxed::Box::new([#lhs, #rhs]),
                     }
                 }
             }
@@ -441,7 +441,7 @@ impl AstVisitor {
             }
             SimpleLogicalExpression::Not(expression) => {
                 let expression = self.visit_simple_logical_expression(expression);
-                quote! { ::ember::agent::bdi::plan::QueryFormula::Not(alloc::boxed::Box::new(#expression)) }
+                quote! { ::ember::agent::bdi::plan::QueryFormula::Not(::alloc::boxed::Box::new(#expression)) }
             }
             SimpleLogicalExpression::Group(expression) => {
                 let expression = self.visit_logical_expression(expression);
@@ -500,7 +500,7 @@ impl AstVisitor {
                 quote! {
                     ::ember::agent::bdi::plan::ArithmeticExpression::Operation {
                         operator: #operator,
-                        operands: alloc::boxed::Box::new([#lhs, #rhs]),
+                        operands: ::alloc::boxed::Box::new([#lhs, #rhs]),
                     }
                 }
             },
@@ -522,7 +522,7 @@ impl AstVisitor {
                 quote! {
                     ::ember::agent::bdi::plan::ArithmeticExpression::Operation {
                         operator: #operator,
-                        operands: alloc::boxed::Box::new([#lhs, #rhs]),
+                        operands: ::alloc::boxed::Box::new([#lhs, #rhs]),
                     }
                 }
             },
@@ -694,7 +694,7 @@ impl AstVisitor {
                 quote! {
                     ::ember::agent::bdi::plan::action::BuiltinAction::Log(
                         #level.parse().expect("failed to parse log level"),
-                        Box::new([#(#terms),*])
+                        ::alloc::boxed::Box::new([#(#terms),*])
                     )
                 }
             }

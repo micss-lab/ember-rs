@@ -2,8 +2,10 @@ pub(super) use esp_wifi::esp_now::{EspNowReceiver, EspNowSender};
 
 use esp_wifi::esp_now::{EspNowReceiver as Receiver, EspNowSender as Sender};
 
+use alloc::string::ToString;
+
 use ember_core::agent::aid::Aid;
-use ember_core::message::MessageEnvelope;
+use ember_core::message::{Payload, TransportMessage};
 
 use crate::Acc;
 use crate::util::aid_to_mac;
@@ -23,16 +25,22 @@ impl<'c> EspNowChannel<'c> {
 }
 
 impl<'c> Acc for EspNowChannel<'c> {
-    fn send(&mut self, address: &Aid, message: MessageEnvelope) -> Result<(), ()> {
+    fn send(&mut self, address: &Aid, message: TransportMessage) -> Result<(), ()> {
         let Some(sender) = self.sender.as_mut() else {
             log::error!("EspNow channel is not configured for sending messages.");
             return Err(());
         };
 
+        let envelope = &message.envelopes.base;
+        let content = match &message.payload {
+            Payload::AclMessage(m) => m.to_string(),
+            Payload::Bytes(_) => unimplemented!(),
+        };
+
         if let Err(err) = sender
             .send(
                 &aid_to_mac(address),
-                &postcard::to_allocvec(&EspNowMessageSer(&message))
+                &postcard::to_allocvec(&EspNowMessageSer::new(envelope, content.as_bytes()))
                     .expect("failed to serialize message into postcard data format"),
             )
             .and_then(|w| w.wait())
@@ -42,9 +50,9 @@ impl<'c> Acc for EspNowChannel<'c> {
         Ok(())
     }
 
-    fn receive(&mut self) -> Option<MessageEnvelope> {
+    fn receive(&mut self) -> Option<TransportMessage> {
         let message = self.receiver.as_mut().and_then(|r| r.receive())?;
-        let envelope = postcard::from_bytes::<EspNowMessageDe>(message.data())
+        postcard::from_bytes::<EspNowMessageDe>(message.data())
             .inspect_err(|_| {
                 log::trace!("Skipping unparsable message.");
             })
@@ -52,7 +60,7 @@ impl<'c> Acc for EspNowChannel<'c> {
             // communication system. In the distributed smart home study, devices locate eachother
             // by broadcasting their service. This message would give an error in this case.
             .ok()?
-            .into_envelope();
-        Some(envelope)
+            .into_transport()
+            .ok()
     }
 }

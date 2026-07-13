@@ -4,21 +4,28 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ember-acc = { workspace = true }
 ember-core = { workspace = true }
 ember-fipa = { workspace = true }
-ember-reactive = { workspace = true }
 ember-time = { workspace = true }
 ember-util = { workspace = true }
-ember-bdi = { workspace = true }
+
+ember-acc = { workspace = true, optional = true }
+ember-bdi = { workspace = true, optional = true }
+ember-reactive = { workspace = true, optional = true }
 
 log = { version = "0.4", default-features = false }
 
-esp-wifi = { version = "0.12", features = ["esp-now"], optional = true }
+esp-wifi = { version = "0.12", optional = true }
 
 [features]
 std = ["ember-time/std"]
-acc-espnow = ["ember-acc/espnow", "dep:esp-wifi"]
-acc-http = ["std", "ember-acc/http"]
-acc-custom = ["ember-acc/custom"]
+
+acc = ["dep:ember-acc"]
+acc-espnow = ["acc", "ember-acc/espnow", "dep:esp-wifi", "esp-wifi/esp-now"]
+acc-http = ["acc", "std", "ember-acc/http"]
+acc-custom = ["acc", "ember-acc/custom"]
+
+agent-bdi = ["dep:ember-bdi"]
+agent-reactive = ["dep:ember-reactive"]
+
 esp32 = ["ember-time/esp32"]

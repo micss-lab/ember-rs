@@ -152,12 +152,13 @@ fn example() {
     let mut client_container = Container::default()
         .with_espnow(Some(sender), None)
         .with_agent(
-            Agent::new("client", ()).with_behaviour(ReadMetrics(VALUES.into_iter().cycle())),
+            ReactiveAgent::new("client", ())
+                .with_behaviour(ReadMetrics(VALUES.into_iter().cycle())),
         );
 
     let mut server_container = Container::default()
         .with_espnow(None, Some(receiver))
-        .with_agent(Agent::new("server", ()).with_behaviour(MetricsReceiver));
+        .with_agent(ReactiveAgent::new("server", ()).with_behaviour(MetricsReceiver));
 
     loop {
         server_container
