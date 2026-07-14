@@ -68,7 +68,7 @@ fn encode_content_and_language(content: &Content, out: &mut String) -> fmt::Resu
         Content::Other { language, content } => {
             use bstr::ByteSlice;
             if let Some(kind) = language {
-                write!(out, " :language {}", kind)?;
+                write!(out, " :language {kind}")?;
             }
             if content.is_utf8() {
                 write!(out, " :content \"{content}\"")

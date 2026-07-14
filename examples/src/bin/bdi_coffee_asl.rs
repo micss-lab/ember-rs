@@ -90,7 +90,7 @@ impl CoffeeAgent {
     }
 
     fn move_location(&mut self, from: Location, to: Location) {
-        info!("[ACTION] 🏃 Moving from {:?} to {:?}", from, to);
+        info!("[ACTION] 🏃 Moving from {from:?} to {to:?}");
     }
 
     fn buy(&mut self, item: Item) {

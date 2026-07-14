@@ -1,0 +1,50 @@
+#:schema https://dystroy.org/bacon/.bacon.schema.json
+
+# This is a configuration file for the bacon tool
+#
+# Complete help on configuration: https://dystroy.org/bacon/config/
+#
+# You may check the current default at
+#   https://github.com/Canop/bacon/blob/main/defaults/default-bacon.toml
+#
+# All jobs shell out to `cargo xtask`, which is the single source of truth
+# for how each target/feature combination is invoked (see xtask/).
+
+default_job = "check-local"
+env.CARGO_TERM_COLOR = "always"
+
+[jobs.check-local]
+command = ["cargo", "xtask", "check", "--target", "local"]
+need_stdout = false
+
+[jobs.check-esp]
+command = ["cargo", "xtask", "check", "--target", "esp32"]
+need_stdout = false
+
+[jobs.check]
+command = ["cargo", "xtask", "check"]
+need_stdout = false
+
+[jobs.clippy-local]
+command = ["cargo", "xtask", "clippy", "--target", "local"]
+need_stdout = false
+
+[jobs.clippy-esp]
+command = ["cargo", "xtask", "clippy", "--target", "esp32"]
+need_stdout = false
+
+[jobs.clippy]
+command = ["cargo", "xtask", "clippy"]
+need_stdout = false
+
+[jobs.test]
+command = ["cargo", "xtask", "test"]
+need_stdout = true
+
+[jobs.hack]
+command = ["cargo", "xtask", "hack"]
+need_stdout = false
+
+[jobs.ci]
+command = ["cargo", "xtask", "ci"]
+need_stdout = true

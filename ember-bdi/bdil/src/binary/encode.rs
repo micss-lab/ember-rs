@@ -13,7 +13,7 @@ pub fn encode(content: &BdilContent) -> Vec<u8> {
         BdilContent::Literal(l) => push_expression(l, &mut out)
             .map_err(|e| log::error!("failed to encode literal bdil content: {e}")),
     };
-    if let Err(_) = result {
+    if result.is_err() {
         return Vec::with_capacity(0);
     }
     out.push(END);

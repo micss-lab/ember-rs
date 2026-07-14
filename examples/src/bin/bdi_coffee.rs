@@ -111,10 +111,10 @@ impl Execute for AgentAction {
                     .lookup_view(&to)
                     .expect("failed to lookup to in bindings");
 
-                info!("[ACTION] 🏃 Moving from {:?} to {:?}", from, to);
+                info!("[ACTION] 🏃 Moving from {from:?} to {to:?}");
             }
             AgentAction::Buy(item) => {
-                info!("[ACTION] 🛒 Buying {}", item);
+                info!("[ACTION] 🛒 Buying {item}");
             }
         }
     }
@@ -153,7 +153,7 @@ fn example() {
         belief_base.assert_no_event(b);
     });
 
-    info!("🧠 Agent has {} initial beliefs.", belief_count);
+    info!("🧠 Agent has {belief_count} initial beliefs.");
     info!("   - at(agent, home)");
     info!("   - at(coffee_machine, kitchen)\n");
 

@@ -25,7 +25,7 @@ impl KnowledgeBase {
             context.emit_event(
                 TriggeringEvent {
                     trigger: Trigger::Addition,
-                    event: belief.into(),
+                    event: belief,
                     goal: None,
                 },
                 None,
@@ -55,7 +55,7 @@ impl KnowledgeBase {
             context.emit_event(
                 TriggeringEvent {
                     trigger: Trigger::Deletion,
-                    event: belief.into(),
+                    event: belief,
                     goal: None,
                 },
                 None,

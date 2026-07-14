@@ -524,7 +524,7 @@ impl core::fmt::Display for Number {
         use Number::*;
         match self {
             Int(i) => write!(f, "{i}"),
-            Float(fl) => write!(f, "{}", fl),
+            Float(fl) => write!(f, "{fl}"),
         }
     }
 }

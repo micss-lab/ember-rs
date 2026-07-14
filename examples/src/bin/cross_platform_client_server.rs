@@ -162,7 +162,7 @@ impl From<Content> for Metrics {
         let Content::Other { content, .. } = content else {
             panic!("message content invalid");
         };
-        core::str::from_utf8(&**content)
+        core::str::from_utf8(&content)
             .expect("content should be valid utf-8")
             .parse()
             .expect("failed to parse content as metrics")

@@ -30,7 +30,7 @@ pub(crate) mod into_literal {
                         }
                         Fields::Unnamed(fields) => {
                             let field_names = (0..fields.unnamed.len()).map(|i| {
-                                syn::Ident::new(&format!("f{}", i), proc_macro2::Span::call_site())
+                                syn::Ident::new(&format!("f{i}"), proc_macro2::Span::call_site())
                             });
                             quote! {
                                 Self::#variant_name( #(#field_names),* ) => #field_expansion
@@ -124,7 +124,7 @@ pub(crate) mod into_literal {
             }
             Fields::Unnamed(fields) => {
                 let exprs = (0..fields.unnamed.len()).map(|i| {
-                    let ident = syn::Ident::new(&format!("f{}", i), proc_macro2::Span::call_site());
+                    let ident = syn::Ident::new(&format!("f{i}"), proc_macro2::Span::call_site());
                     quote! { ::core::convert::Into::into(#ident) }
                 });
                 quote! {

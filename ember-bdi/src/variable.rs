@@ -20,6 +20,12 @@ pub struct Variable {
     pub(crate) id: VariableId,
 }
 
+impl Default for Variable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Variable {
     pub fn new() -> Self {
         let id = NEXT_VARIABLE_ID.get_increment();

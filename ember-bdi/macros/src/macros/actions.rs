@@ -188,10 +188,9 @@ fn extract_action_params(inputs: &syn::punctuated::Punctuated<FnArg, Token![,]>)
                         .push(quote! { #clean_ident: ::ember::agent::bdi::term::owned::Term });
                     params.variant_field_names.push(clean_ident.clone());
 
-                    let err_msg_res = format!("Failed to resolve argument '{}'", clean_ident);
+                    let err_msg_res = format!("Failed to resolve argument '{clean_ident}'");
                     let err_msg_conv = format!(
-                        "Failed to convert argument '{}' to expected type",
-                        clean_ident
+                        "Failed to convert argument '{clean_ident}' to expected type"
                     );
 
                     params.execute_resolutions.push(quote! {
@@ -230,5 +229,5 @@ fn is_context_type(ty: &Type) -> bool {
         _ => return false,
     };
 
-    path.segments.last().map_or(false, |s| s.ident == "Context")
+    path.segments.last().is_some_and(|s| s.ident == "Context")
 }

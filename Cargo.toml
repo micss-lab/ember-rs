@@ -5,6 +5,7 @@ members = [
     "ember-acc",
     "ember-bdi",
     "ember-bdi/bdil",
+    "ember-bdi/macros",
     "ember-core",
     "ember-fipa",
     "ember-reactive",
@@ -12,6 +13,7 @@ members = [
     "ember-util",
 
     "examples",
+    "xtask",
 ]
 
 [workspace.dependencies]

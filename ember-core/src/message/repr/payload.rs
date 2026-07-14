@@ -53,7 +53,7 @@ mod builder {
                         log::warn!("message has no content language parameter");
                         Content::Other {
                             language: None,
-                            content: content.into(),
+                            content,
                         }
                     }
                     Some(l) => {
@@ -66,7 +66,7 @@ mod builder {
                                 log::error!("failed to parse message language param as utf-8: {e}");
                                 "language"
                             })?),
-                            content: content.into(),
+                            content,
                         }
                     }
                 })

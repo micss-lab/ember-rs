@@ -55,11 +55,11 @@ struct SmartHomeAgent;
 #[bdi_actions]
 impl SmartHomeAgent {
     fn turn_on_light(&mut self, room: Room) {
-        info!("[ACTION] 💡 Turning ON light in {:?}", room);
+        info!("[ACTION] 💡 Turning ON light in {room:?}");
     }
 
     fn turn_off_light(&mut self, room: Room) {
-        info!("[ACTION] 🌑 Turning OFF light in {:?}", room);
+        info!("[ACTION] 🌑 Turning OFF light in {room:?}");
     }
 }
 

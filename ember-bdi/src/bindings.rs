@@ -42,9 +42,8 @@ impl<'a, T> Bindings<'a, T> {
 
     /// Filters the bound variables and only retains those present in the specified set.
     pub(crate) fn retain_variables(&mut self, variables: BTreeSet<VariableId>) {
-        self.bindings
-            .as_mut()
-            .map(|b| b.retain(|v, _| variables.contains(v)));
+        if let Some(b) = self.bindings
+            .as_mut() { b.retain(|v, _| variables.contains(v)) }
         self.aliases.retain_variables(variables);
     }
 }

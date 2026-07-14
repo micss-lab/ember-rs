@@ -297,8 +297,7 @@ pub(crate) fn expand(args: BdiAgentArgs, input: DeriveInput) -> TokenStream {
             return quote! {
                 #input
                 #compile_err
-            }
-            .into();
+            };
         }
     };
 
@@ -349,7 +348,7 @@ pub(crate) fn expand(args: BdiAgentArgs, input: DeriveInput) -> TokenStream {
 }
 
 fn generate_beliefbase(beliefs: &[Spanned<Belief>], agent_ident: &Ident) -> impl ToTokens {
-    let beliefs = beliefs.into_iter().map(|b| {
+    let beliefs = beliefs.iter().map(|b| {
         let span = b.span;
         let mut visitor = AstVisitor::new(agent_ident.clone());
         let belief = visitor.visit_belief(&b.node).into_token_stream();
@@ -380,7 +379,7 @@ fn generate_beliefbase(beliefs: &[Spanned<Belief>], agent_ident: &Ident) -> impl
 }
 
 fn generate_initial_goals(goals: &[Spanned<Goal>], agent_ident: &Ident) -> impl ToTokens {
-    let goals = goals.into_iter().map(|g| {
+    let goals = goals.iter().map(|g| {
         let span = g.span;
         let mut visitor = AstVisitor::new(agent_ident.clone());
         let goal = visitor.visit_goal(&g.node).into_token_stream();
@@ -411,7 +410,7 @@ fn generate_initial_goals(goals: &[Spanned<Goal>], agent_ident: &Ident) -> impl 
 }
 
 fn generate_plan_library(plans: &[Spanned<Plan>], agent_ident: &Ident) -> impl ToTokens {
-    let plans = plans.into_iter().map(|p| {
+    let plans = plans.iter().map(|p| {
         let span = p.span;
         let mut visitor = AstVisitor::new(agent_ident.clone());
         let plan = visitor.visit_plan(&p.node).into_token_stream();
