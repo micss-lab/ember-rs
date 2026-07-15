@@ -149,3 +149,63 @@ impl From<Variable> for Term {
         Self::Variable(variable)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use alloc::vec;
+
+    use ember_core::agent::Aid;
+
+    use crate::term::reference::TermRef;
+    use crate::testing::{literal, number, string};
+
+    use super::*;
+
+    #[test]
+    fn test_aid_from_term_parses_local_aid_string() {
+        let term = string("receiver-agent@local");
+
+        let aid = Aid::from_term(TermRef::from(&term)).expect("should parse");
+
+        assert_eq!(aid, Aid::local("receiver-agent"));
+    }
+
+    #[test]
+    fn test_aid_from_term_parses_general_aid_string() {
+        let term = string("receiver-agent@some-platform");
+
+        let aid = Aid::from_term(TermRef::from(&term)).expect("should parse");
+
+        assert_eq!(aid, Aid::general("receiver-agent", "some-platform"));
+    }
+
+    #[test]
+    fn test_aid_from_term_rejects_malformed_aid_string() {
+        let term = string("no-at-sign");
+
+        let err = Aid::from_term(TermRef::from(&term)).unwrap_err();
+
+        assert!(matches!(
+            err,
+            FromTermError::IncorrectConversion(ConversionError::InvalidAid(_))
+        ));
+    }
+
+    #[test]
+    fn test_aid_from_term_rejects_non_string_term() {
+        let term = number(1.0);
+
+        let err = Aid::from_term(TermRef::from(&term)).unwrap_err();
+
+        assert!(matches!(err, FromTermError::InvalidType(_)));
+    }
+
+    #[test]
+    fn test_aid_from_term_rejects_literal_term() {
+        let term = Term::Literal(literal("receiver-agent", vec![]));
+
+        let err = Aid::from_term(TermRef::from(&term)).unwrap_err();
+
+        assert!(matches!(err, FromTermError::InvalidType(_)));
+    }
+}

@@ -5,6 +5,7 @@ error[E0277]: the trait bound `Vec<f32>: FromTerm<'_>` is not satisfied
   |               ^^^^^^^^^^^^^^^^^^^^ the trait `FromTerm<'_>` is not implemented for `Vec<f32>`
   |
   = help: the following other types implement trait `FromTerm<'a>`:
+            Aid
             Sensor
             bstr::bstring::BString
             f32

@@ -21,6 +21,7 @@ This is the longest reference page in the docs; use the section list to navigate
 - [7.11 Sensors and percepts](#711-sensors-and-percepts)
 - [7.12 The reasoning cycle](#712-the-reasoning-cycle)
 - [7.13 Inter-agent belief sharing](#713-inter-agent-belief-sharing)
+  - [7.13.1 Sending to a variable receiver](#7131-sending-to-a-variable-receiver)
 
 ## 7.1 The BDI model in Ember
 
@@ -256,7 +257,7 @@ Built-in actions are written with a **leading dot** and are provided by the runt
 | ---------------------------------------- | -------------------------------------------------------------------------- |
 | `.log("level", term, …)`                 | Log the given terms at `level` (`"error"`, `"warn"`, `"info"`, `"debug"`, `"trace"`). |
 | `.stop_platform()`                       | Stop the whole container.                                                   |
-| `.send("name@host", "performative", lit)`| Send belief `lit` to another agent (see [§7.13](#713-inter-agent-belief-sharing)). |
+| `.send(aid, "performative", lit)`        | Send belief `lit` to another agent; `aid` is a `"name@host"` string or a bound variable (see [§7.13](#713-inter-agent-belief-sharing)). |
 
 Using an unknown `.builtin` is a compile error listing the valid built-ins.
 
@@ -433,8 +434,9 @@ struct SenderAgent;
 
 `.send(aid, performative, literal)` takes:
 
-- **`aid`**: the receiver, `"name@host"` (or `"name@local"`). The address is syntactically validated
-  at compile time; a malformed AID is a compile error.
+- **`aid`**: the receiver, either a literal `"name@host"` string (or `"name@local"`), or a bound
+  variable. A literal address is syntactically validated at compile time; a malformed AID is a
+  compile error.
 - **`performative`**: `"inform"` (assert the belief on the receiver) or `"disconfirm"` (retract it).
 - **`literal`**: the belief to transmit.
 
@@ -452,6 +454,25 @@ struct ReceiverAgent;
 ```
 
 See the `bdi_send` example for a runnable version.
+
+### 7.13.1 Sending to a variable receiver
+
+Instead of a literal address, `aid` may be a variable already bound (e.g. by the triggering event or
+an earlier step in the plan body). This is useful when the destination is only known at runtime —
+for example, replying to whoever sent a registration request:
+
+```rust
+#[bdi_agent(asl = {
+    +register(Addr)
+      <- .send(Addr, "inform", ack).
+})]
+struct RegistrarAgent;
+```
+
+The variable must be bound, at the point `.send` executes, to a string in the same `"name@host"` (or
+`"name@local"`) format as a literal AID — there is no compile-time validation in this case, since the
+address is only known at runtime. If the variable is unbound, or bound to a value that cannot be
+parsed as an AID, the send is skipped and an error is logged instead of stopping the plan.
 
 ## 7.14 Next
 

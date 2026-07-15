@@ -141,3 +141,76 @@ impl Resolve for VariableOrReceiver {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use alloc::vec;
+
+    use ember_core::agent::Aid;
+    use ember_core::message::Receiver;
+
+    use crate::resolve::ResolveFailure;
+    use crate::term::conversion::{ConversionError, FromTermError};
+    use crate::term::view::TermView;
+    use crate::testing::{bindings, string, variable};
+
+    use super::*;
+
+    #[test]
+    fn test_variable_or_receiver_resolves_bound_variable_to_receiver() {
+        let var = variable();
+        let addr = string("receiver-agent@local");
+        let bindings = bindings(vec![(var.clone(), TermView::from(&addr))]);
+
+        let resolved = VariableOrReceiver::Variable(var)
+            .resolve(&bindings)
+            .expect("should resolve");
+
+        assert_eq!(
+            resolved,
+            VariableOrReceiver::Receiver(Receiver::Single(Aid::local("receiver-agent")))
+        );
+    }
+
+    #[test]
+    fn test_variable_or_receiver_leaves_unbound_variable_unresolved() {
+        let var = variable();
+        let bindings = bindings(vec![]);
+
+        let resolved = VariableOrReceiver::Variable(var.clone())
+            .resolve(&bindings)
+            .expect("should resolve");
+
+        assert_eq!(resolved, VariableOrReceiver::Variable(var));
+    }
+
+    #[test]
+    fn test_variable_or_receiver_fails_when_bound_value_is_not_an_aid() {
+        let var = variable();
+        let not_an_aid = string("not-an-aid");
+        let bindings = bindings(vec![(var.clone(), TermView::from(&not_an_aid))]);
+
+        let err = VariableOrReceiver::Variable(var)
+            .resolve(&bindings)
+            .unwrap_err();
+
+        assert!(matches!(
+            err,
+            ResolveFailure::ConversionFailed(FromTermError::IncorrectConversion(
+                ConversionError::InvalidAid(_)
+            ))
+        ));
+    }
+
+    #[test]
+    fn test_variable_or_receiver_resolves_receiver_unchanged() {
+        let receiver = Receiver::Single(Aid::local("receiver-agent"));
+        let bindings = bindings(vec![]);
+
+        let resolved = VariableOrReceiver::Receiver(receiver.clone())
+            .resolve(&bindings)
+            .expect("should resolve");
+
+        assert_eq!(resolved, VariableOrReceiver::Receiver(receiver));
+    }
+}
