@@ -42,8 +42,8 @@ pub fn package_owning_bin(bin: &str) -> Result<String> {
         );
     }
 
-    let metadata: WorkspaceMetadata =
-        serde_json::from_slice(&output.stdout).context("failed to parse `cargo metadata` output")?;
+    let metadata: WorkspaceMetadata = serde_json::from_slice(&output.stdout)
+        .context("failed to parse `cargo metadata` output")?;
 
     for package in &metadata.packages {
         for target in &package.targets {

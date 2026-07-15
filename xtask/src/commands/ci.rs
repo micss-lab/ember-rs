@@ -31,7 +31,11 @@ pub fn run() -> Result<()> {
     }
 
     if !failed.is_empty() {
-        bail!("xtask ci: {} step(s) failed: {}", failed.len(), failed.join(", "));
+        bail!(
+            "xtask ci: {} step(s) failed: {}",
+            failed.len(),
+            failed.join(", ")
+        );
     }
 
     Ok(())

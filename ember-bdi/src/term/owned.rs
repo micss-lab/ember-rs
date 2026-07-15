@@ -56,8 +56,10 @@ impl Structure {
     }
 
     pub(crate) fn collect_variables(&self, variables: &mut BTreeSet<VariableId>) {
-        if let Some(args) = self.arguments.as_ref() { args.iter()
-                .for_each(|arg| arg.collect_variables(&mut *variables)) }
+        if let Some(args) = self.arguments.as_ref() {
+            args.iter()
+                .for_each(|arg| arg.collect_variables(&mut *variables))
+        }
     }
 
     pub(crate) fn atom_and_arity(&self) -> (Atom, usize) {

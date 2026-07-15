@@ -36,7 +36,8 @@ pub fn run(target: Option<Target>) -> Result<()> {
         for (krate, features) in features::crate_feature_names_for(target)? {
             let include = features.join(",");
 
-            let mut args: Vec<&str> = vec!["hack", "check", "-p", &krate, "--target", target.triple()];
+            let mut args: Vec<&str> =
+                vec!["hack", "check", "-p", &krate, "--target", target.triple()];
             args.extend_from_slice(target.extra_args());
             args.push("--feature-powerset");
             args.push("--include-features");

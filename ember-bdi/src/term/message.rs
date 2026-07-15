@@ -20,9 +20,7 @@ impl Term {
             MessageTerm::Float(f) => Self::Number(f),
             MessageTerm::String(s) => Self::String(s),
             MessageTerm::Literal(l) => Self::Literal(l.into()),
-            MessageTerm::Variable(v) => {
-                Term::Variable(variable_map.entry(v).or_default().clone())
-            }
+            MessageTerm::Variable(v) => Term::Variable(variable_map.entry(v).or_default().clone()),
         }
     }
 

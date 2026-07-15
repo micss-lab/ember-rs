@@ -189,9 +189,8 @@ fn extract_action_params(inputs: &syn::punctuated::Punctuated<FnArg, Token![,]>)
                     params.variant_field_names.push(clean_ident.clone());
 
                     let err_msg_res = format!("Failed to resolve argument '{clean_ident}'");
-                    let err_msg_conv = format!(
-                        "Failed to convert argument '{clean_ident}' to expected type"
-                    );
+                    let err_msg_conv =
+                        format!("Failed to convert argument '{clean_ident}' to expected type");
 
                     params.execute_resolutions.push(quote! {
                         let #clean_ident = match ::ember::agent::bdi::resolve::Resolve::resolve_as_view(&#clean_ident, bindings) {

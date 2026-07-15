@@ -13,7 +13,10 @@ pub fn run(target: Option<Target>, bin: Option<String>, extra: &[String]) -> Res
     // See the comment in commands::run for why `--bin` needs an explicit
     // `-p` rather than relying on cargo to disambiguate across the whole
     // workspace.
-    let package = bin.as_deref().map(metadata::package_owning_bin).transpose()?;
+    let package = bin
+        .as_deref()
+        .map(metadata::package_owning_bin)
+        .transpose()?;
 
     let multi_target = targets.len() > 1;
 
