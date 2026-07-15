@@ -186,8 +186,7 @@ pub enum BuiltinAction {
     Log(String, Box<[Term]>),
     StopPlatform,
     Send {
-        aid_name: String,
-        aid_platform: Option<String>,
+        aid: AidOrVariable,
         trigger: Trigger,
         literal: Literal,
     },
@@ -232,19 +231,27 @@ impl BuiltinAction {
         let mut args = VecDeque::from_iter(arguments.unwrap_or_default());
 
         // First arg: Aid string "name@platform" or "name@local", validated at compile time.
-        let aid_str = match args.pop_front() {
-            Some(Term::String(s)) => s,
-            _ => return Err(()),
-        };
-        let (name, platform) = aid_str.split_once('@').ok_or(())?;
-        if name.is_empty() {
-            return Err(());
-        }
-        let aid_name = name.to_string();
-        let aid_platform = match platform {
-            "local" => None,
-            p if !p.is_empty() => Some(p.to_string()),
-            _ => return Err(()),
+        let aid = {
+            match args.pop_front() {
+                Some(Term::String(s)) => {
+                    let (name, platform) = s.split_once('@').ok_or(())?;
+                    if name.is_empty() {
+                        return Err(());
+                    }
+                    let aid_name = name.to_string();
+                    let aid_platform = match platform {
+                        "local" => None,
+                        p if !p.is_empty() => Some(p.to_string()),
+                        _ => return Err(()),
+                    };
+                    AidOrVariable::Aid {
+                        aid_name,
+                        aid_platform,
+                    }
+                }
+                Some(Term::Variable(v)) => AidOrVariable::Variable(v),
+                _ => return Err(()),
+            }
         };
 
         // Second arg: performative string "inform" or "disconfirm".
@@ -268,12 +275,20 @@ impl BuiltinAction {
         }
 
         Ok(Self::Send {
-            aid_name,
-            aid_platform,
+            aid,
             trigger,
             literal,
         })
     }
+}
+
+#[derive(Debug, Clone)]
+pub enum AidOrVariable {
+    Aid {
+        aid_name: String,
+        aid_platform: Option<String>,
+    },
+    Variable(Variable),
 }
 
 pub(crate) struct AstVisitor {
@@ -709,14 +724,31 @@ impl AstVisitor {
                 }
             }
             BuiltinAction::Send {
-                aid_name,
-                aid_platform,
+                aid,
                 trigger,
                 literal,
             } => {
-                let aid = match aid_platform {
-                    None => quote! { ::ember::agent::Aid::local(#aid_name) },
-                    Some(p) => quote! { ::ember::agent::Aid::general(#aid_name, #p) },
+                let aid = match aid {
+                    AidOrVariable::Aid {
+                        aid_name,
+                        aid_platform,
+                    } => {
+                        let aid = match aid_platform {
+                            None => quote! { ::ember::agent::Aid::local(#aid_name) },
+                            Some(p) => quote! { ::ember::agent::Aid::general(#aid_name, #p) },
+                        };
+                        quote! {
+                            ::ember::agent::bdi::plan::action::VariableOrReceiver::Receiver(
+                                ::ember::message::Receiver::from(#aid)
+                            )
+                        }
+                    }
+                    AidOrVariable::Variable(v) => {
+                        let variable = self.visit_variable(v).into_token_stream();
+                        quote! {
+                            ::ember::agent::bdi::plan::action::VariableOrReceiver::Variable(#variable)
+                        }
+                    }
                 };
                 let trigger_ts = match trigger {
                     Trigger::Addition => quote! {
@@ -729,9 +761,7 @@ impl AstVisitor {
                 let literal_ts = self.visit_literal(literal).into_token_stream();
                 quote! {
                     ::ember::agent::bdi::plan::action::BuiltinAction::SendLiteral(
-                        ::ember::agent::bdi::plan::action::VariableOrReceiver::Receiver(
-                            ::ember::message::Receiver::from(#aid)
-                        ),
+                        #aid,
                         #trigger_ts,
                         #literal_ts,
                     )
