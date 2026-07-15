@@ -1,16 +1,19 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
+use log::{Level, log};
+
+use ember_core::agent::Aid;
 use ember_core::message::content::ember_bdil::BdilContent;
 use ember_core::message::{Content, Message, Performative, Receiver};
-use log::{Level, log};
 
 use crate::bindings::BindingLookup;
 use crate::context::Context;
 use crate::event::Trigger;
 use crate::literal::Literal;
-use crate::resolve::Resolve;
+use crate::resolve::{Resolve, ResolveFailure};
 use crate::term::{Structure, Term};
+use crate::variable::Variable;
 
 pub trait Execute: Sized {
     type State;
@@ -55,7 +58,7 @@ where
 pub enum BuiltinAction {
     Log(Level, Box<[Term]>),
     StopPlatform,
-    SendLiteral(Receiver, Trigger, Literal),
+    SendLiteral(VariableOrReceiver, Trigger, Literal),
 }
 
 impl BuiltinAction {
@@ -85,6 +88,17 @@ impl BuiltinAction {
                     Trigger::Addition => Performative::Inform,
                     Trigger::Deletion => Performative::NotUnderstood,
                 };
+                let receiver = match receiver.resolve(bindings) {
+                    Ok(VariableOrReceiver::Receiver(r)) => r,
+                    Ok(_) => {
+                        log::error!("failed to resolve .send arguments");
+                        return;
+                    }
+                    Err(_) => {
+                        log::error!("failed to parse receiver");
+                        return;
+                    }
+                };
                 context.send_message(Message {
                     performative,
                     receiver: Some(receiver),
@@ -94,5 +108,36 @@ impl BuiltinAction {
                 });
             }
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum VariableOrReceiver {
+    Variable(Variable),
+    Receiver(Receiver),
+}
+
+impl Resolve for VariableOrReceiver {
+    type View<'a>
+        = Self
+    where
+        Self: 'a;
+
+    fn resolve(self, bindings: &impl BindingLookup) -> Result<Self, ResolveFailure> {
+        self.resolve_as_view(bindings)
+    }
+
+    fn resolve_as_view<'a>(
+        &'a self,
+        bindings: &'a impl BindingLookup,
+    ) -> Result<Self::View<'a>, ResolveFailure> {
+        Ok(match self {
+            VariableOrReceiver::Variable(v) => match bindings.lookup_as_type::<Aid>(v) {
+                Some(Ok(aid)) => VariableOrReceiver::Receiver(Receiver::Single(aid)),
+                Some(Err(e)) => return Err(ResolveFailure::ConversionFailed(e)),
+                None => VariableOrReceiver::Variable(v.clone()),
+            },
+            VariableOrReceiver::Receiver(r) => self.clone(),
+        })
     }
 }

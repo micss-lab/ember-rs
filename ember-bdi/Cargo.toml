@@ -17,5 +17,5 @@ log = "0.4.30"
 
 [dev-dependencies]
 critical-section = { version = "1.2", features = ["std"] }
-ember = { workspace = true }
+ember = { workspace = true, features = ["agent-bdi"] }
 trybuild = { version = "1", features = ["diff"] }

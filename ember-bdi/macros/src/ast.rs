@@ -267,7 +267,12 @@ impl BuiltinAction {
             return Err(());
         }
 
-        Ok(Self::Send { aid_name, aid_platform, trigger, literal })
+        Ok(Self::Send {
+            aid_name,
+            aid_platform,
+            trigger,
+            literal,
+        })
     }
 }
 
@@ -703,7 +708,12 @@ impl AstVisitor {
                     ::ember::agent::bdi::plan::action::BuiltinAction::StopPlatform
                 }
             }
-            BuiltinAction::Send { aid_name, aid_platform, trigger, literal } => {
+            BuiltinAction::Send {
+                aid_name,
+                aid_platform,
+                trigger,
+                literal,
+            } => {
                 let aid = match aid_platform {
                     None => quote! { ::ember::agent::Aid::local(#aid_name) },
                     Some(p) => quote! { ::ember::agent::Aid::general(#aid_name, #p) },
@@ -719,7 +729,9 @@ impl AstVisitor {
                 let literal_ts = self.visit_literal(literal).into_token_stream();
                 quote! {
                     ::ember::agent::bdi::plan::action::BuiltinAction::SendLiteral(
-                        ::ember::message::Receiver::from(#aid),
+                        ::ember::agent::bdi::plan::action::VariableOrReceiver::Receiver(
+                            ::ember::message::Receiver::from(#aid)
+                        ),
                         #trigger_ts,
                         #literal_ts,
                     )

@@ -1,7 +1,9 @@
+use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use crate::bindings::BindingLookup;
 use crate::literal::Literal;
+use crate::term::FromTermError;
 use crate::term::Structure;
 use crate::term::Term;
 use crate::term::view::{StructureView, TermView};
@@ -12,6 +14,8 @@ pub enum ResolveFailure {
     /// used in. For example, a variable used in the place of a literal should always resolve
     /// to a literal.
     IncorrectKind,
+    /// Converting the ember native type to the custom type failed.
+    ConversionFailed(FromTermError),
 }
 
 impl core::fmt::Display for ResolveFailure {
@@ -20,7 +24,8 @@ impl core::fmt::Display for ResolveFailure {
             f,
             "resolve failure: {}",
             match self {
-                ResolveFailure::IncorrectKind => "incorrect kind",
+                ResolveFailure::IncorrectKind => "incorrect kind".to_string(),
+                ResolveFailure::ConversionFailed(e) => e.to_string(),
             }
         )
     }
