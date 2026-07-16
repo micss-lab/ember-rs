@@ -1,0 +1,11 @@
+error[E0277]: the trait bound `NotLiteral: IntoLiteral` is not satisfied
+ --> tests/macros/compile-fail/percept_custom_expr_missing_into_literal.rs:8:13
+  |
+7 | #[derive(IntoLiteral, Percept)]
+  |                       ------- required by a bound introduced by this call
+8 | #[ember(add(NotLiteral))]
+  |             ^^^^^^^^^^ the trait `IntoLiteral` is not implemented for `NotLiteral`
+  |
+  = help: the following other types implement trait `IntoLiteral`:
+            Bad
+            ember::_crates::ember_bdi::literal::Literal

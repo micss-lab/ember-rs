@@ -1,0 +1,5 @@
+error: Percept cannot be derived for unions
+ --> tests/macros/compile-fail/percept_union.rs:4:7
+  |
+4 | union Bad {
+  |       ^^^

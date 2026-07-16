@@ -1,0 +1,5 @@
+error: unknown percept action, expected `add`, `add(..)`, `remove`, `remove(..)`, or `ignore`
+ --> tests/macros/compile-fail/percept_unknown_action.rs:6:17
+  |
+6 | #[ember(percept(frobnicate))]
+  |                 ^^^^^^^^^^

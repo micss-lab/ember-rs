@@ -1,0 +1,7 @@
+error: `ignore` cannot be combined with other actions in the same list
+ --> tests/macros/compile-fail/percept_ignore_combined.rs:5:23
+  |
+5 | #[derive(IntoLiteral, Percept)]
+  |                       ^^^^^^^
+  |
+  = note: this error originates in the derive macro `Percept` (in Nightly builds, run with -Z macro-backtrace for more info)

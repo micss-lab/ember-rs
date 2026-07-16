@@ -1,0 +1,5 @@
+error: duplicate `percept(...)` entry; only one is allowed per item
+ --> tests/macros/compile-fail/percept_duplicate_namespaced.rs:7:9
+  |
+7 | #[ember(percept(remove))]
+  |         ^^^^^^^^^^^^^^^

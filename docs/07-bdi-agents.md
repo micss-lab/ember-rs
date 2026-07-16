@@ -350,11 +350,71 @@ struct SensorReading { temperature: f32 }
 
 ### `Percept`: mark a type as a perception
 
-See the next section. `#[derive(Percept)]` implies the type becomes a single *added* belief via its
-`IntoLiteral` impl.
+See the next section for how percepts are consumed. By default, `#[derive(Percept)]` makes the type
+become a single *added* belief via its `IntoLiteral` impl — but this is configurable through the
+shared `#[ember(...)]` helper attribute (used by `FromTerm` above too), so a percept can express much
+more than "add one belief":
 
-If a derive does not fit, you can implement `FromTerm` / `IntoLiteral` by hand: the `bdi_coffee`
-example does exactly this.
+- `add` / `add(<expr>)` — emit an *addition* of the belief produced by `<expr>` (any expression whose
+  type implements `IntoLiteral`); `<expr>` defaults to `self` when omitted.
+- `remove` / `remove(<expr>)` — same, but a *deletion*.
+- `ignore` — this item/variant produces no belief at all.
+- Several actions in one list emit several `(Trigger, Literal)` tuples for that single percept
+  instance (e.g. "add belief A and remove belief B" as one state-transition event).
+
+The attribute can be placed on the container (a struct, or as an enum-wide default) and/or on
+individual enum variants, where a variant's own list overrides the container default. With nothing
+specified anywhere, behavior is unchanged from a plain `#[derive(Percept)]`: a single `add(self)`.
+
+```rust
+// A percept that always removes a belief instead of adding one:
+#[derive(IntoLiteral, Percept)]
+#[ember(remove)]
+struct GoneReading { sensor_id: u32 }
+
+// An enum where different variants add vs. remove the same belief:
+#[derive(IntoLiteral)]
+struct DoorOpen;
+
+#[derive(Percept)]
+enum Door {
+    #[ember(add(DoorOpen))]
+    Opened,
+    #[ember(remove(DoorOpen))]
+    Closed,
+}
+
+// Regardless of variant, always the same belief (container-level default applies to every variant
+// that doesn't override it):
+#[derive(Percept)]
+#[ember(add(PowerOnMarker))]
+enum PowerState { On, Off, Standby }
+
+// A custom belief built from the variant's own fields, or several actions in one shot:
+#[derive(Percept)]
+enum Event {
+    #[ember(add(Alarm { since: opened_at }))]
+    Opened { opened_at: u64, reason: String },
+    #[ember(add(NewState(value)), remove(OldState))]
+    Transition { value: i32 },
+}
+```
+
+Every derive that reads configuration through `#[ember(...)]` owns a namespace key equal to its own
+snake_case name (`percept` for `Percept`, `from_term` for `FromTerm`). The flat spellings above
+(`#[ember(add(..))]`, `#[ember(transparent)]`) are shorthand for the common case where only one such
+derive is in play on a given item; if you stack several `ember`-aware derives on the same struct or
+enum and need to be explicit about which configuration belongs to which, wrap each one in its
+namespace:
+
+```rust
+#[derive(IntoLiteral, Percept, FromTerm)]
+#[ember(from_term(transparent), percept(remove))]
+struct Gone(SomeInner);
+```
+
+If a derive does not fit at all, you can implement `FromTerm` / `IntoLiteral` / `Percept` by hand: the
+`bdi_coffee` example does exactly this.
 
 ## 7.11 Sensors and percepts
 

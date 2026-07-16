@@ -1,0 +1,6 @@
+error: #[ember(...)] Percept configuration is not supported on fields; place it on the struct or enum variant instead
+ --> tests/macros/compile-fail/percept_field_attribute.rs:7:5
+  |
+7 | /     #[ember(remove)]
+8 | |     value: f32,
+  | |______________^

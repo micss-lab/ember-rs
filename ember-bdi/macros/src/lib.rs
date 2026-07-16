@@ -35,16 +35,22 @@ pub fn derive_into_literal(input: TokenStream) -> TokenStream {
     macros::derive::into_literal::expand(input).into()
 }
 
-#[proc_macro_derive(Percept)]
+#[proc_macro_derive(Percept, attributes(ember))]
 pub fn derive_percept(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
-    macros::derive::percept::expand(input).into()
+    match macros::derive::percept::expand(input) {
+        Ok(token_stream) => token_stream.into(),
+        Err(err) => err.to_compile_error().into(),
+    }
 }
 
 #[proc_macro_derive(FromTerm, attributes(ember))]
 pub fn derive_from_term(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
-    macros::derive::from_term::expand(input).into()
+    match macros::derive::from_term::expand(input) {
+        Ok(token_stream) => token_stream.into(),
+        Err(err) => err.to_compile_error().into(),
+    }
 }
