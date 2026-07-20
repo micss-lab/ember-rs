@@ -349,7 +349,7 @@ pub(crate) mod percept {
             }
             Fields::Unnamed(fields) => {
                 let idents = (0..fields.unnamed.len())
-                    .map(|i| syn::Ident::new(&format!("f{i}"), proc_macro2::Span::call_site()));
+                    .map(|i| syn::Ident::new(&format!("_{i}"), proc_macro2::Span::call_site()));
                 quote! { Self::#variant_ident( #(#idents),* ) }
             }
             Fields::Unit => quote! { Self::#variant_ident },

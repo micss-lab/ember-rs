@@ -400,6 +400,22 @@ enum Event {
 }
 ```
 
+Named fields are referenced by their declared name, as above. Unnamed (tuple) fields are referenced
+as `_0`, `_1`, … — the same convention `derive_more`'s `Display` derive uses for tuple fields in
+format arguments — rather than a bare number, so there's no ambiguity between a field reference and
+an actual literal value in the expression:
+
+```rust
+#[derive(IntoLiteral)]
+struct ClearanceTimer(f32);
+
+#[derive(Percept)]
+enum DoorSensor {
+    #[ember(add(ClearanceTimer(_0)))]
+    Clearance(f32),
+}
+```
+
 Every derive that reads configuration through `#[ember(...)]` owns a namespace key equal to its own
 snake_case name (`percept` for `Percept`, `from_term` for `FromTerm`). The flat spellings above
 (`#[ember(add(..))]`, `#[ember(transparent)]`) are shorthand for the common case where only one such
