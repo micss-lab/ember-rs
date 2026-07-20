@@ -40,8 +40,9 @@ impl<A: Clone> IntentionQueue<A> {
         let id = existing_intention.unwrap_or_else(|| self.next_id());
         self.intentions
             .entry(id)
-            .or_default()
+            .or_insert_with(|| Intention::new(id))
             .push(plan, bindings, event);
+
         if !self.queue.contains(&id) {
             self.queue.push_back(id);
         }

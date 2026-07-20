@@ -1,5 +1,7 @@
 use alloc::boxed::Box;
 
+use derive_where::derive_where;
+
 use crate::bindings::BindingLookup;
 use crate::literal::Literal;
 use crate::resolve::ResolveFailure;
@@ -75,11 +77,12 @@ impl<'a, A> From<&'a Plan<A>> for PlanEqOrd<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive_where(Debug)]
+#[derive(Clone)]
 pub enum Formula<A> {
     Belief { trigger: Trigger, belief: Literal },
     Goal { kind: GoalKind, goal: Literal },
-    Action(Action<A>),
+    Action(#[derive_where(skip)] Action<A>),
 }
 
 impl<A> Formula<A> {

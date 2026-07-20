@@ -13,8 +13,7 @@ pub(crate) mod result;
 
 pub(crate) type IntentionId = usize;
 
-#[derive_where(Default)]
-#[derive(Debug)]
+#[derive_where(Debug)]
 pub(crate) struct Intention<A> {
     id: IntentionId,
     stack: Vec<Frame<A>>,
@@ -58,6 +57,15 @@ impl<A> Intention<A> {
     }
 }
 
+impl<A> Intention<A> {
+    fn new(id: IntentionId) -> Self {
+        Self {
+            id,
+            stack: Vec::default(),
+        }
+    }
+}
+
 impl<A: Clone> Intention<A> {
     pub(crate) fn push(
         &mut self,
@@ -69,7 +77,7 @@ impl<A: Clone> Intention<A> {
     }
 }
 
-#[derive(Debug)]
+#[derive_where(Debug)]
 struct Frame<A> {
     /// The id of the intention this frame belongs to.
     intention_id: IntentionId,
