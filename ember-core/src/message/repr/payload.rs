@@ -30,8 +30,16 @@ mod builder {
         content: Option<BString>,
     }
 
+    const CONTENT_ENCODING_FIELD: &str = "X-content-encoding";
+
     impl MessageBuilder {
-        pub(super) fn build(self, performative: Performative) -> Result<Message, &'static str> {
+        pub(super) fn build(mut self, performative: Performative) -> Result<Message, &'static str> {
+            let content_encoding = self
+                .other
+                .iter()
+                .position(|(name, _)| name == CONTENT_ENCODING_FIELD)
+                .map(|i| self.other.remove(i).1);
+
             let content = if let Some(content) = self.content {
                 Some(match self.language.as_ref().map(|l| l.as_slice()) {
                     Some(b"fipa-sl0") => Content::FipaSl0(
@@ -41,13 +49,27 @@ mod builder {
                         })?,
                     ),
                     Some(b"bytes") => {
-                        use base64ct::{Base64, Encoding};
-                        Content::Bytes(
-                            Base64::decode_vec(content.to_str_lossy().as_ref()).map_err(|e| {
-                                log::error!("failed to parse bytes content from base64: {e}");
-                                "content (bytes)"
-                            })?,
-                        )
+                        Content::Bytes(match content_encoding.as_ref().map(|v| v.as_slice()) {
+                            None => content.to_vec(),
+                            Some(b"base64") => {
+                                use base64ct::{Base64, Encoding};
+                                Base64::decode_vec(content.to_str_lossy().as_ref()).map_err(
+                                    |e| {
+                                        log::error!(
+                                            "failed to parse bytes content from base64: {e}"
+                                        );
+                                        "content (bytes)"
+                                    },
+                                )?
+                            }
+                            Some(unknown) => {
+                                log::error!(
+                                    "unrecognised `{CONTENT_ENCODING_FIELD}` `{}`",
+                                    bstr::BStr::new(unknown)
+                                );
+                                return Err("content-encoding");
+                            }
+                        })
                     }
                     None => {
                         log::warn!("message has no content language parameter");

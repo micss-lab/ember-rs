@@ -42,10 +42,10 @@ peg::parser! {
                         Ok(Some(MessageField::Ontology(ontology)))
                 }
             / ":content" _ c:string() { Some(MessageField::Content(c)) }
-            / ":" n:word() _ v:string()
+            / ":" n:word() _ v:(string() / word())
                 {?
-                    // TODO: Implement this.
-                    Err("unimplemented fields in string acl repr decode")
+                    let name = String::from_utf8(n.into()).map_err(|_| "utf8 field name")?;
+                    Ok(Some(MessageField::Other(name, v)))
                 }
 
         rule receiver() -> Receiver
