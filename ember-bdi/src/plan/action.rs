@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
+use ember_time::{Duration, Instant};
 use log::{Level, log};
 
 use ember_core::agent::Aid;
@@ -50,10 +51,7 @@ where
         state: &mut Self::State,
     ) -> Option<Self> {
         match self {
-            Action::Builtin(action) => {
-                action.execute(bindings, context);
-                None
-            }
+            Action::Builtin(action) => action.execute(bindings, context).map(Action::Builtin),
             Action::User(action) => action.execute(bindings, context, state).map(Action::User),
         }
     }
@@ -84,13 +82,57 @@ where
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BuiltinAction {
+    /// Log information to the stdout with the given log level.
     Log(Level, Box<[Term]>),
+    /// Terminate the execution of the platform the agent is running on.
     StopPlatform,
+    /// Send a belief update to another agent.
     SendLiteral(VariableOrReceiver, Trigger, Literal),
+    /// Halt the execution of an agents intention until the interval is finished. Construct this
+    /// variant with the `[wait](WaitState::wait)` member function.
+    Wait(WaitState),
+}
+
+/// State for the `.wait` built-in action.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WaitState {
+    start: Option<Instant>,
+    interval: Duration,
+}
+
+impl WaitState {
+    fn poll(self) -> Option<Self> {
+        let Self { start, interval } = self;
+        let Some(start) = start else {
+            return Some(Self {
+                start: Some(ember_time::now()),
+                interval,
+            });
+        };
+
+        if ember_time::now() - start >= interval {
+            return None;
+        }
+        Some(Self {
+            start: Some(start),
+            interval,
+        })
+    }
 }
 
 impl BuiltinAction {
-    pub(crate) fn execute<A>(self, bindings: &impl BindingLookup, context: &mut Context<A>) {
+    pub fn wait(interval: core::time::Duration) -> Self {
+        BuiltinAction::Wait(WaitState {
+            start: None,
+            interval: ember_time::from_core_duration(interval),
+        })
+    }
+
+    pub(crate) fn execute<A>(
+        self,
+        bindings: &impl BindingLookup,
+        context: &mut Context<A>,
+    ) -> Option<Self> {
         use BuiltinAction::*;
         match self {
             Log(level, terms) => {
@@ -102,8 +144,12 @@ impl BuiltinAction {
                     Ok(terms) => log!(level, "{terms:?}"),
                     Err(_) => log::error!("failed to resolve log arguments"),
                 }
+                None
             }
-            StopPlatform => context.stop_platform(),
+            StopPlatform => {
+                context.stop_platform();
+                None
+            }
             SendLiteral(receiver, trigger, literal) => {
                 let literal = Literal {
                     negated: false,
@@ -120,11 +166,11 @@ impl BuiltinAction {
                     Ok(VariableOrReceiver::Receiver(r)) => r,
                     Ok(_) => {
                         log::error!("failed to resolve .send arguments");
-                        return;
+                        return None;
                     }
                     Err(_) => {
                         log::error!("failed to parse receiver");
-                        return;
+                        return None;
                     }
                 };
                 context.send_message(Message {
@@ -134,7 +180,9 @@ impl BuiltinAction {
                     other: None,
                     content: Some(Content::Bdil(BdilContent::Literal(literal.into()))),
                 });
+                None
             }
+            Wait(state) => state.poll().map(Wait),
         }
     }
 }
@@ -165,7 +213,7 @@ impl Resolve for VariableOrReceiver {
                 Some(Err(e)) => return Err(ResolveFailure::ConversionFailed(e)),
                 None => VariableOrReceiver::Variable(v.clone()),
             },
-            VariableOrReceiver::Receiver(r) => self.clone(),
+            VariableOrReceiver::Receiver(_) => self.clone(),
         })
     }
 }
@@ -180,9 +228,28 @@ mod tests {
     use crate::resolve::ResolveFailure;
     use crate::term::conversion::{ConversionError, FromTermError};
     use crate::term::view::TermView;
-    use crate::testing::{bindings, string, variable};
+    use crate::testing::{bindings, new_context_without_environment, string, variable};
 
     use super::*;
+
+    #[test]
+    fn test_wait_stays_pending_until_interval_elapses_then_completes() {
+        // SAFETY: `.wait` never touches the environment.
+        let mut context: Context<()> = unsafe { new_context_without_environment() };
+        let bindings = bindings(vec![]);
+
+        let action = BuiltinAction::wait(core::time::Duration::from_millis(0));
+
+        let action = action
+            .execute(&bindings, &mut context)
+            .expect("the first poll only records the start time and must stay pending");
+
+        let result = action.execute(&bindings, &mut context);
+        assert!(
+            result.is_none(),
+            "a zero-length wait must complete on its second poll"
+        );
+    }
 
     #[test]
     fn test_variable_or_receiver_resolves_bound_variable_to_receiver() {

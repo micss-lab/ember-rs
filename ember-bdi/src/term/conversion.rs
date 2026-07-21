@@ -106,11 +106,7 @@ impl FromTerm<'_> for Aid {
                 .map_err(|_| ConversionError::InvalidUtf8)
                 .and_then(|s| s.parse().map_err(ConversionError::InvalidAid))
                 .map_err(FromTermError::IncorrectConversion),
-            TermRef::Literal {
-                negated,
-                functor,
-                arguments,
-            } => Err(FromTermError::InvalidType(Some(
+            TermRef::Literal { .. } => Err(FromTermError::InvalidType(Some(
                 "string (TODO: Implement literal support)",
             ))),
             _ => Err(FromTermError::InvalidType(Some(

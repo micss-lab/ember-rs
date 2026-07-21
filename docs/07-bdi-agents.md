@@ -258,6 +258,7 @@ Built-in actions are written with a **leading dot** and are provided by the runt
 | `.log("level", term, …)`                 | Log the given terms at `level` (`"error"`, `"warn"`, `"info"`, `"debug"`, `"trace"`). |
 | `.stop_platform()`                       | Stop the whole container.                                                   |
 | `.send(aid, "performative", lit)`        | Send belief `lit` to another agent; `aid` is a `"name@host"` string or a bound variable (see [§7.13](#713-inter-agent-belief-sharing)). |
+| `.wait(millis)`                          | Suspend the current intention for at least `millis` milliseconds before continuing to the next step. `millis` must be an integer literal. Other intentions keep running while this one waits (see [§7.12](#712-the-reasoning-cycle)). |
 
 Using an unknown `.builtin` is a compile error listing the valid built-ins.
 
@@ -492,6 +493,11 @@ Each container tick, a BDI agent's `update`:
 The agent reports itself **finished** to the container when it has no remaining intentions, so a BDI
 agent that has achieved all its goals lets the platform move on (and, if it was the last agent,
 allows the container to idle or stop).
+
+Some actions need more than one tick to finish — `.wait` is the built-in example. While such an
+action is still in progress, its intention doesn't advance to its next step (so later steps in the
+same plan wait for it), but other intentions continue to be scheduled normally, one step per tick, in
+the meantime.
 
 ## 7.13 Inter-agent belief sharing
 

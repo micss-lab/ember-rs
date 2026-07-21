@@ -1,0 +1,5 @@
+error: expected a valid system action (e.g. `.print`, `.message`, etc.)
+ --> tests/macros/compile-fail/bdi_agent_wait_non_integer_argument.rs:5:25
+  |
+5 |     +!brew <- .wait(1.5).
+  |                         ^

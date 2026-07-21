@@ -197,10 +197,7 @@ where
         while let Some((intention_id, action)) = context.actions.pop() {
             use crate::plan::Action::*;
             let pending = match action {
-                Builtin(action) => {
-                    action.execute(&bindings, &mut context);
-                    None
-                }
+                Builtin(action) => action.execute(&bindings, &mut context).map(Builtin),
                 User(action) => action
                     .execute(&bindings, &mut context, &mut self.state)
                     .map(User),
@@ -243,7 +240,7 @@ mod tests {
     use alloc::vec;
 
     use crate::bindings::BindingLookup;
-    use crate::plan::{Action, Formula};
+    use crate::plan::{Action, BuiltinAction, Formula};
     use crate::testing::{literal, plan, trigger};
 
     use super::*;
@@ -344,5 +341,43 @@ mod tests {
         }
         assert!(agent.intentions.is_empty());
         assert_eq!(agent.state, vec!["poll", "poll", "other", "poll", "after"]);
+    }
+
+    #[test]
+    fn test_builtin_wait_blocks_its_intention_until_it_completes() {
+        let mut lib = PlanLibrary::default();
+        lib.add(plan(
+            trigger("wait_test", vec![], Some(GoalKind::Achieve)),
+            None,
+            vec![
+                Formula::Action(Action::Builtin(BuiltinAction::wait(
+                    core::time::Duration::from_millis(0),
+                ))),
+                Formula::Action(Action::User(TestAction::Log("after"))),
+            ],
+        ));
+
+        let mut agent = BdiAgent::<Vec<&'static str>, TestAction, ()>::new(
+            "wait-agent",
+            Vec::new(),
+            None,
+            lib,
+            vec![literal("wait_test", vec![])],
+        );
+
+        let mut environment = new_environment();
+
+        // Tick 1: `.wait` is dispatched. Its first poll only records the start time and is
+        // always pending, so its intention must be blocked and the action kept for retry -
+        // `Log("after")` must not run yet.
+        agent.tick(&mut environment);
+        assert!(agent.state.is_empty());
+        assert_eq!(agent.pending_actions.len(), 1);
+
+        // Tick 2: the interval (0ms) has elapsed, so `.wait`'s second poll completes it,
+        // unblocking the intention, which then immediately advances to `Log("after")`.
+        agent.tick(&mut environment);
+        assert_eq!(agent.state, vec!["after"]);
+        assert!(agent.pending_actions.is_empty());
     }
 }

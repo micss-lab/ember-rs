@@ -568,6 +568,7 @@ dependencies = [
  "ember-bdi-macros",
  "ember-core",
  "ember-fipa",
+ "ember-time",
  "ember-util",
  "log",
  "trybuild",

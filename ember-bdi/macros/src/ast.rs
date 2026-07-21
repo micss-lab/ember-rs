@@ -190,6 +190,9 @@ pub enum BuiltinAction {
         trigger: Trigger,
         literal: Literal,
     },
+    Wait {
+        interval_millis: u64,
+    },
 }
 
 impl TryFrom<AtomicFormula> for BuiltinAction {
@@ -200,6 +203,7 @@ impl TryFrom<AtomicFormula> for BuiltinAction {
             "log" => Self::parse_log(arguments),
             "stop_platform" => Self::parse_stop_platform(arguments),
             "send" => Self::parse_send(arguments),
+            "wait" => Self::parse_wait(arguments),
             _ => Err(()),
         }
     }
@@ -279,6 +283,29 @@ impl BuiltinAction {
             trigger,
             literal,
         })
+    }
+
+    fn parse_wait(arguments: Option<Box<[Term]>>) -> Result<Self, ()> {
+        let mut args = VecDeque::from_iter(arguments.unwrap_or_default());
+
+        let Some(interval) = args.pop_front() else {
+            return Err(());
+        };
+
+        if args.front().is_some() {
+            return Err(());
+        }
+
+        let interval_millis = match interval {
+            Term::Number(n) if n.round() == n => n.round() as u64,
+            Term::String(_) => {
+                // TODO: Implement support for custom time units.
+                return Err(());
+            }
+            _ => return Err(()),
+        };
+
+        Ok(Self::Wait { interval_millis })
     }
 }
 
@@ -765,6 +792,11 @@ impl AstVisitor {
                         #trigger_ts,
                         #literal_ts,
                     )
+                }
+            }
+            BuiltinAction::Wait { interval_millis } => {
+                quote! {
+                    ::ember::agent::bdi::plan::action::BuiltinAction::wait(::core::time::Duration::from_millis(#interval_millis))
                 }
             }
         }
