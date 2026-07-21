@@ -81,12 +81,21 @@ pub(crate) struct GroundQuery<'a> {
     /// On backtracking, the beliefs it has already tried have to be redone.
     original: Option<Iter<'a, Knowledge>>,
 
-    /// To resolve rules, the beliefbase has to be queries recursively.
+    /// To resolve rules, the beliefbase has to be queried recursively.
     knowledge: &'a KnowledgeBase,
+
+    /// During backtracking a negated ground query needs to know whether it has already been
+    /// "satisfied" before. If it has and the backtracking engine comes back with "do you have any
+    /// other ways to satisfy yourself?" it should return `None`.
+    negation_satisfied: bool,
 }
 
 impl<'a> GroundQuery<'a> {
     fn next_bindings(&mut self, existing_bindings: Option<&Bindings<'a>>) -> Option<Bindings<'a>> {
+        if self.negated && self.negation_satisfied {
+            return None;
+        }
+
         match (
             self.negated,
             self.operand
@@ -94,16 +103,20 @@ impl<'a> GroundQuery<'a> {
         ) {
             (false, r) => r,
             (true, Some(_)) => None,
-            (true, None) => Some(
-                // Ensure that empty bindings are always returned such that the
-                // query does not fail.
-                existing_bindings.cloned().unwrap_or_else(Bindings::empty),
-            ),
+            (true, None) => {
+                self.negation_satisfied = true;
+                Some(
+                    // Ensure that empty bindings are always returned such that the
+                    // query does not fail.
+                    existing_bindings.cloned().unwrap_or_else(Bindings::empty),
+                )
+            }
         }
     }
 
     fn reset(&mut self) {
         self.beliefs = self.original.clone();
+        self.negation_satisfied = false;
     }
 }
 
@@ -586,6 +599,7 @@ pub(crate) mod formula {
                 original: beliefs,
                 operand,
                 knowledge: bb,
+                negation_satisfied: false,
             }
         }
 
