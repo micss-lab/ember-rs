@@ -117,6 +117,7 @@ impl<'a> GroundQuery<'a> {
     fn reset(&mut self) {
         self.beliefs = self.original.clone();
         self.negation_satisfied = false;
+        self.operand.reset();
     }
 }
 
@@ -137,6 +138,15 @@ impl<'a> QueryOperand<'a> {
         Self::Literal {
             literal,
             belief_to_process: None,
+        }
+    }
+
+    fn reset(&mut self) {
+        if let Self::Literal {
+            belief_to_process, ..
+        } = self
+        {
+            *belief_to_process = None;
         }
     }
 
@@ -866,6 +876,22 @@ mod tests {
         lit.into()
     }
 
+    fn rule(functor: &str, args: Vec<Term>, body: QueryFormula) -> Knowledge {
+        let lit = Literal {
+            negated: false,
+            structure: Structure {
+                functor: Atom(functor.into()),
+                arguments: if args.is_empty() {
+                    None
+                } else {
+                    Some(args.into_boxed_slice())
+                },
+            },
+        };
+
+        (lit, body).into()
+    }
+
     fn and(ops: Vec<QueryFormula>) -> QueryFormula {
         QueryFormula::Logical {
             operator: LogicalOperator::Conjunction,
@@ -1105,5 +1131,84 @@ mod tests {
 
         let mut query = (&formula).into_query(&bb);
         assert!(query.next_bindings(None).is_some());
+    }
+
+    // Currently fails: a rule's nested query is cached across calls
+    // (`QueryOperand::Literal`'s `belief_to_process`), and `GroundQuery::reset`
+    // only resets the belief iterator, not that cache. That's normally
+    // harmless, because a leaf whose cached attempt genuinely fails falls
+    // back to rebuilding its rule fresh (`.or_else` in
+    // `QueryOperand::next_bindings`) -- which finds the still-true belief
+    // again and "heals" the staleness. But when the stale, exhausted result
+    // is wrapped in `not`, the negation turns "found nothing" into a
+    // successful match instead of a failure, so the fallback that would
+    // have rebuilt it fresh never runs, and the wrong answer survives.
+    //
+    // `alt(X) & green_safe` below: `alt` has two solutions. Trying X=1 first,
+    // `green_safe` correctly fails (has_conflict is genuinely true). That
+    // failure backtracks into `alt` for its second solution, X=2, and
+    // retries `green_safe` -- whose cached search for `has_conflict` is
+    // already spent on its one real match, finds nothing this time, and
+    // `not` reports that as success, so the conjunction as a whole wrongly
+    // succeeds. All of this happens inside a single call to
+    // `next_bindings`, exactly like a real plan's context guard, which is
+    // queried once per candidate plan (`ApplicablePlanSelection::next_plan`).
+    #[test]
+    fn rule_reevaluated_after_unrelated_backtracking() {
+        let mut bb = KnowledgeBase::default();
+
+        // alt(1). alt(2). -- two independent ways for the first operand of
+        // the conjunction below to succeed, so the second solution requires
+        // backtracking into it.
+        bb.assert_no_event(belief("alt", vec![number(1.0)]));
+        bb.assert_no_event(belief("alt", vec![number(2.0)]));
+
+        // sib(a). matches(a). -- exactly one way to satisfy the rule below.
+        bb.assert_no_event(belief("sib", vec![string("a")]));
+        bb.assert_no_event(belief("matches", vec![string("a")]));
+
+        // has_conflict :- sib(S) & matches(S).
+        // green_safe   :- not has_conflict.
+        //
+        // green_safe has to be its own named rule, not `not has_conflict`
+        // inlined directly into the outer conjunction: as the outer
+        // conjunction's operand, green_safe's own belief iterator (the
+        // lookup of green_safe's definition, exactly one entry) does get
+        // reset between attempts, same as any operand past the first. But
+        // that reset never reaches inside green_safe's own cached rule
+        // body -- the `not has_conflict` leaf living in there is operand 0
+        // of a single-operand conjunction, so nothing ever resets *it*, and
+        // has_conflict's own staleness survives buried inside it.
+        let s = variable();
+        bb.assert_no_event(rule(
+            "has_conflict",
+            vec![],
+            and(vec![
+                literal("sib", vec![variable_term(&s)]),
+                literal("matches", vec![variable_term(&s)]),
+            ]),
+        ));
+        bb.assert_no_event(rule(
+            "green_safe",
+            vec![],
+            not(literal("has_conflict", vec![])),
+        ));
+
+        // alt(X) & green_safe -- has_conflict is genuinely true (sib(a) &
+        // matches(a) holds) and nothing retracts it, so green_safe should
+        // fail for every alt(X), not just the first one tried.
+        let x = variable();
+        let formula = and(vec![
+            literal("alt", vec![variable_term(&x)]),
+            literal("green_safe", vec![]),
+        ]);
+
+        let mut query = (&formula).into_query(&bb);
+
+        assert!(
+            query.next_bindings(None).is_none(),
+            "should fail for both alt(1) and alt(2): has_conflict is \
+             genuinely true and nothing ever retracts it"
+        );
     }
 }

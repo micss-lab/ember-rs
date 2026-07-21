@@ -28,10 +28,6 @@ impl<A> IntentionQueue<A> {
         id
     }
 
-    pub(crate) fn is_empty(&mut self) -> bool {
-        self.queue.is_empty()
-    }
-
     pub(crate) fn block(&mut self, id: IntentionId) {
         self.blocked.insert(id);
     }
