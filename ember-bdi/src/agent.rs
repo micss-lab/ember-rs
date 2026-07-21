@@ -226,7 +226,7 @@ where
             ExecutionState::Initiated => return false,
             ExecutionState::Active => self.tick(environment),
         }
-        self.intentions.is_empty()
+        false
     }
 
     fn get_name(&self) -> Cow<str> {
