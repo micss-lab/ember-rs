@@ -140,7 +140,7 @@ impl<A> Frame<A> {
                 },
                 Some(self.intention_id),
             ),
-            Formula::Action(action) => context.perform_action(action),
+            Formula::Action(action) => context.perform_action(self.intention_id, action),
         }
 
         StepOk::pending()
@@ -175,7 +175,7 @@ mod tests {
 
     #[test]
     fn test_intention_step_empty() {
-        let mut intention: Intention<()> = Intention::default();
+        let mut intention: Intention<()> = Intention::new(0);
         // SAFETY: The environment on the context remains untouched,
         let mut context = unsafe { new_context_without_environment() };
 
@@ -185,7 +185,7 @@ mod tests {
 
     #[test]
     fn test_intention_push_and_step() {
-        let mut intention: Intention<()> = Intention::default();
+        let mut intention: Intention<()> = Intention::new(0);
         // SAFETY: The environment on the context remains untouched,
         let mut context = unsafe { new_context_without_environment() };
 
@@ -205,7 +205,7 @@ mod tests {
 
     #[test]
     fn test_intention_step_with_actions() {
-        let mut intention: Intention<&'static str> = Intention::default();
+        let mut intention: Intention<&'static str> = Intention::new(0);
         // SAFETY: The environment on the context remains untouched,
         let mut context = unsafe { new_context_without_environment() };
 
@@ -224,14 +224,17 @@ mod tests {
         // step 1: executes action1 (because it's popped first)
         let result = intention.step(&mut context);
         assert!(matches!(result, Ok(StepOk::Pending)));
-        assert_eq!(context.actions, &[Action::User("action1")]);
+        assert_eq!(context.actions, &[(intention.id, Action::User("action1"))]);
 
         // step 2: executes action2
         let result = intention.step(&mut context);
         assert!(matches!(result, Ok(StepOk::Pending)));
         assert_eq!(
             context.actions,
-            &[Action::User("action1"), Action::User("action2")]
+            &[
+                (intention.id, Action::User("action1")),
+                (intention.id, Action::User("action2"))
+            ]
         );
 
         // step 3: frame done, intention done
@@ -241,7 +244,7 @@ mod tests {
 
     #[test]
     fn test_intention_step_with_beliefs_and_goals() {
-        let mut intention: Intention<()> = Intention::default();
+        let mut intention: Intention<()> = Intention::new(0);
         // SAFETY: The environment on the context remains untouched,
         let mut context = unsafe { new_context_without_environment() };
 

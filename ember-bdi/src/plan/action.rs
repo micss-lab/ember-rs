@@ -7,7 +7,7 @@ use ember_core::agent::Aid;
 use ember_core::message::content::ember_bdil::BdilContent;
 use ember_core::message::{Content, Message, Performative, Receiver};
 
-use crate::bindings::BindingLookup;
+use crate::bindings::{BindingLookup, OwnedBindings};
 use crate::context::Context;
 use crate::event::Trigger;
 use crate::literal::Literal;
@@ -20,12 +20,14 @@ pub trait Execute: Sized {
     /// The action stored in the context. In almost all cases, this can just be `Self`.
     type Action;
 
+    /// Executes the action returning `None` if it has finshed and a new action state if the action
+    /// is to be ran again.
     fn execute(
         self,
         bindings: &impl BindingLookup,
         context: &mut Context<Self::Action>,
         state: &mut Self::State,
-    );
+    ) -> Option<Self>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,11 +48,37 @@ where
         bindings: &impl BindingLookup,
         context: &mut Context<Self::Action>,
         state: &mut Self::State,
-    ) {
+    ) -> Option<Self> {
         match self {
-            Action::Builtin(action) => action.execute(bindings, context),
-            Action::User(action) => action.execute(bindings, context, state),
+            Action::Builtin(action) => {
+                action.execute(bindings, context);
+                None
+            }
+            Action::User(action) => action.execute(bindings, context, state).map(Action::User),
         }
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct PendingAction<A> {
+    action: Action<A>,
+    bindings: OwnedBindings,
+}
+
+impl<A> PendingAction<A> {
+    pub(crate) fn new(action: Action<A>, bindings: OwnedBindings) -> Self {
+        Self { action, bindings }
+    }
+}
+
+impl<State, A> PendingAction<A>
+where
+    A: Execute<State = State, Action = A>,
+{
+    pub(crate) fn execute(self, context: &mut Context<A>, state: &mut State) -> Option<Self> {
+        let Self { action, bindings } = self;
+        let action = action.execute(&bindings, context, state)?;
+        Some(Self { action, bindings })
     }
 }
 

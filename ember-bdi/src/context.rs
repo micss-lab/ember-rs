@@ -7,7 +7,7 @@ use crate::intention::IntentionId;
 use crate::plan::{Action, TriggeringEvent};
 
 pub struct Context<'ctx, A> {
-    pub(crate) actions: Vec<Action<A>>,
+    pub(crate) actions: Vec<(IntentionId, Action<A>)>,
     pub(crate) events: Vec<(EventSource, TriggeringEvent)>,
     pub(crate) environment: &'ctx mut Environment,
 }
@@ -23,8 +23,8 @@ impl<'ctx, A> Context<'ctx, A> {
 }
 
 impl<A> Context<'_, A> {
-    pub(crate) fn perform_action(&mut self, action: Action<A>) {
-        self.actions.push(action);
+    pub(crate) fn perform_action(&mut self, intention_id: IntentionId, action: Action<A>) {
+        self.actions.push((intention_id, action));
     }
 
     pub(crate) fn emit_event(&mut self, event: TriggeringEvent, intention_id: Option<IntentionId>) {

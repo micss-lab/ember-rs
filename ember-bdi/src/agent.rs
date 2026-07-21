@@ -11,10 +11,11 @@ use crate::context::Context;
 use crate::event::EventSource;
 use crate::event::queue::EventQueue;
 use crate::event::selector::FirstEvent;
+use crate::intention::IntentionId;
 use crate::intention::queue::{Fifo, IntentionQueue};
 use crate::knowledge::base::KnowledgeBase;
 use crate::literal::Literal;
-use crate::plan::action::Execute;
+use crate::plan::action::{Execute, PendingAction};
 use crate::plan::library::PlanLibrary;
 use crate::plan::selector::FirstApplicable;
 use crate::plan::{GoalKind, Trigger, TriggeringEvent};
@@ -27,6 +28,10 @@ pub struct BdiAgent<'s, State, Action, Percept> {
     beliefs: KnowledgeBase,
     plans: PlanLibrary<Action>,
     intentions: IntentionQueue<Action>,
+    /// Actions that returned pending on their last poll, keyed by the intention they belong to.
+    /// Retried once per tick until they complete; their owning intention stays blocked in
+    /// `intentions` for as long as they're here.
+    pending_actions: Vec<(IntentionId, PendingAction<Action>)>,
     event_queue: EventQueue,
     sensors: Option<Vec<Sensor<'s, Percept>>>,
     fipa: FipaAgent,
@@ -71,6 +76,7 @@ where
             beliefs: beliefs.unwrap_or_default(),
             plans,
             intentions: IntentionQueue::default(),
+            pending_actions: Vec::new(),
             event_queue: EventQueue::default(),
             sensors: None,
             fipa: FipaAgent::default(),
@@ -179,13 +185,31 @@ where
             self.handle_event(event, source);
         }
 
-        let bindings = self.intentions.step(&mut Fifo, &mut context);
+        for (intention_id, pending) in core::mem::take(&mut self.pending_actions) {
+            match pending.execute(&mut context, &mut self.state) {
+                Some(pending) => self.pending_actions.push((intention_id, pending)),
+                None => self.intentions.unblock(intention_id),
+            }
+        }
 
-        while let Some(action) = context.actions.pop() {
+        let bindings = self.intentions.step(&mut Fifo, &mut context).into_owned();
+
+        while let Some((intention_id, action)) = context.actions.pop() {
             use crate::plan::Action::*;
-            match action {
-                Builtin(action) => action.execute(&bindings, &mut context),
-                User(action) => action.execute(&bindings, &mut context, &mut self.state),
+            let pending = match action {
+                Builtin(action) => {
+                    action.execute(&bindings, &mut context);
+                    None
+                }
+                User(action) => action
+                    .execute(&bindings, &mut context, &mut self.state)
+                    .map(User),
+            };
+
+            if let Some(action) = pending {
+                self.intentions.block(intention_id);
+                self.pending_actions
+                    .push((intention_id, PendingAction::new(action, bindings.clone())));
             }
         }
 
@@ -210,5 +234,115 @@ where
 
     fn get_name(&self) -> Cow<str> {
         self.name.clone()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::collections::VecDeque;
+    use alloc::vec;
+
+    use crate::bindings::BindingLookup;
+    use crate::plan::{Action, Formula};
+    use crate::testing::{literal, plan, trigger};
+
+    use super::*;
+
+    /// A test-only action with one variant that needs several polls to complete (`Wait`) and
+    /// one that completes immediately (`Log`), so tests can observe both multi-poll behaviour
+    /// and that it doesn't affect single-shot actions.
+    #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+    enum TestAction {
+        Wait(u32),
+        Log(&'static str),
+    }
+
+    impl Execute for TestAction {
+        type State = Vec<&'static str>;
+        type Action = TestAction;
+
+        fn execute(
+            self,
+            _bindings: &impl BindingLookup,
+            _context: &mut Context<Self::Action>,
+            state: &mut Self::State,
+        ) -> Option<Self> {
+            match self {
+                TestAction::Wait(remaining) => {
+                    state.push("poll");
+                    if remaining == 0 {
+                        None
+                    } else {
+                        Some(TestAction::Wait(remaining - 1))
+                    }
+                }
+                TestAction::Log(msg) => {
+                    state.push(msg);
+                    None
+                }
+            }
+        }
+    }
+
+    fn new_environment() -> Environment {
+        Environment::new(VecDeque::with_capacity(0))
+    }
+
+    #[test]
+    fn test_multi_poll_action_blocks_its_own_intention_but_not_others() {
+        let mut lib = PlanLibrary::default();
+        lib.add(plan(
+            trigger("wait_test", vec![], Some(GoalKind::Achieve)),
+            None,
+            vec![
+                Formula::Action(Action::User(TestAction::Wait(2))),
+                Formula::Action(Action::User(TestAction::Log("after"))),
+            ],
+        ));
+        lib.add(plan(
+            trigger("other_test", vec![], Some(GoalKind::Achieve)),
+            None,
+            vec![Formula::Action(Action::User(TestAction::Log("other")))],
+        ));
+
+        let mut agent = BdiAgent::<Vec<&'static str>, TestAction, ()>::new(
+            "test-agent",
+            Vec::new(),
+            None,
+            lib,
+            vec![literal("wait_test", vec![]), literal("other_test", vec![])],
+        );
+
+        let mut environment = new_environment();
+
+        // Tick 1: `Wait(2)` is dispatched and polled once. It doesn't complete, so its
+        // intention is blocked and the action is kept around to be retried.
+        agent.tick(&mut environment);
+        assert_eq!(agent.state, vec!["poll"]);
+        assert_eq!(agent.pending_actions.len(), 1);
+
+        // Tick 2: the blocked intention is skipped by the scheduler, so `Wait` is only
+        // retried (still pending) - it does *not* get to run its next formula (`Log("after")`).
+        // Meanwhile the unrelated intention is free to run and completes its one action.
+        agent.tick(&mut environment);
+        assert_eq!(agent.state, vec!["poll", "poll", "other"]);
+        assert_eq!(agent.pending_actions.len(), 1);
+
+        // Tick 3: `Wait`'s last poll completes it, unblocking its intention, which then
+        // immediately advances to `Log("after")` in the same tick.
+        agent.tick(&mut environment);
+        assert_eq!(agent.state, vec!["poll", "poll", "other", "poll", "after"]);
+        assert!(agent.pending_actions.is_empty());
+
+        // No actions are left to run; ticking further should not change the log, and the
+        // agent should eventually report having no more intentions to work on.
+        for _ in 0..10 {
+            if agent.intentions.is_empty() {
+                break;
+            }
+            agent.tick(&mut environment);
+        }
+        assert!(agent.intentions.is_empty());
+        assert_eq!(agent.state, vec!["poll", "poll", "other", "poll", "after"]);
     }
 }

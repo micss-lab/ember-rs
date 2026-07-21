@@ -1,8 +1,8 @@
-use alloc::collections::{BTreeMap, VecDeque};
+use alloc::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use derive_where::derive_where;
 
-use crate::bindings::{BindingLookup, Bindings, OwnedBindings};
+use crate::bindings::{Bindings, OwnedBindings};
 use crate::context::Context;
 use crate::plan::Plan;
 
@@ -14,6 +14,10 @@ use super::{Intention, IntentionId};
 pub(crate) struct IntentionQueue<A> {
     intentions: BTreeMap<IntentionId, Intention<A>>,
     queue: VecDeque<IntentionId>,
+    /// Intentions with an action that hasn't completed yet. The scheduler skips these until
+    /// they're unblocked, so an intention never advances to its next formula while one of its
+    /// actions is still being polled.
+    blocked: BTreeSet<IntentionId>,
     current_id: IntentionId,
 }
 
@@ -26,6 +30,14 @@ impl<A> IntentionQueue<A> {
 
     pub(crate) fn is_empty(&mut self) -> bool {
         self.queue.is_empty()
+    }
+
+    pub(crate) fn block(&mut self, id: IntentionId) {
+        self.blocked.insert(id);
+    }
+
+    pub(crate) fn unblock(&mut self, id: IntentionId) {
+        self.blocked.remove(&id);
     }
 }
 
@@ -52,8 +64,14 @@ impl<A: Clone> IntentionQueue<A> {
         &'a mut self,
         scheduler: &mut S,
         context: &mut Context<A>,
-    ) -> impl BindingLookup + 'a {
-        let Some(id) = scheduler.select_intention(&self.queue, &self.intentions) else {
+    ) -> ReadOnlyBindings<'a> {
+        let candidates = self
+            .queue
+            .iter()
+            .copied()
+            .filter(|id| !self.blocked.contains(id));
+
+        let Some(id) = scheduler.select_intention(candidates, &self.intentions) else {
             return ReadOnlyBindings::Owned(OwnedBindings::empty());
         };
 
@@ -110,7 +128,7 @@ impl<A: Clone> IntentionQueue<A> {
 pub trait Scheduler<A> {
     fn select_intention(
         &mut self,
-        queue: &VecDeque<IntentionId>,
+        candidates: impl IntoIterator<Item = IntentionId>,
         intentions: &BTreeMap<IntentionId, Intention<A>>,
     ) -> Option<IntentionId>;
 }
@@ -120,9 +138,9 @@ pub struct Fifo;
 impl<A> Scheduler<A> for Fifo {
     fn select_intention<'b>(
         &mut self,
-        queue: &VecDeque<IntentionId>,
+        candidates: impl IntoIterator<Item = IntentionId>,
         intentions: &BTreeMap<IntentionId, Intention<A>>,
     ) -> Option<IntentionId> {
-        queue.iter().find(|i| intentions.contains_key(i)).copied()
+        candidates.into_iter().find(|i| intentions.contains_key(i))
     }
 }

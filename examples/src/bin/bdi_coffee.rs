@@ -101,7 +101,7 @@ impl Execute for AgentAction {
         bindings: &impl BindingLookup,
         _context: &mut ember::agent::bdi::context::Context<Self::Action>,
         _state: &mut Self::State,
-    ) {
+    ) -> Option<Self> {
         match self {
             AgentAction::Move { from, to } => {
                 let from = bindings
@@ -117,6 +117,7 @@ impl Execute for AgentAction {
                 info!("[ACTION] 🛒 Buying {item}");
             }
         }
+        None
     }
 }
 

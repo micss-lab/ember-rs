@@ -18,6 +18,18 @@ impl<'a> BindingLookup for ReadOnlyBindings<'a> {
     }
 }
 
+impl ReadOnlyBindings<'_> {
+    /// Materializes an owned copy, cloning only if the bindings were borrowed. Needed to retain
+    /// bindings across ticks (e.g. alongside a pending action), since the borrowed variant is
+    /// tied to the intention queue's lifetime for this tick only.
+    pub(crate) fn into_owned(self) -> OwnedBindings {
+        match self {
+            ReadOnlyBindings::Owned(bindings) => bindings,
+            ReadOnlyBindings::Borrowed(bindings) => bindings.clone(),
+        }
+    }
+}
+
 pub(crate) type Result = ::core::result::Result<StepOk, StepError>;
 
 #[derive(Debug)]
