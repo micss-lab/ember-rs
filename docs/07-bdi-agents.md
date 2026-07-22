@@ -68,8 +68,12 @@ struct CoffeeAgent;
 impl CoffeeAgent {}   // user-defined actions (none here)
 ```
 
-The macro generates a `From<CoffeeAgent>` impl and an `into_agent()` method producing a fully-wired
-`BdiAgent`. Add it to a container like any other agent:
+The macro generates two methods that turn the struct into a fully-wired `BdiAgent`:
+
+- `into_agent()`: uses the agent's **default name**, derived from the struct name, kebab-cased
+  (`CoffeeAgent` → `coffee-agent`).
+- `into_agent_named(name)`: uses a custom name instead, accepting anything that converts into
+  `Cow<'static, str>` (e.g. a `&'static str` or an owned `String`).
 
 ```rust
 Container::new()
@@ -78,8 +82,17 @@ Container::new()
     .unwrap();
 ```
 
-The agent's **name** is derived from the struct name, kebab-cased (`CoffeeAgent` → `coffee-agent`),
-and it registers with the AMS as `coffee-agent@local` on start-up.
+The agent registers with the AMS as `<name>@local` on start-up, so with the default name that's
+`coffee-agent@local`. Use `into_agent_named` to pick a different name, e.g. when running several
+instances of the same agent struct in one container:
+
+```rust
+Container::new()
+    .with_agent(CoffeeAgent.into_agent_named("coffee-agent-1"))
+    .with_agent(CoffeeAgent.into_agent_named("coffee-agent-2"))
+    .start()
+    .unwrap();
+```
 
 The macro accepts two arguments:
 

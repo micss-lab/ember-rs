@@ -318,25 +318,26 @@ pub(crate) fn expand(args: BdiAgentArgs, input: DeriveInput) -> TokenStream {
     let agent_action = format_ident!("{}Action", agent_ident);
 
     let impl_ = quote! {
-        impl From<#agent_ident> for ::ember::agent::bdi::BdiAgent<'static, #agent_ident, #agent_action, #percept_type> {
-            fn from(agent: #agent_ident) -> Self {
+        impl #agent_ident {
+            fn into_agent(self) -> ::ember::agent::bdi::BdiAgent<'static, #agent_ident, #agent_action, #percept_type> {
+                self.into_agent_named(#agent_name)
+            }
+
+            fn into_agent_named(
+                self,
+                name: impl ::core::convert::Into<::alloc::borrow::Cow<'static, str>>
+            ) -> ::ember::agent::bdi::BdiAgent<'static, #agent_ident, #agent_action, #percept_type> {
                 let beliefbase = #beliefbase;
                 let initial_goals = #initial_goals;
                 let plan_library = #plan_library;
 
                 ::ember::agent::bdi::BdiAgent::new(
-                    #agent_name,
-                    agent,
+                    name,
+                    self,
                     Some(beliefbase),
                     plan_library,
                     initial_goals,
                 )
-            }
-        }
-
-        impl #agent_ident {
-            fn into_agent(self) -> ::ember::agent::bdi::BdiAgent<'static, #agent_ident, #agent_action, #percept_type> {
-                self.into()
             }
         }
     };
