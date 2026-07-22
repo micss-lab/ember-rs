@@ -3,6 +3,7 @@ use alloc::collections::BTreeSet;
 use alloc::string::{String, ToString};
 
 use bstr::BString;
+
 use ember_util::cmp::TotalCmpF32;
 
 use crate::literal::Literal;
@@ -14,8 +15,11 @@ pub enum Term {
     Number(TotalCmpF32),
     String(BString),
     Variable(Variable),
-    // TODO: Support lists.
-    // List(List),
+    // A fixed-arity list of terms, unified element-wise (see `unification::traits`).
+    //
+    // TODO: Support Prolog-style partial-list unification via the cons operator (`'.'/2`, i.e.
+    // `[Head|Tail]`) so lists of different lengths can unify by binding a tail variable.
+    List(Box<[Term]>),
     Literal(Literal),
 }
 
@@ -25,6 +29,7 @@ impl Term {
         match self {
             Number(_) | String(_) => true,
             Variable(_) => false,
+            List(items) => items.iter().all(Term::is_ground),
             Literal(literal) => literal.is_ground(),
         }
     }
@@ -34,6 +39,7 @@ impl Term {
             Term::Variable(v) => {
                 vars.insert(v.id);
             }
+            Term::List(items) => items.iter().for_each(|t| t.collect_variables(vars)),
             Term::Literal(literal) => literal.collect_variables(vars),
             _ => {}
         }

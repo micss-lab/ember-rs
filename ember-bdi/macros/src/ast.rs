@@ -51,6 +51,7 @@ pub(crate) enum Term {
     Variable(Variable),
     Number(f32),
     String(String),
+    List(Box<[Term]>),
 }
 
 #[derive(Debug, Clone)]
@@ -658,11 +659,22 @@ impl AstVisitor {
                 }
             }
             Term::Number(number) => quote! {
-                ::ember::agent::bdi::term::owned::Term::Number(#number.into()),
+                ::ember::agent::bdi::term::owned::Term::Number(#number.into())
             },
             Term::String(string) => {
                 quote! {
                     ::ember::agent::bdi::term::owned::Term::String(#string.into())
+                }
+            }
+            Term::List(items) => {
+                let items = items
+                    .iter()
+                    .map(|t| self.visit_term(t).into_token_stream())
+                    .collect::<Vec<_>>();
+                quote! {
+                    ::ember::agent::bdi::term::owned::Term::List(::alloc::boxed::Box::new([
+                        #(#items),*
+                    ]))
                 }
             }
         }

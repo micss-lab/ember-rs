@@ -13,6 +13,7 @@ pub enum TermView<'a> {
     Term(&'a Term),
     Number(TotalCmpF32),
     Variable(&'a Variable),
+    List(Box<[TermView<'a>]>),
     Literal {
         negated: bool,
         structure: StructureView<'a>,
@@ -25,6 +26,7 @@ impl Clone for TermView<'_> {
             Self::Term(term) => Self::Term(term),
             Self::Number(n) => Self::Number(*n),
             Self::Variable(v) => Self::Variable(v),
+            Self::List(items) => Self::List(items.clone()),
             Self::Literal { negated, structure } => Self::Literal {
                 negated: *negated,
                 structure: structure.clone(),
@@ -69,6 +71,13 @@ impl TermView<'_> {
             TermView::Term(term) => term.clone(),
             TermView::Number(n) => Term::Number(n),
             TermView::Variable(v) => Term::Variable(v.clone()),
+            TermView::List(ref items) => Term::List(
+                items
+                    .iter()
+                    .map(TermView::to_owned)
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+            ),
             TermView::Literal {
                 negated,
                 ref structure,

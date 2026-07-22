@@ -61,6 +61,11 @@ peg::parser! {
               {? String::from_utf8(bytes.to_vec())
                      .map(|name| Term::Variable(Variable { name }))
                      .map_err(|_| "invalid utf-8") }
+            / [T_LIST] items:list_body()
+              { Term::List(items) }
+
+        rule list_body() -> Box<[Term]>
+            = terms:term()* [END] { terms.into_boxed_slice() }
     }
 }
 
@@ -182,6 +187,64 @@ mod tests {
                     functor: Functor("broken".into()),
                     arguments: None,
                 })])),
+            }
+            .into(),
+        );
+    }
+
+    #[test]
+    fn list_of_numbers() {
+        round_trip(
+            Literal {
+                negated: false,
+                functor: Functor("readings".into()),
+                arguments: Some(Box::new([Term::List(Box::new([
+                    Term::Int(1),
+                    Term::Int(2),
+                    Term::Int(3),
+                ]))])),
+            }
+            .into(),
+        );
+    }
+
+    #[test]
+    fn empty_list() {
+        round_trip(
+            Literal {
+                negated: false,
+                functor: Functor("items".into()),
+                arguments: Some(Box::new([Term::List(Box::new([]))])),
+            }
+            .into(),
+        );
+    }
+
+    #[test]
+    fn nested_list() {
+        round_trip(
+            Literal {
+                negated: false,
+                functor: Functor("matrix".into()),
+                arguments: Some(Box::new([Term::List(Box::new([
+                    Term::List(Box::new([Term::Int(1), Term::Int(2)])),
+                    Term::List(Box::new([Term::Int(3), Term::Int(4)])),
+                ]))])),
+            }
+            .into(),
+        );
+    }
+
+    #[test]
+    fn list_with_variable() {
+        round_trip(
+            Literal {
+                negated: false,
+                functor: Functor("coords".into()),
+                arguments: Some(Box::new([Term::List(Box::new([
+                    Term::Int(1),
+                    Term::Variable(Variable { name: "X".into() }),
+                ]))])),
             }
             .into(),
         );

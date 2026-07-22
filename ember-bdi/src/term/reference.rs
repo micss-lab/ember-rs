@@ -15,6 +15,7 @@ pub enum TermRef<'a> {
     Number(TotalCmpF32),
     String(&'a BString),
     Variable(&'a Variable),
+    List(Box<[TermRef<'a>]>),
     Literal {
         negated: bool,
         functor: &'a Atom,
@@ -28,6 +29,13 @@ impl TermRef<'_> {
             Self::Number(n) => Term::Number(n),
             Self::String(s) => Term::String(s.clone()),
             Self::Variable(v) => Term::Variable(v.clone()),
+            Self::List(ref items) => Term::List(
+                items
+                    .iter()
+                    .map(TermRef::to_owned)
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+            ),
             Self::Literal {
                 negated,
                 functor,
@@ -55,6 +63,13 @@ impl<'a> From<&'a Term> for TermRef<'a> {
             Term::Number(n) => Self::Number(*n),
             Term::String(s) => Self::String(s),
             Term::Variable(v) => Self::Variable(v),
+            Term::List(items) => Self::List(
+                items
+                    .iter()
+                    .map(Into::into)
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+            ),
             &Term::Literal(Literal {
                 negated,
                 structure:
@@ -85,6 +100,13 @@ impl<'a> From<TermView<'a>> for TermRef<'a> {
             TermView::Term(term) => Self::from(term),
             TermView::Number(n) => Self::Number(n),
             TermView::Variable(v) => Self::Variable(v),
+            TermView::List(items) => Self::List(
+                items
+                    .into_iter()
+                    .map(Into::into)
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+            ),
             TermView::Literal {
                 negated,
                 structure: StructureView { functor, arguments },

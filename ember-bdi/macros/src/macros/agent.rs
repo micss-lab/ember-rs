@@ -121,6 +121,10 @@ peg::parser! {
             / var:VARIABLE() { Term::Variable(var) }
             / num:NUMBER() { Term::Number(num) }
             / string:STRING() { Term::String(string) }
+            / items:list_term() { Term::List(items) }
+
+        rule list_term() -> Box<[Term]>
+            = "[" items:term() ** "," "]" { items.into_boxed_slice() }
 
         rule plan() -> Spanned<Plan>
             = span:span() event:triggering_event() context:( ":" c:context() { c })? "<-" body:body() {

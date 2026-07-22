@@ -114,7 +114,8 @@ goal         ::= "!" literal "."
 plan         ::= trigger_event (":" context)? "<-" body "."
 
 literal      ::= "~"? functor ("(" term ("," term)* ")")?
-term         ::= literal | Variable | Number | String
+term         ::= literal | Variable | Number | String | List
+List         ::= "[" (term ("," term)*)? "]"
 ```
 
 Lexical conventions (matching Prolog/AgentSpeak):
@@ -324,8 +325,9 @@ impl Robot {
 
 ## 7.10 Custom Rust types as terms
 
-BDI terms are `integer`, `float`, `string`, `variable`, or nested `literal`. To move data between the
-symbolic world and your Rust types, Ember provides three derives:
+BDI terms are `integer`, `float`, `string`, `variable`, nested `literal`, or `list` (a fixed-arity
+`[term, term, ...]`, unifying element-wise). To move data between the symbolic world and your Rust
+types, Ember provides three derives:
 
 ### `FromTerm`: decode a term into a Rust value
 

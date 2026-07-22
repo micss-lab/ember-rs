@@ -29,7 +29,8 @@ A content expression is a single literal:
 content-expr ::= literal
 literal      ::= "~"? functor arguments?
 arguments    ::= "(" term ("," term)* ")"
-term         ::= integer | float | string | literal | variable
+term         ::= integer | float | string | literal | variable | list
+list         ::= "[" (term ("," term)*)? "]"
 ```
 
 Identifiers (functors) start lowercase; variables start uppercase or `_`. `~` denotes
@@ -74,6 +75,7 @@ A valid v0.1.0 frame contains **exactly one** expression.
 | `0x23`      | `T_LIT+`       | Positive literal as an argument                |
 | `0x24`      | `T_LIT-`       | Negated literal as an argument                 |
 | `0x25`      | `T_VAR`        | Variable by name, null-terminated              |
+| `0x26`      | `T_LIST`       | `END`-terminated list of terms                 |
 
 All other bytes in these ranges are reserved. Encountering an unknown expression or term code is a
 decode error.

@@ -483,6 +483,7 @@ pub(crate) mod formula {
                         resolve_to_f32(&Term::Variable((*v).clone()), bindings)
                     }
                     Some(TermView::Literal { .. }) => Err(EvaluationError::TypeMismatch),
+                    Some(TermView::List(_)) => Err(EvaluationError::TypeMismatch),
                     Some(TermView::Number(n)) => Ok(**n),
                     None => Err(EvaluationError::InsufficientlyBound),
                 },
@@ -1100,6 +1101,27 @@ mod tests {
     fn type_mismatch_fails_gracefully() {
         let mut bb = KnowledgeBase::default();
         bb.assert_no_event(belief("val", vec![string("not_a_number")]));
+
+        let x = variable();
+        // val(X) & X > 0
+        let formula = and(vec![
+            literal("val", vec![variable_term(&x)]),
+            cmp(
+                expr(variable_term(&x)),
+                CompareOperator::GreaterThan,
+                false,
+                expr(number(0.0)),
+            ),
+        ]);
+
+        let mut query = (&formula).into_query(&bb);
+        assert!(query.next_bindings(None).is_none());
+    }
+
+    #[test]
+    fn arithmetic_rejects_list_term() {
+        let mut bb = KnowledgeBase::default();
+        bb.assert_no_event(belief("val", vec![list(vec![number(1.0), number(2.0)])]));
 
         let x = variable();
         // val(X) & X > 0

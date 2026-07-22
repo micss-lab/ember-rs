@@ -45,6 +45,7 @@ pub enum Term {
     String(BString),
     Literal(Literal),
     Variable(Variable),
+    List(Box<[Term]>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]

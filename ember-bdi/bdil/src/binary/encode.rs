@@ -76,6 +76,10 @@ fn push_term(term: &Term, out: &mut Vec<u8>) -> Result<(), EncodeError> {
             push_literal_body(lit, out)?;
         }
         Term::Variable(var) => push_variable(var, out)?,
+        Term::List(items) => {
+            out.push(T_LIST);
+            push_arg_list(Some(items.as_ref()), out)?;
+        }
     }
     Ok(())
 }

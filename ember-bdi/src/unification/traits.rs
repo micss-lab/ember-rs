@@ -63,6 +63,21 @@ impl Unify<&Term> for Term {
 
             (Literal(l1), Literal(l2)) => l1.collect_constraints(l2),
 
+            // Lists only unify when both sides have equal length, matching element-wise (same
+            // failure mode as `Structure`'s argument list).
+            //
+            // TODO: Support Prolog-style partial-list unification via the cons operator
+            // (`'.'/2`, i.e. `[Head|Tail]`) so lists of different lengths can unify by binding a
+            // tail variable.
+            (List(l1), List(l2)) if l1.len() == l2.len() => {
+                let mut constraints = Vec::new();
+                for (a1, a2) in l1.iter().zip(l2.iter()) {
+                    constraints.extend(a1.collect_constraints(a2)?);
+                }
+                Ok(constraints)
+            }
+            (List(_), List(_)) => Err(UnificationError::ArityMismatch),
+
             _ => Err(UnificationError::TypeMismatch),
         }
     }
@@ -90,6 +105,15 @@ impl<'a> UnifyView<'a> for TermView<'a> {
             (TermView::Variable(v), other) | (other, TermView::Variable(v)) => {
                 v.collect_constraints(other)
             }
+
+            (TermView::List(l1), TermView::List(l2)) if l1.len() == l2.len() => {
+                let mut constraints = Vec::new();
+                for (a1, a2) in l1.into_iter().zip(l2) {
+                    constraints.extend(a1.collect_constraints(a2)?);
+                }
+                Ok(constraints)
+            }
+            (TermView::List(_), TermView::List(_)) => Err(UnificationError::ArityMismatch),
 
             _ => Err(UnificationError::TypeMismatch),
         }
@@ -121,6 +145,15 @@ impl<'v> Unify<TermView<'v>> for Term {
                 .then(alloc::vec::Vec::new)
                 .ok_or(UnificationError::NumberMismatch),
 
+            (Term::List(l1), TermView::List(l2)) if l1.len() == l2.len() => {
+                let mut constraints = Vec::new();
+                for (a1, a2) in l1.iter().zip(l2) {
+                    constraints.extend(a1.collect_constraints(a2)?);
+                }
+                Ok(constraints)
+            }
+            (Term::List(_), TermView::List(_)) => Err(UnificationError::ArityMismatch),
+
             _ => Err(UnificationError::TypeMismatch),
         }
     }
@@ -142,11 +175,11 @@ impl Unify<&Structure> for Structure {
             return Err(UnificationError::ArityMismatch);
         }
 
-        let mut bindings = Vec::new();
+        let mut constraints = Vec::new();
         for (a1, a2) in args1.iter().zip(args2.iter()) {
-            bindings.extend(a1.collect_constraints(a2)?);
+            constraints.extend(a1.collect_constraints(a2)?);
         }
-        Ok(bindings)
+        Ok(constraints)
     }
 }
 
@@ -163,11 +196,11 @@ impl<'a> UnifyView<'a> for StructureView<'a> {
             return Err(UnificationError::ArityMismatch);
         }
 
-        let mut bindings = Vec::new();
+        let mut constraints = Vec::new();
         for (a1, a2) in args1.iter().zip(args2.iter()) {
-            bindings.extend(a1.clone().collect_constraints(a2.clone())?);
+            constraints.extend(a1.clone().collect_constraints(a2.clone())?);
         }
-        Ok(bindings)
+        Ok(constraints)
     }
 }
 
@@ -190,11 +223,11 @@ impl<'v> Unify<StructureView<'v>> for Structure {
             return Err(UnificationError::ArityMismatch);
         }
 
-        let mut bindings = Vec::new();
+        let mut constraints = Vec::new();
         for (a1, a2) in args1.iter().zip(args2.iter()) {
-            bindings.extend(a1.collect_constraints(a2.clone())?);
+            constraints.extend(a1.collect_constraints(a2.clone())?);
         }
-        Ok(bindings)
+        Ok(constraints)
     }
 }
 

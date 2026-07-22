@@ -224,6 +224,13 @@ impl<'a> EquivalenceClasses<'a> {
                         },
                     })
                 }
+                Term::List(items) => {
+                    let mut resolved_items = Vec::with_capacity(items.len());
+                    for item in items.iter() {
+                        resolved_items.push(self.resolve_term(TermView::Term(item), visiting)?);
+                    }
+                    Ok(TermView::List(resolved_items.into_boxed_slice()))
+                }
             },
             TermView::Literal { negated, structure } => {
                 let args = match structure.arguments {
@@ -245,6 +252,14 @@ impl<'a> EquivalenceClasses<'a> {
                 })
             }
             TermView::Number(_) => Ok(term.clone()),
+
+            TermView::List(items) => {
+                let mut resolved_items = Vec::with_capacity(items.len());
+                for item in items {
+                    resolved_items.push(self.resolve_term(item, visiting)?);
+                }
+                Ok(TermView::List(resolved_items.into_boxed_slice()))
+            }
 
             TermView::Variable(v) => {
                 let Some(root) = self.root_of(v.id) else {

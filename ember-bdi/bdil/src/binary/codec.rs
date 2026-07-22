@@ -15,3 +15,4 @@ pub const T_STR: u8 = 0x22;
 pub const T_LIT_POS: u8 = 0x23;
 pub const T_LIT_NEG: u8 = 0x24;
 pub const T_VAR: u8 = 0x25;
+pub const T_LIST: u8 = 0x26;

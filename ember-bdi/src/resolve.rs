@@ -94,6 +94,13 @@ impl Resolve for Term {
         Ok(match *self {
             Term::Number(_) | Term::String(_) => TermView::Term(self),
             Term::Variable(ref v) => bindings.lookup_view(v).unwrap_or(TermView::Variable(v)),
+            Term::List(ref items) => TermView::List(
+                items
+                    .iter()
+                    .map(|t| t.resolve_as_view(bindings))
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_boxed_slice(),
+            ),
             Term::Literal(ref literal) => literal.resolve_as_view(bindings)?,
         })
     }
@@ -262,5 +269,43 @@ mod tests {
             number(31.5),
             "Nested variable X should be resolved to 31.5"
         );
+    }
+
+    #[test]
+    fn test_resolve_list_with_variables() {
+        let x = variable();
+        let bindings = bindings(vec![(x.clone(), TermView::Number(1.0.into()))]);
+
+        let term = list(vec![variable_term(&x), number(2.0)]);
+
+        let resolved = term
+            .resolve(&bindings)
+            .expect("Should resolve successfully");
+
+        assert_eq!(resolved, list(vec![number(1.0), number(2.0)]));
+    }
+
+    #[test]
+    fn test_resolve_nested_list_inside_literal() {
+        let x = variable();
+        let target = string("factory");
+        let bindings = bindings(vec![(x.clone(), TermView::Term(&target))]);
+
+        // route([X, base])
+        let outer_literal = literal("route", vec![list(vec![variable_term(&x), string("base")])]);
+
+        let resolved = outer_literal
+            .resolve(&bindings)
+            .expect("Should recursively resolve terms inside the list");
+
+        let outer_args = resolved
+            .structure
+            .arguments
+            .expect("Should have outer args");
+        let Term::List(items) = &outer_args[0] else {
+            panic!("Expected a nested Term::List wrapper");
+        };
+        assert_eq!(items[0], string("factory"));
+        assert_eq!(items[1], string("base"));
     }
 }

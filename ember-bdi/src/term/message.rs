@@ -1,4 +1,5 @@
 use alloc::collections::btree_map::BTreeMap;
+use alloc::vec::Vec;
 use ember_core::message::content::ember_bdil::{
     Functor, Term as MessageTerm, Variable as MessageVariable,
 };
@@ -21,6 +22,13 @@ impl Term {
             MessageTerm::String(s) => Self::String(s),
             MessageTerm::Literal(l) => Self::Literal(l.into()),
             MessageTerm::Variable(v) => Term::Variable(variable_map.entry(v).or_default().clone()),
+            MessageTerm::List(items) => Self::List(
+                items
+                    .into_iter()
+                    .map(|t| Term::from_message_term(t, variable_map))
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
+            ),
         }
     }
 
@@ -37,6 +45,13 @@ impl Term {
                     .entry(variable.clone())
                     .or_insert_with(|| variable.into_message_variable())
                     .clone(),
+            ),
+            Term::List(items) => MessageTerm::List(
+                items
+                    .into_iter()
+                    .map(|t| t.into_message_term(variable_map))
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice(),
             ),
         }
     }

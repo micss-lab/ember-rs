@@ -40,6 +40,9 @@ term          ::= integer
                |  string
                |  literal
                |  variable
+               |  list
+
+list          ::= '[' term-list? ']'
 
 identifier    ::= [a-z_][a-zA-Z0-9_]*
 variable      ::= [A-Z_][a-zA-Z0-9_]*
@@ -128,9 +131,10 @@ Expression bodies are self-delimiting (see [§2.4](#24-expression-body-literal-0
 | `0x23` | `T_LIT+` | `[nested_literal]` | Positive literal as term |
 | `0x24` | `T_LIT-` | `[nested_literal]` | Negated literal as term |
 | `0x25` | `T_VAR` | `[name-bytes][0x00]` | Variable by name (null-terminated) |
-| `0x26`–`0x2F` | *(reserved)* | — | Future term types |
+| `0x26` | `T_LIST` | `(term_code term_payload)* END` | Fixed-arity list of terms |
+| `0x27`–`0x2F` | *(reserved)* | — | Future term types |
 
-Term codes have no per-term length prefix. If a receiver encounters an unknown term code (0x26–0x2F), it must reject the frame.
+Term codes have no per-term length prefix. If a receiver encounters an unknown term code (0x27–0x2F), it must reject the frame.
 
 ### 2.3 Frame Layout
 
@@ -162,7 +166,7 @@ functor_bytes  = <non-empty sequence of identifier bytes, no 0x00>
 
 arg_list       = (term_code term_payload)* END
 
-term_code      = T_INT | T_FLT | T_STR | T_LIT+ | T_LIT- | T_VAR
+term_code      = T_INT | T_FLT | T_STR | T_LIT+ | T_LIT- | T_VAR | T_LIST
 ```
 
 The expression code (0x10 / 0x11) encodes the negation of the top-level literal. There is no separate negation byte in the body.
@@ -171,9 +175,11 @@ The expression code (0x10 / 0x11) encodes the negation of the top-level literal.
 
 A nested literal is encoded as `functor arg_list` — identical to `expr_body` but without an expression code. Negation is encoded in the term code (0x23 vs 0x24).
 
-### 2.6 Variable Encoding (T_VAR)
+### 2.6 Variable and List Encoding (T_VAR / T_LIST)
 
 Variable names are null-terminated and must be non-empty with no embedded 0x00 bytes. Multiple occurrences of the same name within one frame decode to the same variable.
+
+A list is encoded as `(term_code term_payload)* END` — identical in shape to `arg_list`, just without a preceding functor. Elements may be any term type, including nested lists. An empty list is encoded as a bare `END` immediately following the `T_LIST` code.
 
 ### 2.7 Worked Examples
 
@@ -221,6 +227,23 @@ CA ED  40
 00
 ```
 
+**`readings([1, 2, 3])`** — positive, one list argument of three integers:
+
+```
+CA ED  40
+10
+  30  72 65 61 64 69 6E 67 73 00                            WORD  "readings\0"
+  26                                                         T_LIST
+    20  01 00 00 00                                          T_INT  1
+    20  02 00 00 00                                          T_INT  2
+    20  03 00 00 00                                          T_INT  3
+    00                                                        END (list)
+  00                                                          END (arguments)
+00
+
+Total: 33 bytes
+```
+
 ### 2.8 Extension Rules for Future Versions
 
 **New expression type (MINOR bump):**
@@ -229,7 +252,7 @@ CA ED  40
 3. Document the `expr_body` format in the new version's spec section.
 
 **New term type (MINOR bump):**
-1. Assign a code from `0x26`–`0x2F`.
+1. Assign a code from `0x27`–`0x2F`.
 2. The payload must be self-delimiting (fixed size, or null-terminated).
 3. Document the encoding in the new version's spec section.
 
@@ -252,5 +275,5 @@ The `ember-bdil` binary frame is placed verbatim in the FIPA ACL `:content` fiel
 | Variable name is empty or contains 0x00 | Reject: malformed variable |
 | v0.1.0 frame contains ≠ 1 expression | Reject: malformed content |
 | Unknown expression code (0x12–0x1F) | Reject: unrecognised expression |
-| Unknown term code (0x26–0x2F) | Reject: unrecognised term |
+| Unknown term code (0x27–0x2F) | Reject: unrecognised term |
 | `:language ember-bdil` with performative other than `inform` or `disconfirm` | Respond `not-understood` |

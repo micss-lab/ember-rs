@@ -301,6 +301,74 @@ mod tests {
         assert_eq!(err, UnificationError::NumberMismatch);
     }
 
+    // --- Lists ---
+
+    #[test]
+    fn unify_identical_lists() {
+        let (l1, l2) = (
+            list(vec![number(1.0), string("a")]),
+            list(vec![number(1.0), string("a")]),
+        );
+        assert!(l1.unify(&l2, None).is_ok());
+    }
+
+    #[test]
+    fn empty_list_unification() {
+        let (l1, l2) = (list(vec![]), list(vec![]));
+        assert!(l1.unify(&l2, None).is_ok());
+    }
+
+    #[test]
+    fn list_length_mismatch() {
+        let (l1, l2) = (
+            list(vec![number(1.0)]),
+            list(vec![number(1.0), number(2.0)]),
+        );
+        assert_eq!(
+            l1.unify(&l2, None).unwrap_err(),
+            UnificationError::ArityMismatch
+        );
+    }
+
+    #[test]
+    fn list_element_type_mismatch() {
+        let (l1, l2) = (list(vec![number(1.0)]), list(vec![string("1")]));
+        assert_eq!(
+            l1.unify(&l2, None).unwrap_err(),
+            UnificationError::TypeMismatch
+        );
+    }
+
+    #[test]
+    fn list_element_variable_binding() {
+        let x = variable();
+
+        // [X, 2] == [1, 2]
+        let l1 = list(vec![variable_term(&x), number(2.0)]);
+        let l2 = list(vec![number(1.0), number(2.0)]);
+
+        let result = l1.unify(&l2, None).expect("Unification failed");
+        assert_eq!(result.get_view(&x), Some(number(1.0).as_view()).as_ref());
+    }
+
+    #[test]
+    fn nested_list_unification() {
+        let x = variable();
+
+        // [[X], f(2)] == [[1], f(2)]
+        let l1 = list(vec![
+            list(vec![variable_term(&x)]),
+            literal(false, "f", vec![number(2.0)]),
+        ]);
+        let l2 = list(vec![
+            list(vec![number(1.0)]),
+            literal(false, "f", vec![number(2.0)]),
+        ]);
+
+        let result = l1.unify(&l2, None).expect("Unification failed");
+        assert_eq!(result.get_view(&x), Some(number(1.0).as_view()).as_ref());
+    }
+
     // --- Existing bindings ---
 
     #[test]

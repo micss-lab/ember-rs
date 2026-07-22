@@ -27,6 +27,10 @@ pub fn string(str: &str) -> Term {
 pub fn number(num: f32) -> Term {
     Term::Number(num.into())
 }
+
+pub fn list(items: Vec<Term>) -> Term {
+    Term::List(items.into_boxed_slice())
+}
 pub fn trigger(functor: &str, args: Vec<Term>, goal: Option<GoalKind>) -> TriggeringEvent {
     TriggeringEvent {
         trigger: Trigger::Addition,
