@@ -151,12 +151,21 @@ impl BuiltinAction {
                 None
             }
             SendLiteral(receiver, trigger, literal) => {
-                let literal = Literal {
-                    negated: false,
-                    structure: Structure {
-                        functor: "message".into(),
-                        arguments: Some(Box::new([Term::Literal(literal)])),
-                    },
+                let literal = {
+                    let literal = match literal.resolve(bindings) {
+                        Ok(lit) => lit,
+                        Err(_) => {
+                            log::error!("failed to resolve literal to send");
+                            return None;
+                        }
+                    };
+                    Literal {
+                        negated: false,
+                        structure: Structure {
+                            functor: "message".into(),
+                            arguments: Some(Box::new([Term::Literal(literal)])),
+                        },
+                    }
                 };
                 let performative = match trigger {
                     Trigger::Addition => Performative::Inform,
