@@ -1,4 +1,5 @@
 use alloc::borrow::Cow;
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 
 use ember_core::agent::Agent;
@@ -20,6 +21,7 @@ use crate::plan::library::PlanLibrary;
 use crate::plan::selector::FirstApplicable;
 use crate::plan::{GoalKind, Trigger, TriggeringEvent};
 use crate::sensor::{Percept, Perceptor, Sensor};
+use crate::term::{Structure, Term};
 
 #[derive(Debug)]
 pub struct BdiAgent<'s, State, Action, Percept> {
@@ -120,20 +122,25 @@ where
     fn handle_message(&mut self, performative: Performative, content: BdilContent) {
         match content {
             BdilContent::Literal(l) => {
-                let literal = Literal::from(l);
-                let (trigger, goal) = match performative {
-                    Performative::Inform => (Trigger::Addition, None),
-                    Performative::NotUnderstood => (Trigger::Addition, None),
-                    _ => {
-                        log::error!("unknown performative for bdil message");
-                        return;
+                let literal = {
+                    let literal = Literal::from(l);
+                    Literal {
+                        negated: false,
+                        structure: Structure {
+                            functor: "message".into(),
+                            arguments: Some(Box::new([
+                                Term::String(performative.as_str().into()),
+                                Term::Literal(literal),
+                            ])),
+                        },
                     }
                 };
+
                 self.handle_event(
                     TriggeringEvent {
-                        trigger,
+                        trigger: Trigger::Addition,
                         event: literal,
-                        goal,
+                        goal: None,
                     },
                     EventSource::External,
                 );

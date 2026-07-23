@@ -236,8 +236,6 @@ impl Unify<&Term> for Variable {
     where
         Term: 'a,
     {
-        // TODO: Check that the term can be converted to the type of the variable.
-
         Ok(vec![BindingConstraint::new(self.id, other)])
     }
 }
@@ -247,8 +245,6 @@ impl<'v> Unify<TermView<'v>> for Variable {
     where
         TermView<'v>: 'a,
     {
-        // TODO: Check that the term can be converted to the type of the variable.
-
         Ok(vec![BindingConstraint::new(self.id, other.clone())])
     }
 }

@@ -24,11 +24,11 @@ struct SenderAgent;
 #[bdi_actions]
 impl SenderAgent {}
 
-// ReceiverAgent reacts to the message belief added by the incoming inform.
-// The `.send` builtin wraps the payload in `message(...)` before transmission,
-// so incoming beliefs arrive as `message(resource(water))`.
+// ReceiverAgent reacts to the message belief added on receipt of the inform.
+// Incoming messages are wrapped as `message(<performative>, <payload>)`, so the
+// inform arrives as `message("inform", resource(water))`.
 #[bdi_agent(asl = {
-    +message(resource(X))
+    +message("inform", resource(X))
       <- .log("info", "Received resource: ", X);
          .stop_platform().
 })]

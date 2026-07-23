@@ -128,6 +128,23 @@ Lexical conventions (matching Prolog/AgentSpeak):
 Because the program is parsed by a proc-macro over Rust tokens, malformed programs are **compile
 errors** with a span pointing at the offending token.
 
+### 7.3.1 The anonymous variable `_`
+
+The bare identifier `_` is the **anonymous variable**: unlike a named variable such as `_Ignored`
+(which is an ordinary variable that happens to start with `_`, and unifies across every occurrence of
+that exact name within its scope), each occurrence of the bare `_` introduces its own fresh variable
+that never unifies with any other `_`. Use it where a term must be present but its value is
+irrelevant:
+
+```
++!check : pair(_, _)
+  <- .log("info", "found a pair").
+```
+
+Here `pair(_, _)` matches `pair(1, 2)` just as readily as `pair(1, 1)` — the two `_`s are independent,
+so nothing requires their bound values to be equal. Writing `pair(X, X)` instead would only match
+pairs whose two elements are the same.
+
 ## 7.4 Beliefs
 
 A **belief** is a ground literal placed in the belief base at start-up:
@@ -537,13 +554,14 @@ struct SenderAgent;
 - **`performative`**: `"inform"` (assert the belief on the receiver) or `"disconfirm"` (retract it).
 - **`literal`**: the belief to transmit.
 
-On the receiving side, the incoming belief arrives wrapped in `message(...)`, so the sender's
-`resource(water)` is delivered as the belief `message(resource(water))`. React to it with an ordinary
-belief-addition plan:
+On the receiving side, the incoming belief arrives wrapped in `message(performative, literal)`, so
+the sender's `.send(..., "inform", resource(water))` is delivered as the belief
+`message("inform", resource(water))`. React to it with an ordinary belief-addition plan, matching on
+the performative string if you need to distinguish it:
 
 ```rust
 #[bdi_agent(asl = {
-    +message(resource(X))
+    +message("inform", resource(X))
       <- .log("info", "Received resource: ", X);
          .stop_platform().
 })]

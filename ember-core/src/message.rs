@@ -184,7 +184,7 @@ pub enum Performative {
 }
 
 impl Performative {
-    fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> &'static str {
         use Performative::*;
         match self {
             AcceptProposal => "accept-proposal",

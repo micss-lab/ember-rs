@@ -69,14 +69,17 @@ Variables begin with an uppercase letter or `_`. A variable in a literal is a pl
 
 ### 1.5 Performative Mapping (v0.1.0)
 
-The BDI event generated on receipt is determined solely by the FIPA performative. The mapping is **normative and exhaustive** for v0.1.0. Every performative not listed is a **protocol error** when `:language` is `ember-bdil`; receivers must respond with `not-understood`.
+Every FIPA performative is accepted; none is a protocol error. The BDI event generated on receipt is
+always a belief **addition**, and the performative is preserved by wrapping the content literal with
+it as a leading argument:
 
 | FIPA Performative | Trigger | Goal Kind | BDI Event |
 |---|---|---|---|
-| `inform` | Addition | — | `+belief(literal)` |
-| `not-understood` | Deletion | — | `-belief(literal)` |
+| any | Addition | — | `+message(performative, literal)` |
 
-Future MINOR versions may add new valid performatives (e.g. for goal or query communication). Such additions do not affect the v0.1.0 mapping.
+`performative` is the FIPA performative's wire string (e.g. `"inform"`, `"not-understood"`,
+`"disconfirm"`); `literal` is the content expression, unchanged. Plans distinguish the performative
+that was used by matching on this first argument, e.g. `+message("inform", X)`.
 
 ---
 
@@ -276,4 +279,3 @@ The `ember-bdil` binary frame is placed verbatim in the FIPA ACL `:content` fiel
 | v0.1.0 frame contains ≠ 1 expression | Reject: malformed content |
 | Unknown expression code (0x12–0x1F) | Reject: unrecognised expression |
 | Unknown term code (0x27–0x2F) | Reject: unrecognised term |
-| `:language ember-bdil` with performative other than `inform` or `disconfirm` | Respond `not-understood` |

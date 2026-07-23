@@ -13,7 +13,7 @@ use crate::context::Context;
 use crate::event::Trigger;
 use crate::literal::Literal;
 use crate::resolve::{Resolve, ResolveFailure};
-use crate::term::{Structure, Term};
+use crate::term::Term;
 use crate::variable::Variable;
 
 pub trait Execute: Sized {
@@ -151,20 +151,11 @@ impl BuiltinAction {
                 None
             }
             SendLiteral(receiver, trigger, literal) => {
-                let literal = {
-                    let literal = match literal.resolve(bindings) {
-                        Ok(lit) => lit,
-                        Err(_) => {
-                            log::error!("failed to resolve literal to send");
-                            return None;
-                        }
-                    };
-                    Literal {
-                        negated: false,
-                        structure: Structure {
-                            functor: "message".into(),
-                            arguments: Some(Box::new([Term::Literal(literal)])),
-                        },
+                let literal = match literal.resolve(bindings) {
+                    Ok(lit) => lit,
+                    Err(_) => {
+                        log::error!("failed to resolve literal to send");
+                        return None;
                     }
                 };
                 let performative = match trigger {

@@ -322,6 +322,9 @@ pub enum AidOrVariable {
 pub(crate) struct AstVisitor {
     /// Maps from a `Variable` name to the ident name of the generated rust variable.
     pub(crate) variable_map: HashMap<String, Ident>,
+    /// Keeps track of the amount of anonymous variables used to generate a unique name for each
+    /// one.
+    pub(crate) anonymous_variable_count: usize,
     pub(crate) agent_ident: Ident,
 }
 
@@ -329,6 +332,7 @@ impl AstVisitor {
     pub(crate) fn new(agent_ident: Ident) -> Self {
         Self {
             variable_map: HashMap::new(),
+            anonymous_variable_count: 0,
             agent_ident,
         }
     }
@@ -681,10 +685,22 @@ impl AstVisitor {
     }
 
     fn visit_variable(&mut self, Variable(name): &Variable) -> impl ToTokens {
-        let var_name = self
-            .variable_map
-            .entry(name.clone())
-            .or_insert_with(|| format_ident!("var_{}", name.to_lowercase()));
+        let var_name = match name.as_str() {
+            "_" => {
+                let anon_name = format!("var_anon_{}", {
+                    let count = self.anonymous_variable_count;
+                    self.anonymous_variable_count += 1;
+                    count
+                });
+                self.variable_map
+                    .entry(anon_name.clone())
+                    .or_insert_with(|| format_ident!("{}", anon_name))
+            }
+            _ => self
+                .variable_map
+                .entry(name.clone())
+                .or_insert_with(|| format_ident!("var_{}", name.to_lowercase())),
+        };
         quote! {
             #var_name.clone()
         }
@@ -903,5 +919,38 @@ impl ToTokens for DivMul {
             DivMul::Division => quote! { ::ember::agent::bdi::plan::ArithmeticOperator::Div },
             DivMul::Multiplication => quote! { ::ember::agent::bdi::plan::ArithmeticOperator::Mul },
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn visit(visitor: &mut AstVisitor, name: &str) -> String {
+        visitor
+            .visit_variable(&Variable(name.into()))
+            .into_token_stream()
+            .to_string()
+    }
+
+    #[test]
+    fn named_variable_resolves_to_the_same_rust_variable_on_every_occurrence() {
+        let mut visitor = AstVisitor::new(format_ident!("Agent"));
+
+        assert_eq!(visit(&mut visitor, "X"), visit(&mut visitor, "X"));
+    }
+
+    #[test]
+    fn anonymous_variable_resolves_to_a_fresh_rust_variable_on_every_occurrence() {
+        let mut visitor = AstVisitor::new(format_ident!("Agent"));
+
+        assert_ne!(visit(&mut visitor, "_"), visit(&mut visitor, "_"));
+    }
+
+    #[test]
+    fn anonymous_variable_does_not_collide_with_a_named_variable() {
+        let mut visitor = AstVisitor::new(format_ident!("Agent"));
+
+        assert_ne!(visit(&mut visitor, "_"), visit(&mut visitor, "X"));
     }
 }

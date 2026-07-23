@@ -93,8 +93,8 @@ depending on `time(night)` vs `time(day)`. Shows plan context guards and belief-
 
 ### `bdi_send`
 Two BDI agents sharing beliefs over the **`ember-bdil`** language: a sender `.send`s
-`resource(water)`; the receiver reacts to the resulting `message(resource(X))` belief. The runnable
-version of [BDI §7.13](./07-bdi-agents.md#713-inter-agent-belief-sharing).
+`resource(water)`; the receiver reacts to the resulting `message("inform", resource(X))` belief. The
+runnable version of [BDI §7.13](./07-bdi-agents.md#713-inter-agent-belief-sharing).
 
 ## Where to look next
 

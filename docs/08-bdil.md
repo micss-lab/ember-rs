@@ -9,13 +9,14 @@ authoritative for anyone implementing an interoperable encoder/decoder.
 ## 8.1 Purpose
 
 The language carries **one belief** per message: a single *content expression* that is a literal. The
-FIPA **performative** encodes the intent (assert or retract the belief); the content encodes the
-belief itself. This keeps the payload tiny: important on links like ESP-NOW.
+FIPA **performative** is preserved alongside the belief rather than interpreted by the framework: on
+receipt, every performative is accepted and the belief is always added, wrapped as
+`message(performative, literal)` so plans can react differently depending on the performative used.
+This keeps the payload tiny: important on links like ESP-NOW.
 
-| FIPA Performative | Effect on receiver          |
-| ----------------- | --------------------------- |
-| `inform`          | Add the belief (`+belief`)  |
-| `disconfirm`      | Retract the belief (`-belief`) |
+| FIPA Performative | Effect on receiver                              |
+| ------------------ | ------------------------------------------------ |
+| any                 | Add the belief `message(performative, literal)`  |
 
 From agent code you never build these frames by hand: you use the `.send` built-in action described
 in [BDI Agents §7.13](./07-bdi-agents.md#713-inter-agent-belief-sharing). This page is for
@@ -108,9 +109,9 @@ Ember represents a decoded frame as `Content::Bdil(BdilContent::Literal(_))`.
 
 The language uses semantic versioning; receivers reject a frame whose **major** version differs from
 their own but tolerate higher minor/patch (forward-compatibility). Frames are also rejected for bad
-magic bytes, empty functors, malformed variables, a wrong expression count, or unknown codes. A
-`:language ember-bdil` message with a performative other than the supported ones is answered with
-`not-understood`. The full rejection table is in [`spec/ember-bdil.md` §2.10](../spec/ember-bdil.md#210-rejection-rules).
+magic bytes, empty functors, malformed variables, a wrong expression count, or unknown codes. The
+performative itself is never a rejection reason — see [§8.1](#81-purpose). The full rejection table
+is in [`spec/ember-bdil.md` §2.10](../spec/ember-bdil.md#210-rejection-rules).
 
 ## 8.6 Extending the language
 
