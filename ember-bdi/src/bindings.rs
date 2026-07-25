@@ -111,6 +111,18 @@ impl OwnedBindings {
         })?;
         Ok(solver.solve()?.into())
     }
+
+    pub(crate) fn as_bindings(&self) -> Bindings {
+        Bindings {
+            bindings: self.bindings.as_ref().map(|b| {
+                b.iter()
+                    .map(|(k, v)| (*k, v.as_ref().map(|v| v.as_view())))
+                    .collect()
+            }),
+            aliases: self.aliases.clone(),
+            lifetime_: PhantomData,
+        }
+    }
 }
 
 pub trait BindingLookup {
@@ -128,11 +140,17 @@ pub trait BindingLookup {
     {
         self.lookup(variable).map(T::from_term)
     }
+
+    fn as_bindings(&self) -> Bindings;
 }
 
 impl BindingLookup for Bindings<'_> {
     fn lookup_view<'a>(&'a self, variable: &Variable) -> Option<TermView<'a>> {
         self.get_view(variable).cloned()
+    }
+
+    fn as_bindings(&self) -> Bindings {
+        self.clone()
     }
 }
 
@@ -143,6 +161,10 @@ impl BindingLookup for OwnedBindings {
             .get(&variable.id)?
             .as_ref()
             .map(|t| t.as_view())
+    }
+
+    fn as_bindings(&self) -> Bindings {
+        self.as_bindings()
     }
 }
 

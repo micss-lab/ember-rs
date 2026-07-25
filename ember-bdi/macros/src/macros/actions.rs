@@ -47,6 +47,7 @@ pub(crate) fn expand(mut input: ItemImpl) -> syn::Result<TokenStream> {
                 self,
                 bindings: &impl ::ember::agent::bdi::bindings::BindingLookup,
                 context: &mut ::ember::agent::bdi::context::Context<Self::Action>,
+                knowledge: &::ember::agent::bdi::knowledge::base::KnowledgeBase,
                 state: &mut Self::State,
             ) -> Option<Self> {
                 match self {

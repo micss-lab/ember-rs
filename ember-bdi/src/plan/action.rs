@@ -1,8 +1,10 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use ember_time::{Duration, Instant};
+use derive_where::derive_where;
 use log::{Level, log};
+
+use ember_time::{Duration, Instant};
 
 use ember_core::agent::Aid;
 use ember_core::message::content::ember_bdil::BdilContent;
@@ -11,10 +13,15 @@ use ember_core::message::{Content, Message, Performative, Receiver};
 use crate::bindings::{BindingLookup, OwnedBindings};
 use crate::context::Context;
 use crate::event::Trigger;
+use crate::knowledge::base::KnowledgeBase;
+use crate::knowledge::query::IntoQuery;
 use crate::literal::Literal;
+use crate::plan::{GoalKind, TriggeringEvent};
 use crate::resolve::{Resolve, ResolveFailure};
 use crate::term::Term;
 use crate::variable::Variable;
+
+use super::QueryFormula;
 
 pub trait Execute: Sized {
     type State;
@@ -27,14 +34,16 @@ pub trait Execute: Sized {
         self,
         bindings: &impl BindingLookup,
         context: &mut Context<Self::Action>,
+        knowledge: &KnowledgeBase,
         state: &mut Self::State,
     ) -> Option<Self>;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive_where(Debug, PartialEq, Eq)]
+#[derive(Clone)]
 pub enum Action<A> {
     Builtin(BuiltinAction),
-    User(A),
+    User(#[derive_where(skip)] A),
 }
 
 impl<State, A> Execute for Action<A>
@@ -48,11 +57,16 @@ where
         self,
         bindings: &impl BindingLookup,
         context: &mut Context<Self::Action>,
+        knowledge: &KnowledgeBase,
         state: &mut Self::State,
     ) -> Option<Self> {
         match self {
-            Action::Builtin(action) => action.execute(bindings, context).map(Action::Builtin),
-            Action::User(action) => action.execute(bindings, context, state).map(Action::User),
+            Action::Builtin(action) => action
+                .execute(bindings, context, knowledge)
+                .map(Action::Builtin),
+            Action::User(action) => action
+                .execute(bindings, context, knowledge, state)
+                .map(Action::User),
         }
     }
 }
@@ -73,9 +87,14 @@ impl<State, A> PendingAction<A>
 where
     A: Execute<State = State, Action = A>,
 {
-    pub(crate) fn execute(self, context: &mut Context<A>, state: &mut State) -> Option<Self> {
+    pub(crate) fn execute(
+        self,
+        context: &mut Context<A>,
+        knowledge: &KnowledgeBase,
+        state: &mut State,
+    ) -> Option<Self> {
         let Self { action, bindings } = self;
-        let action = action.execute(&bindings, context, state)?;
+        let action = action.execute(&bindings, context, knowledge, state)?;
         Some(Self { action, bindings })
     }
 }
@@ -91,33 +110,8 @@ pub enum BuiltinAction {
     /// Halt the execution of an agents intention until the interval is finished. Construct this
     /// variant with the `[wait](WaitState::wait)` member function.
     Wait(WaitState),
-}
-
-/// State for the `.wait` built-in action.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WaitState {
-    start: Option<Instant>,
-    interval: Duration,
-}
-
-impl WaitState {
-    fn poll(self) -> Option<Self> {
-        let Self { start, interval } = self;
-        let Some(start) = start else {
-            return Some(Self {
-                start: Some(ember_time::now()),
-                interval,
-            });
-        };
-
-        if ember_time::now() - start >= interval {
-            return None;
-        }
-        Some(Self {
-            start: Some(start),
-            interval,
-        })
-    }
+    /// Spawn a new intention for all possible bindings resulting from unification with the pattern.
+    Forall { query: QueryFormula, goal: Literal },
 }
 
 impl BuiltinAction {
@@ -132,6 +126,7 @@ impl BuiltinAction {
         self,
         bindings: &impl BindingLookup,
         context: &mut Context<A>,
+        knowledge: &KnowledgeBase,
     ) -> Option<Self> {
         use BuiltinAction::*;
         match self {
@@ -183,7 +178,57 @@ impl BuiltinAction {
                 None
             }
             Wait(state) => state.poll().map(Wait),
+            Forall { query, goal } => {
+                let mut query = query.into_query(knowledge);
+                while let Some(bindings) = query.next_bindings(Some(&bindings.as_bindings())) {
+                    let goal = match goal.clone().resolve(&bindings) {
+                        Ok(goal) => goal,
+                        Err(_) => {
+                            log::error!(
+                                "failed to resolve goal in forall body with queried bindings"
+                            );
+                            continue;
+                        }
+                    };
+                    context.emit_event(
+                        TriggeringEvent {
+                            trigger: Trigger::Addition,
+                            goal: Some(GoalKind::Achieve),
+                            event: goal,
+                        },
+                        None,
+                    );
+                }
+                None
+            }
         }
+    }
+}
+
+/// State for the `.wait` built-in action.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WaitState {
+    start: Option<Instant>,
+    interval: Duration,
+}
+
+impl WaitState {
+    fn poll(self) -> Option<Self> {
+        let Self { start, interval } = self;
+        let Some(start) = start else {
+            return Some(Self {
+                start: Some(ember_time::now()),
+                interval,
+            });
+        };
+
+        if ember_time::now() - start >= interval {
+            return None;
+        }
+        Some(Self {
+            start: Some(start),
+            interval,
+        })
     }
 }
 
@@ -237,14 +282,15 @@ mod tests {
         // SAFETY: `.wait` never touches the environment.
         let mut context: Context<()> = unsafe { new_context_without_environment() };
         let bindings = bindings(vec![]);
+        let knowledge = KnowledgeBase::default();
 
         let action = BuiltinAction::wait(core::time::Duration::from_millis(0));
 
         let action = action
-            .execute(&bindings, &mut context)
+            .execute(&bindings, &mut context, &knowledge)
             .expect("the first poll only records the start time and must stay pending");
 
-        let result = action.execute(&bindings, &mut context);
+        let result = action.execute(&bindings, &mut context, &knowledge);
         assert!(
             result.is_none(),
             "a zero-length wait must complete on its second poll"
@@ -307,5 +353,146 @@ mod tests {
             .expect("should resolve");
 
         assert_eq!(resolved, VariableOrReceiver::Receiver(receiver));
+    }
+
+    mod forall {
+        use alloc::vec;
+
+        use crate::event::EventSource;
+        use crate::plan::GoalKind;
+        use crate::testing::{assert_belief, literal, literal_formula, variable_term};
+
+        use super::*;
+
+        #[test]
+        fn no_solutions_emits_no_events_and_completes_immediately() {
+            let mut context: Context<()> = unsafe { new_context_without_environment() };
+            let knowledge = KnowledgeBase::default();
+            let bindings = bindings(vec![]);
+
+            let x = variable();
+            let action = BuiltinAction::Forall {
+                query: literal_formula("item", vec![variable_term(&x)]),
+                goal: literal("process", vec![variable_term(&x)]),
+            };
+
+            let result = action.execute(&bindings, &mut context, &knowledge);
+
+            assert!(result.is_none(), "forall never stays pending");
+            assert!(
+                context.events.is_empty(),
+                "no solutions means no goals are spawned"
+            );
+        }
+
+        #[test]
+        fn spawns_one_fire_and_forget_achieve_event_per_solution() {
+            let mut context: Context<()> = unsafe { new_context_without_environment() };
+            let mut knowledge = KnowledgeBase::default();
+            assert_belief(&mut knowledge, "item", vec![string("a")]);
+            assert_belief(&mut knowledge, "item", vec![string("b")]);
+            assert_belief(&mut knowledge, "item", vec![string("c")]);
+            let bindings = bindings(vec![]);
+
+            let x = variable();
+            let action = BuiltinAction::Forall {
+                query: literal_formula("item", vec![variable_term(&x)]),
+                goal: literal("process", vec![variable_term(&x)]),
+            };
+
+            let result = action.execute(&bindings, &mut context, &knowledge);
+            assert!(result.is_none());
+            assert_eq!(context.events.len(), 3, "one goal event per solution");
+
+            let mut goals: Vec<_> = context
+                .events
+                .iter()
+                .map(|(source, event)| {
+                    assert!(
+                        matches!(source, EventSource::External),
+                        "each solution is spawned as its own independent intention, not tied \
+                         to whatever intention ran .forall"
+                    );
+                    assert_eq!(event.trigger, Trigger::Addition);
+                    assert_eq!(event.goal, Some(GoalKind::Achieve));
+                    event.event.clone()
+                })
+                .collect();
+            goals.sort();
+
+            let mut expected = vec![
+                literal("process", vec![string("a")]),
+                literal("process", vec![string("b")]),
+                literal("process", vec![string("c")]),
+            ];
+            expected.sort();
+
+            assert_eq!(goals, expected);
+        }
+
+        #[test]
+        fn each_solution_keeps_its_own_variables_without_mixing_with_others() {
+            // Correlated pairs: every spawned goal must keep X and Y from the *same*
+            // underlying belief, never X from one solution paired with Y from another.
+            let mut context: Context<()> = unsafe { new_context_without_environment() };
+            let mut knowledge = KnowledgeBase::default();
+            assert_belief(&mut knowledge, "pair", vec![string("a"), string("1")]);
+            assert_belief(&mut knowledge, "pair", vec![string("b"), string("2")]);
+            let bindings = bindings(vec![]);
+
+            let (x, y) = (variable(), variable());
+            let action = BuiltinAction::Forall {
+                query: literal_formula("pair", vec![variable_term(&x), variable_term(&y)]),
+                goal: literal("process", vec![variable_term(&x), variable_term(&y)]),
+            };
+
+            let result = action.execute(&bindings, &mut context, &knowledge);
+            assert!(result.is_none());
+
+            let mut goals: Vec<_> = context.events.into_iter().map(|(_, e)| e.event).collect();
+            goals.sort();
+
+            let mut expected = vec![
+                literal("process", vec![string("a"), string("1")]),
+                literal("process", vec![string("b"), string("2")]),
+            ];
+            expected.sort();
+
+            assert_eq!(
+                goals, expected,
+                "no solution's goal may combine X from one pair with Y from another"
+            );
+        }
+
+        #[test]
+        fn goal_sees_both_the_calling_frames_bindings_and_the_querys_bindings() {
+            let mut context: Context<()> = unsafe { new_context_without_environment() };
+            let mut knowledge = KnowledgeBase::default();
+            assert_belief(&mut knowledge, "item", vec![string("a")]);
+            assert_belief(&mut knowledge, "item", vec![string("b")]);
+
+            let (x, room) = (variable(), variable());
+            let room_value = string("kitchen");
+            let bindings = bindings(vec![(room.clone(), room_value.as_view())]);
+
+            let action = BuiltinAction::Forall {
+                query: literal_formula("item", vec![variable_term(&x)]),
+                goal: literal("process", vec![variable_term(&x), variable_term(&room)]),
+            };
+
+            let result = action.execute(&bindings, &mut context, &knowledge);
+            assert!(result.is_none());
+
+            let mut goals: Vec<_> = context.events.into_iter().map(|(_, e)| e.event).collect();
+            goals.sort();
+
+            let mut expected = vec![
+                literal("process", vec![string("a"), string("kitchen")]),
+                literal("process", vec![string("b"), string("kitchen")]),
+            ];
+            expected.sort();
+
+            assert_eq!(goals, expected);
+        }
     }
 }

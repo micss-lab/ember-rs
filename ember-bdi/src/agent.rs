@@ -193,7 +193,7 @@ where
         }
 
         for (intention_id, pending) in core::mem::take(&mut self.pending_actions) {
-            match pending.execute(&mut context, &mut self.state) {
+            match pending.execute(&mut context, &self.beliefs, &mut self.state) {
                 Some(pending) => self.pending_actions.push((intention_id, pending)),
                 None => self.intentions.unblock(intention_id),
             }
@@ -204,9 +204,11 @@ where
         while let Some((intention_id, action)) = context.actions.pop() {
             use crate::plan::Action::*;
             let pending = match action {
-                Builtin(action) => action.execute(&bindings, &mut context).map(Builtin),
+                Builtin(action) => action
+                    .execute(&bindings, &mut context, &self.beliefs)
+                    .map(Builtin),
                 User(action) => action
-                    .execute(&bindings, &mut context, &mut self.state)
+                    .execute(&bindings, &mut context, &self.beliefs, &mut self.state)
                     .map(User),
             };
 
@@ -247,8 +249,10 @@ mod tests {
     use alloc::vec;
 
     use crate::bindings::BindingLookup;
+    use crate::knowledge::query::IntoQuery;
+
     use crate::plan::{Action, BuiltinAction, Formula};
-    use crate::testing::{literal, plan, trigger};
+    use crate::testing::{assert_belief, literal, literal_formula, plan, string, trigger, variable, variable_term};
 
     use super::*;
 
@@ -269,6 +273,7 @@ mod tests {
             self,
             _bindings: &impl BindingLookup,
             _context: &mut Context<Self::Action>,
+            _knowledge: &KnowledgeBase,
             state: &mut Self::State,
         ) -> Option<Self> {
             match self {
@@ -386,5 +391,76 @@ mod tests {
         agent.tick(&mut environment);
         assert_eq!(agent.state, vec!["after"]);
         assert!(agent.pending_actions.is_empty());
+    }
+
+    #[test]
+    fn test_forall_spawns_independent_intentions_without_blocking_the_calling_plan() {
+        let mut lib = PlanLibrary::<TestAction>::default();
+
+        let x = variable();
+        lib.add(plan(
+            trigger("start", vec![], Some(GoalKind::Achieve)),
+            None,
+            vec![
+                Formula::Action(Action::Builtin(BuiltinAction::Forall {
+                    query: literal_formula("item", vec![variable_term(&x)]),
+                    goal: literal("mark_processed", vec![variable_term(&x)]),
+                })),
+                Formula::Action(Action::User(TestAction::Log("after_forall"))),
+            ],
+        ));
+
+        let y = variable();
+        lib.add(plan(
+            trigger(
+                "mark_processed",
+                vec![variable_term(&y)],
+                Some(GoalKind::Achieve),
+            ),
+            None,
+            vec![Formula::Belief {
+                trigger: Trigger::Addition,
+                belief: literal("processed", vec![variable_term(&y)]),
+            }],
+        ));
+
+        let mut beliefs = KnowledgeBase::default();
+        assert_belief(&mut beliefs, "item", vec![string("a")]);
+        assert_belief(&mut beliefs, "item", vec![string("b")]);
+        assert_belief(&mut beliefs, "item", vec![string("c")]);
+
+        let mut agent = BdiAgent::<Vec<&'static str>, TestAction, ()>::new(
+            "forall-agent",
+            Vec::new(),
+            Some(beliefs),
+            lib,
+            vec![literal("start", vec![])],
+        );
+
+        let mut environment = new_environment();
+
+        for _ in 0..20 {
+            if agent.intentions.is_empty() {
+                break;
+            }
+            agent.tick(&mut environment);
+        }
+
+        assert!(
+            agent.intentions.is_empty(),
+            "agent should reach quiescence: the main plan and all three spawned branches finish"
+        );
+        // The step after `.forall` in the calling plan must run exactly once - not once per
+        // spawned branch - and it must not have waited for the branches to complete first.
+        assert_eq!(agent.state, vec!["after_forall"]);
+
+        for item in ["a", "b", "c"] {
+            let query_formula = literal_formula("processed", vec![string(item)]);
+            let mut query = (&query_formula).into_query(&agent.beliefs);
+            assert!(
+                query.next_bindings(None).is_some(),
+                "processed({item}) should have been asserted by its own spawned intention"
+            );
+        }
     }
 }

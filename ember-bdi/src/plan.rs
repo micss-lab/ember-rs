@@ -77,12 +77,12 @@ impl<'a, A> From<&'a Plan<A>> for PlanEqOrd<'a> {
     }
 }
 
-#[derive_where(Debug)]
+#[derive_where(Debug, PartialEq, Eq)]
 #[derive(Clone)]
 pub enum Formula<A> {
     Belief { trigger: Trigger, belief: Literal },
     Goal { kind: GoalKind, goal: Literal },
-    Action(#[derive_where(skip)] Action<A>),
+    Action(Action<A>),
 }
 
 impl<A> Formula<A> {

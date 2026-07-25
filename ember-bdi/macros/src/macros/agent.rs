@@ -206,6 +206,15 @@ peg::parser! {
 
         rule body_formula() -> Spanned<BodyFormula>
             = span:span() trigger:BODY_FORMULA_TRIGGER() literal:literal() { Spanned { node: BodyFormula::BeliefOrGoal { trigger, literal }, span } }
+            / span:span() "." "forall" "(" query:logical_expression() "," goal:literal() ")" {
+                Spanned {
+                    span,
+                    node: BodyFormula::Action(Spanned {
+                        span,
+                        node: Action::Builtin(BuiltinAction::Forall { query, goal }),
+                    }),
+                }
+            }
             / span:span() period:"."? formula:atomic_formula() {?
                 Ok(Spanned {
                     span,

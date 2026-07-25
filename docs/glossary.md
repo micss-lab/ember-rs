@@ -12,9 +12,9 @@ The FIPA message language Ember models its `Message` type on: a performative, re
 content. See [Messaging](./05-messaging.md).
 
 ### Action
-A leaf step in a BDI plan body. Either a **built-in action** (`.log`, `.send`, `.stop_platform`) or a
-**user-defined action** (a Rust method on the agent, declared with `#[bdi_actions]`). See
-[BDI Agents §7.8–7.9](./07-bdi-agents.md#78-built-in-actions).
+A leaf step in a BDI plan body. Either a **built-in action** (`.log`, `.send`, `.stop_platform`,
+`.forall`) or a **user-defined action** (a Rust method on the agent, declared with `#[bdi_actions]`).
+See [BDI Agents §7.8–7.9](./07-bdi-agents.md#78-built-in-actions).
 
 ### AID (`Aid`)
 An Agent Identifier of the form `name@host` (e.g. `server@local`). Ember's `Aid` type. See

@@ -290,8 +290,52 @@ Built-in actions are written with a **leading dot** and are provided by the runt
 | `.stop_platform()`                       | Stop the whole container.                                                   |
 | `.send(aid, "performative", lit)`        | Send belief `lit` to another agent; `aid` is a `"name@host"` string or a bound variable (see [§7.13](#713-inter-agent-belief-sharing)). |
 | `.wait(millis)`                          | Suspend the current intention for at least `millis` milliseconds before continuing to the next step. `millis` must be an integer literal. Other intentions keep running while this one waits (see [§7.12](#712-the-reasoning-cycle)). |
+| `.forall(condition, goal)`               | For every way `condition` can be satisfied against the belief base, post an achievement goal for `goal` — each in its own new, independent intention. See below. |
 
 Using an unknown `.builtin` is a compile error listing the valid built-ins.
+
+```
++!startup
+  <- .log("info", "starting up");
+     .wait(1500);
+     .stop_platform().
+```
+
+`.log` accepts any number of terms after the level and logs them together. `.wait`'s argument must be
+a literal integer number of milliseconds; see [§7.12](#712-the-reasoning-cycle) for how it interacts
+with the rest of the reasoning cycle. `.stop_platform` takes no arguments. `.send` is covered in depth
+in [§7.13](#713-inter-agent-belief-sharing), since it involves addressing another agent.
+
+`.forall(condition, goal)` takes a *query* — `condition` is a logical expression with the same grammar
+as a plan context or rule body (literals, `&`/`|`/`not`, relational comparisons) — and posts one
+achievement-goal event for `goal` for **every** binding that satisfies it:
+
+```
+item(cup).
+item(plate).
+item(bowl).
+
++!wash_up <- .forall(item(X), wash(X)).
+
++!wash(X) <- .log("info", "washing an item").
+```
+
+Each solution's variables are substituted into `goal` independently: washing `plate` never sees the
+binding that washed `cup`. `.forall` resolves the *entire* set of solutions against the belief base up
+front, in one shot, and then posts one goal per solution as a **brand-new, independent intention**,
+exactly as if it were a freshly-posted external goal rather than a step inside the current plan.
+Concretely, this means:
+
+- The plan containing `.forall` does **not** wait for the spawned goals to be pursued, let alone
+  finished; it moves on to its own next step immediately.
+- Bindings established while pursuing one spawned goal never leak into another, or back into the
+  plan that ran `.forall` — there is nothing to merge, since each is its own intention from the
+  start.
+- Resolving every solution before spawning anything (rather than interleaving belief-base
+  lookups with intention execution) means a `.forall` in a busy agent always spawns goals against a
+  single, consistent snapshot of the belief base, never a partially-updated one.
+
+If `condition` has no solutions, no goals are posted and the step completes immediately.
 
 ## 7.9 User-defined actions
 

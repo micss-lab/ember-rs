@@ -1,4 +1,4 @@
-use crate::bindings::{BindingLookup, OwnedBindings};
+use crate::bindings::{BindingLookup, Bindings, OwnedBindings};
 use crate::resolve::ResolveFailure;
 use crate::term::view::TermView;
 use crate::variable::Variable;
@@ -14,6 +14,13 @@ impl<'a> BindingLookup for ReadOnlyBindings<'a> {
         match self {
             ReadOnlyBindings::Owned(bindings) => bindings.lookup_view(variable),
             ReadOnlyBindings::Borrowed(bindings) => bindings.lookup_view(variable),
+        }
+    }
+
+    fn as_bindings(&self) -> Bindings {
+        match self {
+            ReadOnlyBindings::Owned(bindings) => bindings.as_bindings(),
+            ReadOnlyBindings::Borrowed(bindings) => bindings.as_bindings(),
         }
     }
 }

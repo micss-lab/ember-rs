@@ -194,6 +194,10 @@ pub enum BuiltinAction {
     Wait {
         interval_millis: u64,
     },
+    Forall {
+        query: LogicalExpression,
+        goal: Literal,
+    },
 }
 
 impl TryFrom<AtomicFormula> for BuiltinAction {
@@ -825,6 +829,16 @@ impl AstVisitor {
             BuiltinAction::Wait { interval_millis } => {
                 quote! {
                     ::ember::agent::bdi::plan::action::BuiltinAction::wait(::core::time::Duration::from_millis(#interval_millis))
+                }
+            }
+            BuiltinAction::Forall { query, goal } => {
+                let query = self.visit_logical_expression(query).into_token_stream();
+                let goal = self.visit_literal(goal).into_token_stream();
+                quote! {
+                    ::ember::agent::bdi::plan::action::BuiltinAction::Forall {
+                        query: #query,
+                        goal: #goal,
+                    }
                 }
             }
         }

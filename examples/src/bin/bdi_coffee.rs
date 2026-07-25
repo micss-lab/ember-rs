@@ -100,6 +100,7 @@ impl Execute for AgentAction {
         self,
         bindings: &impl BindingLookup,
         _context: &mut ember::agent::bdi::context::Context<Self::Action>,
+        _knowledge: &ember::agent::bdi::knowledge::base::KnowledgeBase,
         _state: &mut Self::State,
     ) -> Option<Self> {
         match self {
