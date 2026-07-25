@@ -38,9 +38,9 @@ mod std_time_driver_impl {
 
     impl Driver for StdDriver {
         fn now(&self) -> Instant {
-            Instant::from_ticks(
-                StdInstant::now().duration_since(*self.0).as_secs() * TICK_HZ as u64,
-            )
+            let elapsed = StdInstant::now().duration_since(*self.0);
+            let ticks = elapsed.as_nanos() * TICK_HZ as u128 / 1_000_000_000;
+            Instant::from_ticks(ticks as u64)
         }
     }
 
