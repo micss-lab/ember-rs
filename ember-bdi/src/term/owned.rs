@@ -46,6 +46,28 @@ impl Term {
     }
 }
 
+impl core::fmt::Display for Term {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Term::Number(n) => write!(f, "{}", n),
+            Term::String(s) => write!(f, "{}", s),
+            Term::Variable(v) => write!(f, "var_{}", v.id),
+            Term::List(ts) => {
+                write!(f, "[")?;
+                for (i, t) in ts.into_iter().enumerate() {
+                    if i == 0 {
+                        write!(f, "{}", t)?;
+                    } else {
+                        write!(f, ", {}", t)?;
+                    }
+                }
+                write!(f, "]")
+            }
+            Term::Literal(l) => write!(f, "{}", l),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Structure {
     pub functor: Atom,
@@ -76,6 +98,24 @@ impl Structure {
     }
 }
 
+impl core::fmt::Display for Structure {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}", self.functor.display())?;
+        if let Some(args) = self.arguments.as_ref() {
+            write!(f, "(")?;
+            for (i, arg) in args.into_iter().enumerate() {
+                if i == 0 {
+                    write!(f, "{}", arg)?;
+                } else {
+                    write!(f, ", {}", arg)?;
+                }
+            }
+            write!(f, ")")?;
+        }
+        Ok(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Atom(pub String);
 
@@ -85,5 +125,17 @@ where
 {
     fn from(value: T) -> Self {
         Self(value.to_string())
+    }
+}
+
+impl Atom {
+    /// Returns a displayable representation of the atom.
+    ///
+    /// Atom cannot directly implement [`Display`] as this would result in conflicting
+    /// implementations with the `From` impl above.
+    ///
+    /// [`Display`]: core::fmt::Display
+    pub fn display(&self) -> impl core::fmt::Display {
+        &self.0
     }
 }

@@ -33,6 +33,15 @@ impl Literal {
     }
 }
 
+impl core::fmt::Display for Literal {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        if self.negated {
+            write!(f, "~")?;
+        }
+        write!(f, "{}", self.structure)
+    }
+}
+
 pub trait IntoLiteral: Sized {
     fn into_literal(self) -> Literal;
 }
