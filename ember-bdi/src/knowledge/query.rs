@@ -85,14 +85,14 @@ pub(crate) struct GroundQuery<'a> {
     knowledge: &'a KnowledgeBase,
 
     /// During backtracking a negated ground query needs to know whether it has already been
-    /// "satisfied" before. If it has and the backtracking engine comes back with "do you have any
-    /// other ways to satisfy yourself?" it should return `None`.
-    negation_satisfied: bool,
+    /// evaluated before, regardless of the outcome. If it has and the backtracking engine comes
+    /// back with "do you have any other ways to satisfy yourself?" it should return `None`.
+    negation_evaluated: bool,
 }
 
 impl<'a> GroundQuery<'a> {
     fn next_bindings(&mut self, existing_bindings: Option<&Bindings<'a>>) -> Option<Bindings<'a>> {
-        if self.negated && self.negation_satisfied {
+        if self.negated && self.negation_evaluated {
             return None;
         }
 
@@ -102,21 +102,29 @@ impl<'a> GroundQuery<'a> {
                 .next_bindings(self.beliefs.as_mut(), existing_bindings, self.knowledge),
         ) {
             (false, r) => r,
-            (true, Some(_)) => None,
-            (true, None) => {
-                self.negation_satisfied = true;
-                Some(
-                    // Ensure that empty bindings are always returned such that the
-                    // query does not fail.
-                    existing_bindings.cloned().unwrap_or_else(Bindings::empty),
-                )
+            (true, bindings) => {
+                // Don't let a later ask (without an intervening `reset`) re-run
+                // the operand, whose own belief iterators may have been
+                // exhausted by this very evaluation and would then wrongly
+                // report a fresh success.
+                self.negation_evaluated = true;
+
+                if bindings.is_some() {
+                    None
+                } else {
+                    Some(
+                        // Ensure that empty bindings are always returned such that the
+                        // query does not fail.
+                        existing_bindings.cloned().unwrap_or_else(Bindings::empty),
+                    )
+                }
             }
         }
     }
 
     fn reset(&mut self) {
         self.beliefs = self.original.clone();
-        self.negation_satisfied = false;
+        self.negation_evaluated = false;
         self.operand.reset();
     }
 }
@@ -610,7 +618,7 @@ pub(crate) mod formula {
                 original: beliefs,
                 operand,
                 knowledge: bb,
-                negation_satisfied: false,
+                negation_evaluated: false,
             }
         }
 
