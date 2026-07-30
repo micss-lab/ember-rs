@@ -50,9 +50,12 @@ impl Acc for HttpChannel {
             Err(ureq::Error::Timeout(ureq::Timeout::RecvResponse)) => {
                 // TODO: Handle this.
                 log::warn!("Remote acc did not respond");
-                return Ok(());
+                return Err(());
             }
-            Err(e) => panic!("{1}: {:?}", e, "failed to send message"),
+            Err(e) => {
+                log::error!("failed to send message: {e}");
+                return Err(());
+            }
         };
 
         log::debug!("Received response: {:?}", response);
