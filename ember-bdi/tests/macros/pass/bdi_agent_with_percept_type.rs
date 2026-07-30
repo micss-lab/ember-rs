@@ -4,7 +4,7 @@ use ember::agent::bdi::sensor::Percept;
 use ember::agent::bdi::{bdi_actions, bdi_agent};
 
 #[derive(IntoLiteral, Percept)]
-struct TemperatureReading;
+pub struct TemperatureReading;
 
 #[bdi_agent(
     percept_type = TemperatureReading,
@@ -12,7 +12,7 @@ struct TemperatureReading;
         !monitor.
     }
 )]
-struct SensingAgent;
+pub struct SensingAgent;
 
 #[bdi_actions]
 impl SensingAgent {}

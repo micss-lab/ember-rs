@@ -332,11 +332,11 @@ pub(crate) fn expand(args: BdiAgentArgs, input: DeriveInput) -> TokenStream {
 
     let impl_ = quote! {
         impl #agent_ident {
-            fn into_agent(self) -> ::ember::agent::bdi::BdiAgent<'static, #agent_ident, #agent_action, #percept_type> {
+            pub fn into_agent(self) -> ::ember::agent::bdi::BdiAgent<'static, #agent_ident, #agent_action, #percept_type> {
                 self.into_agent_named(#agent_name)
             }
 
-            fn into_agent_named(
+            pub fn into_agent_named(
                 self,
                 name: impl ::core::convert::Into<::alloc::borrow::Cow<'static, str>>
             ) -> ::ember::agent::bdi::BdiAgent<'static, #agent_ident, #agent_action, #percept_type> {

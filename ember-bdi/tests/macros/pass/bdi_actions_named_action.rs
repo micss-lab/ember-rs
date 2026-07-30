@@ -1,7 +1,7 @@
 extern crate alloc;
 use ember::agent::bdi::bdi_actions;
 
-struct Agent;
+pub struct Agent;
 
 #[bdi_actions]
 impl Agent {

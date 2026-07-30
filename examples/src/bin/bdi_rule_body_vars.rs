@@ -58,7 +58,7 @@ setup_example!();
              .stop_platform().
     }
 )]
-struct DiagnosticAgent;
+pub struct DiagnosticAgent;
 
 #[bdi_actions]
 impl DiagnosticAgent {

@@ -1,4 +1,5 @@
 use alloc::boxed::Box;
+use alloc::string::ToString;
 use alloc::vec::Vec;
 
 use derive_where::derive_where;
@@ -133,7 +134,7 @@ impl BuiltinAction {
             Log(level, terms) => {
                 match terms
                     .into_iter()
-                    .map(|t| t.resolve(bindings))
+                    .map(|t| t.resolve(bindings).map(|t| t.to_string()))
                     .collect::<Result<Vec<_>, _>>()
                 {
                     Ok(terms) => log!(level, "{terms:?}"),

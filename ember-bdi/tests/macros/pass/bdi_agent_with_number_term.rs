@@ -6,7 +6,7 @@ use ember::agent::bdi::{bdi_actions, bdi_agent};
     retry_count(3).
     temperature(36.6).
 })]
-struct Agent;
+pub struct Agent;
 
 #[bdi_actions]
 impl Agent {}

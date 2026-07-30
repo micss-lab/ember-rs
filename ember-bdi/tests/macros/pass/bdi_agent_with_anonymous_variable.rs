@@ -13,7 +13,7 @@ use ember::agent::bdi::{bdi_actions, bdi_agent};
     +!check : pair(_, _)
       <- .log("info", "found a pair").
 })]
-struct Agent;
+pub struct Agent;
 
 #[bdi_actions]
 impl Agent {}

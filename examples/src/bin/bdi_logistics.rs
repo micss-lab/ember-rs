@@ -51,7 +51,7 @@ pub struct Entity(String);
              !go_to(Loc).
     }
 )]
-struct LogisticsAgent;
+pub struct LogisticsAgent;
 
 #[bdi_actions]
 impl LogisticsAgent {

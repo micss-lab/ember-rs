@@ -9,7 +9,7 @@ use ember::agent::bdi::{bdi_actions, bdi_agent};
 
     +!process(X) <- .log("info", "processing").
 })]
-struct Agent;
+pub struct Agent;
 
 #[bdi_actions]
 impl Agent {}

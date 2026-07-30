@@ -19,7 +19,7 @@ setup_example!();
     +!startup
       <- .send("receiver-agent@local", "inform", resource(water)).
 })]
-struct SenderAgent;
+pub struct SenderAgent;
 
 #[bdi_actions]
 impl SenderAgent {}
@@ -32,7 +32,7 @@ impl SenderAgent {}
       <- .log("info", "Received resource: ", X);
          .stop_platform().
 })]
-struct ReceiverAgent;
+pub struct ReceiverAgent;
 
 #[bdi_actions]
 impl ReceiverAgent {}

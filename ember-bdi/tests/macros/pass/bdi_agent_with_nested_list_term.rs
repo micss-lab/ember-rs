@@ -5,7 +5,7 @@ use ember::agent::bdi::{bdi_actions, bdi_agent};
     route([from(base), to(factory)]).
     matrix([[1, 2], [3, 4]]).
 })]
-struct Agent;
+pub struct Agent;
 
 #[bdi_actions]
 impl Agent {}

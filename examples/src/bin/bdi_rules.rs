@@ -72,7 +72,7 @@ setup_example!();
              .stop_platform().
     }
 )]
-struct NuclearReactorAgent;
+pub struct NuclearReactorAgent;
 
 #[bdi_actions]
 impl NuclearReactorAgent {

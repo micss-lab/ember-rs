@@ -10,7 +10,7 @@ use ember::agent::bdi::{bdi_actions, bdi_agent};
            !arrived.
     +!arrived <- .log("info", "Arrived!").
 })]
-struct BodyAgent;
+pub struct BodyAgent;
 
 #[bdi_actions]
 impl BodyAgent {}

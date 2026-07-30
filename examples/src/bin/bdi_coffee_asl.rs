@@ -77,7 +77,7 @@ struct SensorReading {
           <- .stop_platform().
     }
 )]
-struct CoffeeAgent;
+pub struct CoffeeAgent;
 
 #[bdi_actions]
 impl CoffeeAgent {

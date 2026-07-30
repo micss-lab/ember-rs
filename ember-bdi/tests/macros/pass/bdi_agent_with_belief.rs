@@ -5,7 +5,7 @@ use ember::agent::bdi::{bdi_actions, bdi_agent};
     at(agent, home).
     at(coffee_machine, kitchen).
 })]
-struct BeliefAgent;
+pub struct BeliefAgent;
 
 #[bdi_actions]
 impl BeliefAgent {}

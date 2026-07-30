@@ -35,7 +35,7 @@ pub(crate) fn expand(mut input: ItemImpl) -> syn::Result<TokenStream> {
         #input
 
         #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-        pub(crate) enum #action_enum_ident {
+        pub enum #action_enum_ident {
             #(#variants),*
         }
 

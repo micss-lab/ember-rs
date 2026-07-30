@@ -4,7 +4,7 @@ use ember::agent::bdi::{bdi_actions, bdi_agent};
 #[bdi_agent(asl = {
     !start.
 })]
-struct GoalAgent;
+pub struct GoalAgent;
 
 #[bdi_actions]
 impl GoalAgent {}

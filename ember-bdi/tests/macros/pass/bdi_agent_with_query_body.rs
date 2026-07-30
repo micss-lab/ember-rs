@@ -5,7 +5,7 @@ use ember::agent::bdi::{bdi_actions, bdi_agent};
     location(home).
     +!go <- ?location(Loc); .log("info", "at", Loc).
 })]
-struct Agent;
+pub struct Agent;
 
 #[bdi_actions]
 impl Agent {}

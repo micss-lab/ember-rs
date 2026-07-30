@@ -1,7 +1,5 @@
 use alloc::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use derive_where::derive_where;
-
 use crate::bindings::{Bindings, OwnedBindings};
 use crate::context::Context;
 use crate::plan::Plan;
@@ -10,8 +8,7 @@ use super::result::*;
 use super::{Intention, IntentionId};
 
 #[derive(Debug)]
-#[derive_where(Default)]
-pub(crate) struct IntentionQueue<A> {
+pub(crate) struct IntentionQueue<A, Sched = Fifo> {
     intentions: BTreeMap<IntentionId, Intention<A>>,
     queue: VecDeque<IntentionId>,
     /// Intentions with an action that hasn't completed yet. The scheduler skips these until
@@ -19,9 +16,22 @@ pub(crate) struct IntentionQueue<A> {
     /// actions is still being polled.
     blocked: BTreeSet<IntentionId>,
     current_id: IntentionId,
+    scheduler: Sched,
 }
 
-impl<A> IntentionQueue<A> {
+impl<A, Sched: Default> Default for IntentionQueue<A, Sched> {
+    fn default() -> Self {
+        Self {
+            intentions: BTreeMap::default(),
+            queue: VecDeque::default(),
+            blocked: BTreeSet::default(),
+            current_id: 0,
+            scheduler: Sched::default(),
+        }
+    }
+}
+
+impl<A, Sched> IntentionQueue<A, Sched> {
     fn next_id(&mut self) -> IntentionId {
         let id = self.current_id;
         self.current_id += 1;
@@ -40,9 +50,27 @@ impl<A> IntentionQueue<A> {
     pub(crate) fn unblock(&mut self, id: IntentionId) {
         self.blocked.remove(&id);
     }
+
+    /// Whether there is at least one intention that isn't currently blocked, i.e. whether
+    /// [`step`](Self::step) would actually advance anything right now.
+    pub(crate) fn has_runnable(&self) -> bool {
+        self.queue.iter().any(|id| !self.blocked.contains(id))
+    }
+
+    /// Configures which intention is stepped next when several are runnable. Replaces the
+    /// default (`Fifo`). Changes the scheduler's type, so it returns a differently-typed queue.
+    pub(crate) fn with_scheduler<NewSched>(self, scheduler: NewSched) -> IntentionQueue<A, NewSched> {
+        IntentionQueue {
+            intentions: self.intentions,
+            queue: self.queue,
+            blocked: self.blocked,
+            current_id: self.current_id,
+            scheduler,
+        }
+    }
 }
 
-impl<A: Clone> IntentionQueue<A> {
+impl<A: Clone, Sched> IntentionQueue<A, Sched> {
     pub(crate) fn push(
         &mut self,
         plan: &'_ Plan<A>,
@@ -61,18 +89,17 @@ impl<A: Clone> IntentionQueue<A> {
         }
     }
 
-    pub(crate) fn step<'a, S: Scheduler<A>>(
-        &'a mut self,
-        scheduler: &mut S,
-        context: &mut Context<A>,
-    ) -> ReadOnlyBindings<'a> {
+    pub(crate) fn step<'a>(&'a mut self, context: &mut Context<A>) -> ReadOnlyBindings<'a>
+    where
+        Sched: Scheduler<A>,
+    {
         let candidates = self
             .queue
             .iter()
             .copied()
             .filter(|id| !self.blocked.contains(id));
 
-        let Some(id) = scheduler.select_intention(candidates, &self.intentions) else {
+        let Some(id) = self.scheduler.select_intention(candidates, &self.intentions) else {
             return ReadOnlyBindings::Owned(OwnedBindings::empty());
         };
 
@@ -134,10 +161,11 @@ pub trait Scheduler<A> {
     ) -> Option<IntentionId>;
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct Fifo;
 
 impl<A> Scheduler<A> for Fifo {
-    fn select_intention<'b>(
+    fn select_intention(
         &mut self,
         candidates: impl IntoIterator<Item = IntentionId>,
         intentions: &BTreeMap<IntentionId, Intention<A>>,

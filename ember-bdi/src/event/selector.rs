@@ -4,6 +4,7 @@ pub trait EventSelector {
     fn should_process_event(&mut self, event: &TriggeringEvent, source: &EventSource) -> bool;
 }
 
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct FirstEvent;
 
 impl EventSelector for FirstEvent {

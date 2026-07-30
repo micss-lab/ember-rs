@@ -6,7 +6,7 @@ use ember::agent::bdi::{bdi_actions, bdi_agent};
     ~off.
     ~locked.
 })]
-struct Agent;
+pub struct Agent;
 
 #[bdi_actions]
 impl Agent {}

@@ -2,7 +2,7 @@ extern crate alloc;
 use ember::agent::bdi::{bdi_actions, bdi_agent};
 
 #[bdi_agent(asl = {})]
-struct MinimalAgent;
+pub struct MinimalAgent;
 
 #[bdi_actions]
 impl MinimalAgent {}

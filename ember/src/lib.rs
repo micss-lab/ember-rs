@@ -34,7 +34,8 @@ pub mod agent {
         pub use ember_bdi::{bdi_actions, bdi_agent};
 
         pub use ember_bdi::{
-            bindings, context, event, knowledge, literal, plan, resolve, sensor, term, variable,
+            bindings, context, event, intention, knowledge, literal, plan, resolve, sensor, term,
+            variable,
         };
     }
 }

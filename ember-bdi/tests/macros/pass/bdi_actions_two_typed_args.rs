@@ -3,7 +3,7 @@ use ember::agent::bdi::term::Term;
 use ember::agent::bdi::{bdi_actions, bdi_agent};
 
 #[bdi_agent(asl = {})]
-struct Agent;
+pub struct Agent;
 
 #[bdi_actions]
 impl Agent {

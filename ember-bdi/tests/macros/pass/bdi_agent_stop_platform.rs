@@ -5,7 +5,7 @@ use ember::agent::bdi::{bdi_actions, bdi_agent};
     +!shutdown <- .stop_platform().
     +!shutdown_with_log <- .log("info", "shutting down"); .stop_platform().
 })]
-struct Agent;
+pub struct Agent;
 
 #[bdi_actions]
 impl Agent {}

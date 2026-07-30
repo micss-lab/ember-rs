@@ -8,7 +8,7 @@ use ember::agent::bdi::{bdi_actions, bdi_agent};
     ancestor(X, Y) :- parent(X, Y).
     ancestor(X, Y) :- parent(X, Z) & ancestor(Z, Y).
 })]
-struct Agent;
+pub struct Agent;
 
 #[bdi_actions]
 impl Agent {}

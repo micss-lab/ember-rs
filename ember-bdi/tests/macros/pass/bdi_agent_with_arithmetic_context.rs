@@ -7,7 +7,7 @@ use ember::agent::bdi::{bdi_actions, bdi_agent};
     +!scale(N) : N + 1 < 10 <- .log("info", "small").
     +!diff(N) : N - 3 == 0 <- .log("info", "three").
 })]
-struct Agent;
+pub struct Agent;
 
 #[bdi_actions]
 impl Agent {}

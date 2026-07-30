@@ -5,7 +5,7 @@ use ember::agent::bdi::{bdi_actions, bdi_agent};
     +!check : not busy <- .log("info", "not busy").
     +!check : not ready & not waiting <- .log("info", "neither ready nor waiting").
 })]
-struct Agent;
+pub struct Agent;
 
 #[bdi_actions]
 impl Agent {}

@@ -9,7 +9,7 @@ use ember::agent::bdi::{bdi_actions, bdi_agent};
     +!go_to(Dest) : at(agent, From)
         <- .log("info", "Moving.").
 })]
-struct ContextAgent;
+pub struct ContextAgent;
 
 #[bdi_actions]
 impl ContextAgent {}

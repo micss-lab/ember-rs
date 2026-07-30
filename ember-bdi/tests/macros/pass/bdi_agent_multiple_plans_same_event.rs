@@ -6,7 +6,7 @@ use ember::agent::bdi::{bdi_actions, bdi_agent};
     +!handle : waiting <- .log("info", "handling while waiting").
     +!handle <- .log("info", "fallback handler").
 })]
-struct Agent;
+pub struct Agent;
 
 #[bdi_actions]
 impl Agent {}

@@ -1,10 +1,12 @@
+use alloc::collections::BTreeMap;
+use alloc::vec::Vec;
 use core::slice::Iter;
 
 use crate::bindings::Bindings;
 use crate::knowledge::base::KnowledgeBase;
 use crate::term::view::TermView;
 
-use super::library::PlanLibrary;
+use super::library::PlanKey;
 use super::{Plan, TriggeringEvent};
 
 /// Lazy selector of plans that are relevant and applicable.
@@ -18,9 +20,12 @@ pub struct PlanSelection<'p, 'e, A> {
 }
 
 impl<'p, 'e, A> PlanSelection<'p, 'e, A> {
-    pub fn select_from_library(event: &'e TriggeringEvent, library: &'p PlanLibrary<A>) -> Self {
+    pub(super) fn select_from_library(
+        event: &'e TriggeringEvent,
+        plans: &'p BTreeMap<PlanKey, Vec<Plan<A>>>,
+    ) -> Self {
         Self {
-            plans: library.plans.get(&event.into()).map(|p| p.iter()),
+            plans: plans.get(&event.into()).map(|p| p.iter()),
             event,
         }
     }
@@ -109,6 +114,7 @@ mod tests {
 
     use crate::knowledge::base::KnowledgeBase;
     use crate::literal::Literal;
+    use crate::plan::library::PlanLibrary;
     use crate::plan::{GoalKind, QueryFormula};
     use crate::term::{Atom, Term};
     use crate::testing::*;
@@ -135,7 +141,7 @@ mod tests {
         store.add(plan);
 
         let event = trigger("test", vec![], Some(GoalKind::Achieve));
-        let mut selection = PlanSelection::select_from_library(&event, &store);
+        let mut selection = PlanSelection::select_from_library(&event, &store.plans);
 
         // 1. If belief base is empty, context fails.
         assert!(
@@ -153,7 +159,7 @@ mod tests {
         };
         bb.assert_no_event(ready_belief);
 
-        let mut selection2 = PlanSelection::select_from_library(&event, &store);
+        let mut selection2 = PlanSelection::select_from_library(&event, &store.plans);
         assert!(
             selection2.next_plan(&bb).is_some(),
             "Plan should now be applicable"
@@ -186,7 +192,7 @@ mod tests {
         });
 
         let event = trigger("goal", vec![], Some(GoalKind::Achieve));
-        let mut selection = PlanSelection::select_from_library(&event, &store);
+        let mut selection = PlanSelection::select_from_library(&event, &store.plans);
 
         let result = selection.next_plan(&bb);
         assert!(result.is_some(), "Should skip Plan 1 and find Plan 2");
@@ -210,7 +216,7 @@ mod tests {
 
         // Event for test(2)
         let event = trigger("test", vec![number(2.0)], Some(GoalKind::Achieve));
-        let mut selection = PlanSelection::select_from_library(&event, &store);
+        let mut selection = PlanSelection::select_from_library(&event, &store.plans);
 
         assert!(
             selection.next_plan(&bb).is_none(),
@@ -233,7 +239,7 @@ mod tests {
 
         // Event: !greet("Alice")
         let event = trigger("greet", vec![string("Alice")], Some(GoalKind::Achieve));
-        let mut selection = PlanSelection::select_from_library(&event, &store);
+        let mut selection = PlanSelection::select_from_library(&event, &store.plans);
 
         let (_, bindings) = selection.next_plan(&bb).expect("Should unify");
 
@@ -247,7 +253,7 @@ mod tests {
         let bb = KnowledgeBase::default();
         let event = trigger("any", vec![], None);
 
-        let mut selection = PlanSelection::select_from_library(&event, &store);
+        let mut selection = PlanSelection::select_from_library(&event, &store.plans);
         assert!(selection.next_plan(&bb).is_none());
     }
 
@@ -282,7 +288,7 @@ mod tests {
 
         // Event: !check("circle")
         let event = trigger("check", vec![string("circle")], Some(GoalKind::Achieve));
-        let mut selection = PlanSelection::select_from_library(&event, &store);
+        let mut selection = PlanSelection::select_from_library(&event, &store.plans);
 
         let result = selection.next_plan(&bb);
         assert!(
@@ -308,7 +314,7 @@ mod tests {
         });
 
         let event = trigger("check", vec![string("apple")], Some(GoalKind::Achieve));
-        let mut selection = PlanSelection::select_from_library(&event, &store);
+        let mut selection = PlanSelection::select_from_library(&event, &store.plans);
         let (_, bindings) = selection.next_plan(&bb).expect("Binding pipe failed");
 
         assert_eq!(bindings.get_view(&x), Some(&string("apple").as_view()));
@@ -340,7 +346,7 @@ mod tests {
             vec![variable_term(&event_var)],
             Some(GoalKind::Achieve),
         );
-        let mut selection = PlanSelection::select_from_library(&event, &store);
+        let mut selection = PlanSelection::select_from_library(&event, &store.plans);
         let (_, bindings) = selection.next_plan(&bb).expect("Aliasing failed");
 
         assert_eq!(bindings.get_view(&event_var), Some(&string("a").as_view()));
@@ -365,7 +371,7 @@ mod tests {
         });
 
         let event = trigger("fix", vec![string("bolt")], Some(GoalKind::Achieve));
-        let (plan, _) = PlanSelection::select_from_library(&event, &store)
+        let (plan, _) = PlanSelection::select_from_library(&event, &store.plans)
             .next_plan(&bb)
             .unwrap();
 
@@ -394,14 +400,14 @@ mod tests {
 
         let event_north = trigger("move", vec![string("north")], Some(GoalKind::Achieve));
         assert!(
-            PlanSelection::select_from_library(&event_north, &store)
+            PlanSelection::select_from_library(&event_north, &store.plans)
                 .next_plan(&bb)
                 .is_none()
         );
 
         let event_south = trigger("move", vec![string("south")], Some(GoalKind::Achieve));
         assert!(
-            PlanSelection::select_from_library(&event_south, &store)
+            PlanSelection::select_from_library(&event_south, &store.plans)
                 .next_plan(&bb)
                 .is_some()
         );

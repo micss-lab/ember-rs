@@ -5,7 +5,7 @@ use ember::agent::bdi::{bdi_actions, bdi_agent};
     +temp(X) <- .log("info", "temperature added", X).
     -temp(X) <- .log("info", "temperature removed", X).
 })]
-struct Agent;
+pub struct Agent;
 
 #[bdi_actions]
 impl Agent {}

@@ -8,7 +8,7 @@ use ember::agent::bdi::{bdi_actions, bdi_agent};
     +!compare(X, Y) : X == Y <- .log("info", "equal").
     +!compare(X, Y) : X != Y <- .log("info", "not equal").
 })]
-struct Agent;
+pub struct Agent;
 
 #[bdi_actions]
 impl Agent {}

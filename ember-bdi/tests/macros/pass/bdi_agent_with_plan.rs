@@ -5,7 +5,7 @@ use ember::agent::bdi::{bdi_actions, bdi_agent};
     !start.
     +!start <- .log("info", "Agent started.").
 })]
-struct PlanAgent;
+pub struct PlanAgent;
 
 #[bdi_actions]
 impl PlanAgent {}

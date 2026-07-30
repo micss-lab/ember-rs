@@ -8,13 +8,15 @@ use crate::plan::{Formula, Plan, Trigger, TriggeringEvent};
 
 use self::result::*;
 
-pub(crate) mod queue;
+pub mod queue;
 pub(crate) mod result;
 
-pub(crate) type IntentionId = usize;
+pub use self::queue::{Fifo, Scheduler};
+
+pub type IntentionId = usize;
 
 #[derive_where(Debug)]
-pub(crate) struct Intention<A> {
+pub struct Intention<A> {
     id: IntentionId,
     stack: Vec<Frame<A>>,
 }

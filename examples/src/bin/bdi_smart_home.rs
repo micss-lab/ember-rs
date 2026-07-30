@@ -50,7 +50,7 @@ pub enum Room {
           <- turn_off_light(Room).
     }
 )]
-struct SmartHomeAgent;
+pub struct SmartHomeAgent;
 
 #[bdi_actions]
 impl SmartHomeAgent {
