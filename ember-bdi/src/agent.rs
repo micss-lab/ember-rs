@@ -13,7 +13,7 @@ use crate::event::EventSource;
 use crate::event::queue::EventQueue;
 use crate::event::selector::{EventSelector, FirstEvent};
 use crate::intention::IntentionId;
-use crate::intention::queue::{Fifo, IntentionQueue, Scheduler};
+use crate::intention::queue::{IntentionQueue, Random, Scheduler};
 use crate::knowledge::base::KnowledgeBase;
 use crate::literal::Literal;
 use crate::plan::action::{Execute, PendingAction};
@@ -69,7 +69,7 @@ pub struct BdiAgent<
     State,
     Action,
     Percept,
-    Sched = Fifo,
+    Sched = Random,
     Sel = FirstEvent,
     PSel = FirstApplicable,
 > {
@@ -124,7 +124,7 @@ impl<'s, State, Action, Percept, Sched, Sel, PSel>
     }
 
     /// Configures which intention is stepped next when several are runnable. Replaces the
-    /// default (`Fifo`). A different scheduler is a different type, so this returns a
+    /// default (`Random`). A different scheduler is a different type, so this returns a
     /// differently-typed agent rather than mutating in place.
     pub fn with_scheduler<NewSched>(
         self,
@@ -508,13 +508,16 @@ mod tests {
             vec![Formula::Action(Action::User(TestAction::Log("other")))],
         ));
 
+        // Pinned to `Fifo` so the tick-by-tick assertions below can rely on a deterministic
+        // selection order - this test is about blocking semantics, not scheduling.
         let mut agent = BdiAgent::<Vec<&'static str>, TestAction, ()>::new(
             "test-agent",
             Vec::new(),
             None,
             lib,
             vec![literal("wait_test", vec![]), literal("other_test", vec![])],
-        );
+        )
+        .with_scheduler(crate::intention::queue::Fifo);
 
         let mut environment = new_environment();
 
@@ -711,9 +714,9 @@ mod tests {
             ],
         );
         // A single-action plan body actually takes two scheduler steps to fully retire (one to
-        // run the action, one more to notice the body is now empty), and `Fifo` keeps
-        // re-selecting the same intention until it's actually removed - so budget generously
-        // rather than trying to hit an exact step count.
+        // run the action, one more to notice the body is now empty), and the scheduler keeps
+        // re-selecting an intention until it's actually removed - so budget generously rather
+        // than trying to hit an exact step count.
         let mut agent = agent.with_tick_budget(TickBudget {
             max_intentions: 10,
             ..TickBudget::default()
@@ -829,7 +832,7 @@ mod tests {
             Vec<&'static str>,
             TestAction,
             (),
-            Fifo,
+            Random,
             FirstEvent,
             RejectShortBody,
         >::new(
