@@ -850,4 +850,259 @@ mod tests {
 
         assert_eq!(agent.state, vec!["second", "marker"]);
     }
+
+    /// Regression test for ChirpPark bug 4b -- distinct from 0952b00 (stale
+    /// answer under backtracking within one query); this one dropped the
+    /// caller's bindings in a single fresh query, no backtracking involved.
+    #[test]
+    fn test_gateway_retry_across_separate_invocations() {
+        use crate::knowledge::belief::Knowledge;
+        use crate::plan::{
+            ArithmeticExpression, ArithmeticOperator, CompareOperator, LogicalOperator,
+            QueryFormula, RelationalOperator, RelationalQueryFormula,
+        };
+        use crate::testing::number;
+
+        fn rule(functor: &str, args: Vec<Term>, body: QueryFormula) -> Knowledge {
+            let lit = literal(functor, args);
+            (lit, body).into()
+        }
+
+        fn and(ops: Vec<QueryFormula>) -> QueryFormula {
+            QueryFormula::Logical {
+                operator: LogicalOperator::Conjunction,
+                operands: ops.into_boxed_slice(),
+            }
+        }
+
+        fn not(op: QueryFormula) -> QueryFormula {
+            QueryFormula::Not(Box::new(op))
+        }
+
+        fn expr(t: Term) -> ArithmeticExpression {
+            ArithmeticExpression::Term(t)
+        }
+
+        fn minus(a: ArithmeticExpression, b: ArithmeticExpression) -> ArithmeticExpression {
+            ArithmeticExpression::Operation {
+                operator: ArithmeticOperator::Min,
+                operands: vec![a, b].into_boxed_slice(),
+            }
+        }
+
+        fn gt(l: ArithmeticExpression, r: ArithmeticExpression) -> QueryFormula {
+            QueryFormula::Relational(RelationalQueryFormula {
+                operator: RelationalOperator::Compare {
+                    operator: CompareOperator::GreaterThan,
+                    equal: false,
+                },
+                operands: (l, r),
+            })
+        }
+
+        // recent_reply(GW) :- last_reply(GW, T) & now(Now) & not Now - T > 5000.0.
+        // gateway_down(GW) :- last_request(GW, ReqT) & now(Now) & not recent_reply(GW)
+        //                      & Now - ReqT > 5000.0.
+        // Exactly va.rs's two rules, verbatim in shape.
+        let gw1 = variable();
+        let treply = variable();
+        let now2 = variable();
+        let recent_reply = rule(
+            "recent_reply",
+            vec![variable_term(&gw1)],
+            and(vec![
+                literal_formula("last_reply", vec![variable_term(&gw1), variable_term(&treply)]),
+                literal_formula("now", vec![variable_term(&now2)]),
+                not(gt(
+                    minus(expr(variable_term(&now2)), expr(variable_term(&treply))),
+                    expr(number(5000.0)),
+                )),
+            ]),
+        );
+
+        let gw2 = variable();
+        let treq = variable();
+        let now3 = variable();
+        let gateway_down = rule(
+            "gateway_down",
+            vec![variable_term(&gw2)],
+            and(vec![
+                literal_formula("last_request", vec![variable_term(&gw2), variable_term(&treq)]),
+                literal_formula("now", vec![variable_term(&now3)]),
+                not(literal_formula("recent_reply", vec![variable_term(&gw2)])),
+                gt(
+                    minus(expr(variable_term(&now3)), expr(variable_term(&treq))),
+                    expr(number(5000.0)),
+                ),
+            ]),
+        );
+
+        let mut beliefs = KnowledgeBase::default();
+        beliefs.assert_no_event(recent_reply);
+        beliefs.assert_no_event(gateway_down);
+        assert_belief(&mut beliefs, "gateway_a", vec![string("ga-1")]);
+        assert_belief(&mut beliefs, "gateway_b", vec![string("ga-2")]);
+        assert_belief(&mut beliefs, "now", vec![number(0.0)]);
+
+        // +!select_gateway : gateway_a(GW) & not gateway_down(GW) <- +target_gateway(GW).
+        // +!select_gateway : gateway_b(GW) & not gateway_down(GW) <- +target_gateway(GW).
+        // Same "one plan per candidate" shape va.rs already uses to sidestep the
+        // *within-query* backtracking bug (0952b00's own target).
+        let mut lib = PlanLibrary::<TestAction>::default();
+        let gwa = variable();
+        lib.add(plan(
+            trigger("select_gateway", vec![], Some(GoalKind::Achieve)),
+            Some(and(vec![
+                literal_formula("gateway_a", vec![variable_term(&gwa)]),
+                not(literal_formula("gateway_down", vec![variable_term(&gwa)])),
+            ])),
+            vec![Formula::Belief {
+                trigger: Trigger::Addition,
+                belief: literal("target_gateway", vec![variable_term(&gwa)]),
+            }],
+        ));
+        let gwb = variable();
+        lib.add(plan(
+            trigger("select_gateway", vec![], Some(GoalKind::Achieve)),
+            Some(and(vec![
+                literal_formula("gateway_b", vec![variable_term(&gwb)]),
+                not(literal_formula("gateway_down", vec![variable_term(&gwb)])),
+            ])),
+            vec![Formula::Belief {
+                trigger: Trigger::Addition,
+                belief: literal("target_gateway", vec![variable_term(&gwb)]),
+            }],
+        ));
+
+        let mut agent = BdiAgent::<Vec<&'static str>, TestAction, ()>::new(
+            "va-poc",
+            Vec::new(),
+            Some(beliefs),
+            lib,
+            vec![],
+        );
+        let mut environment = new_environment();
+
+        // --- Invocation 1: cold boot, neither gateway has ever been contacted. ---
+        agent.handle_event(
+            trigger("select_gateway", vec![], Some(GoalKind::Achieve)),
+            EventSource::External,
+        );
+        for _ in 0..5 {
+            agent.tick(&mut environment);
+        }
+
+        let ga1 = literal_formula("target_gateway", vec![string("ga-1")]);
+        let ga2 = literal_formula("target_gateway", vec![string("ga-2")]);
+        assert!(
+            (&ga1).into_query(&agent.beliefs).next_bindings(None).is_some(),
+            "invocation 1: cold boot should target ga-1 (checked first, neither gateway down yet)"
+        );
+
+        // --- Between invocations: exactly what va.rs's own plans do in the real
+        // timeline -- a request went to ga-1, it never replied, now() advances
+        // past the 5s timeout, so the periodic `now(T)` plan retracts
+        // target_gateway and re-fires `!select_gateway`. ga-2 was never
+        // contacted at all. ---
+        agent
+            .beliefs
+            .remove_no_event(literal("target_gateway", vec![string("ga-1")]));
+        agent
+            .beliefs
+            .assert_no_event(literal("last_request", vec![string("ga-1"), number(0.0)]));
+        agent.beliefs.remove_no_event(literal("now", vec![number(0.0)]));
+        agent
+            .beliefs
+            .assert_no_event(literal("now", vec![number(6000.0)]));
+
+        // --- Invocation 2: a separate, later `!select_gateway` re-invocation,
+        // not a backtrack within the same query -- ga-1 is genuinely down,
+        // ga-2 genuinely is not (no last_request(ga-2, _) exists at all). ---
+        agent.handle_event(
+            trigger("select_gateway", vec![], Some(GoalKind::Achieve)),
+            EventSource::External,
+        );
+        for _ in 0..5 {
+            agent.tick(&mut environment);
+        }
+
+        // --- Isolation check: does plan B's *exact* context formula, evaluated
+        // the exact same way `ApplicablePlanSelection::next_plan` evaluates it
+        // (fresh Query, `Some(&Bindings::empty())` as `existing_bindings`, not
+        // `None`), succeed when run directly, bypassing plan/event/intention
+        // scheduling entirely? If yes, the bug is *not* in query evaluation at
+        // all -- it's in how plan selection got invoked the second time.
+        let gwb2 = variable();
+        let plan_b_context_copy = and(vec![
+            literal_formula("gateway_b", vec![variable_term(&gwb2)]),
+            not(literal_formula("gateway_down", vec![variable_term(&gwb2)])),
+        ]);
+        let empty_bindings = crate::bindings::Bindings::empty();
+        let isolated_result = (&plan_b_context_copy)
+            .into_query(&agent.beliefs)
+            .next_bindings(Some(&empty_bindings));
+
+        // Same conjunction, but with `None` instead of `Some(&Bindings::empty())` --
+        // isolates whether the `Some`/`None` distinction itself matters.
+        let gwb3 = variable();
+        let plan_b_context_copy2 = and(vec![
+            literal_formula("gateway_b", vec![variable_term(&gwb3)]),
+            not(literal_formula("gateway_down", vec![variable_term(&gwb3)])),
+        ]);
+        let isolated_result_none = (&plan_b_context_copy2)
+            .into_query(&agent.beliefs)
+            .next_bindings(None);
+
+        // Same conjunction, but with the gateway hardcoded as a ground string
+        // instead of a variable bound via `gateway_b(GW)` -- isolates whether
+        // going through a *bound variable* (vs. a literal ground term) into the
+        // negated nested-rule lookup is what's different.
+        let ground_conjunction = and(vec![
+            literal_formula("gateway_b", vec![string("ga-2")]),
+            not(literal_formula("gateway_down", vec![string("ga-2")])),
+        ]);
+        let ground_result = (&ground_conjunction)
+            .into_query(&agent.beliefs)
+            .next_bindings(Some(&empty_bindings));
+
+        // Sharpest isolation: evaluate *only* `not gateway_down(GW)` on its own,
+        // with GW pre-bound to "ga-2" via a real `Bindings` map (not threaded
+        // through a preceding conjunct at all). If this still reports
+        // gateway_down as true, the rule's own internal resolution is ignoring
+        // the caller's binding for its argument entirely, rather than being a
+        // caching/backtracking artifact.
+        let gwb4 = variable();
+        let ga2_term = string("ga-2");
+        let pre_bound = crate::testing::bindings(vec![(
+            gwb4.clone(),
+            crate::term::view::TermView::Term(&ga2_term),
+        )]);
+        let solo_negation = not(literal_formula("gateway_down", vec![variable_term(&gwb4)]));
+        let solo_result = (&solo_negation)
+            .into_query(&agent.beliefs)
+            .next_bindings(Some(&pre_bound));
+
+        // --- Diagnostics: what actually happened? ---
+        let gd_a = literal_formula("gateway_down", vec![string("ga-1")]);
+        let gd_b = literal_formula("gateway_down", vec![string("ga-2")]);
+        let debug = alloc::format!(
+            "target_gateway(ga-1)={} target_gateway(ga-2)={} gateway_down(ga-1)={} gateway_down(ga-2)={} \
+             isolated_plan_b_context(Some(empty))={} isolated_plan_b_context(None)={} \
+             ground_conjunction(Some(empty))={} solo_negation_with_GW_prebound_to_ga-2={}",
+            (&ga1).into_query(&agent.beliefs).next_bindings(None).is_some(),
+            (&ga2).into_query(&agent.beliefs).next_bindings(None).is_some(),
+            (&gd_a).into_query(&agent.beliefs).next_bindings(None).is_some(),
+            (&gd_b).into_query(&agent.beliefs).next_bindings(None).is_some(),
+            isolated_result.is_some(),
+            isolated_result_none.is_some(),
+            ground_result.is_some(),
+            solo_result.is_some(),
+        );
+
+        assert!(
+            (&ga2).into_query(&agent.beliefs).next_bindings(None).is_some(),
+            "invocation 2: ga-1 is down and ga-2 is not -- select_gateway should retarget \
+             to ga-2. If this fails, the retry is stuck exactly like the real VA. {debug}"
+        );
+    }
 }

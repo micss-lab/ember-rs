@@ -47,6 +47,14 @@ impl<'a, T> Bindings<'a, T> {
         }
         self.aliases.retain_variables(variables);
     }
+
+    /// Returns the set of variables this instance has anything recorded for.
+    pub(crate) fn variables(&self) -> BTreeSet<VariableId> {
+        self.bindings
+            .as_ref()
+            .map(|b| b.keys().copied().collect())
+            .unwrap_or_default()
+    }
 }
 
 impl<'a> Bindings<'a, TermView<'a>> {

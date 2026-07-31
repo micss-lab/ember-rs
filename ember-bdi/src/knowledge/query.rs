@@ -173,7 +173,11 @@ impl<'a> QueryOperand<'a> {
             existing_bindings: Option<&Bindings<'b>>,
         ) -> Option<Bindings<'b>> {
             while let Some(mut bindings) = query.next_bindings(existing_bindings) {
-                bindings.retain_variables(belief.variables());
+                let mut retain = belief.variables();
+                if let Some(existing) = existing_bindings {
+                    retain.extend(existing.variables());
+                }
+                bindings.retain_variables(retain);
 
                 match belief.unify(literal, Some(&bindings)).ok() {
                     Some(bindings) => return Some(bindings),
@@ -1239,6 +1243,94 @@ mod tests {
             query.next_bindings(None).is_none(),
             "should fail for both alt(1) and alt(2): has_conflict is \
              genuinely true and nothing ever retracts it"
+        );
+    }
+
+    #[test]
+    fn rule_query_ignores_already_bound_argument_and_matches_unrelated_grounding() {
+        let mut bb = KnowledgeBase::default();
+
+        // down(X) :- requested(X).
+        // requested(a). -- the only ground fact, for a DIFFERENT constant
+        // than the one being asked about below.
+        let x = variable();
+        bb.assert_no_event(rule(
+            "down",
+            vec![variable_term(&x)],
+            literal("requested", vec![variable_term(&x)]),
+        ));
+        bb.assert_no_event(belief("requested", vec![string("a")]));
+
+        // Ground-argument sanity check: down("b") is unambiguously false
+        // (nothing at all matches `requested(b)`), and the framework agrees.
+        let ground_query = not(literal("down", vec![string("b")]));
+        let mut ground = (&ground_query).into_query(&bb);
+        assert!(
+            ground.next_bindings(None).is_some(),
+            "sanity check: down(b) should be false since requested(b) doesn't exist"
+        );
+
+        // Same question, but GW arrives pre-bound to "b" via a real
+        // `Bindings` map (exactly how a variable bound by an earlier
+        // conjunct, e.g. `gateway_b(GW) & not gateway_down(GW)`, is passed
+        // into evaluating the second conjunct) instead of being written
+        // directly into the literal as a ground string.
+        let gw = variable();
+        let b_term = string("b");
+        let pre_bound = crate::testing::bindings(vec![(
+            gw.clone(),
+            crate::term::view::TermView::Term(&b_term),
+        )]);
+        let bound_query = not(literal("down", vec![variable_term(&gw)]));
+        let mut bound = (&bound_query).into_query(&bb);
+
+        assert!(
+            bound.next_bindings(Some(&pre_bound)).is_some(),
+            "down(GW) with GW pre-bound to \"b\" should also be false -- \
+             identical question to the ground-literal case above, just \
+             asked through a variable. If this fails, the rule resolved its \
+             own head variable against `requested(a)` without checking that \
+             GW was already constrained to \"b\", and wrongly rebound GW to \
+             \"a\" instead of rejecting the mismatch."
+        );
+    }
+
+    #[test]
+    fn rule_query_preserves_unrelated_bindings_from_earlier_conjuncts() {
+        let mut bb = KnowledgeBase::default();
+
+        // down(X) :- requested(X).
+        // requested(a).
+        let x = variable();
+        bb.assert_no_event(rule(
+            "down",
+            vec![variable_term(&x)],
+            literal("requested", vec![variable_term(&x)]),
+        ));
+        bb.assert_no_event(belief("requested", vec![string("a")]));
+
+        // echo(Y) & gateway_b(GW) bind Y and GW before the query reaches down(GW).
+        bb.assert_no_event(belief("echo", vec![string("keep-me")]));
+        bb.assert_no_event(belief("gateway_b", vec![string("a")]));
+
+        let (y, gw) = (variable(), variable());
+        let formula = and(vec![
+            literal("echo", vec![variable_term(&y)]),
+            literal("gateway_b", vec![variable_term(&gw)]),
+            literal("down", vec![variable_term(&gw)]),
+        ]);
+
+        let mut query = (&formula).into_query(&bb);
+        let bindings = query
+            .next_bindings(None)
+            .expect("down(GW) should succeed: GW = \"a\" matches requested(a)");
+
+        assert_eq!(
+            bindings.get_view(&y),
+            Some(&string("keep-me").as_view()),
+            "Y's binding from the first conjunct should survive the later rule \
+             call to down(GW), even though `down` never mentions Y at all. If \
+             this fails, `next_bindings_for_rule` dropped it again."
         );
     }
 }
