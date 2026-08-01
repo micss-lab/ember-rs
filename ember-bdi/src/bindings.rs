@@ -41,19 +41,11 @@ impl<'a, T> Bindings<'a, T> {
     }
 
     /// Filters the bound variables and only retains those present in the specified set.
-    pub(crate) fn retain_variables(&mut self, variables: BTreeSet<VariableId>) {
+    pub(crate) fn retain_variables(&mut self, variables: &BTreeSet<VariableId>) {
         if let Some(b) = self.bindings.as_mut() {
             b.retain(|v, _| variables.contains(v))
         }
         self.aliases.retain_variables(variables);
-    }
-
-    /// Returns the set of variables this instance has anything recorded for.
-    pub(crate) fn variables(&self) -> BTreeSet<VariableId> {
-        self.bindings
-            .as_ref()
-            .map(|b| b.keys().copied().collect())
-            .unwrap_or_default()
     }
 }
 
@@ -78,6 +70,19 @@ impl<'a> Bindings<'a, TermView<'a>> {
         let mut solver = solver::ConstraintSolver::new(constraints);
         if let Some(existing_bindings) = existing_bindings {
             solver.load_existing_bindings(existing_bindings)?;
+        }
+        solver.solve()
+    }
+
+    pub(crate) fn merge_views<'b>(
+        bindings: impl IntoIterator<Item = &'b Self>,
+    ) -> Result<Self, UnificationError>
+    where
+        'a: 'b,
+    {
+        let mut solver = solver::ConstraintSolver::new(core::iter::empty());
+        for b in bindings {
+            solver.load_existing_bindings(b)?;
         }
         solver.solve()
     }
@@ -192,7 +197,7 @@ impl AliasMap {
         self.0.iter()
     }
 
-    fn retain_variables(&mut self, variables: BTreeSet<VariableId>) {
+    fn retain_variables(&mut self, variables: &BTreeSet<VariableId>) {
         self.0
             .retain(|(v1, v2)| variables.contains(v1) && variables.contains(v2));
     }

@@ -5,6 +5,7 @@ use alloc::vec::Vec;
 use crate::bindings::Bindings;
 use crate::literal::Literal;
 use crate::plan::RelationalQueryFormula;
+use crate::unification::error::UnificationError;
 
 use super::base::KnowledgeBase;
 use super::belief::Knowledge;
@@ -84,15 +85,17 @@ pub(crate) struct GroundQuery<'a> {
     /// To resolve rules, the beliefbase has to be queried recursively.
     knowledge: &'a KnowledgeBase,
 
-    /// During backtracking a negated ground query needs to know whether it has already been
-    /// evaluated before, regardless of the outcome. If it has and the backtracking engine comes
-    /// back with "do you have any other ways to satisfy yourself?" it should return `None`.
-    negation_evaluated: bool,
+    /// During backtracking a ground query needs to know whether it has already been
+    /// evaluated before in cases where it can produce bindings infinitely. For example, where
+    /// there are not beliefs to go through or regular operators such as compare or unify,
+    /// regardless of the outcome. If it has and the backtracking engine comes back with "do you
+    /// have any other ways to satisfy yourself?" it should return `None`.
+    evaluated: bool,
 }
 
 impl<'a> GroundQuery<'a> {
     fn next_bindings(&mut self, existing_bindings: Option<&Bindings<'a>>) -> Option<Bindings<'a>> {
-        if self.negated && self.negation_evaluated {
+        if self.evaluated {
             return None;
         }
 
@@ -101,13 +104,18 @@ impl<'a> GroundQuery<'a> {
             self.operand
                 .next_bindings(self.beliefs.as_mut(), existing_bindings, self.knowledge),
         ) {
-            (false, r) => r,
+            (false, result) => {
+                if self.beliefs.is_none() {
+                    self.evaluated = true;
+                }
+                result
+            }
             (true, bindings) => {
                 // Don't let a later ask (without an intervening `reset`) re-run
                 // the operand, whose own belief iterators may have been
                 // exhausted by this very evaluation and would then wrongly
                 // report a fresh success.
-                self.negation_evaluated = true;
+                self.evaluated = true;
 
                 if bindings.is_some() {
                     None
@@ -124,7 +132,7 @@ impl<'a> GroundQuery<'a> {
 
     fn reset(&mut self) {
         self.beliefs = self.original.clone();
-        self.negation_evaluated = false;
+        self.evaluated = false;
         self.operand.reset();
     }
 }
@@ -136,7 +144,7 @@ pub(crate) enum QueryOperand<'a> {
         /// During unification of this literal it might be that we need to query the
         /// knowledge base again to prove a belief rule. This query has to be
         /// back-trackable, hence we store it here.
-        belief_to_process: Option<(&'a Literal, Query<'a>)>,
+        rule_in_process: Option<RuleQuery<'a>>,
     },
     Relational(&'a RelationalQueryFormula),
 }
@@ -145,16 +153,16 @@ impl<'a> QueryOperand<'a> {
     fn literal(literal: &'a Literal) -> Self {
         Self::Literal {
             literal,
-            belief_to_process: None,
+            rule_in_process: None,
         }
     }
 
     fn reset(&mut self) {
         if let Self::Literal {
-            belief_to_process, ..
+            rule_in_process, ..
         } = self
         {
-            *belief_to_process = None;
+            *rule_in_process = None;
         }
     }
 
@@ -166,48 +174,27 @@ impl<'a> QueryOperand<'a> {
     ) -> Option<Bindings<'a>> {
         use crate::unification::traits::Unify;
 
-        fn next_bindings_for_rule<'b>(
-            belief: &'b Literal,
-            query: &mut Query<'b>,
-            literal: &'b Literal,
-            existing_bindings: Option<&Bindings<'b>>,
-        ) -> Option<Bindings<'b>> {
-            while let Some(mut bindings) = query.next_bindings(existing_bindings) {
-                let mut retain = belief.variables();
-                if let Some(existing) = existing_bindings {
-                    retain.extend(existing.variables());
-                }
-                bindings.retain_variables(retain);
-
-                match belief.unify(literal, Some(&bindings)).ok() {
-                    Some(bindings) => return Some(bindings),
-                    None => continue,
-                }
-            }
-            None
-        }
-
         match self {
             QueryOperand::Literal {
                 literal,
-                belief_to_process,
-            } => belief_to_process
+                rule_in_process,
+            } => rule_in_process
                 .as_mut()
-                .and_then(|(belief, query)| {
-                    next_bindings_for_rule(belief, query, literal, existing_bindings)
-                })
+                .and_then(|rule_query| rule_query.next_bindings(literal, existing_bindings))
                 .or_else(|| {
                     beliefs.and_then(|b| {
                         b.find_map(|knowledge| {
                             if let Some(rule) = &knowledge.rule {
-                                let mut query = knowledge_base.query(rule);
-                                let result = next_bindings_for_rule(
+                                let body = knowledge_base.query(rule);
+                                let mut rule_query = RuleQuery::new(
                                     &knowledge.belief,
-                                    &mut query,
                                     literal,
+                                    body,
                                     existing_bindings,
-                                );
-                                *belief_to_process = Some((&knowledge.belief, query));
+                                )
+                                .ok()?;
+                                let result = rule_query.next_bindings(literal, existing_bindings);
+                                *rule_in_process = Some(rule_query);
                                 result
                             } else {
                                 knowledge.belief.unify(literal, existing_bindings).ok()
@@ -219,6 +206,70 @@ impl<'a> QueryOperand<'a> {
                 formula.verify_bindings(existing_bindings).ok().flatten()
             }
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct RuleQuery<'a> {
+    /// The rule's head literal.
+    head: &'a Literal,
+    /// The rule's body, queried lazily over the knowledge base.
+    body: Query<'a>,
+    /// Bindings resulting from unification of the rules head with the parent queries literal.
+    head_bindings: Bindings<'a>,
+}
+
+impl<'a> RuleQuery<'a> {
+    fn new(
+        head: &'a Literal,
+        literal: &'a Literal,
+        body: Query<'a>,
+        existing_bindings: Option<&Bindings<'a>>,
+    ) -> Result<Self, UnificationError> {
+        use crate::unification::traits::Unify;
+
+        let mut head_bindings = head.unify(literal, existing_bindings)?;
+        head_bindings.retain_variables(&head.variables());
+
+        Ok(Self {
+            head,
+            body,
+            head_bindings,
+        })
+    }
+
+    fn next_bindings(
+        &mut self,
+        literal: &'a Literal,
+        existing_bindings: Option<&Bindings<'a>>,
+    ) -> Option<Bindings<'a>> {
+        use crate::unification::traits::Unify;
+
+        while let Some(mut bindings) = self.body.next_bindings(Some(&self.head_bindings)) {
+            // Drop all variables that are not mentioned in the head of the rule.
+            bindings.retain_variables(&self.head.variables());
+
+            // Restablish the connection (aliasing) between variables in the rule and the original
+            // literal.
+            let Ok(bindings) = self.head.unify(literal, Some(&bindings)) else {
+                continue;
+            };
+
+            // Merge the surrounding bindings into the current ones.
+            let bindings = match existing_bindings {
+                Some(surrounding) => {
+                    let Ok(bindings) = Bindings::merge_views([&bindings, surrounding]) else {
+                        continue;
+                    };
+                    bindings
+                }
+                None => bindings,
+            };
+
+            return Some(bindings);
+        }
+
+        None
     }
 }
 
@@ -622,7 +673,7 @@ pub(crate) mod formula {
                 original: beliefs,
                 operand,
                 knowledge: bb,
-                negation_evaluated: false,
+                evaluated: false,
             }
         }
 
@@ -1331,6 +1382,144 @@ mod tests {
             "Y's binding from the first conjunct should survive the later rule \
              call to down(GW), even though `down` never mentions Y at all. If \
              this fails, `next_bindings_for_rule` dropped it again."
+        );
+    }
+
+    // Reproduces microgrid's best_route/better_exists/reachable shape.
+    // reachable(Dest, Via, Cost) has TWO separate clauses (direct + one
+    // indirect hop), and better_exists(Dest, Cost) :- reachable(Dest, _,
+    // C2) & C2 < Cost is invoked from inside a `not(...)` where Dest/Cost
+    // are already bound by the outer rule's own first conjunct -- one level
+    // deeper than the `down(GW)` case above (that rule's body never itself
+    // called another named, multi-clause rule).
+    //
+    // This used to hang forever (pinned at ~100% CPU, confirmed 12+ minutes)
+    // rather than return a wrong answer: `Cost` is a rule-head parameter
+    // that the body itself needs (`C2 < Cost`), but the old
+    // `next_bindings_for_rule` only unified the head against the caller's
+    // literal *after* resolving the body once, so `Cost` was permanently
+    // unbound while the body ran. Combined with `reachable`'s first clause
+    // being a purely relational (unify-only) sub-rule with no belief
+    // iterator to exhaust, backtracking into it after the doomed `C2 <
+    // Cost` check kept re-deriving the exact same answer forever instead of
+    // ever reporting "no more candidates". Fixed by (1) unifying the rule
+    // head against the caller's literal *before* resolving the body, so
+    // `Cost` is seeded in for the body to use, and (2) giving non-negated,
+    // belief-iterator-less ground queries (bare relational formulas) a
+    // single-shot "already evaluated" guard, mirroring the existing
+    // negated-query guard. See chirppark-gateway-down-bug.md's "deeper,
+    // still-open variant" section for the original repro writeup.
+    #[test]
+    fn nested_rule_over_disjunctive_rule_still_leaks_unrelated_bindings() {
+        let mut bb = KnowledgeBase::default();
+
+        // reachable(load, load, 1).            -- direct link, cost 1
+        // reachable(load, c, 14).               -- indirect via c, cost 14
+        // reachable(load, source, 11).          -- indirect via source, cost 11
+        let (d, v, c) = (variable(), variable(), variable());
+        bb.assert_no_event(rule(
+            "reachable",
+            vec![variable_term(&d), variable_term(&v), variable_term(&c)],
+            and(vec![
+                unify(expr(variable_term(&d)), expr(string("load"))),
+                unify(expr(variable_term(&v)), expr(string("load"))),
+                unify(expr(variable_term(&c)), expr(number(1.0))),
+            ]),
+        ));
+        let (d2, v2, c2) = (variable(), variable(), variable());
+        bb.assert_no_event(rule(
+            "reachable",
+            vec![variable_term(&d2), variable_term(&v2), variable_term(&c2)],
+            and(vec![
+                unify(expr(variable_term(&d2)), expr(string("load"))),
+                unify(expr(variable_term(&v2)), expr(string("c"))),
+                unify(expr(variable_term(&c2)), expr(number(14.0))),
+            ]),
+        ));
+        let (d3, v3, c3) = (variable(), variable(), variable());
+        bb.assert_no_event(rule(
+            "reachable",
+            vec![variable_term(&d3), variable_term(&v3), variable_term(&c3)],
+            and(vec![
+                unify(expr(variable_term(&d3)), expr(string("load"))),
+                unify(expr(variable_term(&v3)), expr(string("source"))),
+                unify(expr(variable_term(&c3)), expr(number(11.0))),
+            ]),
+        ));
+
+        // better_exists(Dest, Cost) :- reachable(Dest, _, C2) & C2 < Cost.
+        let (bd, bc, bc2, b_via) = (variable(), variable(), variable(), variable());
+        bb.assert_no_event(rule(
+            "better_exists",
+            vec![variable_term(&bd), variable_term(&bc)],
+            and(vec![
+                literal(
+                    "reachable",
+                    vec![
+                        variable_term(&bd),
+                        variable_term(&b_via),
+                        variable_term(&bc2),
+                    ],
+                ),
+                cmp(
+                    expr(variable_term(&bc2)),
+                    CompareOperator::LessThan,
+                    false,
+                    expr(variable_term(&bc)),
+                ),
+            ]),
+        ));
+
+        // best_route(Dest, Via, Cost) :- reachable(Dest, Via, Cost) & not better_exists(Dest, Cost).
+        let (rd, rv, rc) = (variable(), variable(), variable());
+        bb.assert_no_event(rule(
+            "best_route",
+            vec![variable_term(&rd), variable_term(&rv), variable_term(&rc)],
+            and(vec![
+                literal(
+                    "reachable",
+                    vec![variable_term(&rd), variable_term(&rv), variable_term(&rc)],
+                ),
+                not(literal(
+                    "better_exists",
+                    vec![variable_term(&rd), variable_term(&rc)],
+                )),
+            ]),
+        ));
+
+        // Enumerate every best_route(load, Via, Cost) solution, exactly what
+        // `.forall(best_route(Dest, Via, Cost) & ..., sync_route(...))` does
+        // in the real agent. Only (via=load, cost=1) should ever satisfy
+        // "not better_exists" -- the other two candidates both have a
+        // strictly cheaper alternative (cost 1) and should be rejected.
+        let (via, cost) = (variable(), variable());
+        let formula = literal(
+            "best_route",
+            vec![string("load"), variable_term(&via), variable_term(&cost)],
+        );
+        let mut query = (&formula).into_query(&bb);
+
+        let mut solutions = alloc::vec::Vec::new();
+        while let Some(bindings) = query.next_bindings(None) {
+            solutions.push((
+                bindings.get_view(&via).cloned(),
+                bindings.get_view(&cost).cloned(),
+            ));
+        }
+
+        assert_eq!(
+            solutions,
+            alloc::vec![(
+                Some(string("load").as_view()),
+                Some(TermView::Number(1.0.into()))
+            )],
+            "best_route(load, Via, Cost) should have exactly one solution \
+             (via=load, cost=1) -- if this contains the via=c/cost=14 or \
+             via=source/cost=11 candidates too, better_exists(load, 14) / \
+             better_exists(load, 11) both wrongly evaluated false instead of \
+             true, i.e. `not(...)`'s nested rule call failed to see that a \
+             cheaper reachable(load, _, _) exists once the NAF'd rule itself \
+             calls a second, disjunctive (multi-clause) rule."
         );
     }
 }
