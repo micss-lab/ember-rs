@@ -445,7 +445,9 @@ mod tests {
     use crate::knowledge::query::IntoQuery;
 
     use crate::plan::{Action, BuiltinAction, Formula};
-    use crate::testing::{assert_belief, literal, literal_formula, plan, string, trigger, variable, variable_term};
+    use crate::testing::{
+        assert_belief, literal, literal_formula, plan, string, trigger, variable, variable_term,
+    };
     use crate::variable::Variable;
 
     use super::*;
@@ -754,9 +756,18 @@ mod tests {
     impl Percept for Burst {
         fn into_beliefs(self) -> impl IntoIterator<Item = (Trigger, Literal)> {
             [
-                (Trigger::Addition, literal("ping", vec![crate::testing::number(1.0)])),
-                (Trigger::Addition, literal("ping", vec![crate::testing::number(2.0)])),
-                (Trigger::Addition, literal("ping", vec![crate::testing::number(3.0)])),
+                (
+                    Trigger::Addition,
+                    literal("ping", vec![crate::testing::number(1.0)]),
+                ),
+                (
+                    Trigger::Addition,
+                    literal("ping", vec![crate::testing::number(2.0)]),
+                ),
+                (
+                    Trigger::Addition,
+                    literal("ping", vec![crate::testing::number(3.0)]),
+                ),
             ]
         }
     }
@@ -771,8 +782,13 @@ mod tests {
             vec![Formula::Action(Action::User(TestAction::Log("pong")))],
         ));
 
-        let mut agent =
-            BdiAgent::<Vec<&'static str>, TestAction, Burst>::new("event-budget-agent", Vec::new(), None, lib, vec![]);
+        let mut agent = BdiAgent::<Vec<&'static str>, TestAction, Burst>::new(
+            "event-budget-agent",
+            Vec::new(),
+            None,
+            lib,
+            vec![],
+        );
         agent.add_sensor(BurstSensor(true));
         let mut agent = agent.with_tick_budget(TickBudget {
             max_events: 10,
@@ -807,7 +823,10 @@ mod tests {
         // `FirstApplicable` would have picked the first instead.
         struct RejectShortBody;
         impl<A> crate::plan::selector::PlanSelector<A> for RejectShortBody {
-            fn filter_plan<'p>(&mut self, plan: &'p crate::plan::Plan<A>) -> Option<&'p crate::plan::Plan<A>> {
+            fn filter_plan<'p>(
+                &mut self,
+                plan: &'p crate::plan::Plan<A>,
+            ) -> Option<&'p crate::plan::Plan<A>> {
                 (plan.body.len() > 1).then_some(plan)
             }
         }
@@ -914,7 +933,10 @@ mod tests {
             "recent_reply",
             vec![variable_term(&gw1)],
             and(vec![
-                literal_formula("last_reply", vec![variable_term(&gw1), variable_term(&treply)]),
+                literal_formula(
+                    "last_reply",
+                    vec![variable_term(&gw1), variable_term(&treply)],
+                ),
                 literal_formula("now", vec![variable_term(&now2)]),
                 not(gt(
                     minus(expr(variable_term(&now2)), expr(variable_term(&treply))),
@@ -930,7 +952,10 @@ mod tests {
             "gateway_down",
             vec![variable_term(&gw2)],
             and(vec![
-                literal_formula("last_request", vec![variable_term(&gw2), variable_term(&treq)]),
+                literal_formula(
+                    "last_request",
+                    vec![variable_term(&gw2), variable_term(&treq)],
+                ),
                 literal_formula("now", vec![variable_term(&now3)]),
                 not(literal_formula("recent_reply", vec![variable_term(&gw2)])),
                 gt(
@@ -998,7 +1023,10 @@ mod tests {
         let ga1 = literal_formula("target_gateway", vec![string("ga-1")]);
         let ga2 = literal_formula("target_gateway", vec![string("ga-2")]);
         assert!(
-            (&ga1).into_query(&agent.beliefs).next_bindings(None).is_some(),
+            (&ga1)
+                .into_query(&agent.beliefs)
+                .next_bindings(None)
+                .is_some(),
             "invocation 1: cold boot should target ga-1 (checked first, neither gateway down yet)"
         );
 
@@ -1013,7 +1041,9 @@ mod tests {
         agent
             .beliefs
             .assert_no_event(literal("last_request", vec![string("ga-1"), number(0.0)]));
-        agent.beliefs.remove_no_event(literal("now", vec![number(0.0)]));
+        agent
+            .beliefs
+            .remove_no_event(literal("now", vec![number(0.0)]));
         agent
             .beliefs
             .assert_no_event(literal("now", vec![number(6000.0)]));
@@ -1092,10 +1122,22 @@ mod tests {
             "target_gateway(ga-1)={} target_gateway(ga-2)={} gateway_down(ga-1)={} gateway_down(ga-2)={} \
              isolated_plan_b_context(Some(empty))={} isolated_plan_b_context(None)={} \
              ground_conjunction(Some(empty))={} solo_negation_with_GW_prebound_to_ga-2={}",
-            (&ga1).into_query(&agent.beliefs).next_bindings(None).is_some(),
-            (&ga2).into_query(&agent.beliefs).next_bindings(None).is_some(),
-            (&gd_a).into_query(&agent.beliefs).next_bindings(None).is_some(),
-            (&gd_b).into_query(&agent.beliefs).next_bindings(None).is_some(),
+            (&ga1)
+                .into_query(&agent.beliefs)
+                .next_bindings(None)
+                .is_some(),
+            (&ga2)
+                .into_query(&agent.beliefs)
+                .next_bindings(None)
+                .is_some(),
+            (&gd_a)
+                .into_query(&agent.beliefs)
+                .next_bindings(None)
+                .is_some(),
+            (&gd_b)
+                .into_query(&agent.beliefs)
+                .next_bindings(None)
+                .is_some(),
             isolated_result.is_some(),
             isolated_result_none.is_some(),
             ground_result.is_some(),
@@ -1103,7 +1145,10 @@ mod tests {
         );
 
         assert!(
-            (&ga2).into_query(&agent.beliefs).next_bindings(None).is_some(),
+            (&ga2)
+                .into_query(&agent.beliefs)
+                .next_bindings(None)
+                .is_some(),
             "invocation 2: ga-1 is down and ga-2 is not -- select_gateway should retarget \
              to ga-2. If this fails, the retry is stuck exactly like the real VA. {debug}"
         );

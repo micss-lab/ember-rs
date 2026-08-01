@@ -372,7 +372,8 @@ pub(crate) mod percept {
         let body = match &input.data {
             Data::Struct(data) => {
                 check_no_stray_percept_attrs(&data.fields)?;
-                let actions = container_actions.unwrap_or_else(|| vec![PerceptAction::default_add()]);
+                let actions =
+                    container_actions.unwrap_or_else(|| vec![PerceptAction::default_add()]);
                 actions_to_vec_expr(&actions, &quote!(self))
             }
             Data::Enum(data) => {
