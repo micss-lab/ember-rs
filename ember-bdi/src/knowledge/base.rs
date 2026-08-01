@@ -1,6 +1,7 @@
 use alloc::collections::{BTreeMap, BTreeSet};
 
 use crate::context::Context;
+use crate::intention::IntentionId;
 use crate::literal::IntoLiteral;
 use crate::plan::{Trigger, TriggeringEvent};
 use crate::term::Atom;
@@ -17,18 +18,22 @@ pub struct KnowledgeBase {
 impl KnowledgeBase {
     /// Adds the belief to the knowledge-base and emits an event that the belief has been added/updated.
     /// Returns `true` if the belief was already present.
-    pub fn assert<A>(&mut self, belief: impl IntoLiteral, context: &mut Context<A>) -> bool {
+    pub fn assert<A>(
+        &mut self,
+        belief: impl IntoLiteral,
+        context: &mut Context<A>,
+        intention_id: Option<IntentionId>,
+    ) -> bool {
         let belief = belief.into_literal();
         let added = self.assert_no_event(belief.clone());
         if added {
-            // TODO: Should this be an external event (no intention id)? I think it does...
             context.emit_event(
                 TriggeringEvent {
                     trigger: Trigger::Addition,
                     event: belief,
                     goal: None,
                 },
-                None,
+                intention_id,
             );
         }
         added
@@ -47,18 +52,22 @@ impl KnowledgeBase {
 
     /// Removes the belief from the knowledge-base and emits an event that the belief has been removed/updated.
     /// Returns `true` if the belief has been removed.
-    pub fn remove<A>(&mut self, belief: impl IntoLiteral, context: &mut Context<A>) -> bool {
+    pub fn remove<A>(
+        &mut self,
+        belief: impl IntoLiteral,
+        context: &mut Context<A>,
+        intention_id: Option<IntentionId>,
+    ) -> bool {
         let belief = belief.into_literal();
         let removed = self.remove_no_event(belief.clone());
         if removed {
-            // TODO: Should this be an external event (no intention id)? I think it does...
             context.emit_event(
                 TriggeringEvent {
                     trigger: Trigger::Deletion,
                     event: belief,
                     goal: None,
                 },
-                None,
+                intention_id,
             );
         }
         removed

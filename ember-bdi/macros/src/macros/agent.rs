@@ -205,7 +205,8 @@ peg::parser! {
         }
 
         rule body_formula() -> Spanned<BodyFormula>
-            = span:span() trigger:BODY_FORMULA_TRIGGER() literal:literal() { Spanned { node: BodyFormula::BeliefOrGoal { trigger, literal }, span } }
+            = span:span() trigger:BODY_FORMULA_GOAL_TRIGGER() literal:literal() { Spanned { node: BodyFormula::Goal { trigger, literal }, span } }
+            / span:span() trigger:BODY_FORMULA_BELIEF_TRIGGER() literal:literal() { Spanned { node: BodyFormula::Belief { trigger: trigger.0, literal, silent: trigger.1 }, span } }
             / span:span() "." "forall" "(" query:logical_expression() "," goal:literal() ")" {
                 Spanned {
                     span,
@@ -286,11 +287,13 @@ peg::parser! {
             / "!=" { RelationalOperator::NotEqual }
             / "=" { RelationalOperator::Unify }
 
-        rule BODY_FORMULA_TRIGGER() -> BodyFormulaTrigger
-            = "!" { BodyFormulaTrigger::Achieve }
-            / "?" { BodyFormulaTrigger::Query }
-            / "+" { BodyFormulaTrigger::Add }
-            / "-" { BodyFormulaTrigger::Remove }
+        rule BODY_FORMULA_BELIEF_TRIGGER() -> (BodyFormulaBeliefTrigger, bool)
+            = "+" silent:"^"? { (BodyFormulaBeliefTrigger::Add, silent.is_some()) }
+            / "-" silent:"^"? { (BodyFormulaBeliefTrigger::Remove, silent.is_some()) }
+
+        rule BODY_FORMULA_GOAL_TRIGGER() -> BodyFormulaGoalTrigger
+            = "!" { BodyFormulaGoalTrigger::Achieve }
+            / "?" { BodyFormulaGoalTrigger::Query }
     }
 }
 

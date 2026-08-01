@@ -315,8 +315,8 @@ where
                 if let Some(percept) = sensor.percept() {
                     for (trigger, belief) in percept.into_beliefs().into_iter() {
                         let _ = match trigger {
-                            Trigger::Addition => self.beliefs.assert(belief, &mut context),
-                            Trigger::Deletion => self.beliefs.remove(belief, &mut context),
+                            Trigger::Addition => self.beliefs.assert(belief, &mut context, None),
+                            Trigger::Deletion => self.beliefs.remove(belief, &mut context, None),
                         };
                     }
                 }
@@ -325,8 +325,6 @@ where
             }
         }
 
-        // Messages: bounded so a burst of inbound messages can't stall the rest of the tick.
-        // `receive_message` just pops from the inbox, so anything left over waits for next tick.
         let max_messages = self.tick_budget.max_messages.unwrap_or(usize::MAX);
         for _ in 0..max_messages {
             let Some(message) =
@@ -348,8 +346,6 @@ where
             self.handle_message(performative, content);
         }
 
-        // Events: bounded so a backlog can be drained faster than one-per-tick when the budget
-        // allows it, instead of always falling further behind under load.
         for _ in 0..self.tick_budget.max_events {
             let Some((event, source)) = self.event_queue.next_event() else {
                 break;
@@ -357,7 +353,6 @@ where
             self.handle_event(event, source);
         }
 
-        // Pending (blocked/multi-tick) actions: same round-robin rotation as sensors.
         let take = self
             .tick_budget
             .max_pending_actions
@@ -375,18 +370,15 @@ where
             }
         }
 
-        // Intentions: step up to `max_intentions` of them. Each stepped intention's own actions
-        // are fully drained and executed - with *its own* bindings - before the next intention
-        // is stepped, so `context.actions` is always empty going into a step. That's what makes
-        // raising `max_intentions` above 1 safe: an action can never be executed against a
-        // different intention's bindings, because no other intention's actions can be sitting in
-        // the queue at the same time.
         for _ in 0..self.tick_budget.max_intentions {
             if !self.intentions.has_runnable() {
                 break;
             }
 
-            let bindings = self.intentions.step(&mut context).into_owned();
+            let bindings = self
+                .intentions
+                .step(&mut context, &mut self.beliefs)
+                .into_owned();
 
             while let Some((intention_id, action)) = context.actions.pop() {
                 use crate::plan::Action::*;
@@ -620,6 +612,7 @@ mod tests {
             vec![Formula::Belief {
                 trigger: Trigger::Addition,
                 belief: literal("processed", vec![variable_term(&y)]),
+                silent: false,
             }],
         ));
 
@@ -987,6 +980,7 @@ mod tests {
             vec![Formula::Belief {
                 trigger: Trigger::Addition,
                 belief: literal("target_gateway", vec![variable_term(&gwa)]),
+                silent: false,
             }],
         ));
         let gwb = variable();
@@ -999,6 +993,7 @@ mod tests {
             vec![Formula::Belief {
                 trigger: Trigger::Addition,
                 belief: literal("target_gateway", vec![variable_term(&gwb)]),
+                silent: false,
             }],
         ));
 

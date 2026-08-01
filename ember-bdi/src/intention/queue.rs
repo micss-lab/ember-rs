@@ -2,6 +2,7 @@ use alloc::collections::{BTreeMap, BTreeSet};
 
 use crate::bindings::{Bindings, OwnedBindings};
 use crate::context::Context;
+use crate::knowledge::base::KnowledgeBase;
 use crate::plan::Plan;
 
 use super::result::*;
@@ -85,7 +86,11 @@ impl<A: Clone, Sched> IntentionQueue<A, Sched> {
             .push(plan, bindings, event);
     }
 
-    pub(crate) fn step<'a>(&'a mut self, context: &mut Context<A>) -> ReadOnlyBindings<'a>
+    pub(crate) fn step<'a>(
+        &'a mut self,
+        context: &mut Context<A>,
+        knowledge: &mut KnowledgeBase,
+    ) -> ReadOnlyBindings<'a>
     where
         Sched: Scheduler<A>,
     {
@@ -108,7 +113,7 @@ impl<A: Clone, Sched> IntentionQueue<A, Sched> {
                 .get_mut(&id)
                 .expect("intention id should exist");
 
-            match intention.step(context) {
+            match intention.step(context, knowledge) {
                 Ok(StepOk::Pending) => false,
                 Ok(StepOk::Done) => true,
                 Err(_) => unimplemented!("report intention execution error to user"),

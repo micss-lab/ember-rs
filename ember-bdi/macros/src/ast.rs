@@ -161,17 +161,26 @@ pub(crate) struct Body(pub(crate) Box<[Spanned<BodyFormula>]>);
 
 #[derive(Debug, Clone)]
 pub(crate) enum BodyFormula {
-    BeliefOrGoal {
-        trigger: BodyFormulaTrigger,
+    Belief {
+        trigger: BodyFormulaBeliefTrigger,
+        literal: Literal,
+        silent: bool,
+    },
+    Goal {
+        trigger: BodyFormulaGoalTrigger,
         literal: Literal,
     },
     Action(Spanned<Action>),
 }
 
 #[derive(Debug, Clone)]
-pub(crate) enum BodyFormulaTrigger {
+pub(crate) enum BodyFormulaBeliefTrigger {
     Add,
     Remove,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum BodyFormulaGoalTrigger {
     Achieve,
     Query,
 }
@@ -411,28 +420,39 @@ impl AstVisitor {
 
     fn visit_body_formula(&mut self, formula: &BodyFormula) -> impl ToTokens {
         match formula {
-            BodyFormula::BeliefOrGoal { trigger, literal } => {
+            BodyFormula::Belief {
+                trigger,
+                literal,
+                silent,
+            } => {
                 let literal = self.visit_literal(literal);
                 match trigger {
-                    BodyFormulaTrigger::Add => quote! {
+                    BodyFormulaBeliefTrigger::Add => quote! {
                         ::ember::agent::bdi::plan::Formula::Belief {
                             trigger: ::ember::agent::bdi::event::Trigger::Addition,
                             belief: #literal,
+                            silent: #silent,
                         }
                     },
-                    BodyFormulaTrigger::Remove => quote! {
+                    BodyFormulaBeliefTrigger::Remove => quote! {
                         ::ember::agent::bdi::plan::Formula::Belief {
                             trigger: ::ember::agent::bdi::event::Trigger::Deletion,
                             belief: #literal,
+                            silent: #silent,
                         }
                     },
-                    BodyFormulaTrigger::Achieve => quote! {
+                }
+            }
+            BodyFormula::Goal { trigger, literal } => {
+                let literal = self.visit_literal(literal);
+                match trigger {
+                    BodyFormulaGoalTrigger::Achieve => quote! {
                         ::ember::agent::bdi::plan::Formula::Goal {
                             kind: ::ember::agent::bdi::event::GoalKind::Achieve,
                             goal: #literal,
                         }
                     },
-                    BodyFormulaTrigger::Query => quote! {
+                    BodyFormulaGoalTrigger::Query => quote! {
                         ::ember::agent::bdi::plan::Formula::Goal {
                             kind: ::ember::agent::bdi::event::GoalKind::Query,
                             goal: #literal,

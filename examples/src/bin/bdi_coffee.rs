@@ -292,6 +292,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
                         arguments: None,
                     },
                 },
+                silent: false,
             },
         ]),
     });
@@ -414,6 +415,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
                         ])),
                     },
                 },
+                silent: false,
             },
             Formula::Belief {
                 trigger: Trigger::Addition,
@@ -427,6 +429,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
                         ])),
                     },
                 },
+                silent: false,
             },
         ]),
     });
@@ -487,6 +490,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
                         arguments: Some(Box::new([Term::String("coffee_beans".into())])),
                     },
                 },
+                silent: false,
             },
         ]),
     });

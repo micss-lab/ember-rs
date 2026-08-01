@@ -80,8 +80,16 @@ impl<'a, A> From<&'a Plan<A>> for PlanEqOrd<'a> {
 #[derive_where(Debug, PartialEq, Eq)]
 #[derive(Clone)]
 pub enum Formula<A> {
-    Belief { trigger: Trigger, belief: Literal },
-    Goal { kind: GoalKind, goal: Literal },
+    Belief {
+        trigger: Trigger,
+        belief: Literal,
+        /// Should updating the beliefbase emit an event for this one.
+        silent: bool,
+    },
+    Goal {
+        kind: GoalKind,
+        goal: Literal,
+    },
     Action(Action<A>),
 }
 
@@ -93,9 +101,14 @@ impl<A> Formula<A> {
         use crate::resolve::Resolve;
 
         Ok(match self {
-            Formula::Belief { trigger, belief } => Formula::Belief {
+            Formula::Belief {
+                trigger,
+                belief,
+                silent,
+            } => Formula::Belief {
                 trigger,
                 belief: belief.resolve(bindings)?,
+                silent,
             },
             Formula::Goal { kind, goal } => Formula::Goal {
                 kind,
