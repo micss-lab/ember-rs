@@ -207,29 +207,76 @@ peg::parser! {
         rule body_formula() -> Spanned<BodyFormula>
             = span:span() trigger:BODY_FORMULA_GOAL_TRIGGER() literal:literal() { Spanned { node: BodyFormula::Goal { trigger, literal }, span } }
             / span:span() trigger:BODY_FORMULA_BELIEF_TRIGGER() literal:literal() { Spanned { node: BodyFormula::Belief { trigger: trigger.0, literal, silent: trigger.1 }, span } }
-            / span:span() "." "forall" "(" query:logical_expression() "," goal:literal() ")" {
+            / span:span() "." action:builtin_action() {
                 Spanned {
                     span,
-                    node: BodyFormula::Action(Spanned {
-                        span,
-                        node: Action::Builtin(BuiltinAction::Forall { query, goal }),
-                    }),
+                    node: BodyFormula::Action(Spanned { span, node: Action::Builtin(action) }),
                 }
             }
-            / span:span() period:"."? formula:atomic_formula() {?
-                Ok(Spanned {
+            / span:span() !"." formula:atomic_formula() {
+                Spanned {
                     span,
-                    node: BodyFormula::Action(Spanned {
-                        span: formula.span,
-                        node: if period.is_some() {
-                            Action::Builtin(BuiltinAction::try_from(formula.node)
-                                .map_err(|_| "a valid system action (e.g. `.print`, `.message`, etc.)")?)
-                        } else {
-                            Action::User(formula)
-                        }
-                    })
-                })
+                    node: BodyFormula::Action(Spanned { span: formula.span, node: Action::User(formula) }),
+                }
             }
+
+        rule builtin_action() -> BuiltinAction
+            = action_log()
+            / action_stop_platform()
+            / action_send()
+            / action_wait()
+            / action_forall()
+            / action_at()
+            / expected!("a valid system action (e.g. `.log`, `.wait`, `.at`, etc.)")
+
+        rule action_log() -> BuiltinAction
+            = "log" "(" level:STRING() terms:("," t:term() { t })* ")" { BuiltinAction::Log(level, terms.into_boxed_slice()) }
+
+        rule action_stop_platform() -> BuiltinAction
+            = "stop_platform" ("(" ")")? { BuiltinAction::StopPlatform }
+
+        rule action_send() -> BuiltinAction
+            = "send" "(" aid:aid_or_variable() "," trigger:PERFORMATIVE() "," literal:literal() ")" {
+            BuiltinAction::Send { aid, trigger, literal }
+        }
+
+        rule action_wait() -> BuiltinAction
+            = "wait" "(" interval_millis:MILLIS() ")" { BuiltinAction::Wait { interval_millis } }
+
+        rule action_forall() -> BuiltinAction
+            = "forall" "(" query:logical_expression() "," goal:literal() ")" { BuiltinAction::Forall { query, goal } }
+
+        rule action_at() -> BuiltinAction
+            = "at" "(" delay_millis:MILLIS() "," goal:literal() ")" { BuiltinAction::At { delay_millis, goal } }
+
+
+        rule aid_or_variable() -> AidOrVariable
+            = s:STRING() {?
+            let (name, platform) = s.split_once('@').ok_or("an aid in the form \"name@platform\" or \"name@local\"")?;
+            if name.is_empty() {
+                return Err("a non-empty aid name");
+            }
+            let aid_platform = match platform {
+                "local" => None,
+                p if !p.is_empty() => Some(p.to_string()),
+                _ => return Err("a non-empty aid platform, or \"local\""),
+            };
+            Ok(AidOrVariable::Aid { aid_name: name.to_string(), aid_platform })
+        }
+            / var:VARIABLE() { AidOrVariable::Variable(var) }
+
+        rule PERFORMATIVE() -> Trigger
+            = s:STRING() {?
+            match s.as_str() {
+                "inform" => Ok(Trigger::Addition),
+                "disconfirm" => Ok(Trigger::Deletion),
+                _ => Err("\"inform\" or \"disconfirm\""),
+            }
+        }
+
+        // TODO: Implement support for custom time units, e.g. `"5s"`.
+        rule MILLIS() -> u64
+            = n:NUMBER() {? (n.round() == n).then_some(n.round() as u64).ok_or("an integer number of milliseconds") }
 
         rule span() -> proc_macro2::Span = #{|input, pos| input.next_span(pos)}
 

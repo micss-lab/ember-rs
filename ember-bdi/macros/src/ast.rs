@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 
 use proc_macro2::{Ident, TokenStream};
 use quote::{ToTokens, format_ident, quote};
@@ -207,120 +207,10 @@ pub enum BuiltinAction {
         query: LogicalExpression,
         goal: Literal,
     },
-}
-
-impl TryFrom<AtomicFormula> for BuiltinAction {
-    type Error = ();
-
-    fn try_from(AtomicFormula { functor, arguments }: AtomicFormula) -> Result<Self, Self::Error> {
-        match functor.0.as_str() {
-            "log" => Self::parse_log(arguments),
-            "stop_platform" => Self::parse_stop_platform(arguments),
-            "send" => Self::parse_send(arguments),
-            "wait" => Self::parse_wait(arguments),
-            _ => Err(()),
-        }
-    }
-}
-
-impl BuiltinAction {
-    fn parse_log(arguments: Option<Box<[Term]>>) -> Result<Self, ()> {
-        let mut arguments = VecDeque::from_iter(arguments.unwrap_or_default());
-
-        let Some(level) = arguments.pop_front() else {
-            return Err(());
-        };
-        let level = match level {
-            Term::String(s) => s,
-            _ => return Err(()),
-        };
-
-        Ok(Self::Log(level, Vec::from(arguments).into_boxed_slice()))
-    }
-
-    fn parse_stop_platform(arguments: Option<Box<[Term]>>) -> Result<Self, ()> {
-        arguments
-            .is_none_or(|args| args.is_empty())
-            .then_some(Self::StopPlatform)
-            .ok_or(())
-    }
-
-    fn parse_send(arguments: Option<Box<[Term]>>) -> Result<Self, ()> {
-        let mut args = VecDeque::from_iter(arguments.unwrap_or_default());
-
-        // First arg: Aid string "name@platform" or "name@local", validated at compile time.
-        let aid = {
-            match args.pop_front() {
-                Some(Term::String(s)) => {
-                    let (name, platform) = s.split_once('@').ok_or(())?;
-                    if name.is_empty() {
-                        return Err(());
-                    }
-                    let aid_name = name.to_string();
-                    let aid_platform = match platform {
-                        "local" => None,
-                        p if !p.is_empty() => Some(p.to_string()),
-                        _ => return Err(()),
-                    };
-                    AidOrVariable::Aid {
-                        aid_name,
-                        aid_platform,
-                    }
-                }
-                Some(Term::Variable(v)) => AidOrVariable::Variable(v),
-                _ => return Err(()),
-            }
-        };
-
-        // Second arg: performative string "inform" or "disconfirm".
-        let trigger = match args.pop_front() {
-            Some(Term::String(s)) => match s.as_str() {
-                "inform" => Trigger::Addition,
-                "disconfirm" => Trigger::Deletion,
-                _ => return Err(()),
-            },
-            _ => return Err(()),
-        };
-
-        // Third arg: the literal to send as content.
-        let literal = match args.pop_front() {
-            Some(Term::Literal(lit)) => lit,
-            _ => return Err(()),
-        };
-
-        if !args.is_empty() {
-            return Err(());
-        }
-
-        Ok(Self::Send {
-            aid,
-            trigger,
-            literal,
-        })
-    }
-
-    fn parse_wait(arguments: Option<Box<[Term]>>) -> Result<Self, ()> {
-        let mut args = VecDeque::from_iter(arguments.unwrap_or_default());
-
-        let Some(interval) = args.pop_front() else {
-            return Err(());
-        };
-
-        if args.front().is_some() {
-            return Err(());
-        }
-
-        let interval_millis = match interval {
-            Term::Number(n) if n.round() == n => n.round() as u64,
-            Term::String(_) => {
-                // TODO: Implement support for custom time units.
-                return Err(());
-            }
-            _ => return Err(()),
-        };
-
-        Ok(Self::Wait { interval_millis })
-    }
+    At {
+        delay_millis: u64,
+        goal: Literal,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -859,6 +749,15 @@ impl AstVisitor {
                         query: #query,
                         goal: #goal,
                     }
+                }
+            }
+            BuiltinAction::At { delay_millis, goal } => {
+                let goal = self.visit_literal(goal).into_token_stream();
+                quote! {
+                    ::ember::agent::bdi::plan::action::BuiltinAction::at(
+                        ::core::time::Duration::from_millis(#delay_millis),
+                        #goal,
+                    )
                 }
             }
         }

@@ -290,6 +290,7 @@ Built-in actions are written with a **leading dot** and are provided by the runt
 | `.stop_platform()`                       | Stop the whole container.                                                   |
 | `.send(aid, "performative", lit)`        | Send belief `lit` to another agent; `aid` is a `"name@host"` string or a bound variable (see [§7.13](#713-inter-agent-belief-sharing)). |
 | `.wait(millis)`                          | Suspend the current intention for at least `millis` milliseconds before continuing to the next step. `millis` must be an integer literal. Other intentions keep running while this one waits (see [§7.12](#712-the-reasoning-cycle)). |
+| `.at(millis, goal)`                      | After at least `millis` milliseconds, post an achievement-goal-addition event for `goal`. Does not block the calling intention: see below. |
 | `.forall(condition, goal)`               | For every way `condition` can be satisfied against the belief base, post an achievement goal for `goal` — each in its own new, independent intention. See below. |
 
 Using an unknown `.builtin` is a compile error listing the valid built-ins.
@@ -305,6 +306,18 @@ Using an unknown `.builtin` is a compile error listing the valid built-ins.
 a literal integer number of milliseconds; see [§7.12](#712-the-reasoning-cycle) for how it interacts
 with the rest of the reasoning cycle. `.stop_platform` takes no arguments. `.send` is covered in depth
 in [§7.13](#713-inter-agent-belief-sharing), since it involves addressing another agent.
+
+`.at(millis, goal)` schedules `goal` for later, without blocking. The step completes immediately and
+the delay runs in the background; once at least `millis` milliseconds have passed, `goal` is posted as
+a fresh achievement-goal-addition event, as if it had come from outside the agent. `goal` is a plain
+literal, not prefixed with `!`: the leading `.at` already makes it unambiguous that this is an
+achievement goal.
+
+```
++!start <- .at(500, check_again); .log("info", "scheduled").
+
++!check_again <- .log("info", "fired").
+```
 
 `.forall(condition, goal)` takes a *query* — `condition` is a logical expression with the same grammar
 as a plan context or rule body (literals, `&`/`|`/`not`, relational comparisons) — and posts one
@@ -574,6 +587,10 @@ Some actions need more than one tick to finish — `.wait` is the built-in examp
 action is still in progress, its intention doesn't advance to its next step (so later steps in the
 same plan wait for it), but other intentions continue to be scheduled normally, one step per tick, in
 the meantime.
+
+`.at` also spans many ticks while it waits out its delay, but it doesn't hold up its calling intention
+at all: it detaches into the background on the first tick, and the intention moves on to its next step
+immediately.
 
 ## 7.13 Inter-agent belief sharing
 

@@ -7,7 +7,8 @@ use crate::intention::IntentionId;
 use crate::plan::{Action, TriggeringEvent};
 
 pub struct Context<'ctx, A> {
-    pub(crate) actions: Vec<(IntentionId, Action<A>)>,
+    /// `None` for actions that shouldn't block their caller -- see `perform_action_non_blocking`.
+    pub(crate) actions: Vec<(Option<IntentionId>, Action<A>)>,
     pub(crate) events: Vec<(EventSource, TriggeringEvent)>,
     pub(crate) environment: &'ctx mut Environment,
 }
@@ -24,7 +25,12 @@ impl<'ctx, A> Context<'ctx, A> {
 
 impl<A> Context<'_, A> {
     pub(crate) fn perform_action(&mut self, intention_id: IntentionId, action: Action<A>) {
-        self.actions.push((intention_id, action));
+        self.actions.push((Some(intention_id), action));
+    }
+
+    /// Like `perform_action`, but the caller isn't blocked while the action stays pending.
+    pub(crate) fn perform_action_non_blocking(&mut self, action: Action<A>) {
+        self.actions.push((None, action));
     }
 
     pub(crate) fn emit_event(&mut self, event: TriggeringEvent, intention_id: Option<IntentionId>) {

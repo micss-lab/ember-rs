@@ -248,7 +248,10 @@ mod tests {
         // step 1: executes action1 (because it's popped first)
         let result = intention.step(&mut context, &mut knowledge);
         assert!(matches!(result, Ok(StepOk::Pending)));
-        assert_eq!(context.actions, &[(intention.id, Action::User("action1"))]);
+        assert_eq!(
+            context.actions,
+            &[(Some(intention.id), Action::User("action1"))]
+        );
 
         // step 2: executes action2
         let result = intention.step(&mut context, &mut knowledge);
@@ -256,8 +259,8 @@ mod tests {
         assert_eq!(
             context.actions,
             &[
-                (intention.id, Action::User("action1")),
-                (intention.id, Action::User("action2"))
+                (Some(intention.id), Action::User("action1")),
+                (Some(intention.id), Action::User("action2"))
             ]
         );
 

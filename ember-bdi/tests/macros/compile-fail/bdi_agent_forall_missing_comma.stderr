@@ -1,4 +1,4 @@
-error: expected one of "&", ")", ",", "|"
+error: expected one of "&", ",", "|"
  --> tests/macros/compile-fail/bdi_agent_forall_missing_comma.rs:5:32
   |
 5 |     +!start <- .forall(item(X) process(X)).

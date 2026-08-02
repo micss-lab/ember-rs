@@ -113,9 +113,20 @@ pub enum BuiltinAction {
     Wait(WaitState),
     /// Spawn a new intention for all possible bindings resulting from unification with the pattern.
     Forall { query: QueryFormula, goal: Literal },
+    /// Raises an achievement-goal event once `delay` has elapsed. Construct this variant with
+    /// the `[at](BuiltinAction::at)` member function.
+    At(AtState),
 }
 
 impl BuiltinAction {
+    pub fn at(delay: core::time::Duration, goal: Literal) -> Self {
+        BuiltinAction::At(AtState {
+            start: None,
+            delay: ember_time::from_core_duration(delay),
+            goal,
+        })
+    }
+
     pub fn wait(interval: core::time::Duration) -> Self {
         BuiltinAction::Wait(WaitState {
             start: None,
@@ -179,6 +190,7 @@ impl BuiltinAction {
                 None
             }
             Wait(state) => state.poll().map(Wait),
+            At(state) => state.poll(bindings, context).map(At),
             Forall { query, goal } => {
                 let mut query = query.into_query(knowledge);
                 while let Some(bindings) = query.next_bindings(Some(&bindings.as_bindings())) {
@@ -203,6 +215,55 @@ impl BuiltinAction {
                 None
             }
         }
+    }
+}
+
+/// State for the `.at` built-in action. Unlike `.wait`, doesn't block the calling intention --
+/// the first poll re-queues itself via `perform_action_non_blocking` and completes immediately;
+/// the requeued copy then polls like `.wait` until `delay` elapses, raising an achievement-goal
+/// event before it finally completes too.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AtState {
+    start: Option<Instant>,
+    delay: Duration,
+    goal: Literal,
+}
+
+impl AtState {
+    fn poll<A>(self, bindings: &impl BindingLookup, context: &mut Context<A>) -> Option<Self> {
+        let Self { start, delay, goal } = self;
+
+        let Some(start) = start else {
+            let armed = Self {
+                start: Some(ember_time::now()),
+                delay,
+                goal,
+            };
+            context.perform_action_non_blocking(Action::Builtin(BuiltinAction::At(armed)));
+            return None;
+        };
+
+        if ember_time::now() - start < delay {
+            return Some(Self {
+                start: Some(start),
+                delay,
+                goal,
+            });
+        }
+
+        match goal.resolve(bindings) {
+            Ok(resolved) => context.emit_event(
+                TriggeringEvent {
+                    trigger: Trigger::Addition,
+                    goal: Some(GoalKind::Achieve),
+                    event: resolved,
+                },
+                None,
+            ),
+            Err(_) => log::error!("failed to resolve goal in .at"),
+        }
+
+        None
     }
 }
 
@@ -354,6 +415,104 @@ mod tests {
             .expect("should resolve");
 
         assert_eq!(resolved, VariableOrReceiver::Receiver(receiver));
+    }
+
+    mod at {
+        use crate::event::EventSource;
+        use crate::plan::GoalKind;
+        use crate::testing::literal;
+
+        use super::*;
+
+        #[test]
+        fn first_poll_completes_immediately_and_requeues_non_blocking() {
+            let mut context: Context<()> = unsafe { new_context_without_environment() };
+            let knowledge = KnowledgeBase::default();
+            let bindings = bindings(vec![]);
+
+            let action = BuiltinAction::at(
+                core::time::Duration::from_secs(3600),
+                literal("check_again", vec![]),
+            );
+
+            let result = action.execute(&bindings, &mut context, &knowledge);
+
+            assert!(result.is_none());
+            assert_eq!(context.actions.len(), 1);
+            assert_eq!(context.actions[0].0, None);
+        }
+
+        #[test]
+        fn requeued_copy_stays_pending_until_delay_elapses() {
+            let mut context: Context<()> = unsafe { new_context_without_environment() };
+            let knowledge = KnowledgeBase::default();
+            let bindings = bindings(vec![]);
+
+            let action = BuiltinAction::at(
+                core::time::Duration::from_secs(3600),
+                literal("check_again", vec![]),
+            );
+            action.execute(&bindings, &mut context, &knowledge);
+            let (_, requeued) = context.actions.pop().unwrap();
+
+            let Action::Builtin(requeued) = requeued else {
+                unreachable!()
+            };
+            let result = requeued.execute(&bindings, &mut context, &knowledge);
+
+            assert!(result.is_some());
+            assert!(context.events.is_empty());
+        }
+
+        #[test]
+        fn fires_exactly_one_achieve_event_once_delay_elapses() {
+            let mut context: Context<()> = unsafe { new_context_without_environment() };
+            let knowledge = KnowledgeBase::default();
+            let bindings = bindings(vec![]);
+
+            let action =
+                BuiltinAction::at(core::time::Duration::ZERO, literal("check_again", vec![]));
+            action.execute(&bindings, &mut context, &knowledge);
+            let (_, requeued) = context.actions.pop().unwrap();
+
+            let Action::Builtin(requeued) = requeued else {
+                unreachable!()
+            };
+            let result = requeued.execute(&bindings, &mut context, &knowledge);
+
+            assert!(result.is_none());
+            assert_eq!(context.events.len(), 1);
+            let (source, event) = &context.events[0];
+            assert!(matches!(source, EventSource::External));
+            assert_eq!(event.trigger, Trigger::Addition);
+            assert_eq!(event.goal, Some(GoalKind::Achieve));
+            assert_eq!(event.event, literal("check_again", vec![]));
+        }
+
+        #[test]
+        fn resolves_the_goal_against_the_calling_frames_bindings() {
+            use crate::testing::{string, variable};
+
+            let mut context: Context<()> = unsafe { new_context_without_environment() };
+            let knowledge = KnowledgeBase::default();
+            let var = variable();
+            let room_value = string("kitchen");
+            let bindings = bindings(vec![(var.clone(), room_value.as_view())]);
+
+            let action = BuiltinAction::at(
+                core::time::Duration::ZERO,
+                literal("go_to", vec![crate::testing::variable_term(&var)]),
+            );
+            action.execute(&bindings, &mut context, &knowledge);
+            let (_, requeued) = context.actions.pop().unwrap();
+            let Action::Builtin(requeued) = requeued else {
+                unreachable!()
+            };
+            requeued.execute(&bindings, &mut context, &knowledge);
+
+            let (_, event) = &context.events[0];
+            assert_eq!(event.event, literal("go_to", vec![string("kitchen")]));
+        }
     }
 
     mod forall {

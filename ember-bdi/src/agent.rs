@@ -80,10 +80,11 @@ pub struct BdiAgent<
     intentions: IntentionQueue<Action, Sched>,
     /// Actions that returned pending on their last poll, keyed by the intention they belong to.
     /// Retried until they complete (subject to `tick_budget.max_pending_actions`); their owning
-    /// intention stays blocked in `intentions` for as long as they're here. A `VecDeque` so
-    /// retries can round-robin: serviced-and-still-pending entries move to the back, untouched
-    /// ones stay at the front and are tried first next tick.
-    pending_actions: VecDeque<(IntentionId, PendingAction<Action>)>,
+    /// intention stays blocked in `intentions` for as long as they're here, unless it's `None`
+    /// (see `Context::perform_action_non_blocking`). A `VecDeque` so retries can round-robin:
+    /// serviced-and-still-pending entries move to the back, untouched ones stay at the front and
+    /// are tried first next tick.
+    pending_actions: VecDeque<(Option<IntentionId>, PendingAction<Action>)>,
     event_queue: EventQueue<Sel>,
     /// A `VecDeque` for the same round-robin reason as `pending_actions`: polled sensors rotate
     /// to the back so `tick_budget.max_sensors` doesn't starve the ones later in the list.
@@ -366,7 +367,11 @@ where
 
             match pending.execute(&mut context, &self.beliefs, &mut self.state) {
                 Some(pending) => self.pending_actions.push_back((intention_id, pending)),
-                None => self.intentions.unblock(intention_id),
+                None => {
+                    if let Some(id) = intention_id {
+                        self.intentions.unblock(id);
+                    }
+                }
             }
         }
 
@@ -392,7 +397,9 @@ where
                 };
 
                 if let Some(action) = pending {
-                    self.intentions.block(intention_id);
+                    if let Some(id) = intention_id {
+                        self.intentions.block(id);
+                    }
                     self.pending_actions
                         .push_back((intention_id, PendingAction::new(action, bindings.clone())));
                 }
@@ -544,6 +551,54 @@ mod tests {
         }
         assert!(agent.intentions.is_empty());
         assert_eq!(agent.state, vec!["poll", "poll", "other", "poll", "after"]);
+    }
+
+    #[test]
+    fn at_does_not_block_the_calling_intention_unlike_wait() {
+        // +!start <- .at(3600000, scheduled_goal); .log_after.
+        // +!scheduled_goal <- .log_fired.
+        let mut lib = PlanLibrary::default();
+        lib.add(plan(
+            trigger("start", vec![], Some(GoalKind::Achieve)),
+            None,
+            vec![
+                Formula::Action(Action::Builtin(BuiltinAction::at(
+                    core::time::Duration::from_secs(3600),
+                    literal("scheduled_goal", vec![]),
+                ))),
+                Formula::Action(Action::User(TestAction::Log("after_at"))),
+            ],
+        ));
+        lib.add(plan(
+            trigger("scheduled_goal", vec![], Some(GoalKind::Achieve)),
+            None,
+            vec![Formula::Action(Action::User(TestAction::Log(
+                "scheduled_fired",
+            )))],
+        ));
+
+        let mut agent = BdiAgent::<Vec<&'static str>, TestAction, ()>::new(
+            "test-agent",
+            Vec::new(),
+            None,
+            lib,
+            vec![literal("start", vec![])],
+        )
+        .with_scheduler(crate::intention::queue::Fifo);
+
+        let mut environment = new_environment();
+
+        // Tick 1: `.at`'s first poll re-queues itself non-blocking and completes immediately.
+        agent.tick(&mut environment);
+        assert_eq!(agent.pending_actions.len(), 1);
+        assert!(agent.intentions.has_runnable());
+
+        // Tick 2: the same intention is free to run its next formula straight away, even
+        // though the re-queued `.at` is still sitting in `pending_actions` an hour from firing.
+        agent.tick(&mut environment);
+        assert_eq!(agent.state, vec!["after_at"]);
+        assert_eq!(agent.pending_actions.len(), 1, "still waiting on its delay");
+        assert!(!agent.state.contains(&"scheduled_fired"));
     }
 
     #[test]

@@ -13,7 +13,7 @@ content. See [Messaging](./05-messaging.md).
 
 ### Action
 A leaf step in a BDI plan body. Either a **built-in action** (`.log`, `.send`, `.stop_platform`,
-`.forall`) or a **user-defined action** (a Rust method on the agent, declared with `#[bdi_actions]`).
+`.forall`, `.at`) or a **user-defined action** (a Rust method on the agent, declared with `#[bdi_actions]`).
 See [BDI Agents §7.8–7.9](./07-bdi-agents.md#78-built-in-actions).
 
 ### AID (`Aid`)
