@@ -71,6 +71,8 @@ impl<S, E> Agent for ReactiveAgent<'_, S, E> {
     }
 
     fn get_name(&self) -> Cow<str> {
-        self.name.clone()
+        use core::borrow::Borrow;
+
+        Cow::Borrowed(self.name.borrow())
     }
 }

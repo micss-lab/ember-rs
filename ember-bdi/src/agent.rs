@@ -78,16 +78,8 @@ pub struct BdiAgent<
     beliefs: KnowledgeBase,
     plans: PlanLibrary<Action, PSel>,
     intentions: IntentionQueue<Action, Sched>,
-    /// Actions that returned pending on their last poll, keyed by the intention they belong to.
-    /// Retried until they complete (subject to `tick_budget.max_pending_actions`); their owning
-    /// intention stays blocked in `intentions` for as long as they're here, unless it's `None`
-    /// (see `Context::perform_action_non_blocking`). A `VecDeque` so retries can round-robin:
-    /// serviced-and-still-pending entries move to the back, untouched ones stay at the front and
-    /// are tried first next tick.
     pending_actions: VecDeque<(Option<IntentionId>, PendingAction<Action>)>,
     event_queue: EventQueue<Sel>,
-    /// A `VecDeque` for the same round-robin reason as `pending_actions`: polled sensors rotate
-    /// to the back so `tick_budget.max_sensors` doesn't starve the ones later in the list.
     sensors: Option<VecDeque<Sensor<'s, Percept>>>,
     fipa: FipaAgent,
     tick_budget: TickBudget,
@@ -429,7 +421,9 @@ where
     }
 
     fn get_name(&self) -> Cow<str> {
-        self.name.clone()
+        use core::borrow::Borrow;
+
+        Cow::Borrowed(self.name.borrow())
     }
 }
 
