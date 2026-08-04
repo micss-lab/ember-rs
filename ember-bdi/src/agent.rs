@@ -357,6 +357,13 @@ where
                         .push_back((intention_id, PendingAction::new(action, bindings.clone())));
                 }
             }
+
+            // Scan over the event queue and block any intention that has unprocessed
+            // events.
+            context.events.iter().for_each(|(s, _)| match s {
+                EventSource::Internal(i) => self.intentions.block(i),
+                EventSource::External => (),
+            });
         }
     }
 }
