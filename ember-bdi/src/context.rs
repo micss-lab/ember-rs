@@ -7,7 +7,6 @@ use crate::intention::IntentionId;
 use crate::plan::{Action, TriggeringEvent};
 
 pub struct Context<'ctx, A> {
-    /// `None` for actions that shouldn't block their caller -- see `perform_action_non_blocking`.
     pub(crate) actions: Vec<(Option<IntentionId>, Action<A>)>,
     pub(crate) events: Vec<(EventSource, TriggeringEvent)>,
     pub(crate) environment: &'ctx mut Environment,

@@ -23,46 +23,6 @@ use crate::plan::{GoalKind, Trigger, TriggeringEvent};
 use crate::sensor::{Percept, Perceptor, Sensor};
 use crate::term::{Structure, Term};
 
-/// Limits on how much work a single [`BdiAgent::update`] tick may perform, so a busy agent
-/// degrades gracefully (falls behind smoothly) instead of doing an unbounded amount of work
-/// (and therefore taking unbounded time) in a single tick.
-///
-/// Every field defaults to today's unconfigured behaviour, so adopting a `TickBudget` is
-/// opt-in and only ever *adds* limits.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TickBudget {
-    /// Maximum number of inbound `ember-bdil` messages handled per tick. `None` means every
-    /// message currently queued is handled, however many there are.
-    pub max_messages: Option<usize>,
-    /// Maximum number of events (belief/goal additions or deletions) handled per tick. Must be
-    /// at least `1` for the agent to make progress; defaults to `1`, matching the un-configured
-    /// behaviour.
-    pub max_events: usize,
-    /// Maximum number of sensors polled per tick, round-robin across ticks so no sensor is
-    /// starved. `None` means every sensor is polled every tick.
-    pub max_sensors: Option<usize>,
-    /// Maximum number of blocked/multi-tick actions retried per tick, round-robin across ticks.
-    /// `None` means every pending action is retried every tick.
-    pub max_pending_actions: Option<usize>,
-    /// Maximum number of intentions stepped per tick. Each stepped intention's own actions are
-    /// always fully executed (using that intention's own bindings) before the next intention is
-    /// stepped, so raising this is safe: it can never mix up bindings between intentions.
-    /// Defaults to `1`, matching the un-configured behaviour.
-    pub max_intentions: usize,
-}
-
-impl Default for TickBudget {
-    fn default() -> Self {
-        Self {
-            max_messages: None,
-            max_events: 1,
-            max_sensors: None,
-            max_pending_actions: None,
-            max_intentions: 1,
-        }
-    }
-}
-
 #[derive(Debug)]
 pub struct BdiAgent<
     's,
@@ -116,10 +76,7 @@ impl<'s, State, Action, Percept, Sched, Sel, PSel>
         self
     }
 
-    /// Configures which intention is stepped next when several are runnable. Replaces the
-    /// default (`Random`). A different scheduler is a different type, so this returns a
-    /// differently-typed agent rather than mutating in place.
-    pub fn with_scheduler<NewSched>(
+    pub fn with_intention_scheduler<NewSched>(
         self,
         scheduler: NewSched,
     ) -> BdiAgent<'s, State, Action, Percept, NewSched, Sel, PSel> {
@@ -137,9 +94,6 @@ impl<'s, State, Action, Percept, Sched, Sel, PSel>
         }
     }
 
-    /// Configures which queued event is handled next. Replaces the default (`FirstEvent`). A
-    /// different selector is a different type, so this returns a differently-typed agent rather
-    /// than mutating in place.
     pub fn with_event_selector<NewSel>(
         self,
         selector: NewSel,
@@ -158,9 +112,6 @@ impl<'s, State, Action, Percept, Sched, Sel, PSel>
         }
     }
 
-    /// Configures how a plan is chosen among those applicable to an event. Replaces the default
-    /// (`FirstApplicable`). A different selector is a different type, so this returns a
-    /// differently-typed agent rather than mutating in place.
     pub fn with_plan_selector<NewPSel>(
         self,
         selector: NewPSel,
@@ -277,49 +228,9 @@ where
             }
         }
     }
-}
 
-impl<State, Action, P, Sched, Sel, PSel> BdiAgent<'_, State, Action, P, Sched, Sel, PSel>
-where
-    Action: Execute<State = State, Action = Action> + Clone,
-    P: Percept,
-    Sched: Scheduler<Action>,
-    Sel: EventSelector,
-    PSel: PlanSelector<Action>,
-{
-    fn tick(&mut self, environment: &mut Environment) {
-        let mut context = Context::new(environment);
-
-        // Sensors: rotate through a `VecDeque` so a `max_sensors` cap can't starve the sensors
-        // later in the list - a sensor is always moved to the back after being polled,
-        // regardless of `max_sensors`, so untouched ones stay at the front for next tick.
-        if let Some(sensors) = self.sensors.as_mut() {
-            let take = self
-                .tick_budget
-                .max_sensors
-                .unwrap_or(sensors.len())
-                .min(sensors.len());
-
-            for _ in 0..take {
-                let Some(mut sensor) = sensors.pop_front() else {
-                    break;
-                };
-
-                if let Some(percept) = sensor.percept() {
-                    for (trigger, belief) in percept.into_beliefs().into_iter() {
-                        let _ = match trigger {
-                            Trigger::Addition => self.beliefs.assert(belief, &mut context, None),
-                            Trigger::Deletion => self.beliefs.remove(belief, &mut context, None),
-                        };
-                    }
-                }
-
-                sensors.push_back(sensor);
-            }
-        }
-
-        let max_messages = self.tick_budget.max_messages.unwrap_or(usize::MAX);
-        for _ in 0..max_messages {
+    fn handle_messages(&mut self, context: &mut Context<'_, Action>) {
+        for _ in 0..self.tick_budget.max_messages.unwrap_or(usize::MAX) {
             let Some(message) =
                 context.receive_message(Some(MessageFilter::language("ember-bdil").into()))
             else {
@@ -338,26 +249,68 @@ where
 
             self.handle_message(performative, content);
         }
+    }
+}
 
+impl<State, Action, Perc, Sched, Sel, PSel> BdiAgent<'_, State, Action, Perc, Sched, Sel, PSel>
+where
+    Perc: Percept,
+{
+    fn tick_sensors(&mut self, context: &mut Context<'_, Action>) {
+        let Some(sensors) = self.sensors.as_mut() else {
+            return;
+        };
+
+        for _ in 0..self.tick_budget.max_sensors.unwrap_or(usize::MAX) {
+            let Some(mut sensor) = sensors.pop_front() else {
+                break;
+            };
+
+            let Some(percept) = sensor.percept() else {
+                sensors.push_back(sensor);
+                continue;
+            };
+
+            for (trigger, belief) in percept.into_beliefs() {
+                let _ = match trigger {
+                    Trigger::Addition => self.beliefs.assert(belief, context, None),
+                    Trigger::Deletion => self.beliefs.remove(belief, context, None),
+                };
+            }
+
+            sensors.push_back(sensor);
+        }
+    }
+}
+
+impl<State, Action, Perc, Sched, Sel, PSel> BdiAgent<'_, State, Action, Perc, Sched, Sel, PSel>
+where
+    Action: Clone,
+    Sel: EventSelector,
+    PSel: PlanSelector<Action>,
+{
+    fn handle_events(&mut self) {
         for _ in 0..self.tick_budget.max_events {
             let Some((event, source)) = self.event_queue.next_event() else {
                 break;
             };
+
             self.handle_event(event, source);
         }
+    }
+}
 
-        let take = self
-            .tick_budget
-            .max_pending_actions
-            .unwrap_or(self.pending_actions.len())
-            .min(self.pending_actions.len());
-
-        for _ in 0..take {
+impl<State, Action, Perc, Sched, Sel, PSel> BdiAgent<'_, State, Action, Perc, Sched, Sel, PSel>
+where
+    Action: Execute<State = State, Action = Action>,
+{
+    fn run_pending_actions(&mut self, context: &mut Context<'_, Action>) {
+        for _ in 0..self.tick_budget.max_pending_actions.unwrap_or(usize::MAX) {
             let Some((intention_id, pending)) = self.pending_actions.pop_front() else {
                 break;
             };
 
-            match pending.execute(&mut context, &self.beliefs, &mut self.state) {
+            match pending.execute(&mut *context, &self.beliefs, &mut self.state) {
                 Some(pending) => self.pending_actions.push_back((intention_id, pending)),
                 None => {
                     if let Some(id) = intention_id {
@@ -366,7 +319,15 @@ where
                 }
             }
         }
+    }
+}
 
+impl<State, Action, Perc, Sched, Sel, PSel> BdiAgent<'_, State, Action, Perc, Sched, Sel, PSel>
+where
+    Action: Clone + Execute<State = State, Action = Action>,
+    Sched: Scheduler<Action>,
+{
+    fn tick_intentions(&mut self, mut context: &mut Context<'_, Action>) {
         for _ in 0..self.tick_budget.max_intentions {
             if !self.intentions.has_runnable() {
                 break;
@@ -397,6 +358,29 @@ where
                 }
             }
         }
+    }
+}
+
+impl<State, Action, Perc, Sched, Sel, PSel> BdiAgent<'_, State, Action, Perc, Sched, Sel, PSel>
+where
+    Action: Execute<State = State, Action = Action> + Clone,
+    Perc: Percept,
+    Sched: Scheduler<Action>,
+    Sel: EventSelector,
+    PSel: PlanSelector<Action>,
+{
+    fn tick(&mut self, environment: &mut Environment) {
+        let mut context = Context::new(environment);
+
+        self.tick_sensors(&mut context);
+
+        self.handle_messages(&mut context);
+
+        self.handle_events();
+
+        self.run_pending_actions(&mut context);
+
+        self.tick_intentions(&mut context);
 
         context.events.into_iter().for_each(|(source, event)| {
             self.event_queue.push(event, source);
@@ -424,6 +408,36 @@ where
         use core::borrow::Borrow;
 
         Cow::Borrowed(self.name.borrow())
+    }
+}
+
+/// Limits on how much work a single [`BdiAgent::update`] tick may perform.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TickBudget {
+    /// Maximum number [`ember-bdil`] messages that will be handled. Defaults to `None` (all that are
+    /// currently queued).
+    pub max_messages: Option<usize>,
+    /// Maximum number of internal and external events that be handled. Defaults to 1.
+    pub max_events: usize,
+    /// Maximum number of sensors polled per tick, round-robin across ticks so no sensor is
+    /// starved. Defaults to `None` (every sensor is polled every tick).
+    pub max_sensors: Option<usize>,
+    /// Maximum number of pending actions repolled per tick, round-robin across ticks.
+    /// Defaults to `None` (every pending action is retried every tick).
+    pub max_pending_actions: Option<usize>,
+    /// Maximum number of intentions stepped per tick. Defaults to `1`.
+    pub max_intentions: usize,
+}
+
+impl Default for TickBudget {
+    fn default() -> Self {
+        Self {
+            max_messages: None,
+            max_events: 1,
+            max_sensors: None,
+            max_pending_actions: None,
+            max_intentions: 1,
+        }
     }
 }
 
@@ -512,7 +526,7 @@ mod tests {
             lib,
             vec![literal("wait_test", vec![]), literal("other_test", vec![])],
         )
-        .with_scheduler(crate::intention::queue::Fifo);
+        .with_intention_scheduler(crate::intention::queue::Fifo);
 
         let mut environment = new_environment();
 
@@ -578,7 +592,7 @@ mod tests {
             lib,
             vec![literal("start", vec![])],
         )
-        .with_scheduler(crate::intention::queue::Fifo);
+        .with_intention_scheduler(crate::intention::queue::Fifo);
 
         let mut environment = new_environment();
 
