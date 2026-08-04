@@ -1,4 +1,4 @@
-use alloc::collections::{BTreeMap, BTreeSet};
+use ember_collections::{SmallMap, SmallSet};
 
 use crate::context::Context;
 use crate::intention::IntentionId;
@@ -12,7 +12,10 @@ use super::query::{IntoQuery, Query};
 #[derive(Debug, Default)]
 pub struct KnowledgeBase {
     /// Mapping from the belief atom and the arity to a list of ground truths.
-    pub(super) collections: BTreeMap<(Atom, usize), KnowledgeCollection>,
+    /// Never holds more than a handful of distinct functor/arity pairs for
+    /// an embedded agent's belief base, so a linear-scan map beats a
+    /// `BTreeMap`'s per-insert node allocation.
+    pub(super) collections: SmallMap<(Atom, usize), KnowledgeCollection>,
 }
 
 impl KnowledgeBase {
@@ -106,7 +109,7 @@ where
 
 /// A collection of beliefs not guaranteed to be semantically consistent.
 #[derive(Debug, Default)]
-pub(super) struct KnowledgeCollection(pub(super) BTreeSet<Knowledge>);
+pub(super) struct KnowledgeCollection(pub(super) SmallSet<Knowledge>);
 
 impl KnowledgeCollection {
     /// Stores the belief in the collection returning `true` if the belief is new.

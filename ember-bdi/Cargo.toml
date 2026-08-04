@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 ember-bdi-macros = { path = "./macros" }
 
+ember-collections = { workspace = true }
 ember-core = { workspace = true }
 ember-fipa = { workspace = true }
 ember-time = { workspace = true }

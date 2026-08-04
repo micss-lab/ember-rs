@@ -1,4 +1,4 @@
-use alloc::collections::btree_set::BTreeSet;
+use ember_collections::SmallSet;
 
 pub use ember_bdi_macros::IntoLiteral;
 
@@ -18,13 +18,13 @@ impl Literal {
         self.structure.is_ground()
     }
 
-    pub(crate) fn variables(&self) -> BTreeSet<VariableId> {
-        let mut vars = BTreeSet::default();
+    pub(crate) fn variables(&self) -> SmallSet<VariableId> {
+        let mut vars = SmallSet::default();
         self.collect_variables(&mut vars);
         vars
     }
 
-    pub(crate) fn collect_variables(&self, vars: &mut BTreeSet<VariableId>) {
+    pub(crate) fn collect_variables(&self, vars: &mut SmallSet<VariableId>) {
         self.structure.collect_variables(vars)
     }
 

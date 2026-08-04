@@ -1,5 +1,6 @@
-use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
+
+use ember_collections::SmallMap;
 
 use crate::bindings::{AliasMap, Bindings, StructureView, TermView};
 use crate::literal::Literal;
@@ -74,14 +75,14 @@ impl<'a> ConstraintSolver<'a> {
             self.classes.find_root(var);
         }
 
-        let mut root_assignments = BTreeMap::new();
-        for (&root, term) in &self.classes.root_to_term {
+        let mut root_assignments = SmallMap::new();
+        for (&root, term) in self.classes.root_to_term.iter() {
             let resolved = self.classes.resolve_term(term.clone(), &mut Vec::new())?;
             root_assignments.insert(root, resolved);
         }
 
-        let mut bindings = BTreeMap::new();
-        let mut root_to_vars: BTreeMap<VariableId, Vec<VariableId>> = BTreeMap::new();
+        let mut bindings = SmallMap::new();
+        let mut root_to_vars: SmallMap<VariableId, Vec<VariableId>> = SmallMap::new();
 
         for &var in &variables {
             let root = self.classes.find_root(var);
@@ -94,7 +95,7 @@ impl<'a> ConstraintSolver<'a> {
         Ok(Bindings::new(bindings, aliases))
     }
 
-    fn extract_aliases(&self, root_to_vars: BTreeMap<VariableId, Vec<VariableId>>) -> AliasMap {
+    fn extract_aliases(&self, root_to_vars: SmallMap<VariableId, Vec<VariableId>>) -> AliasMap {
         let mut aliases_pairs = Vec::new();
         for vars in root_to_vars.values() {
             if let Some((&first, rest)) = vars.split_first() {
@@ -109,8 +110,8 @@ impl<'a> ConstraintSolver<'a> {
 
 #[derive(Debug, Default)]
 struct EquivalenceClasses<'a> {
-    parent: BTreeMap<VariableId, VariableId>,
-    root_to_term: BTreeMap<VariableId, TermView<'a>>,
+    parent: SmallMap<VariableId, VariableId>,
+    root_to_term: SmallMap<VariableId, TermView<'a>>,
 }
 
 impl<'a> EquivalenceClasses<'a> {

@@ -1,7 +1,8 @@
 use core::marker::PhantomData;
 
-use alloc::collections::{BTreeMap, BTreeSet};
 use alloc::vec::Vec;
+
+use ember_collections::{SmallMap, SmallSet};
 
 use crate::term::Term;
 use crate::term::conversion::{FromTerm, FromTermError};
@@ -15,7 +16,7 @@ pub(crate) mod solver;
 
 #[derive(Debug, Clone, Default)]
 pub struct Bindings<'a, T = TermView<'a>> {
-    pub(crate) bindings: Option<BTreeMap<VariableId, Option<T>>>,
+    pub(crate) bindings: Option<SmallMap<VariableId, Option<T>>>,
     pub(crate) aliases: AliasMap,
     lifetime_: PhantomData<&'a ()>,
 }
@@ -41,7 +42,7 @@ impl<'a, T> Bindings<'a, T> {
     }
 
     /// Filters the bound variables and only retains those present in the specified set.
-    pub(crate) fn retain_variables(&mut self, variables: &BTreeSet<VariableId>) {
+    pub(crate) fn retain_variables(&mut self, variables: &SmallSet<VariableId>) {
         if let Some(b) = self.bindings.as_mut() {
             b.retain(|v, _| variables.contains(v))
         }
@@ -197,7 +198,7 @@ impl AliasMap {
         self.0.iter()
     }
 
-    fn retain_variables(&mut self, variables: &BTreeSet<VariableId>) {
+    fn retain_variables(&mut self, variables: &SmallSet<VariableId>) {
         self.0
             .retain(|(v1, v2)| variables.contains(v1) && variables.contains(v2));
     }
