@@ -1,6 +1,7 @@
-use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
 use core::slice::Iter;
+
+use ember_collections::SmallMap;
 
 use crate::bindings::Bindings;
 use crate::knowledge::base::KnowledgeBase;
@@ -22,7 +23,7 @@ pub struct PlanSelection<'p, 'e, A> {
 impl<'p, 'e, A> PlanSelection<'p, 'e, A> {
     pub(super) fn select_from_library(
         event: &'e TriggeringEvent,
-        plans: &'p BTreeMap<PlanKey, Vec<Plan<A>>>,
+        plans: &'p SmallMap<PlanKey, Vec<Plan<A>>>,
     ) -> Self {
         Self {
             plans: plans.get(&event.into()).map(|p| p.iter()),

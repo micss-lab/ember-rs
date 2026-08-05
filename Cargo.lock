@@ -566,6 +566,7 @@ dependencies = [
  "derive_more",
  "ember",
  "ember-bdi-macros",
+ "ember-collections",
  "ember-core",
  "ember-fipa",
  "ember-time",
@@ -594,6 +595,10 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "ember-collections"
+version = "0.1.0"
 
 [[package]]
 name = "ember-core"

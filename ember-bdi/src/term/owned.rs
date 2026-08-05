@@ -1,9 +1,9 @@
 use alloc::boxed::Box;
-use alloc::collections::BTreeSet;
 use alloc::string::{String, ToString};
 
 use bstr::BString;
 
+use ember_collections::SmallSet;
 use ember_util::cmp::TotalCmpF32;
 
 use crate::literal::Literal;
@@ -34,7 +34,7 @@ impl Term {
         }
     }
 
-    pub(crate) fn collect_variables(&self, vars: &mut BTreeSet<VariableId>) {
+    pub(crate) fn collect_variables(&self, vars: &mut SmallSet<VariableId>) {
         match self {
             Term::Variable(v) => {
                 vars.insert(v.id);
@@ -83,7 +83,7 @@ impl Structure {
             .unwrap_or(true)
     }
 
-    pub(crate) fn collect_variables(&self, variables: &mut BTreeSet<VariableId>) {
+    pub(crate) fn collect_variables(&self, variables: &mut SmallSet<VariableId>) {
         if let Some(args) = self.arguments.as_ref() {
             args.iter()
                 .for_each(|arg| arg.collect_variables(&mut *variables))

@@ -1,6 +1,7 @@
 use alloc::boxed::Box;
-use alloc::collections::btree_set::Iter;
 use alloc::vec::Vec;
+
+use ember_collections::SmallSetIter as Iter;
 
 use crate::bindings::Bindings;
 use crate::literal::Literal;

@@ -1,5 +1,6 @@
-use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
+
+use ember_collections::SmallMap;
 
 use crate::bindings::Bindings;
 use crate::knowledge::base::KnowledgeBase;
@@ -11,14 +12,14 @@ use super::{GoalKind, Plan, Trigger, TriggeringEvent};
 
 #[derive(Debug)]
 pub struct PlanLibrary<A, PSel = FirstApplicable> {
-    pub(super) plans: BTreeMap<PlanKey, Vec<Plan<A>>>,
+    pub(super) plans: SmallMap<PlanKey, Vec<Plan<A>>>,
     selector: PSel,
 }
 
 impl<A, PSel: Default> Default for PlanLibrary<A, PSel> {
     fn default() -> Self {
         Self {
-            plans: BTreeMap::default(),
+            plans: SmallMap::default(),
             selector: PSel::default(),
         }
     }
