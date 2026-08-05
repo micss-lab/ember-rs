@@ -45,6 +45,47 @@ pub struct BdiAgent<
     tick_budget: TickBudget,
 }
 
+impl<'s, State, Action, Percept, Sched, Sel, PSel>
+    BdiAgent<'s, State, Action, Percept, Sched, Sel, PSel>
+where
+    Action: Clone,
+    Sched: Default,
+    Sel: Default,
+    PSel: PlanSelector<Action>,
+{
+    pub fn new(
+        name: impl Into<Cow<'static, str>>,
+        state: State,
+        beliefs: Option<KnowledgeBase>,
+        plans: PlanLibrary<Action, PSel>,
+        initial_goals: impl IntoIterator<Item = Literal>,
+    ) -> Self {
+        let mut this = Self {
+            name: name.into(),
+            state,
+            beliefs: beliefs.unwrap_or_default(),
+            plans,
+            intentions: IntentionQueue::default(),
+            pending_actions: VecDeque::new(),
+            event_queue: EventQueue::default(),
+            sensors: None,
+            fipa: FipaAgent::default(),
+            tick_budget: TickBudget::default(),
+        };
+        initial_goals.into_iter().for_each(|g| {
+            this.handle_event(
+                TriggeringEvent {
+                    trigger: Trigger::Addition,
+                    event: g,
+                    goal: Some(GoalKind::Achieve),
+                },
+                EventSource::External,
+            )
+        });
+        this
+    }
+}
+
 impl<'a, State, Action, P, Sched, Sel, PSel> BdiAgent<'a, State, Action, P, Sched, Sel, PSel>
 where
     P: Percept,
@@ -135,50 +176,14 @@ impl<'s, State, Action, Percept, Sched, Sel, PSel>
     BdiAgent<'s, State, Action, Percept, Sched, Sel, PSel>
 where
     Action: Clone,
-    Sched: Default,
-    Sel: Default,
-    PSel: PlanSelector<Action>,
-{
-    pub fn new(
-        name: impl Into<Cow<'static, str>>,
-        state: State,
-        beliefs: Option<KnowledgeBase>,
-        plans: PlanLibrary<Action, PSel>,
-        initial_goals: impl IntoIterator<Item = Literal>,
-    ) -> Self {
-        let mut this = Self {
-            name: name.into(),
-            state,
-            beliefs: beliefs.unwrap_or_default(),
-            plans,
-            intentions: IntentionQueue::default(),
-            pending_actions: VecDeque::new(),
-            event_queue: EventQueue::default(),
-            sensors: None,
-            fipa: FipaAgent::default(),
-            tick_budget: TickBudget::default(),
-        };
-        initial_goals.into_iter().for_each(|g| {
-            this.handle_event(
-                TriggeringEvent {
-                    trigger: Trigger::Addition,
-                    event: g,
-                    goal: Some(GoalKind::Achieve),
-                },
-                EventSource::External,
-            )
-        });
-        this
-    }
-}
-
-impl<'s, State, Action, Percept, Sched, Sel, PSel>
-    BdiAgent<'s, State, Action, Percept, Sched, Sel, PSel>
-where
-    Action: Clone,
     PSel: PlanSelector<Action>,
 {
     fn handle_event(&mut self, event: TriggeringEvent, source: EventSource) {
+        // Free the intention that was blocked by this event not being handled.
+        if let EventSource::Internal(i) = source {
+            self.intentions.unblock_event(i);
+        }
+
         if event.goal.is_none() {
             let ground = event.event.clone();
 
@@ -261,7 +266,11 @@ where
             return;
         };
 
-        for _ in 0..self.tick_budget.max_sensors.unwrap_or(usize::MAX) {
+        for _ in 0..self
+            .tick_budget
+            .max_sensors
+            .unwrap_or_else(|| sensors.len())
+        {
             let Some(mut sensor) = sensors.pop_front() else {
                 break;
             };
@@ -305,7 +314,11 @@ where
     Action: Execute<State = State, Action = Action>,
 {
     fn run_pending_actions(&mut self, context: &mut Context<'_, Action>) {
-        for _ in 0..self.tick_budget.max_pending_actions.unwrap_or(usize::MAX) {
+        for _ in 0..self
+            .tick_budget
+            .max_pending_actions
+            .unwrap_or_else(|| self.pending_actions.len())
+        {
             let Some((intention_id, pending)) = self.pending_actions.pop_front() else {
                 break;
             };
@@ -314,7 +327,7 @@ where
                 Some(pending) => self.pending_actions.push_back((intention_id, pending)),
                 None => {
                     if let Some(id) = intention_id {
-                        self.intentions.unblock(id);
+                        self.intentions.unblock_action(id);
                     }
                 }
             }
@@ -332,6 +345,8 @@ where
             if !self.intentions.has_runnable() {
                 break;
             }
+
+            let events_before = context.events.len();
 
             let bindings = self
                 .intentions
@@ -351,19 +366,19 @@ where
 
                 if let Some(action) = pending {
                     if let Some(id) = intention_id {
-                        self.intentions.block(id);
+                        self.intentions.block_on_action(id);
                     }
                     self.pending_actions
                         .push_back((intention_id, PendingAction::new(action, bindings.clone())));
                 }
             }
 
-            // Scan over the event queue and block any intention that has unprocessed
-            // events.
-            context.events.iter().for_each(|(s, _)| match s {
-                EventSource::Internal(i) => self.intentions.block(i),
-                EventSource::External => (),
-            });
+            // Block any intentions that are newly waiting for an event or action.
+            for (source, _) in &context.events[events_before..] {
+                if let EventSource::Internal(id) = source {
+                    self.intentions.block_on_event(*id);
+                }
+            }
         }
     }
 }
@@ -389,9 +404,10 @@ where
 
         self.tick_intentions(&mut context);
 
-        context.events.into_iter().for_each(|(source, event)| {
-            self.event_queue.push(event, source);
-        });
+        context
+            .events
+            .into_iter()
+            .for_each(|(source, event)| self.event_queue.push(event, source));
     }
 }
 

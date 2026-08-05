@@ -1,4 +1,4 @@
-use alloc::collections::{BTreeMap, BTreeSet};
+use alloc::collections::BTreeMap;
 
 use crate::bindings::{Bindings, OwnedBindings};
 use crate::context::Context;
@@ -11,10 +11,7 @@ use super::{Intention, IntentionId};
 #[derive(Debug)]
 pub(crate) struct IntentionQueue<A, Sched = Random> {
     intentions: BTreeMap<IntentionId, Intention<A>>,
-    /// Intentions with an action that hasn't completed yet. The scheduler skips these until
-    /// they're unblocked, so an intention never advances to its next formula while one of its
-    /// actions is still being polled.
-    blocked: BTreeSet<IntentionId>,
+    blocked: BTreeMap<IntentionId, BlockReasons>,
     current_id: IntentionId,
     scheduler: Sched,
 }
@@ -23,7 +20,7 @@ impl<A, Sched: Default> Default for IntentionQueue<A, Sched> {
     fn default() -> Self {
         Self {
             intentions: BTreeMap::default(),
-            blocked: BTreeSet::default(),
+            blocked: BTreeMap::default(),
             current_id: 0,
             scheduler: Sched::default(),
         }
@@ -42,18 +39,60 @@ impl<A, Sched> IntentionQueue<A, Sched> {
         self.intentions.is_empty()
     }
 
-    pub(crate) fn block(&mut self, id: IntentionId) {
-        self.blocked.insert(id);
+    /// Blocks `id` on an event it just raised. Must be paired with a later
+    /// [`unblock_event`](Self::unblock_event) once that event has been processed.
+    pub(crate) fn block_on_event(&mut self, id: IntentionId) {
+        self.blocked.entry(id).or_default().pending_events += 1;
     }
 
-    pub(crate) fn unblock(&mut self, id: IntentionId) {
-        self.blocked.remove(&id);
+    /// Lifts one event block previously placed by [`block_on_event`](Self::block_on_event).
+    pub(crate) fn unblock_event(&mut self, id: IntentionId) {
+        let reasons = self
+            .blocked
+            .get_mut(&id)
+            .expect("intention wasn't blocked on an event");
+        reasons.pending_events = reasons
+            .pending_events
+            .checked_sub(1)
+            .expect("intention wasn't blocked on an event");
+        if !reasons.is_blocked() {
+            self.blocked.remove(&id);
+        }
+    }
+
+    /// Blocks `id` on an action it just dispatched. Must be paired with a later
+    /// [`unblock_action`](Self::unblock_action) once that action finishes.
+    pub(crate) fn block_on_action(&mut self, id: IntentionId) {
+        let reasons = self.blocked.entry(id).or_default();
+        assert!(
+            !reasons.pending_action,
+            "intention already has an action blocking it"
+        );
+        reasons.pending_action = true;
+    }
+
+    /// Lifts the action block previously placed by [`block_on_action`](Self::block_on_action).
+    pub(crate) fn unblock_action(&mut self, id: IntentionId) {
+        let reasons = self
+            .blocked
+            .get_mut(&id)
+            .expect("intention wasn't blocked on an action");
+        assert!(
+            reasons.pending_action,
+            "intention wasn't blocked on an action"
+        );
+        reasons.pending_action = false;
+        if !reasons.is_blocked() {
+            self.blocked.remove(&id);
+        }
     }
 
     /// Whether there is at least one intention that isn't currently blocked, i.e. whether
     /// [`step`](Self::step) would actually advance anything right now.
     pub(crate) fn has_runnable(&self) -> bool {
-        self.intentions.keys().any(|id| !self.blocked.contains(id))
+        self.intentions
+            .keys()
+            .any(|id| !self.blocked.contains_key(id))
     }
 
     /// Configures which intention is stepped next when several are runnable. Replaces the
@@ -98,7 +137,7 @@ impl<A: Clone, Sched> IntentionQueue<A, Sched> {
             .intentions
             .keys()
             .copied()
-            .filter(|id| !self.blocked.contains(id));
+            .filter(|id| !self.blocked.contains_key(id));
 
         let Some(id) = self
             .scheduler
@@ -137,6 +176,19 @@ impl<A: Clone, Sched> IntentionQueue<A, Sched> {
                 .map(ReadOnlyBindings::Borrowed)
                 .unwrap_or_else(|| ReadOnlyBindings::Owned(OwnedBindings::empty()))
         }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+struct BlockReasons {
+    pending_events: usize,
+    /// Whether it has dispatched an action that hasn't finished executing yet.
+    pending_action: bool,
+}
+
+impl BlockReasons {
+    fn is_blocked(&self) -> bool {
+        self.pending_events > 0 || self.pending_action
     }
 }
 
@@ -213,5 +265,58 @@ impl<A> Scheduler<A> for Random {
         }
 
         chosen
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::vec;
+
+    use crate::bindings::Bindings;
+    use crate::testing::{plan, trigger};
+
+    use super::*;
+
+    /// A queue with a single, freshly pushed, unblocked intention.
+    fn queue_with_one_intention() -> IntentionQueue<()> {
+        let mut queue = IntentionQueue::default();
+        let body = plan::<()>(trigger("start", vec![], None), None, vec![]);
+        queue.push(
+            &body,
+            Bindings::empty(),
+            None,
+            trigger("start", vec![], None),
+        );
+        queue
+    }
+
+    #[test]
+    fn intention_stays_blocked_until_every_reason_clears() {
+        let mut queue = queue_with_one_intention();
+        let id = *queue.intentions.keys().next().unwrap();
+
+        // A belief update it triggered on the way to dispatching an action can raise an event
+        // of its own - the two reasons are independent and must both clear.
+        queue.block_on_action(id);
+        queue.block_on_event(id);
+        assert!(!queue.has_runnable());
+
+        queue.unblock_event(id);
+        assert!(
+            !queue.has_runnable(),
+            "the action block is still outstanding"
+        );
+
+        queue.unblock_action(id);
+        assert!(queue.has_runnable(), "both reasons cleared");
+    }
+
+    #[test]
+    #[should_panic]
+    fn unblocking_a_reason_that_was_never_set_panics() {
+        let mut queue = queue_with_one_intention();
+        let id = *queue.intentions.keys().next().unwrap();
+
+        queue.unblock_action(id);
     }
 }
