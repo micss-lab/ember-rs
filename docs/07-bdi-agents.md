@@ -292,6 +292,7 @@ Built-in actions are written with a **leading dot** and are provided by the runt
 | `.wait(millis)`                          | Suspend the current intention for at least `millis` milliseconds before continuing to the next step. `millis` must be an integer literal. Other intentions keep running while this one waits (see [§7.12](#712-the-reasoning-cycle)). |
 | `.at(millis, goal)`                      | After at least `millis` milliseconds, post an achievement-goal-addition event for `goal`. Does not block the calling intention: see below. |
 | `.forall(condition, goal)`               | For every way `condition` can be satisfied against the belief base, post an achievement goal for `goal` — each in its own new, independent intention. See below. |
+| `.now(var)`                              | Bind the current time, in whole milliseconds, to `var`. Completes immediately. See below. |
 
 Using an unknown `.builtin` is a compile error listing the valid built-ins.
 
@@ -349,6 +350,26 @@ Concretely, this means:
   single, consistent snapshot of the belief base, never a partially-updated one.
 
 If `condition` has no solutions, no goals are posted and the step completes immediately.
+
+`.now(var)` binds the current time, in whole milliseconds, to `var`. Unlike wall-clock time, the
+value has no fixed epoch, so it's only meaningful as a difference between two `.now` readings, e.g.
+to measure how long something took: take a reading before and after, and compare them with the
+arithmetic operators available in a context or rule body ([§7.5](#75-rules-derived-beliefs)).
+
+```
++!start
+  <- .now(T0);
+     !do_work;
+     .now(T1);
+     !report_duration(T0, T1).
+
++!report_duration(T0, T1) : Elapsed = T1 - T0
+  <- .log("info", "took", Elapsed, "ms").
+```
+
+The step completes immediately: `.now` never blocks the calling intention the way `.wait` does.
+`var` should be a variable that isn't already bound to something else, since `.now` establishes a
+fresh binding for it just like unifying against any other term.
 
 ## 7.9 User-defined actions
 
@@ -576,7 +597,7 @@ Each container tick, a BDI agent's `update`:
 5. **Advances the intention stack one step**, resolving variable bindings and collecting the actions
    and events that step produced.
 6. **Executes those actions** (built-in and user), which may add beliefs, post goals, send messages,
-   or stop the platform.
+   bind variables (e.g. `.now`), or stop the platform.
 7. **Queues newly generated events** for subsequent ticks.
 
 The agent reports itself **finished** to the container when it has no remaining intentions, so a BDI
