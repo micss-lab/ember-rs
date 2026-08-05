@@ -6,12 +6,13 @@ use derive_where::derive_where;
 use log::{Level, log};
 
 use ember_time::{Duration, Instant};
+use ember_util::cmp::TotalCmpF32;
 
 use ember_core::agent::Aid;
 use ember_core::message::content::ember_bdil::BdilContent;
 use ember_core::message::{Content, Message, Performative, Receiver};
 
-use crate::bindings::{BindingLookup, Bindings, OwnedBindings};
+use crate::bindings::{AliasMap, BindingLookup, Bindings, OwnedBindings};
 use crate::context::Context;
 use crate::event::Trigger;
 use crate::knowledge::base::KnowledgeBase;
@@ -20,6 +21,7 @@ use crate::literal::Literal;
 use crate::plan::{GoalKind, TriggeringEvent};
 use crate::resolve::{Resolve, ResolveFailure};
 use crate::term::Term;
+use crate::term::view::TermView;
 use crate::variable::Variable;
 
 use super::QueryFormula;
@@ -154,6 +156,8 @@ pub enum BuiltinAction {
     /// Raises an achievement-goal event once `delay` has elapsed. Construct this variant with
     /// the `[at](BuiltinAction::at)` member function.
     At(AtState),
+    /// Binds the current monotonic time in milliseconds to the given variable.
+    Now(Variable),
 }
 
 impl BuiltinAction {
@@ -232,6 +236,17 @@ impl BuiltinAction {
             }
             Wait(state) => state.poll().map(Wait),
             At(state) => state.poll(bindings, context).map(At),
+            Now(variable) => {
+                let millis = ember_time::now().duration_since_epoch().to_millis();
+                let bindings = Bindings::new(
+                    [(
+                        variable.id,
+                        Some(TermView::Number(TotalCmpF32::from(millis as f32))),
+                    )],
+                    AliasMap::empty(),
+                );
+                ExecuteResult::Done(Some(bindings))
+            }
             Forall { query, goal } => {
                 let mut query = query.into_query(knowledge);
                 while let Some(bindings) = query.next_bindings(Some(&bindings.as_bindings())) {
@@ -403,6 +418,23 @@ mod tests {
             matches!(result, ExecuteResult::Done(None)),
             "a zero-length wait must complete on its second poll"
         );
+    }
+
+    #[test]
+    fn test_now_binds_current_millis_to_the_given_variable() {
+        let mut context: Context<()> = unsafe { new_context_without_environment() };
+        let bindings = bindings(vec![]);
+        let knowledge = KnowledgeBase::default();
+        let var = variable();
+
+        let action = BuiltinAction::Now(var.clone());
+
+        let ExecuteResult::Done(Some(result)) = action.execute(&bindings, &mut context, &knowledge)
+        else {
+            panic!(".now must complete immediately with bindings");
+        };
+
+        assert!(matches!(result.get_view(&var), Some(TermView::Number(_))));
     }
 
     #[test]

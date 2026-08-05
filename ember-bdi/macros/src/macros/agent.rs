@@ -227,7 +227,8 @@ peg::parser! {
             / action_wait()
             / action_forall()
             / action_at()
-            / expected!("a valid system action (e.g. `.log`, `.wait`, `.at`, etc.)")
+            / action_now()
+            / expected!("a valid system action (e.g. `.log`, `.wait`, `.at`, `.now`, etc.)")
 
         rule action_log() -> BuiltinAction
             = "log" "(" level:STRING() terms:("," t:term() { t })* ")" { BuiltinAction::Log(level, terms.into_boxed_slice()) }
@@ -248,6 +249,9 @@ peg::parser! {
 
         rule action_at() -> BuiltinAction
             = "at" "(" delay_millis:MILLIS() "," goal:literal() ")" { BuiltinAction::At { delay_millis, goal } }
+
+        rule action_now() -> BuiltinAction
+            = "now" "(" variable:VARIABLE() ")" { BuiltinAction::Now(variable) }
 
 
         rule aid_or_variable() -> AidOrVariable

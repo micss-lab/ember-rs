@@ -211,6 +211,7 @@ pub enum BuiltinAction {
         delay_millis: u64,
         goal: Literal,
     },
+    Now(Variable),
 }
 
 #[derive(Debug, Clone)]
@@ -758,6 +759,12 @@ impl AstVisitor {
                         ::core::time::Duration::from_millis(#delay_millis),
                         #goal,
                     )
+                }
+            }
+            BuiltinAction::Now(variable) => {
+                let variable = self.visit_variable(variable).into_token_stream();
+                quote! {
+                    ::ember::agent::bdi::plan::action::BuiltinAction::Now(#variable)
                 }
             }
         }
