@@ -1,41 +1,4 @@
-use crate::bindings::{BindingLookup, Bindings, OwnedBindings};
 use crate::resolve::ResolveFailure;
-use crate::term::view::TermView;
-use crate::variable::Variable;
-
-#[derive(Debug)]
-pub(crate) enum ReadOnlyBindings<'a> {
-    Owned(OwnedBindings),
-    Borrowed(&'a OwnedBindings),
-}
-
-impl<'a> BindingLookup for ReadOnlyBindings<'a> {
-    fn lookup_view<'b>(&'b self, variable: &Variable) -> Option<TermView<'b>> {
-        match self {
-            ReadOnlyBindings::Owned(bindings) => bindings.lookup_view(variable),
-            ReadOnlyBindings::Borrowed(bindings) => bindings.lookup_view(variable),
-        }
-    }
-
-    fn as_bindings(&self) -> Bindings {
-        match self {
-            ReadOnlyBindings::Owned(bindings) => bindings.as_bindings(),
-            ReadOnlyBindings::Borrowed(bindings) => bindings.as_bindings(),
-        }
-    }
-}
-
-impl ReadOnlyBindings<'_> {
-    /// Materializes an owned copy, cloning only if the bindings were borrowed. Needed to retain
-    /// bindings across ticks (e.g. alongside a pending action), since the borrowed variant is
-    /// tied to the intention queue's lifetime for this tick only.
-    pub(crate) fn into_owned(self) -> OwnedBindings {
-        match self {
-            ReadOnlyBindings::Owned(bindings) => bindings,
-            ReadOnlyBindings::Borrowed(bindings) => bindings.clone(),
-        }
-    }
-}
 
 pub(crate) type Result = ::core::result::Result<StepOk, StepError>;
 

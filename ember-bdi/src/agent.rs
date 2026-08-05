@@ -2,6 +2,7 @@ use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 
+use alloc::vec::Vec;
 use ember_core::agent::Agent;
 use ember_core::environment::Environment;
 use ember_core::message::content::ember_bdil::BdilContent;
@@ -16,7 +17,7 @@ use crate::intention::IntentionId;
 use crate::intention::queue::{IntentionQueue, Random, Scheduler};
 use crate::knowledge::base::KnowledgeBase;
 use crate::literal::Literal;
-use crate::plan::action::{Execute, PendingAction};
+use crate::plan::action::{Execute, ExecuteResult, PendingAction};
 use crate::plan::library::PlanLibrary;
 use crate::plan::selector::{FirstApplicable, PlanSelector};
 use crate::plan::{GoalKind, Trigger, TriggeringEvent};
@@ -311,7 +312,7 @@ where
 
 impl<State, Action, Perc, Sched, Sel, PSel> BdiAgent<'_, State, Action, Perc, Sched, Sel, PSel>
 where
-    Action: Execute<State = State, Action = Action>,
+    Action: Execute<State = State, UserAction = Action>,
 {
     fn run_pending_actions(&mut self, context: &mut Context<'_, Action>) {
         for _ in 0..self
@@ -324,8 +325,13 @@ where
             };
 
             match pending.execute(&mut *context, &self.beliefs, &mut self.state) {
-                Some(pending) => self.pending_actions.push_back((intention_id, pending)),
-                None => {
+                ExecuteResult::Pending(pending) => {
+                    self.pending_actions.push_back((intention_id, pending))
+                }
+                ExecuteResult::Done(Some(_)) => unimplemented!(
+                    "Actions that take more than one tick can currently not return any new bindings."
+                ),
+                ExecuteResult::Done(None) => {
                     if let Some(id) = intention_id {
                         self.intentions.unblock_action(id);
                     }
@@ -337,7 +343,7 @@ where
 
 impl<State, Action, Perc, Sched, Sel, PSel> BdiAgent<'_, State, Action, Perc, Sched, Sel, PSel>
 where
-    Action: Clone + Execute<State = State, Action = Action>,
+    Action: Clone + Execute<State = State, UserAction = Action>,
     Sched: Scheduler<Action>,
 {
     fn tick_intentions(&mut self, mut context: &mut Context<'_, Action>) {
@@ -348,29 +354,18 @@ where
 
             let events_before = context.events.len();
 
-            let bindings = self
-                .intentions
-                .step(&mut context, &mut self.beliefs)
-                .into_owned();
+            self.intentions
+                .step(&mut context, &mut self.beliefs, &mut self.state);
 
-            while let Some((intention_id, action)) = context.actions.pop() {
-                use crate::plan::Action::*;
-                let pending = match action {
-                    Builtin(action) => action
-                        .execute(&bindings, &mut context, &self.beliefs)
-                        .map(Builtin),
-                    User(action) => action
-                        .execute(&bindings, &mut context, &self.beliefs, &mut self.state)
-                        .map(User),
-                };
-
-                if let Some(action) = pending {
-                    if let Some(id) = intention_id {
-                        self.intentions.block_on_action(id);
-                    }
-                    self.pending_actions
-                        .push_back((intention_id, PendingAction::new(action, bindings.clone())));
-                }
+            if !context.actions.is_empty() {
+                core::mem::replace(&mut context.actions, Vec::new())
+                    .into_iter()
+                    .for_each(|(intention, action)| {
+                        if let Some(id) = intention {
+                            self.intentions.block_on_action(id);
+                        }
+                        self.pending_actions.push_back((intention, action));
+                    });
             }
 
             // Block any intentions that are newly waiting for an event or action.
@@ -385,7 +380,7 @@ where
 
 impl<State, Action, Perc, Sched, Sel, PSel> BdiAgent<'_, State, Action, Perc, Sched, Sel, PSel>
 where
-    Action: Execute<State = State, Action = Action> + Clone,
+    Action: Execute<State = State, UserAction = Action> + Clone,
     Perc: Percept,
     Sched: Scheduler<Action>,
     Sel: EventSelector,
@@ -413,7 +408,7 @@ where
 
 impl<State, Action, P, Sched, Sel, PSel> Agent for BdiAgent<'_, State, Action, P, Sched, Sel, PSel>
 where
-    Action: Execute<State = State, Action = Action> + Clone,
+    Action: Execute<State = State, UserAction = Action> + Clone,
     P: Percept,
     Sched: Scheduler<Action>,
     Sel: EventSelector,
@@ -493,27 +488,30 @@ mod tests {
 
     impl Execute for TestAction {
         type State = Vec<&'static str>;
-        type Action = TestAction;
+        type UserAction = TestAction;
 
-        fn execute(
+        fn execute<'b, B>(
             self,
-            _bindings: &impl BindingLookup,
-            _context: &mut Context<Self::Action>,
+            _bindings: &B,
+            _context: &mut Context<Self::UserAction>,
             _knowledge: &KnowledgeBase,
             state: &mut Self::State,
-        ) -> Option<Self> {
+        ) -> ExecuteResult<'b, Self>
+        where
+            B: BindingLookup + 'b,
+        {
             match self {
                 TestAction::Wait(remaining) => {
                     state.push("poll");
                     if remaining == 0 {
-                        None
+                        ExecuteResult::Done(None)
                     } else {
-                        Some(TestAction::Wait(remaining - 1))
+                        ExecuteResult::Pending(TestAction::Wait(remaining - 1))
                     }
                 }
                 TestAction::Log(msg) => {
                     state.push(msg);
-                    None
+                    ExecuteResult::Done(None)
                 }
             }
         }
@@ -751,21 +749,24 @@ mod tests {
 
     impl Execute for RecordArg {
         type State = Vec<alloc::string::String>;
-        type Action = RecordArg;
+        type UserAction = RecordArg;
 
-        fn execute(
+        fn execute<'b, B>(
             self,
-            bindings: &impl BindingLookup,
-            _context: &mut Context<Self::Action>,
+            bindings: &B,
+            _context: &mut Context<Self::UserAction>,
             _knowledge: &KnowledgeBase,
             state: &mut Self::State,
-        ) -> Option<Self> {
+        ) -> ExecuteResult<'b, Self>
+        where
+            B: BindingLookup + 'b,
+        {
             let seen = bindings
                 .lookup_as_type::<alloc::string::String>(&self.0)
                 .and_then(Result::ok)
                 .unwrap_or_else(|| "<unbound>".into());
             state.push(seen);
-            None
+            ExecuteResult::Done(None)
         }
     }
 

@@ -1,9 +1,10 @@
 use alloc::collections::BTreeMap;
 
-use crate::bindings::{Bindings, OwnedBindings};
+use crate::bindings::Bindings;
 use crate::context::Context;
 use crate::knowledge::base::KnowledgeBase;
-use crate::plan::Plan;
+use crate::plan::action::Execute;
+use crate::plan::{Plan, TriggeringEvent};
 
 use super::result::*;
 use super::{Intention, IntentionId};
@@ -116,7 +117,7 @@ impl<A: Clone, Sched> IntentionQueue<A, Sched> {
         plan: &'_ Plan<A>,
         bindings: Bindings<'_>,
         existing_intention: Option<IntentionId>,
-        event: crate::plan::TriggeringEvent,
+        event: TriggeringEvent,
     ) {
         let id = existing_intention.unwrap_or_else(|| self.next_id());
         self.intentions
@@ -124,13 +125,18 @@ impl<A: Clone, Sched> IntentionQueue<A, Sched> {
             .or_insert_with(|| Intention::new(id))
             .push(plan, bindings, event);
     }
+}
 
+impl<A, S, Sched> IntentionQueue<A, Sched>
+where
+    A: Execute<State = S, UserAction = A>,
+{
     pub(crate) fn step<'a>(
         &'a mut self,
         context: &mut Context<A>,
         knowledge: &mut KnowledgeBase,
-    ) -> ReadOnlyBindings<'a>
-    where
+        state: &mut S,
+    ) where
         Sched: Scheduler<A>,
     {
         let candidates = self
@@ -143,7 +149,7 @@ impl<A: Clone, Sched> IntentionQueue<A, Sched> {
             .scheduler
             .select_intention(candidates, &self.intentions)
         else {
-            return ReadOnlyBindings::Owned(OwnedBindings::empty());
+            return;
         };
 
         let is_done = {
@@ -152,7 +158,7 @@ impl<A: Clone, Sched> IntentionQueue<A, Sched> {
                 .get_mut(&id)
                 .expect("intention id should exist");
 
-            match intention.step(context, knowledge) {
+            match intention.step(context, knowledge, state) {
                 Ok(StepOk::Pending) => false,
                 Ok(StepOk::Done) => true,
                 Err(_) => unimplemented!("report intention execution error to user"),
@@ -160,21 +166,9 @@ impl<A: Clone, Sched> IntentionQueue<A, Sched> {
         };
 
         if is_done {
-            let mut intention = self
-                .intentions
+            self.intentions
                 .remove(&id)
                 .expect("intention id should exist");
-
-            ReadOnlyBindings::Owned(intention.take_last_bindings())
-        } else {
-            // TODO: Polonius (the new borrow checker) will fix the NLL limitation that prevents returning the
-            // reference directly from the match arm above. Remove this lookup then.
-            let intention = self.intentions.get(&id).expect("intention id should exist");
-
-            intention
-                .get_last_bindings()
-                .map(ReadOnlyBindings::Borrowed)
-                .unwrap_or_else(|| ReadOnlyBindings::Owned(OwnedBindings::empty()))
         }
     }
 }

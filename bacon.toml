@@ -10,8 +10,13 @@
 # All jobs shell out to `cargo xtask`, which is the single source of truth
 # for how each target/feature combination is invoked (see xtask/).
 
-default_job = "check-local"
+default_job = "lsp"
 env.CARGO_TERM_COLOR = "always"
+
+[jobs.lsp]
+command = ["cargo", "xtask", "lsp", "--color"]
+analyzer = "cargo_json"
+need_stdout = true
 
 [jobs.check-local]
 command = ["cargo", "xtask", "check", "--target", "local"]

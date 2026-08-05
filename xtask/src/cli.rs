@@ -62,7 +62,12 @@ enum Command {
         target: Option<Target>,
     },
     /// Emit combined clippy JSON diagnostics for both targets (for rust-analyzer's overrideCommand).
-    Lsp,
+    Lsp {
+        /// Request ANSI-colored `rendered` diagnostic text (for consumers
+        /// that display it directly, e.g. bacon).
+        #[arg(long)]
+        color: bool,
+    },
     /// Run check, clippy, hack, and test; report a summary.
     Ci,
 }
@@ -76,7 +81,7 @@ impl Cli {
             Command::Clippy { target, fix } => commands::clippy::run(target, fix),
             Command::Test => commands::test::run(),
             Command::Hack { target } => commands::hack::run(target),
-            Command::Lsp => commands::lsp::run(),
+            Command::Lsp { color } => commands::lsp::run(color),
             Command::Ci => commands::ci::run(),
         }
     }

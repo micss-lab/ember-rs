@@ -4,10 +4,11 @@ use ember_core::environment::Environment;
 
 use crate::event::EventSource;
 use crate::intention::IntentionId;
-use crate::plan::{Action, TriggeringEvent};
+use crate::plan::TriggeringEvent;
+use crate::plan::action::PendingAction;
 
 pub struct Context<'ctx, A> {
-    pub(crate) actions: Vec<(Option<IntentionId>, Action<A>)>,
+    pub(crate) actions: Vec<(Option<IntentionId>, PendingAction<A>)>,
     pub(crate) events: Vec<(EventSource, TriggeringEvent)>,
     pub(crate) environment: &'ctx mut Environment,
 }
@@ -23,13 +24,15 @@ impl<'ctx, A> Context<'ctx, A> {
 }
 
 impl<A> Context<'_, A> {
-    pub(crate) fn perform_action(&mut self, intention_id: IntentionId, action: Action<A>) {
-        self.actions.push((Some(intention_id), action));
-    }
-
-    /// Like `perform_action`, but the caller isn't blocked while the action stays pending.
-    pub(crate) fn perform_action_non_blocking(&mut self, action: Action<A>) {
-        self.actions.push((None, action));
+    /// Instead of running an action immediately, the action is pushed to the agent as a pending
+    /// action. Setting `intention` blocks the given intention for the time action remains
+    /// pending.
+    pub(crate) fn dispatch_action(
+        &mut self,
+        action: PendingAction<A>,
+        intention: Option<IntentionId>,
+    ) {
+        self.actions.push((intention, action));
     }
 
     pub(crate) fn emit_event(&mut self, event: TriggeringEvent, intention_id: Option<IntentionId>) {
@@ -43,7 +46,7 @@ impl<A> Context<'_, A> {
     }
 }
 
-impl<E> core::ops::Deref for Context<'_, E> {
+impl<A> core::ops::Deref for Context<'_, A> {
     type Target = Environment;
 
     fn deref(&self) -> &Self::Target {
@@ -51,7 +54,7 @@ impl<E> core::ops::Deref for Context<'_, E> {
     }
 }
 
-impl<E> core::ops::DerefMut for Context<'_, E> {
+impl<A> core::ops::DerefMut for Context<'_, A> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.environment
     }

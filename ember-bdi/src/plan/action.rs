@@ -11,7 +11,7 @@ use ember_core::agent::Aid;
 use ember_core::message::content::ember_bdil::BdilContent;
 use ember_core::message::{Content, Message, Performative, Receiver};
 
-use crate::bindings::{BindingLookup, OwnedBindings};
+use crate::bindings::{BindingLookup, Bindings, OwnedBindings};
 use crate::context::Context;
 use crate::event::Trigger;
 use crate::knowledge::base::KnowledgeBase;
@@ -26,18 +26,42 @@ use super::QueryFormula;
 
 pub trait Execute: Sized {
     type State;
-    /// The action stored in the context. In almost all cases, this can just be `Self`.
-    type Action;
+
+    /// The user action that is stored in the context. If you are unsure about this type, use
+    /// `Self`.
+    type UserAction;
 
     /// Executes the action returning `None` if it has finshed and a new action state if the action
     /// is to be ran again.
-    fn execute(
+    fn execute<'b, B>(
         self,
-        bindings: &impl BindingLookup,
-        context: &mut Context<Self::Action>,
+        bindings: &B,
+        context: &mut Context<Self::UserAction>,
         knowledge: &KnowledgeBase,
         state: &mut Self::State,
-    ) -> Option<Self>;
+    ) -> ExecuteResult<'b, Self>
+    where
+        B: BindingLookup + 'b;
+
+    /// Should the intention this action is fired by wait for the action to complete before
+    /// continuing.
+    fn should_block_intention(&self) -> bool {
+        true
+    }
+}
+
+pub enum ExecuteResult<'b, S> {
+    Pending(S),
+    Done(Option<Bindings<'b>>),
+}
+
+impl<'b, S> ExecuteResult<'b, S> {
+    pub fn map<U>(self, f: impl FnOnce(S) -> U) -> ExecuteResult<'b, U> {
+        match self {
+            ExecuteResult::Pending(s) => ExecuteResult::Pending(f(s)),
+            ExecuteResult::Done(bindings) => ExecuteResult::Done(bindings),
+        }
+    }
 }
 
 #[derive_where(Debug, PartialEq, Eq)]
@@ -47,20 +71,24 @@ pub enum Action<A> {
     User(#[derive_where(skip)] A),
 }
 
-impl<State, A> Execute for Action<A>
+impl<A, S> Execute for Action<A>
 where
-    A: Execute<State = State, Action = A>,
+    A: Execute<State = S, UserAction = A>,
 {
-    type State = State;
-    type Action = A;
+    type State = S;
 
-    fn execute(
+    type UserAction = A;
+
+    fn execute<'b, B>(
         self,
-        bindings: &impl BindingLookup,
-        context: &mut Context<Self::Action>,
+        bindings: &B,
+        context: &mut Context<Self::UserAction>,
         knowledge: &KnowledgeBase,
         state: &mut Self::State,
-    ) -> Option<Self> {
+    ) -> ExecuteResult<'b, Self>
+    where
+        B: BindingLookup + 'b,
+    {
         match self {
             Action::Builtin(action) => action
                 .execute(bindings, context, knowledge)
@@ -68,6 +96,13 @@ where
             Action::User(action) => action
                 .execute(bindings, context, knowledge, state)
                 .map(Action::User),
+        }
+    }
+
+    fn should_block_intention(&self) -> bool {
+        match self {
+            Action::Builtin(action) => action.should_block_intention(),
+            Action::User(a) => a.should_block_intention(),
         }
     }
 }
@@ -84,19 +119,22 @@ impl<A> PendingAction<A> {
     }
 }
 
-impl<State, A> PendingAction<A>
+impl<S, A> PendingAction<A>
 where
-    A: Execute<State = State, Action = A>,
+    A: Execute<State = S, UserAction = A>,
 {
     pub(crate) fn execute(
         self,
         context: &mut Context<A>,
         knowledge: &KnowledgeBase,
-        state: &mut State,
-    ) -> Option<Self> {
+        state: &mut S,
+    ) -> ExecuteResult<'static, Self> {
         let Self { action, bindings } = self;
-        let action = action.execute(&bindings, context, knowledge, state)?;
-        Some(Self { action, bindings })
+
+        match action.execute(&bindings, context, knowledge, state) {
+            ExecuteResult::Pending(action) => ExecuteResult::Pending(Self { action, bindings }),
+            ExecuteResult::Done(bindings) => ExecuteResult::Done(bindings),
+        }
     }
 }
 
@@ -134,12 +172,15 @@ impl BuiltinAction {
         })
     }
 
-    pub(crate) fn execute<A>(
+    pub(crate) fn execute<'b, B, A>(
         self,
-        bindings: &impl BindingLookup,
+        bindings: &B,
         context: &mut Context<A>,
         knowledge: &KnowledgeBase,
-    ) -> Option<Self> {
+    ) -> ExecuteResult<'b, Self>
+    where
+        B: BindingLookup + 'b,
+    {
         use BuiltinAction::*;
         match self {
             Log(level, terms) => {
@@ -151,18 +192,18 @@ impl BuiltinAction {
                     Ok(terms) => log!(level, "{terms:?}"),
                     Err(_) => log::error!("failed to resolve log arguments"),
                 }
-                None
+                ExecuteResult::Done(None)
             }
             StopPlatform => {
                 context.stop_platform();
-                None
+                ExecuteResult::Done(None)
             }
             SendLiteral(receiver, trigger, literal) => {
                 let literal = match literal.resolve(bindings) {
                     Ok(lit) => lit,
                     Err(_) => {
                         log::error!("failed to resolve literal to send");
-                        return None;
+                        return ExecuteResult::Done(None);
                     }
                 };
                 let performative = match trigger {
@@ -173,11 +214,11 @@ impl BuiltinAction {
                     Ok(VariableOrReceiver::Receiver(r)) => r,
                     Ok(_) => {
                         log::error!("failed to resolve .send arguments");
-                        return None;
+                        return ExecuteResult::Done(None);
                     }
                     Err(_) => {
                         log::error!("failed to parse receiver");
-                        return None;
+                        return ExecuteResult::Done(None);
                     }
                 };
                 context.send_message(Message {
@@ -187,7 +228,7 @@ impl BuiltinAction {
                     other: None,
                     content: Some(Content::Bdil(BdilContent::Literal(literal.into()))),
                 });
-                None
+                ExecuteResult::Done(None)
             }
             Wait(state) => state.poll().map(Wait),
             At(state) => state.poll(bindings, context).map(At),
@@ -212,16 +253,17 @@ impl BuiltinAction {
                         None,
                     );
                 }
-                None
+                ExecuteResult::Done(None)
             }
         }
     }
+
+    fn should_block_intention(&self) -> bool {
+        !matches!(self, Self::At(_))
+    }
 }
 
-/// State for the `.at` built-in action. Unlike `.wait`, doesn't block the calling intention --
-/// the first poll re-queues itself via `perform_action_non_blocking` and completes immediately;
-/// the requeued copy then polls like `.wait` until `delay` elapses, raising an achievement-goal
-/// event before it finally completes too.
+/// State for the `.at` built-in action.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AtState {
     start: Option<Instant>,
@@ -230,7 +272,10 @@ pub struct AtState {
 }
 
 impl AtState {
-    fn poll<A>(self, bindings: &impl BindingLookup, context: &mut Context<A>) -> Option<Self> {
+    fn poll<'b, B, A>(self, bindings: &B, context: &mut Context<A>) -> ExecuteResult<'b, Self>
+    where
+        B: BindingLookup + 'b,
+    {
         let Self { start, delay, goal } = self;
 
         let Some(start) = start else {
@@ -239,12 +284,12 @@ impl AtState {
                 delay,
                 goal,
             };
-            context.perform_action_non_blocking(Action::Builtin(BuiltinAction::At(armed)));
-            return None;
+
+            return ExecuteResult::Pending(armed);
         };
 
         if ember_time::now() - start < delay {
-            return Some(Self {
+            return ExecuteResult::Pending(Self {
                 start: Some(start),
                 delay,
                 goal,
@@ -263,7 +308,7 @@ impl AtState {
             Err(_) => log::error!("failed to resolve goal in .at"),
         }
 
-        None
+        ExecuteResult::Done(None)
     }
 }
 
@@ -275,19 +320,19 @@ pub struct WaitState {
 }
 
 impl WaitState {
-    fn poll(self) -> Option<Self> {
+    fn poll(self) -> ExecuteResult<'static, Self> {
         let Self { start, interval } = self;
         let Some(start) = start else {
-            return Some(Self {
+            return ExecuteResult::Pending(Self {
                 start: Some(ember_time::now()),
                 interval,
             });
         };
 
         if ember_time::now() - start >= interval {
-            return None;
+            return ExecuteResult::Done(None);
         }
-        Some(Self {
+        ExecuteResult::Pending(Self {
             start: Some(start),
             interval,
         })
@@ -348,13 +393,14 @@ mod tests {
 
         let action = BuiltinAction::wait(core::time::Duration::from_millis(0));
 
-        let action = action
-            .execute(&bindings, &mut context, &knowledge)
-            .expect("the first poll only records the start time and must stay pending");
+        let ExecuteResult::Pending(action) = action.execute(&bindings, &mut context, &knowledge)
+        else {
+            panic!("the first poll only records the start time and must stay pending");
+        };
 
         let result = action.execute(&bindings, &mut context, &knowledge);
         assert!(
-            result.is_none(),
+            matches!(result, ExecuteResult::Done(None)),
             "a zero-length wait must complete on its second poll"
         );
     }
@@ -437,9 +483,8 @@ mod tests {
 
             let result = action.execute(&bindings, &mut context, &knowledge);
 
-            assert!(result.is_none());
-            assert_eq!(context.actions.len(), 1);
-            assert_eq!(context.actions[0].0, None);
+            assert!(matches!(result, ExecuteResult::Pending(_)));
+            assert!(context.actions.is_empty());
         }
 
         #[test]
@@ -452,15 +497,14 @@ mod tests {
                 core::time::Duration::from_secs(3600),
                 literal("check_again", vec![]),
             );
-            action.execute(&bindings, &mut context, &knowledge);
-            let (_, requeued) = context.actions.pop().unwrap();
-
-            let Action::Builtin(requeued) = requeued else {
+            let ExecuteResult::Pending(requeued) =
+                action.execute(&bindings, &mut context, &knowledge)
+            else {
                 unreachable!()
             };
             let result = requeued.execute(&bindings, &mut context, &knowledge);
 
-            assert!(result.is_some());
+            assert!(matches!(result, ExecuteResult::Pending(_)));
             assert!(context.events.is_empty());
         }
 
@@ -472,15 +516,14 @@ mod tests {
 
             let action =
                 BuiltinAction::at(core::time::Duration::ZERO, literal("check_again", vec![]));
-            action.execute(&bindings, &mut context, &knowledge);
-            let (_, requeued) = context.actions.pop().unwrap();
-
-            let Action::Builtin(requeued) = requeued else {
+            let ExecuteResult::Pending(requeued) =
+                action.execute(&bindings, &mut context, &knowledge)
+            else {
                 unreachable!()
             };
             let result = requeued.execute(&bindings, &mut context, &knowledge);
 
-            assert!(result.is_none());
+            assert!(matches!(result, ExecuteResult::Done(None)));
             assert_eq!(context.events.len(), 1);
             let (source, event) = &context.events[0];
             assert!(matches!(source, EventSource::External));
@@ -503,9 +546,9 @@ mod tests {
                 core::time::Duration::ZERO,
                 literal("go_to", vec![crate::testing::variable_term(&var)]),
             );
-            action.execute(&bindings, &mut context, &knowledge);
-            let (_, requeued) = context.actions.pop().unwrap();
-            let Action::Builtin(requeued) = requeued else {
+            let ExecuteResult::Pending(requeued) =
+                action.execute(&bindings, &mut context, &knowledge)
+            else {
                 unreachable!()
             };
             requeued.execute(&bindings, &mut context, &knowledge);
@@ -538,7 +581,7 @@ mod tests {
 
             let result = action.execute(&bindings, &mut context, &knowledge);
 
-            assert!(result.is_none(), "forall never stays pending");
+            assert!(matches!(result, ExecuteResult::Done(None)), "forall never stays pending");
             assert!(
                 context.events.is_empty(),
                 "no solutions means no goals are spawned"
@@ -561,7 +604,7 @@ mod tests {
             };
 
             let result = action.execute(&bindings, &mut context, &knowledge);
-            assert!(result.is_none());
+            assert!(matches!(result, ExecuteResult::Done(None)));
             assert_eq!(context.events.len(), 3, "one goal event per solution");
 
             let mut goals: Vec<_> = context
@@ -607,7 +650,7 @@ mod tests {
             };
 
             let result = action.execute(&bindings, &mut context, &knowledge);
-            assert!(result.is_none());
+            assert!(matches!(result, ExecuteResult::Done(None)));
 
             let mut goals: Vec<_> = context.events.into_iter().map(|(_, e)| e.event).collect();
             goals.sort();
@@ -641,7 +684,7 @@ mod tests {
             };
 
             let result = action.execute(&bindings, &mut context, &knowledge);
-            assert!(result.is_none());
+            assert!(matches!(result, ExecuteResult::Done(None)));
 
             let mut goals: Vec<_> = context.events.into_iter().map(|(_, e)| e.event).collect();
             goals.sort();

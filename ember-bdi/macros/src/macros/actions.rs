@@ -41,15 +41,18 @@ pub(crate) fn expand(mut input: ItemImpl) -> syn::Result<TokenStream> {
 
         impl ::ember::agent::bdi::plan::action::Execute for #action_enum_ident {
             type State = #self_ty;
-            type Action = Self;
+            type UserAction = Self;
 
-            fn execute(
+            fn execute<'b, B>(
                 self,
-                bindings: &impl ::ember::agent::bdi::bindings::BindingLookup,
-                context: &mut ::ember::agent::bdi::context::Context<Self::Action>,
+                bindings: &B,
+                context: &mut ::ember::agent::bdi::context::Context<Self::UserAction>,
                 knowledge: &::ember::agent::bdi::knowledge::base::KnowledgeBase,
                 state: &mut Self::State,
-            ) -> Option<Self> {
+            ) -> ::ember::agent::bdi::plan::action::ExecuteResult<'b, Self>
+            where
+                B: ::ember::agent::bdi::bindings::BindingLookup + 'b,
+            {
                 match self {
                     #(#match_arms)*
                 }
@@ -119,7 +122,7 @@ impl GeneratedActions {
             #action_enum_ident::#variant_ident { #(#variant_field_names),* } => {
                 #(#execute_resolutions)*
                 state.#method_ident(#(#method_call_args),*);
-                None
+                ::ember::agent::bdi::plan::action::ExecuteResult::Done(None)
             }
         });
 
@@ -199,14 +202,14 @@ fn extract_action_params(inputs: &syn::punctuated::Punctuated<FnArg, Token![,]>)
                             Ok(val) => val,
                             Err(e) => {
                                 ::log::error!("{}: {:?}", #err_msg_res, e);
-                                return None;
+                                return ::ember::agent::bdi::plan::action::ExecuteResult::Done(None);
                             }
                         };
                         let #clean_ident = match <#ty as ::ember::agent::bdi::term::conversion::FromTerm>::from_term(#clean_ident.into()) {
                             Ok(val) => val,
                             Err(e) => {
                                 ::log::error!("{}: {e}", #err_msg_conv);
-                                return None;
+                                return ::ember::agent::bdi::plan::action::ExecuteResult::Done(None);
                             }
                         };
                     });

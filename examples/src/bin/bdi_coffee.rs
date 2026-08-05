@@ -94,15 +94,18 @@ enum AgentAction {
 impl Execute for AgentAction {
     type State = ();
 
-    type Action = Self;
+    type UserAction = Self;
 
-    fn execute(
+    fn execute<'b, B>(
         self,
-        bindings: &impl BindingLookup,
-        _context: &mut ember::agent::bdi::context::Context<Self::Action>,
+        bindings: &B,
+        _context: &mut ember::agent::bdi::context::Context<Self::UserAction>,
         _knowledge: &ember::agent::bdi::knowledge::base::KnowledgeBase,
         _state: &mut Self::State,
-    ) -> Option<Self> {
+    ) -> ember::agent::bdi::plan::action::ExecuteResult<'b, Self>
+    where
+        B: BindingLookup + 'b,
+    {
         match self {
             AgentAction::Move { from, to } => {
                 let from = bindings
@@ -118,7 +121,7 @@ impl Execute for AgentAction {
                 info!("[ACTION] 🛒 Buying {item}");
             }
         }
-        None
+        ember::agent::bdi::plan::action::ExecuteResult::Done(None)
     }
 }
 

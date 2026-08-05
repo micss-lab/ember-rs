@@ -9,7 +9,19 @@ use crate::target::Target;
 /// rust-analyzer can only run one process, but this workspace has two
 /// mutually-incompatible targets (std vs. no_std), so we run clippy once per
 /// target here and let both JSON-lines streams flow through.
-pub fn run() -> Result<()> {
+///
+/// `color` requests `json-diagnostic-rendered-ansi`, whose `rendered` field
+/// carries ANSI escapes: consumers that display the rendered text as-is
+/// (e.g. bacon) want this, but rust-analyzer doesn't unless the client
+/// declares the `colorDiagnosticOutput` experimental capability, so it stays
+/// off there.
+pub fn run(color: bool) -> Result<()> {
+    let message_format = if color {
+        "--message-format=json,json-diagnostic-rendered-ansi"
+    } else {
+        "--message-format=json"
+    };
+
     for target in Target::ALL {
         let features = features::qualified_features_for(target)?.join(",");
 
@@ -18,7 +30,7 @@ pub fn run() -> Result<()> {
             "--workspace",
             "--target",
             target.triple(),
-            "--message-format=json",
+            message_format,
         ];
         if let Some(exclude) = target.workspace_exclude() {
             args.push("--exclude");

@@ -5,6 +5,7 @@ use derive_where::derive_where;
 use crate::bindings::{Bindings, OwnedBindings};
 use crate::context::Context;
 use crate::knowledge::base::KnowledgeBase;
+use crate::plan::action::{Execute, ExecuteResult, PendingAction};
 use crate::plan::{Formula, Plan, Trigger, TriggeringEvent};
 
 use self::result::*;
@@ -22,17 +23,21 @@ pub struct Intention<A> {
     stack: Vec<Frame<A>>,
 }
 
-impl<A> Intention<A> {
+impl<A, S> Intention<A>
+where
+    A: Execute<State = S, UserAction = A>,
+{
     pub(crate) fn step(
         &mut self,
         context: &mut Context<A>,
         knowledge: &mut KnowledgeBase,
+        state: &mut S,
     ) -> Result {
         let Some(frame) = self.stack.last_mut() else {
             return StepOk::done();
         };
 
-        let bindings = match frame.step(context, knowledge)? {
+        let bindings = match frame.step(context, knowledge, state)? {
             StepOk::Done => frame.take_filtered_bindings(),
             StepOk::Pending => return StepOk::pending(),
         };
@@ -50,17 +55,6 @@ impl<A> Intention<A> {
         .expect("merging bindings between frames failed");
 
         StepOk::pending()
-    }
-
-    pub(crate) fn get_last_bindings(&self) -> Option<&OwnedBindings> {
-        Some(&self.stack.last()?.bindings)
-    }
-
-    pub(crate) fn take_last_bindings(&mut self) -> OwnedBindings {
-        self.stack
-            .last_mut()
-            .map(|f| f.take_filtered_bindings())
-            .unwrap_or_else(OwnedBindings::empty)
     }
 }
 
@@ -114,8 +108,16 @@ impl<A: Clone> Frame<A> {
     }
 }
 
-impl<A> Frame<A> {
-    fn step(&mut self, context: &mut Context<A>, knowledge: &mut KnowledgeBase) -> Result {
+impl<A, S> Frame<A>
+where
+    A: Execute<State = S, UserAction = A>,
+{
+    fn step(
+        &mut self,
+        context: &mut Context<A>,
+        knowledge: &mut KnowledgeBase,
+        state: &mut S,
+    ) -> Result {
         let Some(formula) = self.remaining.pop() else {
             return StepOk::done();
         };
@@ -158,7 +160,29 @@ impl<A> Frame<A> {
                 },
                 Some(self.intention_id),
             ),
-            Formula::Action(action) => context.perform_action(self.intention_id, action),
+            Formula::Action(action) => {
+                use crate::plan::action::Execute;
+
+                // TODO: Make use of resolve to resolve actions as well.
+                match action.execute(&self.bindings, &mut *context, knowledge, state) {
+                    ExecuteResult::Pending(pending) => {
+                        let intention = pending
+                            .should_block_intention()
+                            .then_some(self.intention_id);
+                        context.dispatch_action(
+                            PendingAction::new(pending, self.bindings.clone()),
+                            intention,
+                        )
+                    }
+                    ExecuteResult::Done(Some(bindings)) => {
+                        self.bindings =
+                            Bindings::merge_views([&self.bindings.as_bindings(), &bindings])
+                                .expect("merging bindings from action into frame failed")
+                                .into()
+                    }
+                    ExecuteResult::Done(None) => (),
+                }
+            }
         }
 
         StepOk::pending()
@@ -200,7 +224,7 @@ mod tests {
 
         // Step with no frames returns Done
         assert!(matches!(
-            intention.step(&mut context, &mut knowledge),
+            intention.step(&mut context, &mut knowledge, &mut ()),
             Ok(StepOk::Done)
         ));
     }
@@ -221,51 +245,65 @@ mod tests {
 
         // Plan has no body, so one step should complete the frame, merge bindings, and remove the frame.
         // It returns Done because the intention has no more frames.
-        let result = intention.step(&mut context, &mut knowledge);
+        let result = intention.step(&mut context, &mut knowledge, &mut ());
         assert!(matches!(result, Ok(StepOk::Done)));
         assert_eq!(intention.stack.len(), 0);
     }
 
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct LogAction(&'static str);
+
+    impl crate::plan::action::Execute for LogAction {
+        type State = Vec<&'static str>;
+        type UserAction = LogAction;
+
+        fn execute<'b, B>(
+            self,
+            _bindings: &B,
+            _context: &mut Context<Self::UserAction>,
+            _knowledge: &KnowledgeBase,
+            state: &mut Self::State,
+        ) -> crate::plan::action::ExecuteResult<'b, Self>
+        where
+            B: crate::bindings::BindingLookup + 'b,
+        {
+            state.push(self.0);
+            crate::plan::action::ExecuteResult::Done(None)
+        }
+    }
+
     #[test]
     fn test_intention_step_with_actions() {
-        let mut intention: Intention<&'static str> = Intention::new(0);
+        let mut intention: Intention<LogAction> = Intention::new(0);
         // SAFETY: The environment on the context remains untouched,
         let mut context = unsafe { new_context_without_environment() };
         let mut knowledge = KnowledgeBase::default();
+        let mut state = Vec::new();
 
         let trigger = trigger("event", vec![], None);
         let plan = plan(
             trigger.clone(),
             None,
             vec![
-                Formula::Action(Action::User("action1")),
-                Formula::Action(Action::User("action2")),
+                Formula::Action(Action::User(LogAction("action1"))),
+                Formula::Action(Action::User(LogAction("action2"))),
             ],
         );
 
         intention.push(&plan, Bindings::empty(), trigger);
 
         // step 1: executes action1 (because it's popped first)
-        let result = intention.step(&mut context, &mut knowledge);
+        let result = intention.step(&mut context, &mut knowledge, &mut state);
         assert!(matches!(result, Ok(StepOk::Pending)));
-        assert_eq!(
-            context.actions,
-            &[(Some(intention.id), Action::User("action1"))]
-        );
+        assert_eq!(state, vec!["action1"]);
 
         // step 2: executes action2
-        let result = intention.step(&mut context, &mut knowledge);
+        let result = intention.step(&mut context, &mut knowledge, &mut state);
         assert!(matches!(result, Ok(StepOk::Pending)));
-        assert_eq!(
-            context.actions,
-            &[
-                (Some(intention.id), Action::User("action1")),
-                (Some(intention.id), Action::User("action2"))
-            ]
-        );
+        assert_eq!(state, vec!["action1", "action2"]);
 
         // step 3: frame done, intention done
-        let result = intention.step(&mut context, &mut knowledge);
+        let result = intention.step(&mut context, &mut knowledge, &mut state);
         assert!(matches!(result, Ok(StepOk::Done)));
     }
 
@@ -295,10 +333,10 @@ mod tests {
 
         intention.push(&plan, Bindings::empty(), trigger);
 
-        let result = intention.step(&mut context, &mut knowledge);
+        let result = intention.step(&mut context, &mut knowledge, &mut ());
         assert!(matches!(result, Ok(StepOk::Pending)));
 
-        let result = intention.step(&mut context, &mut knowledge);
+        let result = intention.step(&mut context, &mut knowledge, &mut ());
         assert!(matches!(result, Ok(StepOk::Pending)));
     }
 
@@ -332,7 +370,7 @@ mod tests {
 
         // A single step executes the belief formula (and only that -- the frame isn't done yet,
         // nothing has drained the emitted event through `handle_event`).
-        let result = intention.step(&mut context, &mut knowledge);
+        let result = intention.step(&mut context, &mut knowledge, &mut ());
         assert!(matches!(result, Ok(StepOk::Pending)));
 
         let query_formula = literal_formula("route_active", vec![string("load"), string("c")]);

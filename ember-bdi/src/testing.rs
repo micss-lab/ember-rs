@@ -3,14 +3,33 @@ use alloc::vec::Vec;
 
 use ember_core::environment::Environment;
 
-use crate::bindings::Bindings;
+use crate::bindings::{Bindings, BindingLookup};
 use crate::context::Context;
 use crate::knowledge::base::KnowledgeBase;
 use crate::literal::Literal;
+use crate::plan::action::{Execute, ExecuteResult};
 use crate::plan::{Formula, GoalKind, Plan, QueryFormula, Trigger, TriggeringEvent};
 use crate::term::view::TermView;
 use crate::term::{Atom, Structure, Term};
 use crate::variable::Variable;
+
+impl Execute for () {
+    type State = ();
+    type UserAction = ();
+
+    fn execute<'b, B>(
+        self,
+        _bindings: &B,
+        _context: &mut Context<Self::UserAction>,
+        _knowledge: &KnowledgeBase,
+        _state: &mut Self::State,
+    ) -> ExecuteResult<'b, Self>
+    where
+        B: BindingLookup + 'b,
+    {
+        ExecuteResult::Done(None)
+    }
+}
 
 pub fn variable() -> Variable {
     Variable::new()
