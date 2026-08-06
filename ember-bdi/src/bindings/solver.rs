@@ -253,6 +253,7 @@ impl<'a> EquivalenceClasses<'a> {
                 })
             }
             TermView::Number(_) => Ok(term.clone()),
+            TermView::String(_) => Ok(term.clone()),
 
             TermView::List(items) => {
                 let mut resolved_items = Vec::with_capacity(items.len());

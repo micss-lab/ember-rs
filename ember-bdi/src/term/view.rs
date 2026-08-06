@@ -1,6 +1,8 @@
+use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
+use bstr::BStr;
 use ember_util::cmp::TotalCmpF32;
 
 use crate::literal::Literal;
@@ -12,6 +14,7 @@ use super::{Atom, Structure, Term};
 pub enum TermView<'a> {
     Term(&'a Term),
     Number(TotalCmpF32),
+    String(Cow<'a, BStr>),
     Variable(&'a Variable),
     List(Box<[TermView<'a>]>),
     Literal {
@@ -25,6 +28,7 @@ impl Clone for TermView<'_> {
         match self {
             Self::Term(term) => Self::Term(term),
             Self::Number(n) => Self::Number(*n),
+            Self::String(s) => Self::String(s.clone()),
             Self::Variable(v) => Self::Variable(v),
             Self::List(items) => Self::List(items.clone()),
             Self::Literal { negated, structure } => Self::Literal {
@@ -70,6 +74,7 @@ impl TermView<'_> {
         match *self {
             TermView::Term(term) => term.clone(),
             TermView::Number(n) => Term::Number(n),
+            TermView::String(ref s) => Term::String(s.clone().into_owned()),
             TermView::Variable(v) => Term::Variable(v.clone()),
             TermView::List(ref items) => Term::List(
                 items

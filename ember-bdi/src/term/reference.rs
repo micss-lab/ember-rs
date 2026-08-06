@@ -1,7 +1,8 @@
+use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use bstr::BString;
+use bstr::BStr;
 use ember_util::cmp::TotalCmpF32;
 
 use crate::literal::Literal;
@@ -13,7 +14,7 @@ use super::view::{StructureView, TermView};
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TermRef<'a> {
     Number(TotalCmpF32),
-    String(&'a BString),
+    String(Cow<'a, BStr>),
     Variable(&'a Variable),
     List(Box<[TermRef<'a>]>),
     Literal {
@@ -27,7 +28,7 @@ impl TermRef<'_> {
     pub fn to_owned(&self) -> Term {
         match *self {
             Self::Number(n) => Term::Number(n),
-            Self::String(s) => Term::String(s.clone()),
+            Self::String(ref s) => Term::String(s.clone().into_owned()),
             Self::Variable(v) => Term::Variable(v.clone()),
             Self::List(ref items) => Term::List(
                 items
@@ -61,7 +62,7 @@ impl<'a> From<&'a Term> for TermRef<'a> {
     fn from(term: &'a Term) -> Self {
         match term {
             Term::Number(n) => Self::Number(*n),
-            Term::String(s) => Self::String(s),
+            Term::String(s) => Self::String(Cow::Borrowed(s.as_ref())),
             Term::Variable(v) => Self::Variable(v),
             Term::List(items) => Self::List(
                 items
@@ -99,6 +100,7 @@ impl<'a> From<TermView<'a>> for TermRef<'a> {
         match term {
             TermView::Term(term) => Self::from(term),
             TermView::Number(n) => Self::Number(n),
+            TermView::String(s) => Self::String(s),
             TermView::Variable(v) => Self::Variable(v),
             TermView::List(items) => Self::List(
                 items

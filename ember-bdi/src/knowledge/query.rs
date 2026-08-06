@@ -549,6 +549,7 @@ pub(crate) mod formula {
                     Some(TermView::Literal { .. }) => Err(EvaluationError::TypeMismatch),
                     Some(TermView::List(_)) => Err(EvaluationError::TypeMismatch),
                     Some(TermView::Number(n)) => Ok(**n),
+                    Some(TermView::String(_)) => Err(EvaluationError::TypeMismatch),
                     None => Err(EvaluationError::InsufficientlyBound),
                 },
                 _ => Err(EvaluationError::TypeMismatch),

@@ -80,7 +80,7 @@ impl FromTerm<'_> for f32 {
 impl FromTerm<'_> for BString {
     fn from_term(term: TermRef<'_>) -> Result<Self, FromTermError> {
         match term {
-            TermRef::String(s) => Ok(s.clone()),
+            TermRef::String(s) => Ok(s.clone().into_owned()),
             TermRef::Literal {
                 functor,
                 arguments,
