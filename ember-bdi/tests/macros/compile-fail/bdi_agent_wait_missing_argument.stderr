@@ -1,4 +1,4 @@
-error: expected one of "at", "forall", "log", "now", "send", "stop_platform", a valid system action (e.g. `.log`, `.wait`, `.at`, `.now`, etc.)
+error: expected one of "at", "forall", "log", "me", "now", "send", "stop_platform", a valid system action (e.g. `.log`, `.wait`, `.at`, `.now`, `.me`, etc.)
  --> tests/macros/compile-fail/bdi_agent_wait_missing_argument.rs:5:16
   |
 5 |     +!brew <- .wait().

@@ -212,6 +212,7 @@ pub enum BuiltinAction {
         goal: Literal,
     },
     Now(Variable),
+    Me(Variable),
 }
 
 #[derive(Debug, Clone)]
@@ -765,6 +766,12 @@ impl AstVisitor {
                 let variable = self.visit_variable(variable).into_token_stream();
                 quote! {
                     ::ember::agent::bdi::plan::action::BuiltinAction::Now(#variable)
+                }
+            }
+            BuiltinAction::Me(variable) => {
+                let variable = self.visit_variable(variable).into_token_stream();
+                quote! {
+                    ::ember::agent::bdi::plan::action::BuiltinAction::Me(#variable)
                 }
             }
         }

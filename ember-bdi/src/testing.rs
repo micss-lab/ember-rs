@@ -1,9 +1,12 @@
+use alloc::borrow::Cow;
+use alloc::boxed::Box;
 use alloc::collections::vec_deque::VecDeque;
+use alloc::rc::Rc;
 use alloc::vec::Vec;
 
 use ember_core::environment::Environment;
 
-use crate::bindings::{Bindings, BindingLookup};
+use crate::bindings::{BindingLookup, Bindings};
 use crate::context::Context;
 use crate::knowledge::base::KnowledgeBase;
 use crate::literal::Literal;
@@ -116,7 +119,16 @@ pub fn plan<A>(
 pub unsafe fn new_context_without_environment<A>() -> Context<'static, A> {
     let mut environment = Environment::new(VecDeque::with_capacity(0));
     // SAFETY: The context should never be used during testing.
-    Context::new(unsafe {
+    Context::new(Rc::new(Cow::Borrowed("test-agent")), unsafe {
         core::mem::transmute::<&mut Environment, &'static mut Environment>(&mut environment)
     })
+}
+
+/// Returns a context for use during testing backed by a real (leaked) environment, safe to read
+/// from and write to. Use this instead of [`new_context_without_environment`] for actions that
+/// touch the environment, e.g. `.stop_platform` or `.send`.
+pub fn new_context_with_environment<A>() -> Context<'static, A> {
+    let environment: &'static mut Environment =
+        Box::leak(Box::new(Environment::new(VecDeque::with_capacity(0))));
+    Context::new(Rc::new(Cow::Borrowed("test-agent")), environment)
 }

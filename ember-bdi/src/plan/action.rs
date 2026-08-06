@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::string::ToString;
 use alloc::vec::Vec;
@@ -158,6 +159,10 @@ pub enum BuiltinAction {
     At(AtState),
     /// Binds the current monotonic time in milliseconds to the given variable.
     Now(Variable),
+    /// Binds the agent's name to the given variable.
+    // TODO: Use unification instead of just binding allowing this action to be used as a check,
+    // not only a fetch.
+    Me(Variable),
 }
 
 impl BuiltinAction {
@@ -269,6 +274,18 @@ impl BuiltinAction {
                     );
                 }
                 ExecuteResult::Done(None)
+            }
+            Me(variable) => {
+                let bindings = Bindings::new(
+                    [(
+                        variable.id,
+                        Some(TermView::String(Cow::Owned(
+                            context.agent_name.as_ref().clone().into_owned().into(),
+                        ))),
+                    )],
+                    AliasMap::empty(),
+                );
+                ExecuteResult::Done(Some(bindings))
             }
         }
     }
@@ -395,9 +412,59 @@ mod tests {
     use crate::resolve::ResolveFailure;
     use crate::term::conversion::{ConversionError, FromTermError};
     use crate::term::view::TermView;
-    use crate::testing::{bindings, new_context_without_environment, string, variable};
+    use crate::testing::{
+        bindings, new_context_with_environment, new_context_without_environment, string, variable,
+        variable_term,
+    };
 
     use super::*;
+
+    #[test]
+    fn test_log_resolves_bound_variables_and_completes_immediately_without_side_effects() {
+        // SAFETY: `.log` never touches the environment.
+        let mut context: Context<()> = unsafe { new_context_without_environment() };
+        let knowledge = KnowledgeBase::default();
+        let var = variable();
+        let room_value = string("kitchen");
+        let bindings = bindings(vec![(var.clone(), room_value.as_view())]);
+
+        let action = BuiltinAction::Log(Level::Info, vec![variable_term(&var)].into_boxed_slice());
+
+        let result = action.execute(&bindings, &mut context, &knowledge);
+
+        assert!(matches!(result, ExecuteResult::Done(None)));
+        assert!(context.events.is_empty());
+        assert!(context.actions.is_empty());
+    }
+
+    #[test]
+    fn test_log_completes_immediately_even_when_a_term_fails_to_resolve() {
+        // SAFETY: `.log` never touches the environment.
+        let mut context: Context<()> = unsafe { new_context_without_environment() };
+        let knowledge = KnowledgeBase::default();
+        let bindings = bindings(vec![]);
+
+        let action = BuiltinAction::Log(
+            Level::Info,
+            vec![variable_term(&variable())].into_boxed_slice(),
+        );
+
+        let result = action.execute(&bindings, &mut context, &knowledge);
+
+        assert!(matches!(result, ExecuteResult::Done(None)));
+    }
+
+    #[test]
+    fn test_stop_platform_sets_the_environment_stop_flag_and_completes_immediately() {
+        let mut context: Context<()> = new_context_with_environment();
+        let bindings = bindings(vec![]);
+        let knowledge = KnowledgeBase::default();
+
+        let result = BuiltinAction::StopPlatform.execute(&bindings, &mut context, &knowledge);
+
+        assert!(matches!(result, ExecuteResult::Done(None)));
+        assert!(context.stop_platform, ".stop_platform must set the environment's stop flag");
+    }
 
     #[test]
     fn test_wait_stays_pending_until_interval_elapses_then_completes() {
@@ -435,6 +502,27 @@ mod tests {
         };
 
         assert!(matches!(result.get_view(&var), Some(TermView::Number(_))));
+    }
+
+    #[test]
+    fn test_me_binds_the_agents_name_to_the_given_variable() {
+        // SAFETY: `.me` never touches the environment.
+        let mut context: Context<()> = unsafe { new_context_without_environment() };
+        let bindings = bindings(vec![]);
+        let knowledge = KnowledgeBase::default();
+        let var = variable();
+
+        let action = BuiltinAction::Me(var.clone());
+
+        let ExecuteResult::Done(Some(result)) = action.execute(&bindings, &mut context, &knowledge)
+        else {
+            panic!(".me must complete immediately with bindings");
+        };
+
+        assert_eq!(
+            result.get_view(&var).map(TermView::to_owned),
+            Some(string("test-agent"))
+        );
     }
 
     #[test]
@@ -493,6 +581,113 @@ mod tests {
             .expect("should resolve");
 
         assert_eq!(resolved, VariableOrReceiver::Receiver(receiver));
+    }
+
+    mod send_literal {
+        use alloc::vec;
+
+        use ember_core::message::{Payload, TransportMessage};
+
+        use crate::testing::literal;
+
+        use super::*;
+
+        fn sent_message<'ctx>(context: &'ctx Context<'ctx, ()>) -> &'ctx Message {
+            let [TransportMessage {
+                payload: Payload::AclMessage(message),
+                ..
+            }] = context.message_outbox.as_slice()
+            else {
+                panic!("expected exactly one parsed acl message in the outbox");
+            };
+            message
+        }
+
+        #[test]
+        fn resolves_a_bound_variable_receiver_and_pushes_an_inform_message() {
+            let mut context: Context<()> = new_context_with_environment();
+            let knowledge = KnowledgeBase::default();
+            let receiver_var = variable();
+            let addr = string("receiver-agent@local");
+            let bindings = bindings(vec![(receiver_var.clone(), addr.as_view())]);
+
+            let action = BuiltinAction::SendLiteral(
+                VariableOrReceiver::Variable(receiver_var),
+                Trigger::Addition,
+                literal("ack", vec![]),
+            );
+
+            let result = action.execute(&bindings, &mut context, &knowledge);
+
+            assert!(matches!(result, ExecuteResult::Done(None)));
+            let message = sent_message(&context);
+            assert_eq!(message.performative, Performative::Inform);
+            assert_eq!(
+                message.receiver,
+                Some(Receiver::Single(Aid::local("receiver-agent")))
+            );
+        }
+
+        #[test]
+        fn deletion_trigger_maps_to_the_not_understood_performative() {
+            let mut context: Context<()> = new_context_with_environment();
+            let knowledge = KnowledgeBase::default();
+            let bindings = bindings(vec![]);
+
+            let action = BuiltinAction::SendLiteral(
+                VariableOrReceiver::Receiver(Receiver::Single(Aid::local("receiver-agent"))),
+                Trigger::Deletion,
+                literal("ack", vec![]),
+            );
+
+            action.execute(&bindings, &mut context, &knowledge);
+
+            assert_eq!(
+                sent_message(&context).performative,
+                Performative::NotUnderstood
+            );
+        }
+
+        #[test]
+        fn resolves_the_literals_arguments_against_the_calling_frames_bindings() {
+            let mut context: Context<()> = new_context_with_environment();
+            let knowledge = KnowledgeBase::default();
+            let var = variable();
+            let room_value = string("kitchen");
+            let bindings = bindings(vec![(var.clone(), room_value.as_view())]);
+
+            let action = BuiltinAction::SendLiteral(
+                VariableOrReceiver::Receiver(Receiver::Single(Aid::local("receiver-agent"))),
+                Trigger::Addition,
+                literal("location", vec![variable_term(&var)]),
+            );
+
+            action.execute(&bindings, &mut context, &knowledge);
+
+            let Some(Content::Bdil(BdilContent::Literal(sent))) = &sent_message(&context).content
+            else {
+                panic!("expected a bdil literal content");
+            };
+            assert_eq!(sent.functor.0, "location");
+        }
+
+        #[test]
+        fn leaves_the_outbox_empty_when_the_receiver_fails_to_resolve() {
+            let mut context: Context<()> = new_context_with_environment();
+            let knowledge = KnowledgeBase::default();
+            let bindings = bindings(vec![]);
+
+            let action = BuiltinAction::SendLiteral(
+                VariableOrReceiver::Variable(variable()),
+                Trigger::Addition,
+                literal("ack", vec![]),
+            );
+
+            let result = action.execute(&bindings, &mut context, &knowledge);
+
+            assert!(matches!(result, ExecuteResult::Done(None)));
+            assert!(context.message_outbox.is_empty());
+        }
     }
 
     mod at {
@@ -613,7 +808,10 @@ mod tests {
 
             let result = action.execute(&bindings, &mut context, &knowledge);
 
-            assert!(matches!(result, ExecuteResult::Done(None)), "forall never stays pending");
+            assert!(
+                matches!(result, ExecuteResult::Done(None)),
+                "forall never stays pending"
+            );
             assert!(
                 context.events.is_empty(),
                 "no solutions means no goals are spawned"

@@ -1,3 +1,5 @@
+use alloc::borrow::Cow;
+use alloc::rc::Rc;
 use alloc::vec::Vec;
 
 use ember_core::environment::Environment;
@@ -8,14 +10,19 @@ use crate::plan::TriggeringEvent;
 use crate::plan::action::PendingAction;
 
 pub struct Context<'ctx, A> {
+    pub(crate) agent_name: Rc<Cow<'static, str>>,
     pub(crate) actions: Vec<(Option<IntentionId>, PendingAction<A>)>,
     pub(crate) events: Vec<(EventSource, TriggeringEvent)>,
     pub(crate) environment: &'ctx mut Environment,
 }
 
 impl<'ctx, A> Context<'ctx, A> {
-    pub(crate) fn new(environment: &'ctx mut Environment) -> Self {
+    pub(crate) fn new(
+        agent_name: Rc<Cow<'static, str>>,
+        environment: &'ctx mut Environment,
+    ) -> Self {
         Self {
+            agent_name,
             actions: Vec::new(),
             events: Vec::new(),
             environment,

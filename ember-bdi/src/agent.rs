@@ -2,6 +2,7 @@ use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 
+use alloc::rc::Rc;
 use alloc::vec::Vec;
 use ember_core::agent::Agent;
 use ember_core::environment::Environment;
@@ -34,7 +35,7 @@ pub struct BdiAgent<
     Sel = FirstEvent,
     PSel = FirstApplicable,
 > {
-    name: Cow<'static, str>,
+    name: Rc<Cow<'static, str>>,
     state: State,
     beliefs: KnowledgeBase,
     plans: PlanLibrary<Action, PSel>,
@@ -62,7 +63,7 @@ where
         initial_goals: impl IntoIterator<Item = Literal>,
     ) -> Self {
         let mut this = Self {
-            name: name.into(),
+            name: Rc::new(name.into()),
             state,
             beliefs: beliefs.unwrap_or_default(),
             plans,
@@ -387,7 +388,7 @@ where
     PSel: PlanSelector<Action>,
 {
     fn tick(&mut self, environment: &mut Environment) {
-        let mut context = Context::new(environment);
+        let mut context = Context::new(self.name.clone(), environment);
 
         self.tick_sensors(&mut context);
 
@@ -423,9 +424,7 @@ where
     }
 
     fn get_name(&self) -> Cow<str> {
-        use core::borrow::Borrow;
-
-        Cow::Borrowed(self.name.borrow())
+        Cow::Borrowed(self.name.as_ref())
     }
 }
 
