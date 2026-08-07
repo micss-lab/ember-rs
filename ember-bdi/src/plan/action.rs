@@ -159,7 +159,7 @@ pub enum BuiltinAction {
     At(AtState),
     /// Binds the current monotonic time in milliseconds to the given variable.
     Now(Variable),
-    /// Binds the agent's name to the given variable.
+    /// Binds the agent's own fully-qualified AID (`name@platform`) to the given variable.
     // TODO: Use unification instead of just binding allowing this action to be used as a check,
     // not only a fetch.
     Me(Variable),
@@ -276,13 +276,9 @@ impl BuiltinAction {
                 ExecuteResult::Done(None)
             }
             Me(variable) => {
+                let aid = Aid::local(context.agent_name.as_ref().clone().into_owned()).to_string();
                 let bindings = Bindings::new(
-                    [(
-                        variable.id,
-                        Some(TermView::String(Cow::Owned(
-                            context.agent_name.as_ref().clone().into_owned().into(),
-                        ))),
-                    )],
+                    [(variable.id, Some(TermView::String(Cow::Owned(aid.into()))))],
                     AliasMap::empty(),
                 );
                 ExecuteResult::Done(Some(bindings))
@@ -505,7 +501,7 @@ mod tests {
     }
 
     #[test]
-    fn test_me_binds_the_agents_name_to_the_given_variable() {
+    fn test_me_binds_the_agents_fully_qualified_aid_to_the_given_variable() {
         // SAFETY: `.me` never touches the environment.
         let mut context: Context<()> = unsafe { new_context_without_environment() };
         let bindings = bindings(vec![]);
@@ -521,7 +517,7 @@ mod tests {
 
         assert_eq!(
             result.get_view(&var).map(TermView::to_owned),
-            Some(string("test-agent"))
+            Some(string("test-agent@local"))
         );
     }
 
