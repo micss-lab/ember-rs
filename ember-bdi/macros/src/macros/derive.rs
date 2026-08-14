@@ -158,10 +158,10 @@ pub(crate) mod percept {
     //!
     //! Grammar (flat: `#[ember(add(..))]`; namespaced: `#[ember(percept(add(..)))]`), a
     //! comma-separated list of actions:
-    //! - `add` / `add(<expr>)` — emit `(Trigger::Addition, IntoLiteral::into_literal(<expr>))`;
+    //! - `add` / `add(<expr>)`: emit `(Trigger::Addition, IntoLiteral::into_literal(<expr>))`;
     //!   `<expr>` defaults to `self` when omitted.
-    //! - `remove` / `remove(<expr>)` — same, with `Trigger::Deletion`.
-    //! - `ignore` — emit nothing for this item/variant (must be alone in its list).
+    //! - `remove` / `remove(<expr>)`: same, with `Trigger::Deletion`.
+    //! - `ignore`: emit nothing for this item/variant (must be alone in its list).
     //!
     //! May be placed on the container (struct, or enum-wide default) and/or on individual enum
     //! variants (a variant's own list overrides the container default; no attribute anywhere

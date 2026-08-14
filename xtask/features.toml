@@ -4,7 +4,7 @@
 #
 # Consumed at runtime by `xtask hack` (cargo-hack --include-features) and
 # `xtask lsp` (per-target stand-in for --all-features). Crates without a
-# meaningful [features] table are simply omitted here.
+# meaningful [features] table are omitted here.
 
 [ember]
 std = "local"

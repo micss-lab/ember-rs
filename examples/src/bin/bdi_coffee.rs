@@ -195,56 +195,8 @@ fn example() {
     info!("☕ BDI Agent demo finished. ☕");
 }
 
-/// Creates and returns the PlanLibrary for the coffee-making agent.
-///
-/// These plans constitute the following ASL file:
-///
-/// ```asl
-///     // AI-generated.
-///
-///     // **Goal: Make Coffee**
-///     // This plan is chosen if the agent is in the same location as the coffee
-///     // machine and has coffee beans. It is the most specific and ideal plan.
-///     +!make_coffee : at(agent, Loc) & at(coffee_machine, Loc) & have(coffee_beans)
-///       <- .print("Enjoying a fresh cup of coffee!").
-///
-///     // This is the default plan for making coffee. It's chosen if the conditions
-///     // for the first plan are not met. It creates sub-goals to get the agent
-///     // to the right place and to acquire the necessary ingredients. After the
-///     // sub-goals are complete, it retries the original `!make_coffee` goal.
-///     +!make_coffee
-///       <- !go_to(kitchen);
-///          !get_beans;
-///          !make_coffee.
-///
-///
-///     // **Goal: Go to a Location**
-///     // This plan handles the goal of moving the agent to a new location.
-///     // If the agent is already at the destination, it does nothing.
-///     +!go_to(Dest) : at(agent, Dest)
-///       <- .print("Already at ", Dest).
-///
-///     // If the agent is not at the destination, this plan is selected. It performs
-///     // the `move` action and then updates its internal belief state about its location.
-///     +!go_to(Dest) : at(agent, From)
-///       <- .move(From, Dest);
-///          -at(agent, From);
-///          +at(agent, Dest).
-///
-///
-///     // **Goal: Get Coffee Beans**
-///     // This plan is for acquiring coffee beans. If the agent already has them,
-///     // it simply notes that fact.
-///     +!get_beans : have(coffee_beans)
-///       <- .print("Found coffee beans in the pantry.").
-///
-///     // If the agent does not have coffee beans, this default plan is chosen.
-///     // It performs the `buy` action and then adds the `have(coffee_beans)`
-///     // belief to its knowledge base.
-///     +!get_beans
-///       <- .buy(coffee_beans);
-///          +have(coffee_beans).
-/// ```
+/// Creates and returns the PlanLibrary for the coffee-making agent. See the
+/// `// Plan A:` .. `// Plan F:` comments below for the ASL each plan encodes.
 fn define_plans() -> PlanLibrary<AgentAction> {
     let mut lib = PlanLibrary::default();
 

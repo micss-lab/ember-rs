@@ -1,6 +1,6 @@
-pub(super) use esp_wifi::esp_now::{EspNowReceiver, EspNowSender};
+pub(super) use esp_radio::esp_now::{EspNowReceiver, EspNowSender};
 
-use esp_wifi::esp_now::{EspNowReceiver as Receiver, EspNowSender as Sender};
+use esp_radio::esp_now::{EspNowReceiver as Receiver, EspNowSender as Sender};
 
 use alloc::string::ToString;
 

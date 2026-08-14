@@ -34,6 +34,13 @@ derive-where = "1.6"
 derive_more = { version = "2.1", default-features = false }
 log = { version = "0.4", default-features = false }
 
+esp-alloc = "0.10.0"
+esp-backtrace = { version = "0.19.0", default-features = false }
+esp-hal = { version = "1.1.2", default-features = false }
+esp-println = "0.17.0"
+esp-radio = "0.18.0"
+esp-rtos = "0.3.0"
+
 [profile.release]
 panic = "abort"
 debug-assertions = true

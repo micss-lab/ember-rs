@@ -30,7 +30,7 @@ pub mod agent {
 
     #[cfg(feature = "agent-bdi")]
     pub mod bdi {
-        pub use ember_bdi::agent::BdiAgent;
+        pub use ember_bdi::agent::{BdiAgent, TickBudget};
         pub use ember_bdi::{bdi_actions, bdi_agent};
 
         pub use ember_bdi::{

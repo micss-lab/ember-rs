@@ -21,8 +21,8 @@ tiny_http = { version = "0.12", optional = true }
 ureq = { version = "3.0", default-features = false, optional = true }
 serde_bencode = { version = "0.2", optional = true }
 
-esp-hal = { version = "0.23", default-features = false, features = ["unstable"], optional = true }
-esp-wifi = { version = "0.12", features = ["esp32", "esp-now"], optional = true }
+esp-hal = { workspace = true, features = ["unstable"], optional = true }
+esp-radio = { workspace = true, features = ["esp32", "wifi", "esp-now", "unstable"], optional = true }
 macaddr = { version = "1.0", default-features = false, features = ["serde"], optional = true }
 postcard = { version = "1.1", default-features = false, features = ["alloc"], optional = true }
 
@@ -45,7 +45,7 @@ espnow = [
     "serde-espnow",
 
     "dep:esp-hal",
-    "dep:esp-wifi",
+    "dep:esp-radio",
     "dep:postcard",
 ]
 custom = []

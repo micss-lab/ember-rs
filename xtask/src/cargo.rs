@@ -11,7 +11,7 @@ pub fn run_cargo(args: &[&str]) -> Result<()> {
     let joined = args.join(" ");
 
     // Unconditional (not gated by XTASK_LOG) and on stderr, so the exact
-    // command is always visible — for both copy-paste retries outside xtask,
+    // command is always visible, for both copy-paste retries outside xtask,
     // and to keep stdout clean for commands whose output feeds a parser
     // (`lsp`'s concatenated cargo JSON).
     eprintln!("$ {cargo} {joined}");

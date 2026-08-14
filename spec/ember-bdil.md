@@ -6,11 +6,11 @@
 
 ---
 
-## Part 1 — Language
+## Part 1: Language
 
 ### 1.1 Purpose
 
-`ember-bdil` is a FIPA ACL content language for exchanging BDI belief state between agents. A message carries one **content expression** — a single literal representing a belief. The FIPA performative encodes the intent (add or remove the belief); the content language encodes the belief itself.
+`ember-bdil` is a FIPA ACL content language for exchanging BDI belief state between agents. A message carries one **content expression** being a single literal representing a belief. The FIPA performative encodes the intent (add or remove the belief); the content language encodes the belief itself.
 
 ### 1.2 Versioning
 
@@ -61,7 +61,7 @@ escape        ::= '\\' ['"\\nrt]
 
 Variables begin with an uppercase letter or `_`. A variable in a literal is a placeholder for an unknown ground term.
 
-**Scope rule:** All variables in a single message are **message-local**. A variable name refers to the same value wherever it appears within the same message. Variables are fully independent of any variables in the receiving agent's knowledge base — they never unify with knowledge-base variables unless the agent explicitly binds them after decoding.
+**Scope rule:** All variables in a single message are **message-local**. A variable name refers to the same value wherever it appears within the same message. Variables are fully independent of any variables in the receiving agent's knowledge base. They never unify with knowledge-base variables unless the agent explicitly binds them after decoding.
 
 **Negation:** `~` marks negation-as-failure (NAF), not classical negation. This matches AgentSpeak semantics.
 
@@ -83,13 +83,13 @@ that was used by matching on this first argument, e.g. `+message("inform", X)`.
 
 ---
 
-## Part 2 — Bit-Efficient Encoding
+## Part 2: Bit-Efficient Encoding
 
 ### 2.1 Design Principles
 
 The encoding follows the FIPA bit-efficient representation philosophy:
 
-1. Every known keyword or construct type is represented by a **single predefined byte from the code table** — no known symbol is ever transmitted as a raw string.
+1. Every known keyword or construct type is represented by a **single predefined byte from the code table**. No known symbol is ever transmitted as a raw string.
 2. All structures are **self-delimiting**: null-terminated words, END-terminated argument lists, and fixed-size numeric fields. No length-of-payload headers.
 3. All unused byte ranges are **reserved and documented** so future versions extend the code table without conflict.
 
@@ -176,17 +176,17 @@ The expression code (0x10 / 0x11) encodes the negation of the top-level literal.
 
 ### 2.5 Nested Literal Payload (T_LIT+ / T_LIT-)
 
-A nested literal is encoded as `functor arg_list` — identical to `expr_body` but without an expression code. Negation is encoded in the term code (0x23 vs 0x24).
+A nested literal is encoded as `functor arg_list`, identical to `expr_body` but without an expression code. Negation is encoded in the term code (0x23 vs 0x24).
 
 ### 2.6 Variable and List Encoding (T_VAR / T_LIST)
 
 Variable names are null-terminated and must be non-empty with no embedded 0x00 bytes. Multiple occurrences of the same name within one frame decode to the same variable.
 
-A list is encoded as `(term_code term_payload)* END` — identical in shape to `arg_list`, just without a preceding functor. Elements may be any term type, including nested lists. An empty list is encoded as a bare `END` immediately following the `T_LIST` code.
+A list is encoded as `(term_code term_payload)* END`, identical in shape to `arg_list`, just without a preceding functor. Elements may be any term type, including nested lists. An empty list is encoded as a bare `END` immediately following the `T_LIST` code.
 
 ### 2.7 Worked Examples
 
-**`location(agent1, room3)`** — positive, two 0-arity literal args:
+**`location(agent1, room3)`** positive, two 0-arity literal args:
 
 ```
 CA ED              magic
@@ -205,7 +205,7 @@ CA ED              magic
 Total: 33 bytes
 ```
 
-**`at(robot, X)`** — positive, one literal arg + one variable:
+**`at(robot, X)`** positive, one literal arg + one variable:
 
 ```
 CA ED  40
@@ -219,7 +219,7 @@ CA ED  40
 Total: 23 bytes
 ```
 
-**`~faulty(sensor1)`** — negated, one literal arg:
+**`~faulty(sensor1)`** negated, one literal arg:
 
 ```
 CA ED  40
@@ -230,7 +230,7 @@ CA ED  40
 00
 ```
 
-**`readings([1, 2, 3])`** — positive, one list argument of three integers:
+**`readings([1, 2, 3])`** positive, one list argument of three integers:
 
 ```
 CA ED  40
@@ -261,7 +261,7 @@ Total: 33 bytes
 
 **Pre-coded well-known functors (PATCH bump):**
 1. Assign codes from `0x31`–`0x3F`.
-2. No payload — the functor string is implied by the code.
+2. No payload, the functor string is implied by the code.
 3. Document the code→string mapping in the patch spec section.
 
 ### 2.9 Embedding in FIPA ACL

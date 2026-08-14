@@ -4,7 +4,7 @@ use alloc::string::ToString;
 use alloc::vec::Vec;
 
 #[cfg(feature = "acc-espnow")]
-use esp_wifi::esp_now;
+use esp_radio::esp_now;
 
 use ember_core::agent::Agent;
 use ember_core::agent::aid::Aid;

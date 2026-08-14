@@ -46,7 +46,7 @@ fn load() -> Result<Config> {
 /// Kept per-crate, rather than unioned into one flat list, because
 /// `cargo-hack`'s `--ignore-unknown-features` doesn't reliably suppress an
 /// error when a feature name from one crate's list is passed to a different
-/// crate that doesn't declare it — so each crate must be hacked in isolation
+/// crate that doesn't declare it, so each crate must be hacked in isolation
 /// (`-p <crate> --include-features <that crate's own names>`) rather than as
 /// one `--workspace --include-features <everyone's names>` run.
 pub fn crate_feature_names_for(target: Target) -> Result<Vec<(String, Vec<String>)>> {

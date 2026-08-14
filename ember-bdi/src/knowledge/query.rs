@@ -1409,8 +1409,7 @@ mod tests {
     // `Cost` is seeded in for the body to use, and (2) giving non-negated,
     // belief-iterator-less ground queries (bare relational formulas) a
     // single-shot "already evaluated" guard, mirroring the existing
-    // negated-query guard. See chirppark-gateway-down-bug.md's "deeper,
-    // still-open variant" section for the original repro writeup.
+    // negated-query guard.
     #[test]
     fn nested_rule_over_disjunctive_rule_still_leaks_unrelated_bindings() {
         let mut bb = KnowledgeBase::default();

@@ -1,7 +1,7 @@
 # Contributing to Ember
 
 Thanks for your interest in developing Ember further. This document is the entry point for
-**contributors** — people who want to change the framework itself, not just build agents with it. If
+**contributors**: people who want to change the framework itself, not just build agents with it. If
 you only want to *use* Ember, the [`docs/`](./docs) directory is what you want.
 
 Ember is research software developed as part of a master's thesis. The architecture is deliberately
@@ -14,7 +14,7 @@ rest. This guide explains the layout, the conventions, and where to plug things 
 
 ### With Nix (recommended)
 
-A [`flake.nix`](./flake.nix) provides a fully configured shell — the pinned Rust toolchain, the ESP
+A [`flake.nix`](./flake.nix) provides a fully configured shell: the pinned Rust toolchain, the ESP
 tooling (`espup`, `espflash`), `bacon`, `cargo-expand`, `cargo-flamegraph`, and more:
 
 ```sh
@@ -33,8 +33,8 @@ An `.envrc` is included, so with `direnv` the shell loads automatically on `cd`.
 
 ### Useful tools
 
-- **`bacon`** — background checking; see [`bacon.toml`](./bacon.toml).
-- **`cargo-expand`** — indispensable when working on the proc-macros (see [§6](#6-working-on-the-proc-macros)).
+- **`bacon`**: background checking; see [`bacon.toml`](./bacon.toml).
+- **`cargo-expand`**: indispensable when working on the proc-macros (see [§6](#6-working-on-the-proc-macros)).
 
 ---
 
@@ -68,9 +68,9 @@ If your change touches embedded code paths, also run the `-esp` equivalents.
 
 - Unit and integration tests live alongside the code (`#[cfg(test)]`, `mod testing`).
 - `ember-bdi/macros` uses [`trybuild`](https://docs.rs/trybuild) for compile-fail/compile-pass tests
-  of the proc-macros — the right place to pin down macro diagnostics.
+  of the proc-macros, the right place to pin down macro diagnostics.
 
-Currently the project is very light on tests. More tests are very much welcomed.
+Currently the project is light on tests. More tests are welcomed.
 
 ---
 
@@ -103,7 +103,7 @@ vocabulary (`Agent`, `Message`, `Environment`) that everything else builds on. I
 wanting to reference a container or a specific agent kind from `ember-core`, that is a signal the
 abstraction belongs higher up.
 
-The boundary between `ember-core` and `ember` is still being formalised — err on the side of putting
+The boundary between `ember-core` and `ember` is still being formalised; err on the side of putting
 platform-agnostic types in `ember-core` and runtime/wiring in `ember`.
 
 ---
@@ -116,7 +116,7 @@ Understanding these three seams makes most of the codebase navigable.
 
 The container only knows [`Agent`](./ember-core/src/agent.rs): `update(&mut Environment) -> bool` and
 `get_name`. Every agent kind implements it. This is the single seam that keeps reactive and BDI agents
-interchangeable — respect it when adding a new kind.
+interchangeable; respect it when adding a new kind.
 
 ### The `FipaAgent` component
 
@@ -154,7 +154,7 @@ channel to attempt.
 
 Add a variant to [`Content`](./ember-core/src/message/content.rs), give it a `.language()` string, and
 implement encode/decode in `ember-core/src/message/repr/`. Unknown languages must continue to round-trip
-as `Content::Other` rather than erroring — this is a deliberate robustness property.
+as `Content::Other` rather than erroring; this is a deliberate robustness property.
 
 ### Extending `ember-bdil`
 
@@ -186,10 +186,10 @@ Practical tips:
 
 - Use `cargo expand` (e.g. on an example) to see generated code.
 - Add a `trybuild` case for any new diagnostic or accepted/rejected syntax.
-- Generated code refers to types through the `::ember::agent::bdi::…` re-export paths — keep those
+- Generated code refers to types through the `::ember::agent::bdi::…` re-export paths; keep those
   stable, or update the macros and the `ember` façade together.
 
-Some derive/action modules are marked *"AI-generated, human verified"*; hold new code to the same bar —
+Some derive/action modules are marked *"AI-generated, human verified"*; hold new code to the same bar:
 verify behaviour with tests, don't just trust generation.
 
 ---
@@ -202,7 +202,7 @@ verify behaviour with tests, don't just trust generation.
 - **`no_std` discipline:** core crates are `#![no_std]` + `extern crate alloc`. Never reach for `std`
   outside a `#[cfg(feature = "std")]` gate. Use `alloc` collections and `core` APIs.
 - **Errors, not panics:** on-device panics are fatal. Prefer returning/logging errors. A recent fix
-  explicitly stopped the BDIL codec from panicking on malformed input — follow that spirit. Reserve
+  explicitly stopped the BDIL codec from panicking on malformed input; follow that spirit. Reserve
   panics for genuine invariant violations.
 - **Logging:** use the `log` crate (`log::info!`, `debug!`, `error!`), not `println!`. Keep hot paths
   quiet.

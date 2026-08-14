@@ -110,7 +110,7 @@ Ember represents a decoded frame as `Content::Bdil(BdilContent::Literal(_))`.
 The language uses semantic versioning; receivers reject a frame whose **major** version differs from
 their own but tolerate higher minor/patch (forward-compatibility). Frames are also rejected for bad
 magic bytes, empty functors, malformed variables, a wrong expression count, or unknown codes. The
-performative itself is never a rejection reason — see [§8.1](#81-purpose). The full rejection table
+performative itself is never a rejection reason; see [§8.1](#81-purpose). The full rejection table
 is in [`spec/ember-bdil.md` §2.10](../spec/ember-bdil.md#210-rejection-rules).
 
 ## 8.6 Extending the language

@@ -11,7 +11,7 @@ use ember_examples::setup_example;
 setup_example!();
 
 // SenderAgent informs ReceiverAgent that it has `resource(water)` on startup.
-// The Aid "receiver-agent@local" is validated at compile time — a malformed Aid
+// The Aid "receiver-agent@local" is validated at compile time. A malformed Aid
 // (e.g. missing '@') would cause a compile error from the proc-macro.
 #[bdi_agent(asl = {
     !startup.

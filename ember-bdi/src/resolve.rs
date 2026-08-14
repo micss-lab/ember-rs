@@ -210,7 +210,7 @@ mod tests {
         // A negated variable literal
         let literal = Term::Variable(var);
 
-        // Ensure that resolve_possible_as_view captures underlying literal aspects,
+        // Ensure that `resolve` captures underlying literal aspects,
         // but note that the `negated` value produced matches the variant wrapped by the view.
         let resolved = literal
             .resolve(&bindings)

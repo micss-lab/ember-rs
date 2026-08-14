@@ -340,12 +340,6 @@ mod tests {
         assert!(matches!(result, Ok(StepOk::Pending)));
     }
 
-    // Regression test for the microgrid route-churn bug (see
-    // `ember-case-studies/microgrid-route-churn-bug.md`): a plan body's own `+belief`/`-belief`
-    // must be queryable immediately, in the same step that executes it, not several ticks later
-    // once its emitted event happens to reach the front of the outer event queue. Without the
-    // synchronous `assert_no_event`/`remove_no_event` call in `Frame::step`'s `Formula::Belief`
-    // arm, this belief would only become visible after a later, separate `handle_event` call.
     #[test]
     fn belief_formula_is_queryable_immediately_after_its_own_step() {
         use crate::knowledge::query::IntoQuery;

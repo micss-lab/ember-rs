@@ -15,13 +15,18 @@ critical-section = { version = "1.2.0", features = ["std"] }
 
 [target.'cfg(target_os = "none")'.dependencies]
 ember = { workspace = true, features = ["acc-espnow", "agent-bdi", "agent-reactive"] }
+ember-time = { path = "../ember-time", features = ["esp32"] }
 
-esp-alloc = "0.6.0"
-esp-println = { version = "0.12.0", features = ["esp32", "log"] }
-esp-backtrace = { version = "0.14.2", default-features = false, features = [
+esp-alloc = { workspace = true }
+esp-println = { workspace = true, features = ["esp32", "log-04"] }
+esp-backtrace = { workspace = true, features = [
     "esp32",
     "println",
     "panic-handler",
 ] }
-esp-hal = { version = "0.23.1", features = ["esp32", "unstable"] }
-esp-wifi = { version = "0.12.0", features = ["esp32", "wifi", "esp-now"] }
+esp-hal = { workspace = true, default-features = true, features = ["esp32", "unstable"] }
+esp-radio = { workspace = true, features = ["esp32", "wifi", "esp-now", "unstable"] }
+esp-rtos = { workspace = true, features = ["esp32", "esp-radio"] }
+# esp-hal itself doesn't forward this feature, so it has to be forced on
+# directly here for `#[ram(reclaimed)]` (see esp.rs) to compile.
+esp-hal-procmacros = { version = "0.22.0", features = ["__esp_idf_bootloader"] }

@@ -122,30 +122,22 @@ where
 #[cfg(target_os = "none")]
 fn example() {
     use esp_hal::clock::CpuClock;
-    use esp_hal::rng::Rng;
+    use esp_hal::interrupt::software::SoftwareInterruptControl;
     use esp_hal::timer::timg::TimerGroup;
 
     log::info!("Running example `esp_now_client_server`");
 
-    let peripherals = esp_hal::init({
-        let mut config = esp_hal::Config::default();
-        config.cpu_clock = CpuClock::max();
-        config
-    });
+    let peripherals = esp_hal::init(esp_hal::Config::default().with_cpu_clock(CpuClock::max()));
 
     log::info!("Initialized peripherals");
 
     let timg0 = TimerGroup::new(peripherals.TIMG0);
-    let init = esp_wifi::init(
-        timg0.timer0,
-        Rng::new(peripherals.RNG),
-        peripherals.RADIO_CLK,
-    )
-    .expect("failed to initialize wifi");
+    let sw_interrupt = SoftwareInterruptControl::new(peripherals.SW_INTERRUPT);
+    esp_rtos::start(timg0.timer0, sw_interrupt.software_interrupt0);
 
-    let (_manager, sender, receiver) = esp_wifi::esp_now::EspNow::new(&init, peripherals.WIFI)
-        .expect("failed to initialize esp-now")
-        .split();
+    let (_controller, interfaces) = esp_radio::wifi::new(peripherals.WIFI, Default::default())
+        .expect("failed to initialize wifi");
+    let (_manager, sender, receiver) = interfaces.esp_now.split();
 
     log::info!("Initialized wifi");
 

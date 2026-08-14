@@ -23,7 +23,7 @@ rarely name them.
 
 ## 4.2 The run loop
 
-`start()` simply calls `poll()` in a loop until `poll()` signals that the platform should stop:
+`start()` calls `poll()` in a loop until `poll()` signals that the platform should stop:
 
 ```rust
 pub fn start(mut self) -> Result<(), Box<dyn Error>> {

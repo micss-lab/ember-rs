@@ -5,7 +5,7 @@ use alloc::boxed::Box;
 use alloc::collections::BTreeSet;
 
 #[cfg(feature = "acc-espnow")]
-use esp_wifi::esp_now;
+use esp_radio::esp_now;
 
 #[cfg(feature = "acc")]
 use ember_acc::{Acc, Channels};

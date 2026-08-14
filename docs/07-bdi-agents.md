@@ -141,7 +141,7 @@ irrelevant:
   <- .log("info", "found a pair").
 ```
 
-Here `pair(_, _)` matches `pair(1, 2)` just as readily as `pair(1, 1)` — the two `_`s are independent,
+Here `pair(_, _)` matches `pair(1, 2)` just as readily as `pair(1, 1)`: the two `_`s are independent,
 so nothing requires their bound values to be equal. Writing `pair(X, X)` instead would only match
 pairs whose two elements are the same.
 
@@ -291,7 +291,7 @@ Built-in actions are written with a **leading dot** and are provided by the runt
 | `.send(aid, "performative", lit)`        | Send belief `lit` to another agent; `aid` is a `"name@host"` string or a bound variable (see [§7.13](#713-inter-agent-belief-sharing)). |
 | `.wait(millis)`                          | Suspend the current intention for at least `millis` milliseconds before continuing to the next step. `millis` must be an integer literal. Other intentions keep running while this one waits (see [§7.12](#712-the-reasoning-cycle)). |
 | `.at(millis, goal)`                      | After at least `millis` milliseconds, post an achievement-goal-addition event for `goal`. Does not block the calling intention: see below. |
-| `.forall(condition, goal)`               | For every way `condition` can be satisfied against the belief base, post an achievement goal for `goal` — each in its own new, independent intention. See below. |
+| `.forall(condition, goal)`               | For every way `condition` can be satisfied against the belief base, post an achievement goal for `goal`, each in its own new, independent intention. See below. |
 | `.now(var)`                              | Bind the current time, in whole milliseconds, to `var`. Completes immediately. See below. |
 
 Using an unknown `.builtin` is a compile error listing the valid built-ins.
@@ -320,8 +320,8 @@ achievement goal.
 +!check_again <- .log("info", "fired").
 ```
 
-`.forall(condition, goal)` takes a *query* — `condition` is a logical expression with the same grammar
-as a plan context or rule body (literals, `&`/`|`/`not`, relational comparisons) — and posts one
+`.forall(condition, goal)` takes a *query*: `condition` is a logical expression with the same grammar
+as a plan context or rule body (literals, `&`/`|`/`not`, relational comparisons), and posts one
 achievement-goal event for `goal` for **every** binding that satisfies it:
 
 ```
@@ -343,7 +343,7 @@ Concretely, this means:
 - The plan containing `.forall` does **not** wait for the spawned goals to be pursued, let alone
   finished; it moves on to its own next step immediately.
 - Bindings established while pursuing one spawned goal never leak into another, or back into the
-  plan that ran `.forall` — there is nothing to merge, since each is its own intention from the
+  plan that ran `.forall`; there is nothing to merge, since each is its own intention from the
   start.
 - Resolving every solution before spawning anything (rather than interleaving belief-base
   lookups with intention execution) means a `.forall` in a busy agent always spawns goals against a
@@ -462,14 +462,14 @@ struct SensorReading { temperature: f32 }
 ### `Percept`: mark a type as a perception
 
 See the next section for how percepts are consumed. By default, `#[derive(Percept)]` makes the type
-become a single *added* belief via its `IntoLiteral` impl — but this is configurable through the
+become a single *added* belief via its `IntoLiteral` impl, but this is configurable through the
 shared `#[ember(...)]` helper attribute (used by `FromTerm` above too), so a percept can express much
 more than "add one belief":
 
-- `add` / `add(<expr>)` — emit an *addition* of the belief produced by `<expr>` (any expression whose
+- `add` / `add(<expr>)`: emit an *addition* of the belief produced by `<expr>` (any expression whose
   type implements `IntoLiteral`); `<expr>` defaults to `self` when omitted.
-- `remove` / `remove(<expr>)` — same, but a *deletion*.
-- `ignore` — this item/variant produces no belief at all.
+- `remove` / `remove(<expr>)`: same, but a *deletion*.
+- `ignore`: this item/variant produces no belief at all.
 - Several actions in one list emit several `(Trigger, Literal)` tuples for that single percept
   instance (e.g. "add belief A and remove belief B" as one state-transition event).
 
@@ -512,8 +512,8 @@ enum Event {
 ```
 
 Named fields are referenced by their declared name, as above. Unnamed (tuple) fields are referenced
-as `_0`, `_1`, … — the same convention `derive_more`'s `Display` derive uses for tuple fields in
-format arguments — rather than a bare number, so there's no ambiguity between a field reference and
+as `_0`, `_1`, …, the same convention `derive_more`'s `Display` derive uses for tuple fields in
+format arguments, rather than a bare number, so there's no ambiguity between a field reference and
 an actual literal value in the expression:
 
 ```rust
@@ -604,7 +604,7 @@ The agent reports itself **finished** to the container when it has no remaining 
 agent that has achieved all its goals lets the platform move on (and, if it was the last agent,
 allows the container to idle or stop).
 
-Some actions need more than one tick to finish — `.wait` is the built-in example. While such an
+Some actions need more than one tick to finish; `.wait` is the built-in example. While such an
 action is still in progress, its intention doesn't advance to its next step (so later steps in the
 same plan wait for it), but other intentions continue to be scheduled normally, one step per tick, in
 the meantime.
@@ -655,7 +655,7 @@ See the `bdi_send` example for a runnable version.
 ### 7.13.1 Sending to a variable receiver
 
 Instead of a literal address, `aid` may be a variable already bound (e.g. by the triggering event or
-an earlier step in the plan body). This is useful when the destination is only known at runtime —
+an earlier step in the plan body). This is useful when the destination is only known at runtime,
 for example, replying to whoever sent a registration request:
 
 ```rust
@@ -667,7 +667,7 @@ struct RegistrarAgent;
 ```
 
 The variable must be bound, at the point `.send` executes, to a string in the same `"name@host"` (or
-`"name@local"`) format as a literal AID — there is no compile-time validation in this case, since the
+`"name@local"`) format as a literal AID; there is no compile-time validation in this case, since the
 address is only known at runtime. If the variable is unbound, or bound to a value that cannot be
 parsed as an AID, the send is skipped and an error is logged instead of stopping the plan.
 

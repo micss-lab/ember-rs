@@ -25,7 +25,7 @@ struct BinTarget {
 ///
 /// Resolved dynamically (rather than assuming a fixed crate name) so that
 /// running/building a specific `--bin` never has to pull in the rest of the
-/// workspace's dependency graph — in particular, xtask's own `std`-only
+/// workspace's dependency graph, in particular xtask's own `std`-only
 /// deps, which can't compile for the `no_std` ESP32 target.
 pub fn package_owning_bin(bin: &str) -> Result<String> {
     let cargo = env::var("CARGO").unwrap_or_else(|_| "cargo".into());

@@ -15,13 +15,13 @@ ember-reactive = { workspace = true, optional = true }
 
 log = { version = "0.4", default-features = false }
 
-esp-wifi = { version = "0.12", optional = true }
+esp-radio = { workspace = true, optional = true }
 
 [features]
 std = ["ember-time/std"]
 
 acc = ["dep:ember-acc"]
-acc-espnow = ["acc", "ember-acc/espnow", "dep:esp-wifi", "esp-wifi/esp-now"]
+acc-espnow = ["acc", "ember-acc/espnow", "dep:esp-radio", "esp-radio/esp-now"]
 acc-http = ["acc", "std", "ember-acc/http"]
 acc-custom = ["acc", "ember-acc/custom"]
 
