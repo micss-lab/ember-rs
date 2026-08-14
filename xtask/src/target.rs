@@ -38,6 +38,22 @@ impl Target {
             Target::Esp32 => Some("xtask"),
         }
     }
+
+    /// For `xtask hack` on this target: an extra feature to fold into
+    /// `krate`'s feature-powerset, grouped 1:1 with an existing feature of
+    /// that powerset via `cargo hack --group-features` (so combos get both
+    /// or neither, never one without the other). The existing feature only
+    /// compiles when the extra one is also on, and nothing in an isolated
+    /// `-p` check supplies it the way the binary crate normally would via
+    /// feature unification. See `ember-acc/Cargo.toml`'s `rt` feature.
+    /// Returns `(existing_feature, extra_feature)`.
+    pub fn hack_feature_group(self, krate: &str) -> Option<(&'static str, &'static str)> {
+        match (self, krate) {
+            (Target::Esp32, "ember-acc") => Some(("espnow", "rt")),
+            (Target::Esp32, "ember") => Some(("acc-espnow", "ember-acc/rt")),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for Target {

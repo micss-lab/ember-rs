@@ -2,7 +2,7 @@
 # valid for: "local" (x86_64-unknown-linux-gnu / std), "esp32"
 # (xtensa-esp32-none-elf / no_std via -Zbuild-std=core,alloc), or "both".
 #
-# Consumed at runtime by `xtask hack` (cargo-hack --include-features) and
+# Consumed at runtime by `xtask hack` (cargo-hack --exclude-features) and
 # `xtask lsp` (per-target stand-in for --all-features). Crates without a
 # meaningful [features] table are omitted here.
 
@@ -23,6 +23,7 @@ serde-http = "local"
 custom = "both"
 espnow = "esp32"
 serde-espnow = "esp32"
+rt = "esp32"
 
 [ember-time]
 std = "local"

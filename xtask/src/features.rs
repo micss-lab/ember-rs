@@ -40,27 +40,39 @@ fn load() -> Result<Config> {
     toml::from_str(&raw).with_context(|| format!("failed to parse {}", path.display()))
 }
 
-/// Per-crate bare feature names valid for `target`, one entry per crate that
-/// has at least one such feature (crates with none are omitted).
+/// Per-crate bare feature names NOT valid for `target`, one entry per crate
+/// that has at least one feature that IS valid for `target`. Crates with
+/// none are omitted, since there is nothing to powerset over.
 ///
 /// Kept per-crate, rather than unioned into one flat list, because
 /// `cargo-hack`'s `--ignore-unknown-features` doesn't reliably suppress an
 /// error when a feature name from one crate's list is passed to a different
 /// crate that doesn't declare it, so each crate must be hacked in isolation
-/// (`-p <crate> --include-features <that crate's own names>`) rather than as
-/// one `--workspace --include-features <everyone's names>` run.
-pub fn crate_feature_names_for(target: Target) -> Result<Vec<(String, Vec<String>)>> {
+/// (`-p <crate> --exclude-features <that crate's other-target names>`)
+/// rather than as one `--workspace --exclude-features <everyone's names>`
+/// run.
+///
+/// This is the complement of the feature set (excluded, not included)
+/// because `cargo-hack` 0.6.45 silently drops any feature named in
+/// `--group-features` when `--include-features` is also passed, instead of
+/// toggling it. Confirmed empirically with `--print-command-list`.
+/// `--exclude-features` doesn't have this problem.
+pub fn crate_feature_names_excluded_for(target: Target) -> Result<Vec<(String, Vec<String>)>> {
     let config = load()?;
     let mut result: Vec<(String, Vec<String>)> = config
         .into_iter()
         .filter_map(|(krate, features)| {
-            let mut names: Vec<String> = features
+            let has_relevant = features.values().any(|scope| scope.matches(target));
+            if !has_relevant {
+                return None;
+            }
+            let mut excluded: Vec<String> = features
                 .into_iter()
-                .filter(|(_, scope)| scope.matches(target))
+                .filter(|(_, scope)| !scope.matches(target))
                 .map(|(name, _)| name)
                 .collect();
-            names.sort();
-            (!names.is_empty()).then_some((krate, names))
+            excluded.sort();
+            Some((krate, excluded))
         })
         .collect();
     result.sort_by(|a, b| a.0.cmp(&b.0));

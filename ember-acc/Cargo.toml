@@ -58,6 +58,13 @@ serde-espnow = [
     "dep:macaddr",
     "dep:serde",
 ]
+# Forwards esp-hal's `rt`. No real consumer needs this; the binary crate
+# already enables `rt` workspace-wide via feature unification. It exists so
+# `cargo xtask hack` can supply it when checking this crate in isolation
+# (`-p`, not `--workspace`), mirroring how esp-radio's own CI check-configs
+# always pair wifi checks with `esp-hal/rt` supplied externally instead of
+# requiring it through the feature graph.
+rt = ["esp-hal/rt"]
 
 [lints.clippy]
 uninlined_format_args = { level = "allow" }

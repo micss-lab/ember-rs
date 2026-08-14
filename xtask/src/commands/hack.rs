@@ -32,16 +32,26 @@ pub fn run(target: Option<Target>) -> Result<()> {
         eprintln!("\n=== hack: {target} ===");
 
         // Each crate is hacked in isolation (`-p`), not `--workspace`: see
-        // the doc comment on `features::crate_feature_names_for` for why.
-        for (krate, features) in features::crate_feature_names_for(target)? {
-            let include = features.join(",");
+        // the doc comment on `features::crate_feature_names_excluded_for`
+        // for why, and for why `--exclude-features` is used over
+        // `--include-features`.
+        for (krate, excluded_features) in features::crate_feature_names_excluded_for(target)? {
+            let exclude = excluded_features.join(",");
+            let group = target.hack_feature_group(&krate);
+            let group_arg = group.map(|(existing, extra)| format!("{existing},{extra}"));
 
             let mut args: Vec<&str> =
                 vec!["hack", "check", "-p", &krate, "--target", target.triple()];
             args.extend_from_slice(target.extra_args());
             args.push("--feature-powerset");
-            args.push("--include-features");
-            args.push(&include);
+            if !exclude.is_empty() {
+                args.push("--exclude-features");
+                args.push(&exclude);
+            }
+            if let Some(group_arg) = &group_arg {
+                args.push("--group-features");
+                args.push(group_arg);
+            }
 
             run_cargo(&args)?;
         }
