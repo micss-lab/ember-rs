@@ -136,8 +136,8 @@ impl<A, S, Sched> IntentionQueue<A, Sched>
 where
     A: Execute<State = S, UserAction = A>,
 {
-    pub(crate) fn step<'a>(
-        &'a mut self,
+    pub(crate) fn step(
+        &mut self,
         context: &mut Context<A>,
         knowledge: &mut KnowledgeBase,
         state: &mut S,
@@ -258,7 +258,7 @@ impl<A> Scheduler<A> for Random {
             .filter(|id| intentions.contains_key(id))
         {
             count += 1;
-            if self.next_u64() % count == 0 {
+            if self.next_u64().is_multiple_of(count) {
                 chosen = Some(id);
             }
         }

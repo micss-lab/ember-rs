@@ -31,7 +31,7 @@ mod std_time_driver_impl {
     use std::sync::LazyLock;
     use std::time::Instant as StdInstant;
 
-    use super::{Driver, Instant, time_driver_impl};
+    use super::{Driver, Instant};
     use crate::TICK_HZ;
 
     struct StdDriver(LazyLock<StdInstant>);
@@ -54,7 +54,7 @@ mod std_time_driver_impl {
 pub mod esp32_tim_driver_impl {
     use esp32::TIMG0;
 
-    use super::{Driver, time_driver_impl};
+    use super::Driver;
     use crate::Instant;
 
     struct Esp32Driver;

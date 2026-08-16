@@ -126,7 +126,7 @@ impl OwnedBindings {
         Ok(solver.solve()?.into())
     }
 
-    pub(crate) fn as_bindings(&self) -> Bindings {
+    pub(crate) fn as_bindings(&self) -> Bindings<'_> {
         Bindings {
             bindings: self.bindings.as_ref().map(|b| {
                 b.iter()
@@ -155,7 +155,7 @@ pub trait BindingLookup {
         self.lookup(variable).map(T::from_term)
     }
 
-    fn as_bindings(&self) -> Bindings;
+    fn as_bindings(&self) -> Bindings<'_>;
 }
 
 impl BindingLookup for Bindings<'_> {
@@ -163,7 +163,7 @@ impl BindingLookup for Bindings<'_> {
         self.get_view(variable).cloned()
     }
 
-    fn as_bindings(&self) -> Bindings {
+    fn as_bindings(&self) -> Bindings<'_> {
         self.clone()
     }
 }
@@ -177,7 +177,7 @@ impl BindingLookup for OwnedBindings {
             .map(|t| t.as_view())
     }
 
-    fn as_bindings(&self) -> Bindings {
+    fn as_bindings(&self) -> Bindings<'_> {
         self.as_bindings()
     }
 }

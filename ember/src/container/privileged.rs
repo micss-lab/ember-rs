@@ -29,7 +29,7 @@ pub(super) struct PrivilegedAgents {
 }
 
 impl PrivilegedAgents {
-    pub(super) fn agent_names(&self) -> impl IntoIterator<Item = Cow<str>> + '_ {
+    pub(super) fn agent_names(&self) -> impl IntoIterator<Item = Cow<'_, str>> + '_ {
         core::iter::once(self.ams.get_name())
     }
 
@@ -121,7 +121,7 @@ mod ams {
                 entry.insert(AgentReference::Local(LocalAgentReference {
                     inbox: Vec::new(),
                 }));
-                log::info!("Agent `{}` successfully registered.", &name);
+                log::info!("Agent `{}` successfully registered.", name);
             }
             Entry::Occupied(_) => {
                 log::error!("Cannot register agent `{aid}` as it is already registered.");

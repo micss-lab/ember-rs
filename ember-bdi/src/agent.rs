@@ -3,7 +3,6 @@ use alloc::boxed::Box;
 use alloc::collections::VecDeque;
 
 use alloc::rc::Rc;
-use alloc::vec::Vec;
 use ember_core::agent::Agent;
 use ember_core::environment::Environment;
 use ember_core::message::content::ember_bdil::BdilContent;
@@ -268,11 +267,7 @@ where
             return;
         };
 
-        for _ in 0..self
-            .tick_budget
-            .max_sensors
-            .unwrap_or_else(|| sensors.len())
-        {
+        for _ in 0..self.tick_budget.max_sensors.unwrap_or(sensors.len()) {
             let Some(mut sensor) = sensors.pop_front() else {
                 break;
             };
@@ -319,7 +314,7 @@ where
         for _ in 0..self
             .tick_budget
             .max_pending_actions
-            .unwrap_or_else(|| self.pending_actions.len())
+            .unwrap_or(self.pending_actions.len())
         {
             let Some((intention_id, pending)) = self.pending_actions.pop_front() else {
                 break;
@@ -347,7 +342,7 @@ where
     Action: Clone + Execute<State = State, UserAction = Action>,
     Sched: Scheduler<Action>,
 {
-    fn tick_intentions(&mut self, mut context: &mut Context<'_, Action>) {
+    fn tick_intentions(&mut self, context: &mut Context<'_, Action>) {
         for _ in 0..self.tick_budget.max_intentions {
             if !self.intentions.has_runnable() {
                 break;
@@ -356,17 +351,17 @@ where
             let events_before = context.events.len();
 
             self.intentions
-                .step(&mut context, &mut self.beliefs, &mut self.state);
+                .step(context, &mut self.beliefs, &mut self.state);
 
             if !context.actions.is_empty() {
-                core::mem::replace(&mut context.actions, Vec::new())
-                    .into_iter()
-                    .for_each(|(intention, action)| {
+                core::mem::take(&mut context.actions).into_iter().for_each(
+                    |(intention, action)| {
                         if let Some(id) = intention {
                             self.intentions.block_on_action(id);
                         }
                         self.pending_actions.push_back((intention, action));
-                    });
+                    },
+                );
             }
 
             // Block any intentions that are newly waiting for an event or action.
@@ -423,7 +418,7 @@ where
         false
     }
 
-    fn get_name(&self) -> Cow<str> {
+    fn get_name(&self) -> Cow<'_, str> {
         Cow::Borrowed(self.name.as_ref())
     }
 }

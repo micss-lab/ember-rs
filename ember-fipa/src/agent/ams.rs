@@ -48,7 +48,7 @@ impl AgentTrait for AmsAgent {
         false
     }
 
-    fn get_name(&self) -> Cow<str> {
+    fn get_name(&self) -> Cow<'_, str> {
         Cow::Borrowed("ams")
     }
 }

@@ -62,10 +62,10 @@ pub(crate) fn expand(mut input: ItemImpl) -> syn::Result<TokenStream> {
 }
 
 fn extract_impl_ident(self_ty: &Type) -> syn::Result<Ident> {
-    if let Type::Path(TypePath { path, .. }) = self_ty {
-        if let Some(segment) = path.segments.last() {
-            return Ok(segment.ident.clone());
-        }
+    if let Type::Path(TypePath { path, .. }) = self_ty
+        && let Some(segment) = path.segments.last()
+    {
+        return Ok(segment.ident.clone());
     }
     Err(Error::new(
         syn::spanned::Spanned::span(self_ty),
@@ -141,14 +141,12 @@ fn extract_bdi_action_name(attrs: &mut Vec<syn::Attribute>) -> syn::Result<Optio
                 syn::punctuated::Punctuated::<Meta, Token![,]>::parse_terminated,
             )?;
             for meta in nested {
-                if let Meta::NameValue(nv) = meta {
-                    if nv.path.is_ident("name") {
-                        if let syn::Expr::Lit(expr_lit) = &nv.value {
-                            if let Lit::Str(lit_str) = &expr_lit.lit {
-                                custom_name = Some(lit_str.value());
-                            }
-                        }
-                    }
+                if let Meta::NameValue(nv) = meta
+                    && nv.path.is_ident("name")
+                    && let syn::Expr::Lit(expr_lit) = &nv.value
+                    && let Lit::Str(lit_str) = &expr_lit.lit
+                {
+                    custom_name = Some(lit_str.value());
                 }
             }
         } else {

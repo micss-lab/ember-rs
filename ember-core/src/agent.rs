@@ -9,5 +9,5 @@ pub mod aid;
 pub trait Agent {
     fn update(&mut self, environment: &mut Environment) -> bool;
 
-    fn get_name(&self) -> Cow<str>;
+    fn get_name(&self) -> Cow<'_, str>;
 }

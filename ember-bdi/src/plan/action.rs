@@ -459,7 +459,10 @@ mod tests {
         let result = BuiltinAction::StopPlatform.execute(&bindings, &mut context, &knowledge);
 
         assert!(matches!(result, ExecuteResult::Done(None)));
-        assert!(context.stop_platform, ".stop_platform must set the environment's stop flag");
+        assert!(
+            context.stop_platform,
+            ".stop_platform must set the environment's stop flag"
+        );
     }
 
     #[test]
@@ -589,10 +592,12 @@ mod tests {
         use super::*;
 
         fn sent_message<'ctx>(context: &'ctx Context<'ctx, ()>) -> &'ctx Message {
-            let [TransportMessage {
-                payload: Payload::AclMessage(message),
-                ..
-            }] = context.message_outbox.as_slice()
+            let [
+                TransportMessage {
+                    payload: Payload::AclMessage(message),
+                    ..
+                },
+            ] = context.message_outbox.as_slice()
             else {
                 panic!("expected exactly one parsed acl message in the outbox");
             };

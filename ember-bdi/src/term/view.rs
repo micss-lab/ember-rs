@@ -95,7 +95,7 @@ impl TermView<'_> {
 }
 
 impl Term {
-    pub(crate) fn as_view(&self) -> TermView {
+    pub(crate) fn as_view(&self) -> TermView<'_> {
         self.into()
     }
 }
