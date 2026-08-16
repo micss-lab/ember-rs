@@ -40,6 +40,11 @@ impl<A, Sched> IntentionQueue<A, Sched> {
         self.intentions.is_empty()
     }
 
+    #[cfg(test)]
+    pub(crate) fn intention_stack_len(&self, id: IntentionId) -> Option<usize> {
+        self.intentions.get(&id).map(Intention::stack_len)
+    }
+
     /// Blocks `id` on an event it just raised. Must be paired with a later
     /// [`unblock_event`](Self::unblock_event) once that event has been processed.
     pub(crate) fn block_on_event(&mut self, id: IntentionId) {

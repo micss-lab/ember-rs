@@ -896,6 +896,50 @@ mod tests {
     }
 
     #[test]
+    fn test_self_recursive_goal_does_not_leak_stack_frames() {
+        // `+!loop <- !loop.`, the standard AgentSpeak "run forever" idiom used throughout the
+        // microgrid/traffic-light case studies (heartbeat_loop, led_supervisor). Each recursion
+        // resolves the plan body down to nothing but re-raises the same internal event, which
+        // must replace the frame it came from, not stack a dead one underneath it.
+        let mut lib = PlanLibrary::<TestAction>::default();
+        lib.add(plan(
+            trigger("loop", vec![], Some(GoalKind::Achieve)),
+            None,
+            vec![Formula::Goal {
+                kind: GoalKind::Achieve,
+                goal: literal("loop", Vec::with_capacity(0)),
+            }],
+        ));
+
+        let agent = BdiAgent::<Vec<&'static str>, TestAction, ()>::new(
+            "loop-agent",
+            Vec::new(),
+            None,
+            lib,
+            vec![literal("loop", Vec::with_capacity(0))],
+        );
+        let mut agent = agent.with_tick_budget(TickBudget {
+            max_events: 10,
+            max_intentions: 10,
+            ..TickBudget::default()
+        });
+
+        let mut environment = new_environment();
+        for _ in 0..50 {
+            agent.tick(&mut environment);
+            // Momentarily absent (between the old frame's own recursion emitting the next
+            // `!loop` and that event being handled) is fine; more than one frame stacked up
+            // for it is the leak this guards against.
+            if let Some(len) = agent.intentions.intention_stack_len(0) {
+                assert_eq!(
+                    len, 1,
+                    "self-recursive goal must not accumulate dead frames underneath the live one"
+                );
+            }
+        }
+    }
+
+    #[test]
     fn test_custom_plan_selector_replaces_first_applicable() {
         // Reject any applicable plan with a one-step body; among these two same-triggered
         // plans, that rejects the first (added) one and forces the second to be selected -

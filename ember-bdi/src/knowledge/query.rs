@@ -32,43 +32,60 @@ impl<'a> Query<'a> {
         }
         None
     }
+
+    fn reset(&mut self) {
+        self.conjunctions.iter_mut().for_each(Conjunction::reset);
+    }
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct Conjunction<'a> {
     operands: Box<[GroundQuery<'a>]>,
+    /// Bindings for operands already satisfied in the current search.
+    /// Persists across calls so a later call resumes the walk instead of
+    /// restarting it at operand 0.
+    current_bindings: Vec<Bindings<'a>>,
 }
 
 impl<'a> Conjunction<'a> {
     fn next_bindings(&mut self, existing_bindings: Option<&Bindings<'a>>) -> Option<Bindings<'a>> {
-        let mut current_bindings = Vec::with_capacity(self.operands.len());
-        let mut cursor = 0_usize;
+        // Resume: back off the last operand so its next alternative gets
+        // tried, instead of restarting the whole walk at operand 0.
+        let mut cursor = self.current_bindings.len();
+        if cursor > 0 && cursor == self.operands.len() {
+            cursor -= 1;
+            self.current_bindings.pop();
+        }
+
         while let Some(operand) = self.operands.get_mut(cursor) {
             match operand.next_bindings(
-                current_bindings
+                self.current_bindings
                     .get(cursor.saturating_sub(1))
                     .or(existing_bindings),
             ) {
                 Some(bindings) => {
-                    current_bindings.push(bindings);
+                    self.current_bindings.push(bindings);
                     cursor += 1;
                 }
                 None => {
                     if cursor == 0 {
-                        break;
+                        return None;
                     }
-                    current_bindings.pop();
+                    self.current_bindings.pop();
                     operand.reset();
                     cursor -= 1;
                 }
             }
         }
 
-        // Reset every operand except the first one in case this function gets
-        // called again.
-        self.operands.iter_mut().skip(1).for_each(|o| o.reset());
+        self.current_bindings.last().cloned()
+    }
 
-        current_bindings.pop()
+    /// Full reset for reuse under different outer bindings, as opposed to
+    /// `next_bindings`'s resume-in-place backtracking.
+    fn reset(&mut self) {
+        self.current_bindings.clear();
+        self.operands.iter_mut().for_each(GroundQuery::reset);
     }
 }
 
@@ -105,12 +122,7 @@ impl<'a> GroundQuery<'a> {
             self.operand
                 .next_bindings(self.beliefs.as_mut(), existing_bindings, self.knowledge),
         ) {
-            (false, result) => {
-                if self.beliefs.is_none() {
-                    self.evaluated = true;
-                }
-                result
-            }
+            (false, result) => result,
             (true, bindings) => {
                 // Don't let a later ask (without an intervening `reset`) re-run
                 // the operand, whose own belief iterators may have been
@@ -147,7 +159,13 @@ pub(crate) enum QueryOperand<'a> {
         /// back-trackable, hence we store it here.
         rule_in_process: Option<RuleQuery<'a>>,
     },
-    Relational(&'a RelationalQueryFormula),
+    Relational {
+        formula: &'a RelationalQueryFormula,
+        /// Because this query is not based on a belief iterator, it can return `Some` infinitely as
+        /// if it has new solutions. Using `evaluated`, `None` can be returned after the first call.
+        evaluated: bool,
+    },
+    Group(Box<Query<'a>>),
 }
 
 impl<'a> QueryOperand<'a> {
@@ -159,11 +177,12 @@ impl<'a> QueryOperand<'a> {
     }
 
     fn reset(&mut self) {
-        if let Self::Literal {
-            rule_in_process, ..
-        } = self
-        {
-            *rule_in_process = None;
+        match self {
+            Self::Literal {
+                rule_in_process, ..
+            } => *rule_in_process = None,
+            Self::Group(query) => query.reset(),
+            Self::Relational { evaluated, .. } => *evaluated = false,
         }
     }
 
@@ -203,9 +222,15 @@ impl<'a> QueryOperand<'a> {
                         })
                     })
                 }),
-            QueryOperand::Relational(formula) => {
-                formula.verify_bindings(existing_bindings).ok().flatten()
+            QueryOperand::Relational { formula, evaluated } => {
+                if *evaluated {
+                    None
+                } else {
+                    *evaluated = true;
+                    formula.verify_bindings(existing_bindings).ok().flatten()
+                }
             }
+            QueryOperand::Group(query) => query.next_bindings(existing_bindings),
         }
     }
 }
@@ -317,7 +342,7 @@ pub(crate) mod formula {
 
     impl<'a> IntoQuery<'a> for &'a QueryFormula {
         fn into_query(self, knowledge: &'a KnowledgeBase) -> Query<'a> {
-            self::into_dnf::convert(self, knowledge)
+            self::lowering::convert(self, knowledge)
         }
     }
 
@@ -557,9 +582,17 @@ pub(crate) mod formula {
         }
     }
 
-    /// AI-generated module for converting the recursive query formula structure into the
-    /// negation-normal form compatible with the [`Query`] type.
-    mod into_dnf {
+    /// AI-generated
+    /// Lowers a [`QueryFormula`] onto the [`Query`]/[`Conjunction`] shape
+    /// directly, without distributing into disjunctive normal form. A
+    /// formula that does not fit the shape expected at a given level (a
+    /// compound formula in leaf position, negated or not) becomes its own
+    /// subquery via [`QueryOperand::Group`] instead. Per-literal De Morgan
+    /// distribution is unsound for a negated conjunction whose conjuncts
+    /// share a variable, so it is not applied anywhere here, not even for
+    /// the negated-disjunction case where it would be sound.
+    mod lowering {
+        use alloc::boxed::Box;
         use alloc::vec;
         use alloc::vec::Vec;
 
@@ -570,86 +603,98 @@ pub(crate) mod formula {
 
         use super::{LogicalOperator, QueryFormula};
 
-        /// Intermediate structure to build Disjunctive Normal Form: (A & B) | (C & D)
-        struct DnfBuilder<'a>(Vec<Vec<GroundQuery<'a>>>);
-
-        impl<'a> DnfBuilder<'a> {
-            /// Identity for OR: An empty list of conjunctions
-            fn empty() -> Self {
-                Self(Vec::new())
-            }
-
-            /// Identity for AND: A single empty conjunction
-            fn unit() -> Self {
-                Self(vec![Vec::new()])
-            }
-
-            /// Logic OR: Combine the sets of possible conjunctions
-            fn or(mut self, other: Self) -> Self {
-                self.0.extend(other.0);
-                self
-            }
-
-            /// Logic AND: Create a Cartesian product of all conjunctions (Distribution)
-            fn and(self, other: Self) -> Self {
-                let mut result = Vec::new();
-                for left_conj in &self.0 {
-                    for right_conj in &other.0 {
-                        let mut combined = left_conj.clone();
-                        combined.extend(right_conj.clone());
-                        result.push(combined);
-                    }
-                }
-                DnfBuilder(result)
-            }
-        }
-
         pub fn convert<'a>(formula: &'a QueryFormula, bb: &'a KnowledgeBase) -> Query<'a> {
-            let dnf = transform(formula, false, bb);
-
-            let conjunctions = dnf
-                .0
-                .into_iter()
-                .map(|ops| Conjunction {
-                    operands: ops.into_boxed_slice(),
-                })
-                .collect::<Vec<_>>()
-                .into_boxed_slice();
-
-            Query { conjunctions }
+            transform(formula, bb)
         }
 
-        fn transform<'a>(
+        fn transform<'a>(formula: &'a QueryFormula, bb: &'a KnowledgeBase) -> Query<'a> {
+            match formula {
+                QueryFormula::Logical {
+                    operator: LogicalOperator::Disjunction,
+                    operands,
+                } => Query {
+                    conjunctions: operands
+                        .iter()
+                        .map(|op| transform_conjunction(op, bb))
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice(),
+                },
+                // Does not start with an OR: it is a single AND-branch on its own.
+                _ => Query {
+                    conjunctions: vec![transform_conjunction(formula, bb)].into_boxed_slice(),
+                },
+            }
+        }
+
+        fn transform_conjunction<'a>(
+            formula: &'a QueryFormula,
+            bb: &'a KnowledgeBase,
+        ) -> Conjunction<'a> {
+            match formula {
+                QueryFormula::Logical {
+                    operator: LogicalOperator::Conjunction,
+                    operands,
+                } => Conjunction {
+                    operands: operands
+                        .iter()
+                        .map(|op| transform_leaf(op, bb))
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice(),
+                    current_bindings: Vec::new(),
+                },
+                // Does not start with an AND: it is a single leaf on its own.
+                _ => Conjunction {
+                    operands: vec![transform_leaf(formula, bb)].into_boxed_slice(),
+                    current_bindings: Vec::new(),
+                },
+            }
+        }
+
+        fn transform_leaf<'a>(formula: &'a QueryFormula, bb: &'a KnowledgeBase) -> GroundQuery<'a> {
+            match formula {
+                QueryFormula::Literal(lit) => create_leaf(QueryOperand::literal(lit), false, bb),
+                QueryFormula::Relational(rel) => create_leaf(
+                    QueryOperand::Relational {
+                        formula: rel,
+                        evaluated: false,
+                    },
+                    false,
+                    bb,
+                ),
+                QueryFormula::Not(inner) => match inner.as_ref() {
+                    // A negated literal/relational is still a plain ground leaf.
+                    QueryFormula::Literal(lit) => create_leaf(QueryOperand::literal(lit), true, bb),
+                    QueryFormula::Relational(rel) => create_leaf(
+                        QueryOperand::Relational {
+                            formula: rel,
+                            evaluated: false,
+                        },
+                        true,
+                        bb,
+                    ),
+                    // Negating a compound formula does not fit a leaf: resolve it
+                    // as its own subquery and negate the existence check as a
+                    // whole, rather than distributing the negation into it.
+                    compound => create_group_leaf(compound, true, bb),
+                },
+                // A bare compound formula in leaf position, for example the
+                // `B|C` inside `A & (B|C)`, does not fit a leaf either.
+                compound @ QueryFormula::Logical { .. } => create_group_leaf(compound, false, bb),
+            }
+        }
+
+        fn create_group_leaf<'a>(
             formula: &'a QueryFormula,
             negated: bool,
             bb: &'a KnowledgeBase,
-        ) -> DnfBuilder<'a> {
-            match formula {
-                QueryFormula::Literal(lit) => {
-                    let leaf = create_leaf(QueryOperand::literal(lit), negated, bb);
-                    DnfBuilder(vec![vec![leaf]])
-                }
-                QueryFormula::Relational(rel) => {
-                    let leaf = create_leaf(QueryOperand::Relational(rel), negated, bb);
-                    DnfBuilder(vec![vec![leaf]])
-                }
-                QueryFormula::Not(inner) => transform(inner, !negated, bb),
-                QueryFormula::Logical { operator, operands } => {
-                    match (operator, negated) {
-                        // Standard Disjunction OR Negated Conjunction (via De Morgan)
-                        (LogicalOperator::Disjunction, false)
-                        | (LogicalOperator::Conjunction, true) => operands
-                            .iter()
-                            .map(|op| transform(op, negated, bb))
-                            .fold(DnfBuilder::empty(), DnfBuilder::or),
-                        // Standard Conjunction OR Negated Disjunction (via De Morgan)
-                        (LogicalOperator::Conjunction, false)
-                        | (LogicalOperator::Disjunction, true) => operands
-                            .iter()
-                            .map(|op| transform(op, negated, bb))
-                            .fold(DnfBuilder::unit(), DnfBuilder::and),
-                    }
-                }
+        ) -> GroundQuery<'a> {
+            GroundQuery {
+                negated,
+                beliefs: None,
+                original: None,
+                operand: QueryOperand::Group(Box::new(transform(formula, bb))),
+                knowledge: bb,
+                evaluated: false,
             }
         }
 
@@ -719,7 +764,7 @@ pub(crate) mod formula {
             // --- Tests ---
 
             #[test]
-            fn compile_single_literal() {
+            fn single_literal_is_one_conjunction_one_leaf() {
                 let bb = KnowledgeBase::default();
                 let formula = QueryFormula::Literal(mock_literal("p"));
 
@@ -735,25 +780,27 @@ pub(crate) mod formula {
             }
 
             #[test]
-            fn double_negation_elimination() {
-                // !!p  =>  p
+            fn negated_literal_stays_a_plain_leaf() {
+                // `not p` fits a leaf directly: no subquery needed.
                 let bb = KnowledgeBase::default();
-                let formula = QueryFormula::Not(Box::new(QueryFormula::Not(Box::new(
-                    QueryFormula::Literal(mock_literal("p")),
-                ))));
+                let formula = QueryFormula::Not(Box::new(QueryFormula::Literal(mock_literal("p"))));
 
                 let query = convert(&formula, &bb);
 
                 assert_eq!(query.conjunctions.len(), 1);
-                assert!(
-                    !query.conjunctions[0].operands[0].negated,
-                    "Double Not should be positive"
-                );
+                assert_eq!(query.conjunctions[0].operands.len(), 1);
+                assert!(matches!(
+                    query.conjunctions[0].operands[0].operand,
+                    QueryOperand::Literal { .. }
+                ));
+                assert!(query.conjunctions[0].operands[0].negated);
             }
 
             #[test]
-            fn de_morgan_not_and() {
-                // !(p & q)  =>  (!p | !q)
+            fn negated_conjunction_becomes_a_single_subquery_leaf() {
+                // `not (p & q)` no longer decomposes via De Morgan: it maps
+                // onto one negated Group leaf wrapping the positive `p & q`
+                // as its own nested query.
                 let bb = KnowledgeBase::default();
                 let formula = QueryFormula::Not(Box::new(QueryFormula::Logical {
                     operator: LogicalOperator::Conjunction,
@@ -766,15 +813,22 @@ pub(crate) mod formula {
 
                 let query = convert(&formula, &bb);
 
-                // Should result in two separate conjunctions (disjunction)
-                assert_eq!(query.conjunctions.len(), 2);
-                assert!(query.conjunctions[0].operands[0].negated);
-                assert!(query.conjunctions[1].operands[0].negated);
+                assert_eq!(query.conjunctions.len(), 1);
+                assert_eq!(query.conjunctions[0].operands.len(), 1);
+                let leaf = &query.conjunctions[0].operands[0];
+                assert!(leaf.negated);
+                let QueryOperand::Group(inner) = &leaf.operand else {
+                    panic!("expected a Group leaf");
+                };
+                assert_eq!(inner.conjunctions.len(), 1);
+                assert_eq!(inner.conjunctions[0].operands.len(), 2);
             }
 
             #[test]
-            fn de_morgan_not_or() {
-                // !(p | q)  =>  (!p & !q)
+            fn negated_disjunction_also_becomes_a_subquery_leaf() {
+                // `not (p | q)` is sound to flatten via De Morgan, but the
+                // lowering applies the same "compound under not becomes a
+                // subquery" rule uniformly, without that exception.
                 let bb = KnowledgeBase::default();
                 let formula = QueryFormula::Not(Box::new(QueryFormula::Logical {
                     operator: LogicalOperator::Disjunction,
@@ -787,16 +841,22 @@ pub(crate) mod formula {
 
                 let query = convert(&formula, &bb);
 
-                // Should result in one conjunction with two negated operands
                 assert_eq!(query.conjunctions.len(), 1);
-                assert_eq!(query.conjunctions[0].operands.len(), 2);
-                assert!(query.conjunctions[0].operands[0].negated);
-                assert!(query.conjunctions[0].operands[1].negated);
+                assert_eq!(query.conjunctions[0].operands.len(), 1);
+                let leaf = &query.conjunctions[0].operands[0];
+                assert!(leaf.negated);
+                let QueryOperand::Group(inner) = &leaf.operand else {
+                    panic!("expected a Group leaf");
+                };
+                assert_eq!(inner.conjunctions.len(), 2);
             }
 
             #[test]
-            fn distributive_law_complex() {
-                // (A | B) & (C | D)  =>  (A&C) | (A&D) | (B&C) | (B&D)
+            fn disjunction_nested_in_conjunction_does_not_distribute() {
+                // `(a|b) & (c|d)` used to expand into a 4-way cartesian
+                // product. It now maps onto one conjunction whose two
+                // operands are each a Group leaf wrapping its own
+                // disjunction, with no distribution at all.
                 let bb = KnowledgeBase::default();
 
                 let left = QueryFormula::Logical {
@@ -822,10 +882,11 @@ pub(crate) mod formula {
 
                 let query = convert(&formula, &bb);
 
-                // Verification of Cartesian product
-                assert_eq!(query.conjunctions.len(), 4, "Should have 4 paths (2x2)");
-                for conj in query.conjunctions.iter() {
-                    assert_eq!(conj.operands.len(), 2, "Each path needs both terms");
+                assert_eq!(query.conjunctions.len(), 1);
+                assert_eq!(query.conjunctions[0].operands.len(), 2);
+                for leaf in query.conjunctions[0].operands.iter() {
+                    assert!(!leaf.negated);
+                    assert!(matches!(leaf.operand, QueryOperand::Group(_)));
                 }
             }
 
@@ -854,47 +915,7 @@ pub(crate) mod formula {
 
                 // Second operand is Relational (negated)
                 assert!(ops[1].negated);
-                assert!(matches!(ops[1].operand, QueryOperand::Relational(_)));
-            }
-
-            #[test]
-            fn deep_tree_flattening() {
-                // (A & B) | (C & (D | E)) => (A&B) | (C&D) | (C&E)
-                let bb = KnowledgeBase::default();
-
-                let d_or_e = QueryFormula::Logical {
-                    operator: LogicalOperator::Disjunction,
-                    operands: vec![
-                        QueryFormula::Literal(mock_literal("d")),
-                        QueryFormula::Literal(mock_literal("e")),
-                    ]
-                    .into_boxed_slice(),
-                };
-
-                let c_and_de = QueryFormula::Logical {
-                    operator: LogicalOperator::Conjunction,
-                    operands: vec![QueryFormula::Literal(mock_literal("c")), d_or_e]
-                        .into_boxed_slice(),
-                };
-
-                let ab = QueryFormula::Logical {
-                    operator: LogicalOperator::Conjunction,
-                    operands: vec![
-                        QueryFormula::Literal(mock_literal("a")),
-                        QueryFormula::Literal(mock_literal("b")),
-                    ]
-                    .into_boxed_slice(),
-                };
-
-                let formula = QueryFormula::Logical {
-                    operator: LogicalOperator::Disjunction,
-                    operands: vec![ab, c_and_de].into_boxed_slice(),
-                };
-
-                let query = convert(&formula, &bb);
-
-                // Expected: 3 conjunctions
-                assert_eq!(query.conjunctions.len(), 3);
+                assert!(matches!(ops[1].operand, QueryOperand::Relational { .. }));
             }
         }
     }
@@ -1522,5 +1543,115 @@ mod tests {
              cheaper reachable(load, _, _) exists once the NAF'd rule itself \
              calls a second, disjunctive (multi-clause) rule."
         );
+    }
+
+    #[test]
+    fn single_solution_conjunct_before_enumerating_conjunct_yields_all_combinations() {
+        // Regression: Conjunction::next_bindings used to restart its
+        // cartesian-product walk at operand 0 on every call. If operand 0 has
+        // exactly one solution, it was left exhausted and unreset after the
+        // first success, so the second call bailed immediately instead of
+        // asking operand 1 (neighbor) for its remaining solutions.
+        let mut bb = KnowledgeBase::default();
+        bb.assert_no_event(belief("node_active", vec![]));
+        bb.assert_no_event(belief("neighbor", vec![string("n1")]));
+        bb.assert_no_event(belief("neighbor", vec![string("n2")]));
+
+        let via = variable();
+        let formula = and(vec![
+            literal("node_active", vec![]),
+            literal("neighbor", vec![variable_term(&via)]),
+        ]);
+
+        let mut query = (&formula).into_query(&bb);
+
+        let first = query
+            .next_bindings(None)
+            .expect("should find first neighbor");
+        assert_eq!(first.get_view(&via), Some(&string("n1").as_view()));
+
+        let second = query
+            .next_bindings(None)
+            .expect("should find second neighbor too");
+        assert_eq!(second.get_view(&via), Some(&string("n2").as_view()));
+
+        assert!(query.next_bindings(None).is_none());
+    }
+
+    #[test]
+    fn negating_conjunction_with_shared_variable_checks_the_whole_conjunction() {
+        // Regression: negated conjunctions used to be decomposed via De
+        // Morgan into independently negated leaves, which is unsound once
+        // the leaves share a variable. The relational leaf ended up
+        // evaluated with that variable permanently unbound, its evaluation
+        // error silently read as "false", and the negation vacuously
+        // succeeded no matter what via_candidate held.
+        let mut bb = KnowledgeBase::default();
+        bb.assert_no_event(belief("via_candidate", vec![string("n1"), number(1.0)]));
+        bb.assert_no_event(belief("via_candidate", vec![string("n5"), number(5.0)]));
+
+        let other_id = variable();
+        let formula = not(and(vec![
+            literal(
+                "via_candidate",
+                vec![variable_term(&variable()), variable_term(&other_id)],
+            ),
+            cmp(
+                expr(variable_term(&other_id)),
+                CompareOperator::LessThan,
+                false,
+                expr(number(2.0)),
+            ),
+        ]));
+
+        let mut query = (&formula).into_query(&bb);
+        // A via_candidate with id 1.0 < 2.0 exists, so the negation must fail.
+        assert!(query.next_bindings(None).is_none());
+    }
+
+    #[test]
+    fn double_negation_behaves_like_the_original() {
+        // `not (not p)` no longer collapses structurally, it lowers to a
+        // negated subquery wrapping a negated leaf. Confirms that still
+        // evaluates the same as the original, unnegated formula.
+        let mut bb = KnowledgeBase::default();
+        bb.assert_no_event(belief("p", vec![]));
+
+        let formula = not(not(literal("p", vec![])));
+        assert!((&formula).into_query(&bb).next_bindings(None).is_some());
+
+        let formula = not(not(literal("q", vec![])));
+        assert!((&formula).into_query(&bb).next_bindings(None).is_none());
+    }
+
+    #[test]
+    fn disjunction_nested_inside_conjunction_resolves_via_subquery() {
+        // Confirms the direct-mapping lowering handles a compound formula in
+        // leaf position (here, an OR inside an AND) as a subquery, and still
+        // enumerates every combination correctly.
+        let mut bb = KnowledgeBase::default();
+        bb.assert_no_event(belief("node_active", vec![]));
+        bb.assert_no_event(belief("neighbor", vec![string("n1")]));
+        bb.assert_no_event(belief("neighbor", vec![string("n2")]));
+
+        let via = variable();
+        let formula = and(vec![
+            literal("node_active", vec![]),
+            or(vec![literal("neighbor", vec![variable_term(&via)])]),
+        ]);
+
+        let mut query = (&formula).into_query(&bb);
+
+        let first = query
+            .next_bindings(None)
+            .expect("should find first neighbor");
+        assert_eq!(first.get_view(&via), Some(&string("n1").as_view()));
+
+        let second = query
+            .next_bindings(None)
+            .expect("should find second neighbor too");
+        assert_eq!(second.get_view(&via), Some(&string("n2").as_view()));
+
+        assert!(query.next_bindings(None).is_none());
     }
 }

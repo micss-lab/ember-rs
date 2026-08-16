@@ -65,6 +65,11 @@ impl<A> Intention<A> {
             stack: Vec::default(),
         }
     }
+
+    #[cfg(test)]
+    pub(crate) fn stack_len(&self) -> usize {
+        self.stack.len()
+    }
 }
 
 impl<A: Clone> Intention<A> {
@@ -124,6 +129,9 @@ where
 
         let formula = formula.resolve_possible(&self.bindings)?;
 
+        // Prevent tail recursion optimization if the last frame dispatched an action to the agent.
+        let mut blocked_on_pending_action = false;
+
         match formula {
             Formula::Belief {
                 trigger,
@@ -169,6 +177,7 @@ where
                         let intention = pending
                             .should_block_intention()
                             .then_some(self.intention_id);
+                        blocked_on_pending_action = intention.is_some();
                         context.dispatch_action(
                             PendingAction::new(pending, self.bindings.clone()),
                             intention,
@@ -183,6 +192,12 @@ where
                     ExecuteResult::Done(None) => (),
                 }
             }
+        }
+
+        // Pop the frame immediately such that it does not leak when the plan is infinitely tail
+        // recursive. For example, heartbeat plans.
+        if self.remaining.is_empty() && !blocked_on_pending_action {
+            return StepOk::done();
         }
 
         StepOk::pending()
@@ -292,19 +307,18 @@ mod tests {
 
         intention.push(&plan, Bindings::empty(), trigger);
 
-        // step 1: executes action1 (because it's popped first)
+        // step 1: executes action1 (because it's popped first), one more formula left in the
+        // body so the frame isn't done yet.
         let result = intention.step(&mut context, &mut knowledge, &mut state);
         assert!(matches!(result, Ok(StepOk::Pending)));
         assert_eq!(state, vec!["action1"]);
 
-        // step 2: executes action2
-        let result = intention.step(&mut context, &mut knowledge, &mut state);
-        assert!(matches!(result, Ok(StepOk::Pending)));
-        assert_eq!(state, vec!["action1", "action2"]);
-
-        // step 3: frame done, intention done
+        // step 2: executes action2, the last formula in the body - both it and the (empty)
+        // body being exhausted happen in this same step, so the frame reports done immediately
+        // rather than needing an extra no-op step to notice.
         let result = intention.step(&mut context, &mut knowledge, &mut state);
         assert!(matches!(result, Ok(StepOk::Done)));
+        assert_eq!(state, vec!["action1", "action2"]);
     }
 
     #[test]
@@ -333,11 +347,14 @@ mod tests {
 
         intention.push(&plan, Bindings::empty(), trigger);
 
+        // step 1: emits the goal event, one more formula (the belief) left in the body.
         let result = intention.step(&mut context, &mut knowledge, &mut ());
         assert!(matches!(result, Ok(StepOk::Pending)));
 
+        // step 2: asserts the belief, the last formula in the body - done immediately, same as
+        // the all-actions case above.
         let result = intention.step(&mut context, &mut knowledge, &mut ());
-        assert!(matches!(result, Ok(StepOk::Pending)));
+        assert!(matches!(result, Ok(StepOk::Done)));
     }
 
     #[test]
@@ -362,10 +379,11 @@ mod tests {
 
         intention.push(&plan, Bindings::empty(), trigger);
 
-        // A single step executes the belief formula (and only that -- the frame isn't done yet,
-        // nothing has drained the emitted event through `handle_event`).
+        // A single step executes the belief formula and, since it's also the last one in the
+        // body, reports the frame done immediately - independent of whether the event it just
+        // emitted has been drained through `handle_event` yet.
         let result = intention.step(&mut context, &mut knowledge, &mut ());
-        assert!(matches!(result, Ok(StepOk::Pending)));
+        assert!(matches!(result, Ok(StepOk::Done)));
 
         let query_formula = literal_formula("route_active", vec![string("load"), string("c")]);
         assert!(
