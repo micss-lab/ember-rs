@@ -334,12 +334,12 @@ peg::parser! {
             / "*" { DivMul::Multiplication }
 
         rule RELATIONAL_OPERATOR() -> RelationalOperator
-            = "<" { RelationalOperator::Smaller }
-            / ">" { RelationalOperator::Larger }
-            / "<=" { RelationalOperator::SmallerEq }
+            = "<=" { RelationalOperator::SmallerEq }
             / ">=" { RelationalOperator::LargerEq }
             / "==" { RelationalOperator::Equal }
             / "!=" { RelationalOperator::NotEqual }
+            / "<" { RelationalOperator::Smaller }
+            / ">" { RelationalOperator::Larger }
             / "=" { RelationalOperator::Unify }
 
         rule BODY_FORMULA_BELIEF_TRIGGER() -> (BodyFormulaBeliefTrigger, bool)
