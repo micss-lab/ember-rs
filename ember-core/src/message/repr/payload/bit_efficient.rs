@@ -45,6 +45,8 @@ mod round_trip_tests {
 
     use alloc::collections::BTreeSet;
 
+    use ember_bdi_bdil::{BdilContent, Functor, Literal};
+
     use crate::agent::aid::Aid;
     use crate::message::content::fipa_sl::Sl0Content as SlContent;
     use crate::message::{Content, Message, Performative, Receiver};
@@ -59,6 +61,21 @@ mod round_trip_tests {
         let encoded = encode(&msg);
         let decoded = decode(&encoded).expect("decode failed");
         assert_eq!(msg, decoded);
+    }
+
+    #[test]
+    fn inform_bdil_content() {
+        round_trip(Message {
+            performative: Performative::Inform,
+            receiver: Some(Receiver::Single(aid("bob@local"))),
+            ontology: None,
+            other: None,
+            content: Some(Content::Bdil(BdilContent::Literal(Literal {
+                negated: false,
+                functor: Functor::from("alive"),
+                arguments: None,
+            }))),
+        });
     }
 
     #[test]

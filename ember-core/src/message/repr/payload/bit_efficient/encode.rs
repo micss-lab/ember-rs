@@ -44,8 +44,6 @@ pub(super) fn push_content_and_language(content: &Content, out: &mut Vec<u8>) {
         Content::Bdil(c) => {
             out.push(KW_LANGUAGE);
             push_bin_word(language.as_bytes(), out);
-            out.push(KW_ENCODING);
-            push_bin_word(b"bit-efficient", out);
             out.push(KW_CONTENT);
             push_bin_string(&ember_bdi_bdil::binary::encode(c), out);
         }

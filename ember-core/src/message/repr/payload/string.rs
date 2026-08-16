@@ -24,6 +24,8 @@ pub fn decode(bytes: &[u8]) -> Result<Message, ()> {
 
 #[cfg(all(test, not(target_os = "none")))]
 mod round_trip_tests {
+    use ember_bdi_bdil::{BdilContent, Functor, Literal};
+
     use crate::agent::aid::Aid;
     use crate::message::{Content, Message, Performative, Receiver};
 
@@ -47,6 +49,23 @@ mod round_trip_tests {
             ontology: None,
             other: None,
             content: Some(Content::Bytes(alloc::vec![0xDE, 0xAD, 0xBE, 0xEF])),
+        });
+    }
+
+    // Regression test: the decoder used to not unwrap the string format's
+    // base64-wrapped Bdil content.
+    #[test]
+    fn inform_bdil_content_is_base64_round_tripped() {
+        round_trip(Message {
+            performative: Performative::Inform,
+            receiver: Some(Receiver::Single(aid("bob@local"))),
+            ontology: None,
+            other: None,
+            content: Some(Content::Bdil(BdilContent::Literal(Literal {
+                negated: false,
+                functor: Functor::from("alive"),
+                arguments: None,
+            }))),
         });
     }
 }

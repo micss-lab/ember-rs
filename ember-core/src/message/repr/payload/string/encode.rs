@@ -61,7 +61,7 @@ fn encode_content_and_language(content: &Content, out: &mut String) -> fmt::Resu
             use base64ct::{Base64, Encoding};
             write!(
                 out,
-                " :language {language} :X-content-encoding base64 :encoding bit-efficient :content \"{}\"",
+                " :language {language} :X-content-encoding base64 :content \"{}\"",
                 Base64::encode_string(&ember_bdi_bdil::binary::encode(c))
             )
         }

@@ -9,6 +9,7 @@ mod builder {
     use bstr::{BString, ByteSlice};
 
     use crate::agent::Aid;
+    use crate::message::content::ember_bdil;
     use crate::message::content::fipa_sl::Sl0Content;
     use crate::message::{Content, Message, Performative, Receiver};
 
@@ -41,6 +42,24 @@ mod builder {
                 .map(|i| self.other.remove(i).1);
 
             let content = if let Some(content) = self.content {
+                let decoded = match content_encoding.as_ref().map(|v| v.as_slice()) {
+                    None => content.to_vec(),
+                    Some(b"base64") => {
+                        use base64ct::{Base64, Encoding};
+                        Base64::decode_vec(content.to_str_lossy().as_ref()).map_err(|e| {
+                            log::error!("failed to parse bytes content from base64: {e}");
+                            "content (bytes)"
+                        })?
+                    }
+                    Some(unknown) => {
+                        log::error!(
+                            "unrecognised `{CONTENT_ENCODING_FIELD}` `{}`",
+                            bstr::BStr::new(unknown)
+                        );
+                        return Err("content-encoding");
+                    }
+                };
+
                 Some(match self.language.as_ref().map(|l| l.as_slice()) {
                     Some(b"fipa-sl0") => Content::FipaSl0(
                         Sl0Content::try_from_sl(content.as_bstr()).map_err(|e| {
@@ -48,28 +67,12 @@ mod builder {
                             "content"
                         })?,
                     ),
-                    Some(b"bytes") => {
-                        Content::Bytes(match content_encoding.as_ref().map(|v| v.as_slice()) {
-                            None => content.to_vec(),
-                            Some(b"base64") => {
-                                use base64ct::{Base64, Encoding};
-                                Base64::decode_vec(content.to_str_lossy().as_ref()).map_err(
-                                    |e| {
-                                        log::error!(
-                                            "failed to parse bytes content from base64: {e}"
-                                        );
-                                        "content (bytes)"
-                                    },
-                                )?
-                            }
-                            Some(unknown) => {
-                                log::error!(
-                                    "unrecognised `{CONTENT_ENCODING_FIELD}` `{}`",
-                                    bstr::BStr::new(unknown)
-                                );
-                                return Err("content-encoding");
-                            }
-                        })
+                    Some(b"bytes") => Content::Bytes(decoded),
+                    Some(b"ember-bdil") => {
+                        Content::Bdil(ember_bdil::binary::decode(&decoded).map_err(|e| {
+                            log::error!("failed to parse ember-bdil content: {e}");
+                            "content (ember-bdil)"
+                        })?)
                     }
                     None => {
                         log::warn!("message has no content language parameter");
