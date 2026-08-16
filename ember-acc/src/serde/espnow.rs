@@ -50,12 +50,12 @@ pub mod de {
 
     impl<'a> EspNowMessageDe<'a> {
         pub fn into_transport(self) -> Result<TransportMessage, ()> {
-            let message = repr::payload::string::decode(self.content)?;
+            let message = repr::payload::bit_efficient::decode(self.content)?;
             let envelope = MessageEnvelope {
                 to: self.envelope.to,
                 from: self.envelope.from,
                 date: chrono::DateTime::<chrono::Utc>::MIN_UTC.into(),
-                acl_representation: AclRepresentation::String,
+                acl_representation: AclRepresentation::BitEfficient,
                 other: None,
             };
             Ok(TransportMessage {

@@ -2,9 +2,8 @@ pub(super) use esp_radio::esp_now::{EspNowReceiver, EspNowSender};
 
 use esp_radio::esp_now::{EspNowReceiver as Receiver, EspNowSender as Sender};
 
-use alloc::string::ToString;
-
 use ember_core::agent::aid::Aid;
+use ember_core::message::repr::payload::bit_efficient;
 use ember_core::message::{Payload, TransportMessage};
 
 use crate::Acc;
@@ -33,19 +32,28 @@ impl<'c> Acc for EspNowChannel<'c> {
 
         let envelope = &message.envelopes.base;
         let content = match &message.payload {
-            Payload::AclMessage(m) => m.to_string(),
+            Payload::AclMessage(m) => bit_efficient::encode(m),
             Payload::Bytes(_) => unimplemented!(),
         };
 
+        let frame = postcard::to_allocvec(&EspNowMessageSer::new(envelope, &content))
+            .expect("failed to serialize message into postcard data format");
+
+        // ESP-NOW's hard per-packet cap; esp_now_send doesn't check it for us.
+        if frame.len() > esp_radio::esp_now::ESP_NOW_MAX_DATA_LEN {
+            log::error!(
+                "message to {address} is {} bytes, over ESP-NOW's {}-byte limit, dropping",
+                frame.len(),
+                esp_radio::esp_now::ESP_NOW_MAX_DATA_LEN
+            );
+            return Ok(());
+        }
+
         if let Err(err) = sender
-            .send(
-                &aid_to_mac(address),
-                &postcard::to_allocvec(&EspNowMessageSer::new(envelope, content.as_bytes()))
-                    .expect("failed to serialize message into postcard data format"),
-            )
+            .send(&aid_to_mac(address), &frame)
             .and_then(|w| w.wait())
         {
-            log::error!("EspNow send error: {:?}", err);
+            log::error!("EspNow send error to {address}: {:?}", err);
         }
         Ok(())
     }
