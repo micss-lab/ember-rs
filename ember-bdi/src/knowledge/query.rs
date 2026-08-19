@@ -4,8 +4,10 @@ use alloc::vec::Vec;
 use ember_collections::SmallSetIter as Iter;
 
 use crate::bindings::Bindings;
+use crate::context::PureContext;
 use crate::literal::Literal;
 use crate::plan::RelationalQueryFormula;
+use crate::plan::action::PureAction;
 use crate::unification::error::UnificationError;
 
 use super::base::KnowledgeBase;
@@ -103,6 +105,10 @@ pub(crate) struct GroundQuery<'a> {
     /// To resolve rules, the beliefbase has to be queried recursively.
     knowledge: &'a KnowledgeBase,
 
+    /// To evaluate a `PureAction::Me` leaf. Threaded through like `knowledge`, even though only
+    /// that one leaf kind actually reads it.
+    pure_context: &'a PureContext,
+
     /// During backtracking a ground query needs to know whether it has already been
     /// evaluated before in cases where it can produce bindings infinitely. For example, where
     /// there are not beliefs to go through or regular operators such as compare or unify,
@@ -119,8 +125,12 @@ impl<'a> GroundQuery<'a> {
 
         match (
             self.negated,
-            self.operand
-                .next_bindings(self.beliefs.as_mut(), existing_bindings, self.knowledge),
+            self.operand.next_bindings(
+                self.beliefs.as_mut(),
+                existing_bindings,
+                self.knowledge,
+                self.pure_context,
+            ),
         ) {
             (false, result) => result,
             (true, bindings) => {
@@ -165,6 +175,12 @@ pub(crate) enum QueryOperand<'a> {
         /// if it has new solutions. Using `evaluated`, `None` can be returned after the first call.
         evaluated: bool,
     },
+    /// A pure built-in action (`.now`, `.me`) used as a leaf. Same single-shot shape as
+    /// `Relational`: it doesn't read the belief base, so there's nothing to backtrack into.
+    Action {
+        action: &'a PureAction,
+        evaluated: bool,
+    },
     Group(Box<Query<'a>>),
 }
 
@@ -182,7 +198,9 @@ impl<'a> QueryOperand<'a> {
                 rule_in_process, ..
             } => *rule_in_process = None,
             Self::Group(query) => query.reset(),
-            Self::Relational { evaluated, .. } => *evaluated = false,
+            Self::Relational { evaluated, .. } | Self::Action { evaluated, .. } => {
+                *evaluated = false
+            }
         }
     }
 
@@ -191,6 +209,7 @@ impl<'a> QueryOperand<'a> {
         beliefs: Option<&mut Iter<'a, Knowledge>>,
         existing_bindings: Option<&Bindings<'a>>,
         knowledge_base: &'a KnowledgeBase,
+        pure_context: &'a PureContext,
     ) -> Option<Bindings<'a>> {
         use crate::unification::traits::Unify;
 
@@ -205,7 +224,7 @@ impl<'a> QueryOperand<'a> {
                     beliefs.and_then(|b| {
                         b.find_map(|knowledge| {
                             if let Some(rule) = &knowledge.rule {
-                                let body = knowledge_base.query(rule);
+                                let body = knowledge_base.query(rule, pure_context);
                                 let mut rule_query = RuleQuery::new(
                                     &knowledge.belief,
                                     literal,
@@ -228,6 +247,18 @@ impl<'a> QueryOperand<'a> {
                 } else {
                     *evaluated = true;
                     formula.verify_bindings(existing_bindings).ok().flatten()
+                }
+            }
+            QueryOperand::Action { action, evaluated } => {
+                if *evaluated {
+                    None
+                } else {
+                    *evaluated = true;
+                    let fresh = action.evaluate(pure_context);
+                    match existing_bindings {
+                        Some(existing) => Bindings::merge_views([existing, &fresh]).ok(),
+                        None => Some(fresh),
+                    }
                 }
             }
             QueryOperand::Group(query) => query.next_bindings(existing_bindings),
@@ -303,7 +334,7 @@ pub trait IntoQuery<'a>
 where
     Self: 'a,
 {
-    fn into_query(self, knowledge: &'a KnowledgeBase) -> Query<'a>;
+    fn into_query(self, knowledge: &'a KnowledgeBase, pure_context: &'a PureContext) -> Query<'a>;
 }
 
 impl RelationalQueryFormula {
@@ -323,8 +354,10 @@ impl RelationalQueryFormula {
 pub(crate) mod formula {
     use alloc::boxed::Box;
 
+    use crate::context::PureContext;
     use crate::knowledge::base::KnowledgeBase;
     use crate::literal::Literal;
+    use crate::plan::action::PureAction;
     use crate::term::{Atom, Structure, Term};
 
     use super::{IntoQuery, Query};
@@ -338,11 +371,18 @@ pub(crate) mod formula {
         },
         Literal(Literal),
         Relational(RelationalQueryFormula),
+        /// A pure built-in action (`.now`, `.me`), the only kind of built-in action allowed in a
+        /// plan's context guard.
+        Action(PureAction),
     }
 
     impl<'a> IntoQuery<'a> for &'a QueryFormula {
-        fn into_query(self, knowledge: &'a KnowledgeBase) -> Query<'a> {
-            self::lowering::convert(self, knowledge)
+        fn into_query(
+            self,
+            knowledge: &'a KnowledgeBase,
+            pure_context: &'a PureContext,
+        ) -> Query<'a> {
+            self::lowering::convert(self, knowledge, pure_context)
         }
     }
 
@@ -596,6 +636,7 @@ pub(crate) mod formula {
         use alloc::vec;
         use alloc::vec::Vec;
 
+        use crate::context::PureContext;
         use crate::knowledge::base::KnowledgeBase;
         use crate::knowledge::query::{Conjunction, GroundQuery, Query, QueryOperand};
 
@@ -603,11 +644,19 @@ pub(crate) mod formula {
 
         use super::{LogicalOperator, QueryFormula};
 
-        pub fn convert<'a>(formula: &'a QueryFormula, bb: &'a KnowledgeBase) -> Query<'a> {
-            transform(formula, bb)
+        pub fn convert<'a>(
+            formula: &'a QueryFormula,
+            bb: &'a KnowledgeBase,
+            pure_context: &'a PureContext,
+        ) -> Query<'a> {
+            transform(formula, bb, pure_context)
         }
 
-        fn transform<'a>(formula: &'a QueryFormula, bb: &'a KnowledgeBase) -> Query<'a> {
+        fn transform<'a>(
+            formula: &'a QueryFormula,
+            bb: &'a KnowledgeBase,
+            pure_context: &'a PureContext,
+        ) -> Query<'a> {
             match formula {
                 QueryFormula::Logical {
                     operator: LogicalOperator::Disjunction,
@@ -615,13 +664,14 @@ pub(crate) mod formula {
                 } => Query {
                     conjunctions: operands
                         .iter()
-                        .map(|op| transform_conjunction(op, bb))
+                        .map(|op| transform_conjunction(op, bb, pure_context))
                         .collect::<Vec<_>>()
                         .into_boxed_slice(),
                 },
                 // Does not start with an OR: it is a single AND-branch on its own.
                 _ => Query {
-                    conjunctions: vec![transform_conjunction(formula, bb)].into_boxed_slice(),
+                    conjunctions: vec![transform_conjunction(formula, bb, pure_context)]
+                        .into_boxed_slice(),
                 },
             }
         }
@@ -629,6 +679,7 @@ pub(crate) mod formula {
         fn transform_conjunction<'a>(
             formula: &'a QueryFormula,
             bb: &'a KnowledgeBase,
+            pure_context: &'a PureContext,
         ) -> Conjunction<'a> {
             match formula {
                 QueryFormula::Logical {
@@ -637,22 +688,28 @@ pub(crate) mod formula {
                 } => Conjunction {
                     operands: operands
                         .iter()
-                        .map(|op| transform_leaf(op, bb))
+                        .map(|op| transform_leaf(op, bb, pure_context))
                         .collect::<Vec<_>>()
                         .into_boxed_slice(),
                     current_bindings: Vec::new(),
                 },
                 // Does not start with an AND: it is a single leaf on its own.
                 _ => Conjunction {
-                    operands: vec![transform_leaf(formula, bb)].into_boxed_slice(),
+                    operands: vec![transform_leaf(formula, bb, pure_context)].into_boxed_slice(),
                     current_bindings: Vec::new(),
                 },
             }
         }
 
-        fn transform_leaf<'a>(formula: &'a QueryFormula, bb: &'a KnowledgeBase) -> GroundQuery<'a> {
+        fn transform_leaf<'a>(
+            formula: &'a QueryFormula,
+            bb: &'a KnowledgeBase,
+            pure_context: &'a PureContext,
+        ) -> GroundQuery<'a> {
             match formula {
-                QueryFormula::Literal(lit) => create_leaf(QueryOperand::literal(lit), false, bb),
+                QueryFormula::Literal(lit) => {
+                    create_leaf(QueryOperand::literal(lit), false, bb, pure_context)
+                }
                 QueryFormula::Relational(rel) => create_leaf(
                     QueryOperand::Relational {
                         formula: rel,
@@ -660,10 +717,22 @@ pub(crate) mod formula {
                     },
                     false,
                     bb,
+                    pure_context,
+                ),
+                QueryFormula::Action(action) => create_leaf(
+                    QueryOperand::Action {
+                        action,
+                        evaluated: false,
+                    },
+                    false,
+                    bb,
+                    pure_context,
                 ),
                 QueryFormula::Not(inner) => match inner.as_ref() {
                     // A negated literal/relational is still a plain ground leaf.
-                    QueryFormula::Literal(lit) => create_leaf(QueryOperand::literal(lit), true, bb),
+                    QueryFormula::Literal(lit) => {
+                        create_leaf(QueryOperand::literal(lit), true, bb, pure_context)
+                    }
                     QueryFormula::Relational(rel) => create_leaf(
                         QueryOperand::Relational {
                             formula: rel,
@@ -671,15 +740,27 @@ pub(crate) mod formula {
                         },
                         true,
                         bb,
+                        pure_context,
+                    ),
+                    QueryFormula::Action(action) => create_leaf(
+                        QueryOperand::Action {
+                            action,
+                            evaluated: false,
+                        },
+                        true,
+                        bb,
+                        pure_context,
                     ),
                     // Negating a compound formula does not fit a leaf: resolve it
                     // as its own subquery and negate the existence check as a
                     // whole, rather than distributing the negation into it.
-                    compound => create_group_leaf(compound, true, bb),
+                    compound => create_group_leaf(compound, true, bb, pure_context),
                 },
                 // A bare compound formula in leaf position, for example the
                 // `B|C` inside `A & (B|C)`, does not fit a leaf either.
-                compound @ QueryFormula::Logical { .. } => create_group_leaf(compound, false, bb),
+                compound @ QueryFormula::Logical { .. } => {
+                    create_group_leaf(compound, false, bb, pure_context)
+                }
             }
         }
 
@@ -687,13 +768,15 @@ pub(crate) mod formula {
             formula: &'a QueryFormula,
             negated: bool,
             bb: &'a KnowledgeBase,
+            pure_context: &'a PureContext,
         ) -> GroundQuery<'a> {
             GroundQuery {
                 negated,
                 beliefs: None,
                 original: None,
-                operand: QueryOperand::Group(Box::new(transform(formula, bb))),
+                operand: QueryOperand::Group(Box::new(transform(formula, bb, pure_context))),
                 knowledge: bb,
+                pure_context,
                 evaluated: false,
             }
         }
@@ -702,6 +785,7 @@ pub(crate) mod formula {
             operand: QueryOperand<'a>,
             negated: bool,
             bb: &'a KnowledgeBase,
+            pure_context: &'a PureContext,
         ) -> GroundQuery<'a> {
             let beliefs = match operand {
                 QueryOperand::Literal {
@@ -720,6 +804,7 @@ pub(crate) mod formula {
                 original: beliefs,
                 operand,
                 knowledge: bb,
+                pure_context,
                 evaluated: false,
             }
         }
@@ -733,6 +818,7 @@ pub(crate) mod formula {
                 RelationalOperator, RelationalQueryFormula,
             };
             use crate::term::{Atom, Structure, Term};
+            use crate::testing::pure_context;
             use alloc::boxed::Box;
             use alloc::vec;
 
@@ -765,10 +851,11 @@ pub(crate) mod formula {
 
             #[test]
             fn single_literal_is_one_conjunction_one_leaf() {
+                let pure_context = pure_context();
                 let bb = KnowledgeBase::default();
                 let formula = QueryFormula::Literal(mock_literal("p"));
 
-                let query = convert(&formula, &bb);
+                let query = convert(&formula, &bb, &pure_context);
 
                 assert_eq!(query.conjunctions.len(), 1);
                 assert_eq!(query.conjunctions[0].operands.len(), 1);
@@ -781,11 +868,12 @@ pub(crate) mod formula {
 
             #[test]
             fn negated_literal_stays_a_plain_leaf() {
+                let pure_context = pure_context();
                 // `not p` fits a leaf directly: no subquery needed.
                 let bb = KnowledgeBase::default();
                 let formula = QueryFormula::Not(Box::new(QueryFormula::Literal(mock_literal("p"))));
 
-                let query = convert(&formula, &bb);
+                let query = convert(&formula, &bb, &pure_context);
 
                 assert_eq!(query.conjunctions.len(), 1);
                 assert_eq!(query.conjunctions[0].operands.len(), 1);
@@ -798,6 +886,7 @@ pub(crate) mod formula {
 
             #[test]
             fn negated_conjunction_becomes_a_single_subquery_leaf() {
+                let pure_context = pure_context();
                 // `not (p & q)` no longer decomposes via De Morgan: it maps
                 // onto one negated Group leaf wrapping the positive `p & q`
                 // as its own nested query.
@@ -811,7 +900,7 @@ pub(crate) mod formula {
                     .into_boxed_slice(),
                 }));
 
-                let query = convert(&formula, &bb);
+                let query = convert(&formula, &bb, &pure_context);
 
                 assert_eq!(query.conjunctions.len(), 1);
                 assert_eq!(query.conjunctions[0].operands.len(), 1);
@@ -826,6 +915,7 @@ pub(crate) mod formula {
 
             #[test]
             fn negated_disjunction_also_becomes_a_subquery_leaf() {
+                let pure_context = pure_context();
                 // `not (p | q)` is sound to flatten via De Morgan, but the
                 // lowering applies the same "compound under not becomes a
                 // subquery" rule uniformly, without that exception.
@@ -839,7 +929,7 @@ pub(crate) mod formula {
                     .into_boxed_slice(),
                 }));
 
-                let query = convert(&formula, &bb);
+                let query = convert(&formula, &bb, &pure_context);
 
                 assert_eq!(query.conjunctions.len(), 1);
                 assert_eq!(query.conjunctions[0].operands.len(), 1);
@@ -853,6 +943,7 @@ pub(crate) mod formula {
 
             #[test]
             fn disjunction_nested_in_conjunction_does_not_distribute() {
+                let pure_context = pure_context();
                 // `(a|b) & (c|d)` used to expand into a 4-way cartesian
                 // product. It now maps onto one conjunction whose two
                 // operands are each a Group leaf wrapping its own
@@ -880,7 +971,7 @@ pub(crate) mod formula {
                     operands: vec![left, right].into_boxed_slice(),
                 };
 
-                let query = convert(&formula, &bb);
+                let query = convert(&formula, &bb, &pure_context);
 
                 assert_eq!(query.conjunctions.len(), 1);
                 assert_eq!(query.conjunctions[0].operands.len(), 2);
@@ -892,6 +983,7 @@ pub(crate) mod formula {
 
             #[test]
             fn nested_relational_negation() {
+                let pure_context = pure_context();
                 // p & !(x == 0)
                 let bb = KnowledgeBase::default();
                 let formula = QueryFormula::Logical {
@@ -903,7 +995,7 @@ pub(crate) mod formula {
                     .into_boxed_slice(),
                 };
 
-                let query = convert(&formula, &bb);
+                let query = convert(&formula, &bb, &pure_context);
 
                 assert_eq!(query.conjunctions.len(), 1);
                 let ops = &query.conjunctions[0].operands;
@@ -1034,6 +1126,7 @@ mod tests {
 
     #[test]
     fn shared_variable_conjunction() {
+        let pure_context = pure_context();
         let mut bb = KnowledgeBase::default();
         bb.assert_no_event(belief("parent", vec![string("alice"), string("bob")]));
         bb.assert_no_event(belief("parent", vec![string("bob"), string("charlie")]));
@@ -1044,7 +1137,7 @@ mod tests {
             literal("parent", vec![variable_term(&x), variable_term(&y)]),
         ]);
 
-        let mut query = (&formula).into_query(&bb);
+        let mut query = (&formula).into_query(&bb, &pure_context);
         let bindings = query.next_bindings(None).expect("Should find bindings");
 
         assert_eq!(bindings.get_view(&x), Some(&string("bob").as_view()));
@@ -1053,6 +1146,7 @@ mod tests {
 
     #[test]
     fn backtracking_across_operands() {
+        let pure_context = pure_context();
         let mut bb = KnowledgeBase::default();
         bb.assert_no_event(belief("p", vec![number(1.0), number(10.0)]));
         bb.assert_no_event(belief("p", vec![number(1.0), number(20.0)]));
@@ -1064,7 +1158,7 @@ mod tests {
             literal("q", vec![variable_term(&x), variable_term(&y)]),
         ]);
 
-        let mut query = (&formula).into_query(&bb);
+        let mut query = (&formula).into_query(&bb, &pure_context);
         let bindings = query.next_bindings(None).expect("Should backtrack to X=20");
 
         assert_eq!(bindings.get_view(&x), Some(&number(20.0).as_view()));
@@ -1073,18 +1167,30 @@ mod tests {
 
     #[test]
     fn closed_world_negation() {
+        let pure_context = pure_context();
         let mut bb = KnowledgeBase::default();
         bb.assert_no_event(belief("is_raining", vec![]));
 
         let f_sunny = not(literal("is_sunny", vec![]));
-        assert!((&f_sunny).into_query(&bb).next_bindings(None).is_some());
+        assert!(
+            (&f_sunny)
+                .into_query(&bb, &pure_context)
+                .next_bindings(None)
+                .is_some()
+        );
 
         let f_raining = not(literal("is_raining", vec![]));
-        assert!((&f_raining).into_query(&bb).next_bindings(None).is_none());
+        assert!(
+            (&f_raining)
+                .into_query(&bb, &pure_context)
+                .next_bindings(None)
+                .is_none()
+        );
     }
 
     #[test]
     fn disjunction_and_flattening() {
+        let pure_context = pure_context();
         let mut bb = KnowledgeBase::default();
         bb.assert_no_event(belief("a", vec![number(1.0)]));
         bb.assert_no_event(belief("b", vec![number(2.0)]));
@@ -1100,7 +1206,7 @@ mod tests {
             literal("c", vec![variable_term(&x)]),
         ]);
 
-        let mut query = (&formula).into_query(&bb);
+        let mut query = (&formula).into_query(&bb, &pure_context);
         let bindings = query.next_bindings(None).expect("Should match X=2");
         assert_eq!(bindings.get_view(&x), Some(&number(2.0).as_view()));
         assert!(query.next_bindings(None).is_none());
@@ -1108,6 +1214,7 @@ mod tests {
 
     #[test]
     fn relational_comparison() {
+        let pure_context = pure_context();
         let mut bb = KnowledgeBase::default();
         bb.assert_no_event(belief("val", vec![number(5.0)]));
         bb.assert_no_event(belief("val", vec![number(15.0)]));
@@ -1124,7 +1231,7 @@ mod tests {
             ),
         ]);
 
-        let mut query = (&formula).into_query(&bb);
+        let mut query = (&formula).into_query(&bb, &pure_context);
         let bindings = query.next_bindings(None).expect("Should find X=15");
         assert_eq!(bindings.get_view(&x), Some(&number(15.0).as_view()));
         assert!(query.next_bindings(None).is_none());
@@ -1132,6 +1239,7 @@ mod tests {
 
     #[test]
     fn relational_unification_math() {
+        let pure_context = pure_context();
         let mut bb = KnowledgeBase::default();
         bb.assert_no_event(belief("base", vec![number(10.0)]));
 
@@ -1148,13 +1256,14 @@ mod tests {
             ),
         ]);
 
-        let mut query = (&formula).into_query(&bb);
+        let mut query = (&formula).into_query(&bb, &pure_context);
         let bindings = query.next_bindings(None).expect("Should unify Y to 20");
         assert_eq!(bindings.get_view(&y), Some(&TermView::Number(20.0.into())));
     }
 
     #[test]
     fn arithmetic_division_by_zero_fails_gracefully() {
+        let pure_context = pure_context();
         let mut bb = KnowledgeBase::default();
         bb.assert_no_event(belief("val", vec![number(0.0)]));
         bb.assert_no_event(belief("val", vec![number(2.0)]));
@@ -1174,7 +1283,7 @@ mod tests {
             ),
         ]);
 
-        let mut query = (&formula).into_query(&bb);
+        let mut query = (&formula).into_query(&bb, &pure_context);
         // The Div by 0 branch should return None natively and backtrack to X=2
         let bindings = query
             .next_bindings(None)
@@ -1185,6 +1294,7 @@ mod tests {
 
     #[test]
     fn type_mismatch_fails_gracefully() {
+        let pure_context = pure_context();
         let mut bb = KnowledgeBase::default();
         bb.assert_no_event(belief("val", vec![string("not_a_number")]));
 
@@ -1200,12 +1310,13 @@ mod tests {
             ),
         ]);
 
-        let mut query = (&formula).into_query(&bb);
+        let mut query = (&formula).into_query(&bb, &pure_context);
         assert!(query.next_bindings(None).is_none());
     }
 
     #[test]
     fn arithmetic_rejects_list_term() {
+        let pure_context = pure_context();
         let mut bb = KnowledgeBase::default();
         bb.assert_no_event(belief("val", vec![list(vec![number(1.0), number(2.0)])]));
 
@@ -1221,12 +1332,13 @@ mod tests {
             ),
         ]);
 
-        let mut query = (&formula).into_query(&bb);
+        let mut query = (&formula).into_query(&bb, &pure_context);
         assert!(query.next_bindings(None).is_none());
     }
 
     #[test]
     fn complex_de_morgan_resolution() {
+        let pure_context = pure_context();
         let mut bb = KnowledgeBase::default();
         bb.assert_no_event(belief("p", vec![number(1.0)]));
         bb.assert_no_event(belief("q", vec![number(1.0)]));
@@ -1237,7 +1349,7 @@ mod tests {
             not(literal("q", vec![number(1.0)])),
         ]));
 
-        let mut query = (&formula).into_query(&bb);
+        let mut query = (&formula).into_query(&bb, &pure_context);
         assert!(query.next_bindings(None).is_some());
     }
 
@@ -1263,6 +1375,7 @@ mod tests {
     // queried once per candidate plan (`ApplicablePlanSelection::next_plan`).
     #[test]
     fn rule_reevaluated_after_unrelated_backtracking() {
+        let pure_context = pure_context();
         let mut bb = KnowledgeBase::default();
 
         // alt(1). alt(2). -- two independent ways for the first operand of
@@ -1311,7 +1424,7 @@ mod tests {
             literal("green_safe", vec![]),
         ]);
 
-        let mut query = (&formula).into_query(&bb);
+        let mut query = (&formula).into_query(&bb, &pure_context);
 
         assert!(
             query.next_bindings(None).is_none(),
@@ -1322,6 +1435,7 @@ mod tests {
 
     #[test]
     fn rule_query_ignores_already_bound_argument_and_matches_unrelated_grounding() {
+        let pure_context = pure_context();
         let mut bb = KnowledgeBase::default();
 
         // down(X) :- requested(X).
@@ -1338,7 +1452,7 @@ mod tests {
         // Ground-argument sanity check: down("b") is unambiguously false
         // (nothing at all matches `requested(b)`), and the framework agrees.
         let ground_query = not(literal("down", vec![string("b")]));
-        let mut ground = (&ground_query).into_query(&bb);
+        let mut ground = (&ground_query).into_query(&bb, &pure_context);
         assert!(
             ground.next_bindings(None).is_some(),
             "sanity check: down(b) should be false since requested(b) doesn't exist"
@@ -1356,7 +1470,7 @@ mod tests {
             crate::term::view::TermView::Term(&b_term),
         )]);
         let bound_query = not(literal("down", vec![variable_term(&gw)]));
-        let mut bound = (&bound_query).into_query(&bb);
+        let mut bound = (&bound_query).into_query(&bb, &pure_context);
 
         assert!(
             bound.next_bindings(Some(&pre_bound)).is_some(),
@@ -1371,6 +1485,7 @@ mod tests {
 
     #[test]
     fn rule_query_preserves_unrelated_bindings_from_earlier_conjuncts() {
+        let pure_context = pure_context();
         let mut bb = KnowledgeBase::default();
 
         // down(X) :- requested(X).
@@ -1394,7 +1509,7 @@ mod tests {
             literal("down", vec![variable_term(&gw)]),
         ]);
 
-        let mut query = (&formula).into_query(&bb);
+        let mut query = (&formula).into_query(&bb, &pure_context);
         let bindings = query
             .next_bindings(None)
             .expect("down(GW) should succeed: GW = \"a\" matches requested(a)");
@@ -1433,6 +1548,7 @@ mod tests {
     // negated-query guard.
     #[test]
     fn nested_rule_over_disjunctive_rule_still_leaks_unrelated_bindings() {
+        let pure_context = pure_context();
         let mut bb = KnowledgeBase::default();
 
         // reachable(load, load, 1).            -- direct link, cost 1
@@ -1519,7 +1635,7 @@ mod tests {
             "best_route",
             vec![string("load"), variable_term(&via), variable_term(&cost)],
         );
-        let mut query = (&formula).into_query(&bb);
+        let mut query = (&formula).into_query(&bb, &pure_context);
 
         let mut solutions = alloc::vec::Vec::new();
         while let Some(bindings) = query.next_bindings(None) {
@@ -1547,6 +1663,7 @@ mod tests {
 
     #[test]
     fn single_solution_conjunct_before_enumerating_conjunct_yields_all_combinations() {
+        let pure_context = pure_context();
         // Regression: Conjunction::next_bindings used to restart its
         // cartesian-product walk at operand 0 on every call. If operand 0 has
         // exactly one solution, it was left exhausted and unreset after the
@@ -1563,7 +1680,7 @@ mod tests {
             literal("neighbor", vec![variable_term(&via)]),
         ]);
 
-        let mut query = (&formula).into_query(&bb);
+        let mut query = (&formula).into_query(&bb, &pure_context);
 
         let first = query
             .next_bindings(None)
@@ -1580,6 +1697,7 @@ mod tests {
 
     #[test]
     fn negating_conjunction_with_shared_variable_checks_the_whole_conjunction() {
+        let pure_context = pure_context();
         // Regression: negated conjunctions used to be decomposed via De
         // Morgan into independently negated leaves, which is unsound once
         // the leaves share a variable. The relational leaf ended up
@@ -1604,13 +1722,14 @@ mod tests {
             ),
         ]));
 
-        let mut query = (&formula).into_query(&bb);
+        let mut query = (&formula).into_query(&bb, &pure_context);
         // A via_candidate with id 1.0 < 2.0 exists, so the negation must fail.
         assert!(query.next_bindings(None).is_none());
     }
 
     #[test]
     fn double_negation_behaves_like_the_original() {
+        let pure_context = pure_context();
         // `not (not p)` no longer collapses structurally, it lowers to a
         // negated subquery wrapping a negated leaf. Confirms that still
         // evaluates the same as the original, unnegated formula.
@@ -1618,14 +1737,25 @@ mod tests {
         bb.assert_no_event(belief("p", vec![]));
 
         let formula = not(not(literal("p", vec![])));
-        assert!((&formula).into_query(&bb).next_bindings(None).is_some());
+        assert!(
+            (&formula)
+                .into_query(&bb, &pure_context)
+                .next_bindings(None)
+                .is_some()
+        );
 
         let formula = not(not(literal("q", vec![])));
-        assert!((&formula).into_query(&bb).next_bindings(None).is_none());
+        assert!(
+            (&formula)
+                .into_query(&bb, &pure_context)
+                .next_bindings(None)
+                .is_none()
+        );
     }
 
     #[test]
     fn disjunction_nested_inside_conjunction_resolves_via_subquery() {
+        let pure_context = pure_context();
         // Confirms the direct-mapping lowering handles a compound formula in
         // leaf position (here, an OR inside an AND) as a subquery, and still
         // enumerates every combination correctly.
@@ -1640,7 +1770,7 @@ mod tests {
             or(vec![literal("neighbor", vec![variable_term(&via)])]),
         ]);
 
-        let mut query = (&formula).into_query(&bb);
+        let mut query = (&formula).into_query(&bb, &pure_context);
 
         let first = query
             .next_bindings(None)

@@ -235,7 +235,9 @@ A plan has three parts:
 
 - **Context (`: …`)**: an optional guard: a logical expression (same grammar as rule bodies) that
   must hold against the current belief base for the plan to be *applicable*. Variables bound here are
-  available in the body.
+  available in the body. A context may also call `.now` or `.me` — the only built-in actions with no
+  side effects, so the only ones safe to run in a position that can be evaluated more than once per
+  event (see [§7.8](#78-built-in-actions)).
 
 - **Body (`<- …`)**: a sequence of steps separated by `;` and ended with `.` (see [§7.7](#77-plan-bodies-actions-and-events)).
 
@@ -292,9 +294,18 @@ Built-in actions are written with a **leading dot** and are provided by the runt
 | `.wait(millis)`                          | Suspend the current intention for at least `millis` milliseconds before continuing to the next step. `millis` must be an integer literal. Other intentions keep running while this one waits (see [§7.12](#712-the-reasoning-cycle)). |
 | `.at(millis, goal)`                      | After at least `millis` milliseconds, post an achievement-goal-addition event for `goal`. Does not block the calling intention: see below. |
 | `.forall(condition, goal)`               | For every way `condition` can be satisfied against the belief base, post an achievement goal for `goal`, each in its own new, independent intention. See below. |
-| `.now(var)`                              | Bind the current time, in whole milliseconds, to `var`. Completes immediately. See below. |
+| `.now(var)`                              | Bind the current time, in whole milliseconds, to `var`. Completes immediately. Usable in a context. |
+| `.me(var)`                               | Bind the agent's own fully-qualified AID (`name@platform`) to `var`. Completes immediately. Usable in a context. |
 
-Using an unknown `.builtin` is a compile error listing the valid built-ins.
+`.now` and `.me` are the only built-in actions with no side effects: they just read something and
+bind a variable, nothing else. That makes them the only ones usable inside a plan's context guard
+(`: …`) as well as a plan body — everything else in this table is body-only, and using one in a
+context is a compile error. This matters because a context isn't guaranteed to run exactly once per
+event: it can be re-evaluated across candidate plans, or across belief alternatives while
+backtracking within one guard, so a side-effecting action there could fire more than once.
+
+Using an unknown `.builtin`, or a side-effecting one in a context, is a compile error listing the
+valid built-ins for that position.
 
 ```
 +!startup

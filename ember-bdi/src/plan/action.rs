@@ -14,7 +14,7 @@ use ember_core::message::content::ember_bdil::BdilContent;
 use ember_core::message::{Content, Message, Performative, Receiver};
 
 use crate::bindings::{AliasMap, BindingLookup, Bindings, OwnedBindings};
-use crate::context::Context;
+use crate::context::{Context, PureContext};
 use crate::event::Trigger;
 use crate::knowledge::base::KnowledgeBase;
 use crate::knowledge::query::IntoQuery;
@@ -143,6 +143,98 @@ where
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BuiltinAction {
+    /// A side-effect-free action: reads something and binds a variable, nothing else. The only
+    /// kind of built-in action allowed in a plan's context guard.
+    Pure(PureAction),
+    /// A built-in action that touches the environment, sends a message, or otherwise has an
+    /// effect beyond producing bindings. Body-only; never valid in a context guard.
+    Impure(ImpureAction),
+}
+
+impl BuiltinAction {
+    pub fn at(delay: core::time::Duration, goal: Literal) -> Self {
+        BuiltinAction::Impure(ImpureAction::At(AtState {
+            start: None,
+            delay: ember_time::from_core_duration(delay),
+            goal,
+        }))
+    }
+
+    pub fn wait(interval: core::time::Duration) -> Self {
+        BuiltinAction::Impure(ImpureAction::Wait(WaitState {
+            start: None,
+            interval: ember_time::from_core_duration(interval),
+        }))
+    }
+
+    pub(crate) fn execute<'b, B, A>(
+        self,
+        bindings: &B,
+        context: &mut Context<A>,
+        knowledge: &KnowledgeBase,
+    ) -> ExecuteResult<'b, Self>
+    where
+        B: BindingLookup + 'b,
+    {
+        match self {
+            BuiltinAction::Pure(action) => {
+                ExecuteResult::Done(Some(action.evaluate(&context.pure)))
+            }
+            BuiltinAction::Impure(action) => action
+                .execute(bindings, context, knowledge)
+                .map(BuiltinAction::Impure),
+        }
+    }
+
+    fn should_block_intention(&self) -> bool {
+        match self {
+            BuiltinAction::Pure(_) => true,
+            BuiltinAction::Impure(action) => !matches!(action, ImpureAction::At(_)),
+        }
+    }
+}
+
+/// Built-in actions with no side effects, usable both in a plan body and in a plan's context
+/// guard.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PureAction {
+    /// Binds the current monotonic time in milliseconds to the given variable.
+    Now(Variable),
+    /// Binds the agent's own fully-qualified AID (`name@platform`) to the given variable.
+    // TODO: Use unification instead of just binding allowing this action to be used as a check,
+    // not only a fetch.
+    Me(Variable),
+}
+
+impl PureAction {
+    pub(crate) fn evaluate<'b>(&self, pure_context: &PureContext) -> Bindings<'b> {
+        match self {
+            PureAction::Now(variable) => {
+                let millis = ember_time::now().duration_since_epoch().to_millis();
+                Bindings::new(
+                    [(
+                        variable.id,
+                        Some(TermView::Number(TotalCmpF32::from(millis as f32))),
+                    )],
+                    AliasMap::empty(),
+                )
+            }
+            PureAction::Me(variable) => {
+                let aid =
+                    Aid::local(pure_context.agent_name.as_ref().clone().into_owned()).to_string();
+                Bindings::new(
+                    [(variable.id, Some(TermView::String(Cow::Owned(aid.into()))))],
+                    AliasMap::empty(),
+                )
+            }
+        }
+    }
+}
+
+/// Built-in actions that touch the environment, send a message, or otherwise have an effect
+/// beyond producing bindings. Body-only.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ImpureAction {
     /// Log information to the stdout with the given log level.
     Log(Level, Box<[Term]>),
     /// Terminate the execution of the platform the agent is running on.
@@ -157,31 +249,10 @@ pub enum BuiltinAction {
     /// Raises an achievement-goal event once `delay` has elapsed. Construct this variant with
     /// the `[at](BuiltinAction::at)` member function.
     At(AtState),
-    /// Binds the current monotonic time in milliseconds to the given variable.
-    Now(Variable),
-    /// Binds the agent's own fully-qualified AID (`name@platform`) to the given variable.
-    // TODO: Use unification instead of just binding allowing this action to be used as a check,
-    // not only a fetch.
-    Me(Variable),
 }
 
-impl BuiltinAction {
-    pub fn at(delay: core::time::Duration, goal: Literal) -> Self {
-        BuiltinAction::At(AtState {
-            start: None,
-            delay: ember_time::from_core_duration(delay),
-            goal,
-        })
-    }
-
-    pub fn wait(interval: core::time::Duration) -> Self {
-        BuiltinAction::Wait(WaitState {
-            start: None,
-            interval: ember_time::from_core_duration(interval),
-        })
-    }
-
-    pub(crate) fn execute<'b, B, A>(
+impl ImpureAction {
+    fn execute<'b, B, A>(
         self,
         bindings: &B,
         context: &mut Context<A>,
@@ -190,7 +261,7 @@ impl BuiltinAction {
     where
         B: BindingLookup + 'b,
     {
-        use BuiltinAction::*;
+        use ImpureAction::*;
         match self {
             Log(level, terms) => {
                 match terms
@@ -241,19 +312,9 @@ impl BuiltinAction {
             }
             Wait(state) => state.poll().map(Wait),
             At(state) => state.poll(bindings, context).map(At),
-            Now(variable) => {
-                let millis = ember_time::now().duration_since_epoch().to_millis();
-                let bindings = Bindings::new(
-                    [(
-                        variable.id,
-                        Some(TermView::Number(TotalCmpF32::from(millis as f32))),
-                    )],
-                    AliasMap::empty(),
-                );
-                ExecuteResult::Done(Some(bindings))
-            }
             Forall { query, goal } => {
-                let mut query = query.into_query(knowledge);
+                let pure_context = context.pure.clone();
+                let mut query = query.into_query(knowledge, &pure_context);
                 while let Some(bindings) = query.next_bindings(Some(&bindings.as_bindings())) {
                     let goal = match goal.clone().resolve(&bindings) {
                         Ok(goal) => goal,
@@ -275,19 +336,7 @@ impl BuiltinAction {
                 }
                 ExecuteResult::Done(None)
             }
-            Me(variable) => {
-                let aid = Aid::local(context.agent_name.as_ref().clone().into_owned()).to_string();
-                let bindings = Bindings::new(
-                    [(variable.id, Some(TermView::String(Cow::Owned(aid.into()))))],
-                    AliasMap::empty(),
-                );
-                ExecuteResult::Done(Some(bindings))
-            }
         }
-    }
-
-    fn should_block_intention(&self) -> bool {
-        !matches!(self, Self::At(_))
     }
 }
 
@@ -424,7 +473,10 @@ mod tests {
         let room_value = string("kitchen");
         let bindings = bindings(vec![(var.clone(), room_value.as_view())]);
 
-        let action = BuiltinAction::Log(Level::Info, vec![variable_term(&var)].into_boxed_slice());
+        let action = BuiltinAction::Impure(ImpureAction::Log(
+            Level::Info,
+            vec![variable_term(&var)].into_boxed_slice(),
+        ));
 
         let result = action.execute(&bindings, &mut context, &knowledge);
 
@@ -440,10 +492,10 @@ mod tests {
         let knowledge = KnowledgeBase::default();
         let bindings = bindings(vec![]);
 
-        let action = BuiltinAction::Log(
+        let action = BuiltinAction::Impure(ImpureAction::Log(
             Level::Info,
             vec![variable_term(&variable())].into_boxed_slice(),
-        );
+        ));
 
         let result = action.execute(&bindings, &mut context, &knowledge);
 
@@ -456,7 +508,11 @@ mod tests {
         let bindings = bindings(vec![]);
         let knowledge = KnowledgeBase::default();
 
-        let result = BuiltinAction::StopPlatform.execute(&bindings, &mut context, &knowledge);
+        let result = BuiltinAction::Impure(ImpureAction::StopPlatform).execute(
+            &bindings,
+            &mut context,
+            &knowledge,
+        );
 
         assert!(matches!(result, ExecuteResult::Done(None)));
         assert!(
@@ -493,7 +549,7 @@ mod tests {
         let knowledge = KnowledgeBase::default();
         let var = variable();
 
-        let action = BuiltinAction::Now(var.clone());
+        let action = BuiltinAction::Pure(PureAction::Now(var.clone()));
 
         let ExecuteResult::Done(Some(result)) = action.execute(&bindings, &mut context, &knowledge)
         else {
@@ -511,7 +567,7 @@ mod tests {
         let knowledge = KnowledgeBase::default();
         let var = variable();
 
-        let action = BuiltinAction::Me(var.clone());
+        let action = BuiltinAction::Pure(PureAction::Me(var.clone()));
 
         let ExecuteResult::Done(Some(result)) = action.execute(&bindings, &mut context, &knowledge)
         else {
@@ -612,11 +668,11 @@ mod tests {
             let addr = string("receiver-agent@local");
             let bindings = bindings(vec![(receiver_var.clone(), addr.as_view())]);
 
-            let action = BuiltinAction::SendLiteral(
+            let action = BuiltinAction::Impure(ImpureAction::SendLiteral(
                 VariableOrReceiver::Variable(receiver_var),
                 Trigger::Addition,
                 literal("ack", vec![]),
-            );
+            ));
 
             let result = action.execute(&bindings, &mut context, &knowledge);
 
@@ -635,11 +691,11 @@ mod tests {
             let knowledge = KnowledgeBase::default();
             let bindings = bindings(vec![]);
 
-            let action = BuiltinAction::SendLiteral(
+            let action = BuiltinAction::Impure(ImpureAction::SendLiteral(
                 VariableOrReceiver::Receiver(Receiver::Single(Aid::local("receiver-agent"))),
                 Trigger::Deletion,
                 literal("ack", vec![]),
-            );
+            ));
 
             action.execute(&bindings, &mut context, &knowledge);
 
@@ -657,11 +713,11 @@ mod tests {
             let room_value = string("kitchen");
             let bindings = bindings(vec![(var.clone(), room_value.as_view())]);
 
-            let action = BuiltinAction::SendLiteral(
+            let action = BuiltinAction::Impure(ImpureAction::SendLiteral(
                 VariableOrReceiver::Receiver(Receiver::Single(Aid::local("receiver-agent"))),
                 Trigger::Addition,
                 literal("location", vec![variable_term(&var)]),
-            );
+            ));
 
             action.execute(&bindings, &mut context, &knowledge);
 
@@ -678,11 +734,11 @@ mod tests {
             let knowledge = KnowledgeBase::default();
             let bindings = bindings(vec![]);
 
-            let action = BuiltinAction::SendLiteral(
+            let action = BuiltinAction::Impure(ImpureAction::SendLiteral(
                 VariableOrReceiver::Variable(variable()),
                 Trigger::Addition,
                 literal("ack", vec![]),
-            );
+            ));
 
             let result = action.execute(&bindings, &mut context, &knowledge);
 
@@ -802,10 +858,10 @@ mod tests {
             let bindings = bindings(vec![]);
 
             let x = variable();
-            let action = BuiltinAction::Forall {
+            let action = BuiltinAction::Impure(ImpureAction::Forall {
                 query: literal_formula("item", vec![variable_term(&x)]),
                 goal: literal("process", vec![variable_term(&x)]),
-            };
+            });
 
             let result = action.execute(&bindings, &mut context, &knowledge);
 
@@ -829,10 +885,10 @@ mod tests {
             let bindings = bindings(vec![]);
 
             let x = variable();
-            let action = BuiltinAction::Forall {
+            let action = BuiltinAction::Impure(ImpureAction::Forall {
                 query: literal_formula("item", vec![variable_term(&x)]),
                 goal: literal("process", vec![variable_term(&x)]),
-            };
+            });
 
             let result = action.execute(&bindings, &mut context, &knowledge);
             assert!(matches!(result, ExecuteResult::Done(None)));
@@ -875,10 +931,10 @@ mod tests {
             let bindings = bindings(vec![]);
 
             let (x, y) = (variable(), variable());
-            let action = BuiltinAction::Forall {
+            let action = BuiltinAction::Impure(ImpureAction::Forall {
                 query: literal_formula("pair", vec![variable_term(&x), variable_term(&y)]),
                 goal: literal("process", vec![variable_term(&x), variable_term(&y)]),
-            };
+            });
 
             let result = action.execute(&bindings, &mut context, &knowledge);
             assert!(matches!(result, ExecuteResult::Done(None)));
@@ -909,10 +965,10 @@ mod tests {
             let room_value = string("kitchen");
             let bindings = bindings(vec![(room.clone(), room_value.as_view())]);
 
-            let action = BuiltinAction::Forall {
+            let action = BuiltinAction::Impure(ImpureAction::Forall {
                 query: literal_formula("item", vec![variable_term(&x)]),
                 goal: literal("process", vec![variable_term(&x), variable_term(&room)]),
-            };
+            });
 
             let result = action.execute(&bindings, &mut context, &knowledge);
             assert!(matches!(result, ExecuteResult::Done(None)));

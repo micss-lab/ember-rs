@@ -160,8 +160,18 @@ peg::parser! {
         rule simple_logical_expression() -> SimpleLogicalExpression
             = "not" expr:simple_logical_expression() { SimpleLogicalExpression::Not(Box::new(expr)) }
             / "(" expr:logical_expression() ")" { SimpleLogicalExpression::Group(Box::new(expr)) }
+            / "." action:pure_builtin_action() { SimpleLogicalExpression::Action(action) }
             / lit:literal() { SimpleLogicalExpression::Literal(lit) }
             / expr:relational_expression() { SimpleLogicalExpression::Rel(expr) }
+
+        // Only the built-in actions with no side effects may appear in a context guard - a
+        // context can be evaluated more than once per event (backtracking across candidate
+        // plans, or across belief alternatives within one conjunction), so anything effectful
+        // here could double-fire.
+        rule pure_builtin_action() -> PureAction
+            = "now" "(" variable:VARIABLE() ")" { PureAction::Now(variable) }
+            / "me" "(" variable:VARIABLE() ")" { PureAction::Me(variable) }
+            / expected!("a pure action usable in a context (`.now`, `.me`)")
 
         rule relational_expression() -> RelationalExpression
             = lhs:relational_term() operator:RELATIONAL_OPERATOR() rhs:relational_term() {

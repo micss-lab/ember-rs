@@ -4,6 +4,7 @@ use core::slice::Iter;
 use ember_collections::SmallMap;
 
 use crate::bindings::Bindings;
+use crate::context::PureContext;
 use crate::knowledge::base::KnowledgeBase;
 use crate::term::view::TermView;
 
@@ -34,12 +35,15 @@ impl<'p, 'e, A> PlanSelection<'p, 'e, A> {
     pub fn next_plan<'b>(
         &mut self,
         knowledge: &'b KnowledgeBase,
+        pure_context: &'b PureContext,
     ) -> Option<(&'p Plan<A>, Bindings<'b>)>
     where
         'e: 'b,
         'p: 'b,
     {
-        self.relevant().applicable().next_plan(knowledge)
+        self.relevant()
+            .applicable()
+            .next_plan(knowledge, pure_context)
     }
 
     fn relevant<'s>(&'s mut self) -> RelevantPlanSelection<'s, 'p, 'e, A> {
@@ -85,7 +89,11 @@ impl<'p, 'e, A> RelevantPlanSelection<'_, 'p, 'e, A> {
 struct ApplicablePlanSelection<'s, 'p, 'e, A>(RelevantPlanSelection<'s, 'p, 'e, A>);
 
 impl<'p, 'e, A> ApplicablePlanSelection<'_, 'p, 'e, A> {
-    fn next_plan<'b>(&mut self, knowledge: &'b KnowledgeBase) -> Option<(&'p Plan<A>, Bindings<'b>)>
+    fn next_plan<'b>(
+        &mut self,
+        knowledge: &'b KnowledgeBase,
+        pure_context: &'b PureContext,
+    ) -> Option<(&'p Plan<A>, Bindings<'b>)>
     where
         'p: 'e,
         'e: 'b,
@@ -97,7 +105,9 @@ impl<'p, 'e, A> ApplicablePlanSelection<'_, 'p, 'e, A> {
                 return Some((relevant_plan, bindings));
             };
 
-            let Some(bindings) = context.into_query(knowledge).next_bindings(Some(&bindings))
+            let Some(bindings) = context
+                .into_query(knowledge, pure_context)
+                .next_bindings(Some(&bindings))
             else {
                 continue;
             };
@@ -124,6 +134,7 @@ mod tests {
 
     #[test]
     fn test_relevant_but_not_applicable() {
+        let pure_context = pure_context();
         let mut store = PlanLibrary::<()>::default();
         let mut bb = KnowledgeBase::default();
 
@@ -146,7 +157,7 @@ mod tests {
 
         // 1. If belief base is empty, context fails.
         assert!(
-            selection.next_plan(&bb).is_none(),
+            selection.next_plan(&bb, &pure_context).is_none(),
             "Plan should not be applicable"
         );
 
@@ -162,13 +173,14 @@ mod tests {
 
         let mut selection2 = PlanSelection::select_from_library(&event, &store.plans);
         assert!(
-            selection2.next_plan(&bb).is_some(),
+            selection2.next_plan(&bb, &pure_context).is_some(),
             "Plan should now be applicable"
         );
     }
 
     #[test]
     fn test_backtracking_to_second_plan() {
+        let pure_context = pure_context();
         let mut store = PlanLibrary::<()>::default();
         let bb = KnowledgeBase::default();
 
@@ -195,7 +207,7 @@ mod tests {
         let event = trigger("goal", vec![], Some(GoalKind::Achieve));
         let mut selection = PlanSelection::select_from_library(&event, &store.plans);
 
-        let result = selection.next_plan(&bb);
+        let result = selection.next_plan(&bb, &pure_context);
         assert!(result.is_some(), "Should skip Plan 1 and find Plan 2");
         assert!(
             result.unwrap().0.context.is_none(),
@@ -205,6 +217,7 @@ mod tests {
 
     #[test]
     fn test_unification_failure_in_relevance() {
+        let pure_context = pure_context();
         let mut store = PlanLibrary::<()>::default();
         let bb = KnowledgeBase::default();
 
@@ -220,13 +233,14 @@ mod tests {
         let mut selection = PlanSelection::select_from_library(&event, &store.plans);
 
         assert!(
-            selection.next_plan(&bb).is_none(),
+            selection.next_plan(&bb, &pure_context).is_none(),
             "Plan trigger test(1) should not match event test(2)"
         );
     }
 
     #[test]
     fn test_variable_unification_event_to_plan() {
+        let pure_context = pure_context();
         let mut store = PlanLibrary::<()>::default();
         let bb = KnowledgeBase::default();
 
@@ -242,7 +256,9 @@ mod tests {
         let event = trigger("greet", vec![string("Alice")], Some(GoalKind::Achieve));
         let mut selection = PlanSelection::select_from_library(&event, &store.plans);
 
-        let (_, bindings) = selection.next_plan(&bb).expect("Should unify");
+        let (_, bindings) = selection
+            .next_plan(&bb, &pure_context)
+            .expect("Should unify");
 
         // Check that X was correctly bound to "Alice"
         assert_eq!(bindings.get_view(&x), Some(&string("Alice").as_view()));
@@ -250,16 +266,18 @@ mod tests {
 
     #[test]
     fn test_empty_store_returns_none() {
+        let pure_context = pure_context();
         let store = PlanLibrary::<()>::default();
         let bb = KnowledgeBase::default();
         let event = trigger("any", vec![], None);
 
         let mut selection = PlanSelection::select_from_library(&event, &store.plans);
-        assert!(selection.next_plan(&bb).is_none());
+        assert!(selection.next_plan(&bb, &pure_context).is_none());
     }
 
     #[test]
     fn test_context_uses_trigger_bindings() {
+        let pure_context = pure_context();
         let mut store = PlanLibrary::<()>::default();
         let mut bb = KnowledgeBase::default();
 
@@ -291,7 +309,7 @@ mod tests {
         let event = trigger("check", vec![string("circle")], Some(GoalKind::Achieve));
         let mut selection = PlanSelection::select_from_library(&event, &store.plans);
 
-        let result = selection.next_plan(&bb);
+        let result = selection.next_plan(&bb, &pure_context);
         assert!(
             result.is_some(),
             "Context should see that Obj is 'circle' from the event"
@@ -300,6 +318,7 @@ mod tests {
 
     #[test]
     fn test_full_binding_propagation_pipeline() {
+        let pure_context = pure_context();
         let mut store = PlanLibrary::<()>::default();
         let mut bb = KnowledgeBase::default();
         assert_belief(&mut bb, "color", vec![string("apple"), string("red")]);
@@ -316,7 +335,9 @@ mod tests {
 
         let event = trigger("check", vec![string("apple")], Some(GoalKind::Achieve));
         let mut selection = PlanSelection::select_from_library(&event, &store.plans);
-        let (_, bindings) = selection.next_plan(&bb).expect("Binding pipe failed");
+        let (_, bindings) = selection
+            .next_plan(&bb, &pure_context)
+            .expect("Binding pipe failed");
 
         assert_eq!(bindings.get_view(&x), Some(&string("apple").as_view()));
         assert_eq!(bindings.get_view(&y), Some(&string("red").as_view()));
@@ -324,6 +345,7 @@ mod tests {
 
     #[test]
     fn test_variable_aliasing_event_to_context() {
+        let pure_context = pure_context();
         let mut store = PlanLibrary::<()>::default();
         let mut bb = KnowledgeBase::default();
         assert_belief(&mut bb, "linked", vec![string("a"), string("b")]);
@@ -348,13 +370,16 @@ mod tests {
             Some(GoalKind::Achieve),
         );
         let mut selection = PlanSelection::select_from_library(&event, &store.plans);
-        let (_, bindings) = selection.next_plan(&bb).expect("Aliasing failed");
+        let (_, bindings) = selection
+            .next_plan(&bb, &pure_context)
+            .expect("Aliasing failed");
 
         assert_eq!(bindings.get_view(&event_var), Some(&string("a").as_view()));
     }
 
     #[test]
     fn test_backtracking_on_context_failure() {
+        let pure_context = pure_context();
         let mut store = PlanLibrary::<()>::default();
         let mut bb = KnowledgeBase::default();
         assert_belief(&mut bb, "is_broken", vec![string("bolt")]);
@@ -373,7 +398,7 @@ mod tests {
 
         let event = trigger("fix", vec![string("bolt")], Some(GoalKind::Achieve));
         let (plan, _) = PlanSelection::select_from_library(&event, &store.plans)
-            .next_plan(&bb)
+            .next_plan(&bb, &pure_context)
             .unwrap();
 
         let QueryFormula::Literal(Literal { structure, .. }) = plan.context.as_ref().unwrap()
@@ -385,6 +410,7 @@ mod tests {
 
     #[test]
     fn test_context_negation_with_event_bindings() {
+        let pure_context = pure_context();
         let mut bb = KnowledgeBase::default();
         let mut store = PlanLibrary::<()>::default();
         assert_belief(&mut bb, "blocked", vec![string("north")]);
@@ -402,14 +428,14 @@ mod tests {
         let event_north = trigger("move", vec![string("north")], Some(GoalKind::Achieve));
         assert!(
             PlanSelection::select_from_library(&event_north, &store.plans)
-                .next_plan(&bb)
+                .next_plan(&bb, &pure_context)
                 .is_none()
         );
 
         let event_south = trigger("move", vec![string("south")], Some(GoalKind::Achieve));
         assert!(
             PlanSelection::select_from_library(&event_south, &store.plans)
-                .next_plan(&bb)
+                .next_plan(&bb, &pure_context)
                 .is_some()
         );
     }

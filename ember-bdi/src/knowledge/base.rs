@@ -1,6 +1,6 @@
 use ember_collections::{SmallMap, SmallSet};
 
-use crate::context::Context;
+use crate::context::{Context, PureContext};
 use crate::intention::IntentionId;
 use crate::literal::IntoLiteral;
 use crate::plan::{Trigger, TriggeringEvent};
@@ -89,8 +89,12 @@ impl KnowledgeBase {
         beliefs.remove(&belief)
     }
 
-    pub fn query<'a>(&'a self, query: impl IntoQuery<'a>) -> Query<'a> {
-        query.into_query(self)
+    pub fn query<'a>(
+        &'a self,
+        query: impl IntoQuery<'a>,
+        pure_context: &'a PureContext,
+    ) -> Query<'a> {
+        query.into_query(self, pure_context)
     }
 }
 

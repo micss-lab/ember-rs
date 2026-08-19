@@ -9,7 +9,7 @@ use ember_core::message::content::ember_bdil::BdilContent;
 use ember_core::message::{Content, Message, MessageFilter, Performative};
 use ember_fipa::agent::{ExecutionState, FipaAgent};
 
-use crate::context::Context;
+use crate::context::{Context, PureContext};
 use crate::event::EventSource;
 use crate::event::queue::EventQueue;
 use crate::event::selector::{EventSelector, FirstEvent};
@@ -34,7 +34,7 @@ pub struct BdiAgent<
     Sel = FirstEvent,
     PSel = FirstApplicable,
 > {
-    name: Rc<Cow<'static, str>>,
+    name: PureContext,
     state: State,
     beliefs: KnowledgeBase,
     plans: PlanLibrary<Action, PSel>,
@@ -62,7 +62,7 @@ where
         initial_goals: impl IntoIterator<Item = Literal>,
     ) -> Self {
         let mut this = Self {
-            name: Rc::new(name.into()),
+            name: PureContext::new(Rc::new(name.into())),
             state,
             beliefs: beliefs.unwrap_or_default(),
             plans,
@@ -194,7 +194,7 @@ where
             };
         }
 
-        let Some((plan, bindings)) = self.plans.select(&event, &self.beliefs) else {
+        let Some((plan, bindings)) = self.plans.select(&event, &self.beliefs, &self.name) else {
             return;
         };
 
@@ -411,7 +411,7 @@ where
     PSel: PlanSelector<Action>,
 {
     fn update(&mut self, environment: &mut Environment) -> bool {
-        match self.fipa.update(environment, &self.name) {
+        match self.fipa.update(environment, &self.name.agent_name) {
             ExecutionState::Initiated => return false,
             ExecutionState::Active => self.tick(environment),
         }
@@ -419,7 +419,7 @@ where
     }
 
     fn get_name(&self) -> Cow<'_, str> {
-        Cow::Borrowed(self.name.as_ref())
+        Cow::Borrowed(self.name.agent_name.as_ref())
     }
 }
 
@@ -463,7 +463,7 @@ mod tests {
     use crate::bindings::BindingLookup;
     use crate::knowledge::query::IntoQuery;
 
-    use crate::plan::{Action, BuiltinAction, Formula};
+    use crate::plan::{Action, BuiltinAction, Formula, ImpureAction};
     use crate::testing::{
         assert_belief, literal, literal_formula, plan, string, trigger, variable, variable_term,
     };
@@ -671,10 +671,12 @@ mod tests {
             trigger("start", vec![], Some(GoalKind::Achieve)),
             None,
             vec![
-                Formula::Action(Action::Builtin(BuiltinAction::Forall {
-                    query: literal_formula("item", vec![variable_term(&x)]),
-                    goal: literal("mark_processed", vec![variable_term(&x)]),
-                })),
+                Formula::Action(Action::Builtin(BuiltinAction::Impure(
+                    ImpureAction::Forall {
+                        query: literal_formula("item", vec![variable_term(&x)]),
+                        goal: literal("mark_processed", vec![variable_term(&x)]),
+                    },
+                ))),
                 Formula::Action(Action::User(TestAction::Log("after_forall"))),
             ],
         ));
@@ -726,7 +728,7 @@ mod tests {
 
         for item in ["a", "b", "c"] {
             let query_formula = literal_formula("processed", vec![string(item)]);
-            let mut query = (&query_formula).into_query(&agent.beliefs);
+            let mut query = (&query_formula).into_query(&agent.beliefs, &agent.name);
             assert!(
                 query.next_bindings(None).is_some(),
                 "processed({item}) should have been asserted by its own spawned intention"
@@ -1144,7 +1146,7 @@ mod tests {
         let ga2 = literal_formula("target_gateway", vec![string("ga-2")]);
         assert!(
             (&ga1)
-                .into_query(&agent.beliefs)
+                .into_query(&agent.beliefs, &agent.name)
                 .next_bindings(None)
                 .is_some(),
             "invocation 1: cold boot should target ga-1 (checked first, neither gateway down yet)"
@@ -1192,7 +1194,7 @@ mod tests {
         ]);
         let empty_bindings = crate::bindings::Bindings::empty();
         let isolated_result = (&plan_b_context_copy)
-            .into_query(&agent.beliefs)
+            .into_query(&agent.beliefs, &agent.name)
             .next_bindings(Some(&empty_bindings));
 
         // Same conjunction, but with `None` instead of `Some(&Bindings::empty())` --
@@ -1203,7 +1205,7 @@ mod tests {
             not(literal_formula("gateway_down", vec![variable_term(&gwb3)])),
         ]);
         let isolated_result_none = (&plan_b_context_copy2)
-            .into_query(&agent.beliefs)
+            .into_query(&agent.beliefs, &agent.name)
             .next_bindings(None);
 
         // Same conjunction, but with the gateway hardcoded as a ground string
@@ -1215,7 +1217,7 @@ mod tests {
             not(literal_formula("gateway_down", vec![string("ga-2")])),
         ]);
         let ground_result = (&ground_conjunction)
-            .into_query(&agent.beliefs)
+            .into_query(&agent.beliefs, &agent.name)
             .next_bindings(Some(&empty_bindings));
 
         // Sharpest isolation: evaluate *only* `not gateway_down(GW)` on its own,
@@ -1232,7 +1234,7 @@ mod tests {
         )]);
         let solo_negation = not(literal_formula("gateway_down", vec![variable_term(&gwb4)]));
         let solo_result = (&solo_negation)
-            .into_query(&agent.beliefs)
+            .into_query(&agent.beliefs, &agent.name)
             .next_bindings(Some(&pre_bound));
 
         // --- Diagnostics: what actually happened? ---
@@ -1243,19 +1245,19 @@ mod tests {
              isolated_plan_b_context(Some(empty))={} isolated_plan_b_context(None)={} \
              ground_conjunction(Some(empty))={} solo_negation_with_GW_prebound_to_ga-2={}",
             (&ga1)
-                .into_query(&agent.beliefs)
+                .into_query(&agent.beliefs, &agent.name)
                 .next_bindings(None)
                 .is_some(),
             (&ga2)
-                .into_query(&agent.beliefs)
+                .into_query(&agent.beliefs, &agent.name)
                 .next_bindings(None)
                 .is_some(),
             (&gd_a)
-                .into_query(&agent.beliefs)
+                .into_query(&agent.beliefs, &agent.name)
                 .next_bindings(None)
                 .is_some(),
             (&gd_b)
-                .into_query(&agent.beliefs)
+                .into_query(&agent.beliefs, &agent.name)
                 .next_bindings(None)
                 .is_some(),
             isolated_result.is_some(),
@@ -1266,7 +1268,7 @@ mod tests {
 
         assert!(
             (&ga2)
-                .into_query(&agent.beliefs)
+                .into_query(&agent.beliefs, &agent.name)
                 .next_bindings(None)
                 .is_some(),
             "invocation 2: ga-1 is down and ga-2 is not -- select_gateway should retarget \

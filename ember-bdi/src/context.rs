@@ -9,20 +9,32 @@ use crate::intention::IntentionId;
 use crate::plan::TriggeringEvent;
 use crate::plan::action::PendingAction;
 
-pub struct Context<'ctx, A> {
+/// What a pure built-in action (`.now`, `.me`) needs to evaluate, whether that's inside a
+/// plan body or a context guard. Kept separate from `Context` so that a future pure action
+/// needing something new grows this struct instead of another bare parameter threaded
+/// through the whole query engine.
+#[derive(Debug, Clone)]
+pub struct PureContext {
     pub(crate) agent_name: Rc<Cow<'static, str>>,
+}
+
+impl PureContext {
+    pub(crate) fn new(agent_name: Rc<Cow<'static, str>>) -> Self {
+        Self { agent_name }
+    }
+}
+
+pub struct Context<'ctx, A> {
+    pub(crate) pure: PureContext,
     pub(crate) actions: Vec<(Option<IntentionId>, PendingAction<A>)>,
     pub(crate) events: Vec<(EventSource, TriggeringEvent)>,
     pub(crate) environment: &'ctx mut Environment,
 }
 
 impl<'ctx, A> Context<'ctx, A> {
-    pub(crate) fn new(
-        agent_name: Rc<Cow<'static, str>>,
-        environment: &'ctx mut Environment,
-    ) -> Self {
+    pub(crate) fn new(pure: PureContext, environment: &'ctx mut Environment) -> Self {
         Self {
-            agent_name,
+            pure,
             actions: Vec::new(),
             events: Vec::new(),
             environment,

@@ -3,6 +3,7 @@ use alloc::vec::Vec;
 use ember_collections::SmallMap;
 
 use crate::bindings::Bindings;
+use crate::context::PureContext;
 use crate::knowledge::base::KnowledgeBase;
 use crate::term::Atom;
 
@@ -49,6 +50,7 @@ impl<A, PSel> PlanLibrary<A, PSel> {
         &'p mut self,
         event: &'e TriggeringEvent,
         knowledge: &'b KnowledgeBase,
+        pure_context: &'b PureContext,
     ) -> Option<(&'p Plan<A>, Bindings<'b>)>
     where
         'p: 'b,
@@ -56,7 +58,8 @@ impl<A, PSel> PlanLibrary<A, PSel> {
         PSel: PlanSelector<A>,
     {
         let selection = PlanSelection::select_from_library(event, &self.plans);
-        self.selector.select_plan(selection, knowledge)
+        self.selector
+            .select_plan(selection, knowledge, pure_context)
     }
 }
 

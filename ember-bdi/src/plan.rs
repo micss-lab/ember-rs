@@ -9,7 +9,7 @@ use crate::resolve::ResolveFailure;
 pub use crate::event::{GoalKind, Trigger, TriggeringEvent};
 pub use crate::knowledge::query::formula::*;
 
-pub use self::action::{Action, BuiltinAction};
+pub use self::action::{Action, BuiltinAction, ImpureAction, PureAction};
 
 pub mod action;
 pub mod library;

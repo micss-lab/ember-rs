@@ -16,7 +16,8 @@ use ember::agent::bdi::literal::{IntoLiteral, Literal};
 use ember::agent::bdi::plan::action::Execute;
 use ember::agent::bdi::plan::library::PlanLibrary;
 use ember::agent::bdi::plan::{
-    Action, BuiltinAction, Formula, GoalKind, Plan, QueryFormula, Trigger, TriggeringEvent,
+    Action, BuiltinAction, Formula, GoalKind, ImpureAction, Plan, QueryFormula, Trigger,
+    TriggeringEvent,
 };
 use ember::agent::bdi::sensor::{Percept, Perceptor};
 use ember::agent::bdi::term::reference::TermRef;
@@ -231,13 +232,13 @@ fn define_plans() -> PlanLibrary<AgentAction> {
             QueryFormula::literal(false, "have", Some([Term::String("coffee_beans".into())])),
         ])),
         body: Box::new([
-            Formula::Action(Action::Builtin(BuiltinAction::Log(
+            Formula::Action(Action::Builtin(BuiltinAction::Impure(ImpureAction::Log(
                 log::Level::Info,
                 [Term::String(
                     "[ACTION] 💬 Enjoying a fresh cup of coffee!".into(),
                 )]
                 .into(),
-            ))),
+            )))),
             Formula::Belief {
                 trigger: Trigger::Addition,
                 belief: Literal {
@@ -324,13 +325,15 @@ fn define_plans() -> PlanLibrary<AgentAction> {
             "at",
             Some([Term::String("agent".into()), Term::Variable(v_dest.clone())]),
         )),
-        body: Box::new([Formula::Action(Action::Builtin(BuiltinAction::Log(
-            log::Level::Info,
-            [
-                Term::String("[ACTION] 💬 Already at".into()),
-                Term::Variable(v_dest.clone()),
-            ]
-            .into(),
+        body: Box::new([Formula::Action(Action::Builtin(BuiltinAction::Impure(
+            ImpureAction::Log(
+                log::Level::Info,
+                [
+                    Term::String("[ACTION] 💬 Already at".into()),
+                    Term::Variable(v_dest.clone()),
+                ]
+                .into(),
+            ),
         )))]),
     });
 
@@ -410,12 +413,14 @@ fn define_plans() -> PlanLibrary<AgentAction> {
             "have",
             Some([Term::String("coffee_beans".into())]),
         )),
-        body: Box::new([Formula::Action(Action::Builtin(BuiltinAction::Log(
-            log::Level::Info,
-            [Term::String(
-                "[ACTION] 💬 Found coffee beans in the pantry.".into(),
-            )]
-            .into(),
+        body: Box::new([Formula::Action(Action::Builtin(BuiltinAction::Impure(
+            ImpureAction::Log(
+                log::Level::Info,
+                [Term::String(
+                    "[ACTION] 💬 Found coffee beans in the pantry.".into(),
+                )]
+                .into(),
+            ),
         )))]),
     });
 
@@ -463,9 +468,9 @@ fn define_plans() -> PlanLibrary<AgentAction> {
             },
         },
         context: None,
-        body: Box::new([Formula::Action(Action::Builtin(
-            BuiltinAction::StopPlatform,
-        ))]),
+        body: Box::new([Formula::Action(Action::Builtin(BuiltinAction::Impure(
+            ImpureAction::StopPlatform,
+        )))]),
     });
 
     lib

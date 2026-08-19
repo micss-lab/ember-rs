@@ -7,7 +7,7 @@ use alloc::vec::Vec;
 use ember_core::environment::Environment;
 
 use crate::bindings::{BindingLookup, Bindings};
-use crate::context::Context;
+use crate::context::{Context, PureContext};
 use crate::knowledge::base::KnowledgeBase;
 use crate::literal::Literal;
 use crate::plan::action::{Execute, ExecuteResult};
@@ -102,6 +102,12 @@ pub fn assert_belief(bb: &mut KnowledgeBase, functor: &str, args: Vec<Term>) {
     bb.assert_no_event(lit);
 }
 
+/// The `PureContext` used by [`new_context_without_environment`] and
+/// [`new_context_with_environment`], for tests that need to query a `PureAction::Me` leaf.
+pub fn pure_context() -> PureContext {
+    PureContext::new(Rc::new(Cow::Borrowed("test-agent")))
+}
+
 pub fn plan<A>(
     trigger: TriggeringEvent,
     context: Option<QueryFormula>,
@@ -119,7 +125,7 @@ pub fn plan<A>(
 pub unsafe fn new_context_without_environment<A>() -> Context<'static, A> {
     let mut environment = Environment::new(VecDeque::with_capacity(0));
     // SAFETY: The context should never be used during testing.
-    Context::new(Rc::new(Cow::Borrowed("test-agent")), unsafe {
+    Context::new(pure_context(), unsafe {
         core::mem::transmute::<&mut Environment, &'static mut Environment>(&mut environment)
     })
 }
@@ -130,5 +136,5 @@ pub unsafe fn new_context_without_environment<A>() -> Context<'static, A> {
 pub fn new_context_with_environment<A>() -> Context<'static, A> {
     let environment: &'static mut Environment =
         Box::leak(Box::new(Environment::new(VecDeque::with_capacity(0))));
-    Context::new(Rc::new(Cow::Borrowed("test-agent")), environment)
+    Context::new(pure_context(), environment)
 }

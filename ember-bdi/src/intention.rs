@@ -176,7 +176,7 @@ where
                     // Jason-style two-tier query: check the belief base first, fall back to an event.
                     let query = QueryFormula::Literal(goal.clone());
                     match (&query)
-                        .into_query(&*knowledge)
+                        .into_query(&*knowledge, &context.pure)
                         .next_bindings(Some(&self.bindings.as_bindings()))
                     {
                         Some(bindings) => {
@@ -438,7 +438,7 @@ mod tests {
         let query_formula = literal_formula("route_active", vec![string("load"), string("c")]);
         assert!(
             (&query_formula)
-                .into_query(&knowledge)
+                .into_query(&knowledge, &context.pure)
                 .next_bindings(None)
                 .is_some(),
             "belief should already be queryable right after the step that added it"

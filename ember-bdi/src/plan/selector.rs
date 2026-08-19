@@ -1,4 +1,5 @@
 use crate::bindings::Bindings;
+use crate::context::PureContext;
 use crate::knowledge::base::KnowledgeBase;
 
 use super::Plan;
@@ -13,12 +14,13 @@ pub trait PlanSelector<A> {
         &mut self,
         mut selection: PlanSelection<'p, 'e, A>,
         knowledge: &'b KnowledgeBase,
+        pure_context: &'b PureContext,
     ) -> Option<(&'p Plan<A>, Bindings<'b>)>
     where
         'p: 'b,
         'e: 'b,
     {
-        while let Some((plan, bindings)) = selection.next_plan(knowledge) {
+        while let Some((plan, bindings)) = selection.next_plan(knowledge, pure_context) {
             if let Some(plan) = self.filter_plan(plan) {
                 return Some((plan, bindings));
             }

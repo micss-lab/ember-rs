@@ -97,8 +97,20 @@ pub(crate) enum LogicalExpression {
 pub(crate) enum SimpleLogicalExpression {
     Literal(Literal),
     Rel(RelationalExpression),
+    /// A pure built-in action (`.now`, `.me`) used in a context guard.
+    Action(PureAction),
     Not(Box<SimpleLogicalExpression>),
     Group(Box<LogicalExpression>),
+}
+
+/// The built-in actions with no side effects, the only ones allowed in a context guard. A
+/// dedicated type rather than a `BuiltinAction` leaf: `BuiltinAction::Forall` embeds a
+/// `LogicalExpression` by value, which would make `SimpleLogicalExpression` recursively sized
+/// if it held a full `BuiltinAction` instead.
+#[derive(Debug, Clone)]
+pub(crate) enum PureAction {
+    Now(Variable),
+    Me(Variable),
 }
 
 #[derive(Debug, Clone)]
@@ -418,6 +430,10 @@ impl AstVisitor {
                 let expression = self.visit_relational_expression(expression);
                 quote! { ::ember::agent::bdi::plan::QueryFormula::Relational(#expression) }
             }
+            SimpleLogicalExpression::Action(action) => {
+                let action = self.visit_pure_action(action);
+                quote! { ::ember::agent::bdi::plan::QueryFormula::Action(#action) }
+            }
             SimpleLogicalExpression::Not(expression) => {
                 let expression = self.visit_simple_logical_expression(expression);
                 quote! { ::ember::agent::bdi::plan::QueryFormula::Not(::alloc::boxed::Box::new(#expression)) }
@@ -694,15 +710,19 @@ impl AstVisitor {
                     .into_iter()
                     .map(|t| self.visit_term(t).to_token_stream());
                 quote! {
-                    ::ember::agent::bdi::plan::action::BuiltinAction::Log(
-                        #level.parse().expect("failed to parse log level"),
-                        ::alloc::boxed::Box::new([#(#terms),*])
+                    ::ember::agent::bdi::plan::action::BuiltinAction::Impure(
+                        ::ember::agent::bdi::plan::action::ImpureAction::Log(
+                            #level.parse().expect("failed to parse log level"),
+                            ::alloc::boxed::Box::new([#(#terms),*])
+                        )
                     )
                 }
             }
             BuiltinAction::StopPlatform => {
                 quote! {
-                    ::ember::agent::bdi::plan::action::BuiltinAction::StopPlatform
+                    ::ember::agent::bdi::plan::action::BuiltinAction::Impure(
+                        ::ember::agent::bdi::plan::action::ImpureAction::StopPlatform
+                    )
                 }
             }
             BuiltinAction::Send {
@@ -742,10 +762,12 @@ impl AstVisitor {
                 };
                 let literal_ts = self.visit_literal(literal).into_token_stream();
                 quote! {
-                    ::ember::agent::bdi::plan::action::BuiltinAction::SendLiteral(
-                        #aid,
-                        #trigger_ts,
-                        #literal_ts,
+                    ::ember::agent::bdi::plan::action::BuiltinAction::Impure(
+                        ::ember::agent::bdi::plan::action::ImpureAction::SendLiteral(
+                            #aid,
+                            #trigger_ts,
+                            #literal_ts,
+                        )
                     )
                 }
             }
@@ -758,10 +780,12 @@ impl AstVisitor {
                 let query = self.visit_logical_expression(query).into_token_stream();
                 let goal = self.visit_literal(goal).into_token_stream();
                 quote! {
-                    ::ember::agent::bdi::plan::action::BuiltinAction::Forall {
-                        query: #query,
-                        goal: #goal,
-                    }
+                    ::ember::agent::bdi::plan::action::BuiltinAction::Impure(
+                        ::ember::agent::bdi::plan::action::ImpureAction::Forall {
+                            query: #query,
+                            goal: #goal,
+                        }
+                    )
                 }
             }
             BuiltinAction::At { delay_millis, goal } => {
@@ -776,13 +800,34 @@ impl AstVisitor {
             BuiltinAction::Now(variable) => {
                 let variable = self.visit_variable(variable).into_token_stream();
                 quote! {
-                    ::ember::agent::bdi::plan::action::BuiltinAction::Now(#variable)
+                    ::ember::agent::bdi::plan::action::BuiltinAction::Pure(
+                        ::ember::agent::bdi::plan::action::PureAction::Now(#variable)
+                    )
                 }
             }
             BuiltinAction::Me(variable) => {
                 let variable = self.visit_variable(variable).into_token_stream();
                 quote! {
-                    ::ember::agent::bdi::plan::action::BuiltinAction::Me(#variable)
+                    ::ember::agent::bdi::plan::action::BuiltinAction::Pure(
+                        ::ember::agent::bdi::plan::action::PureAction::Me(#variable)
+                    )
+                }
+            }
+        }
+    }
+
+    fn visit_pure_action(&mut self, action: &PureAction) -> impl ToTokens {
+        match action {
+            PureAction::Now(variable) => {
+                let variable = self.visit_variable(variable).into_token_stream();
+                quote! {
+                    ::ember::agent::bdi::plan::action::PureAction::Now(#variable)
+                }
+            }
+            PureAction::Me(variable) => {
+                let variable = self.visit_variable(variable).into_token_stream();
+                quote! {
+                    ::ember::agent::bdi::plan::action::PureAction::Me(#variable)
                 }
             }
         }
