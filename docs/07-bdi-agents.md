@@ -29,7 +29,7 @@ This is the longest reference page in the docs; use the section list to navigate
 | ------------- | ----------------------------------------------------------------------------------- |
 | **Belief**    | A ground literal in the *belief base*, e.g. `at(agent, home)`.                       |
 | **Rule**      | A logic-programming clause that *derives* beliefs, e.g. `cooling_active :- pump_active`. |
-| **Desire/Goal** | An *achievement goal* `!g` the agent wants to bring about, or a *test goal* `?g`. |
+| **Desire/Goal** | An *achievement goal* `!g` the agent wants to bring about, or a *test goal* `?g` that checks the belief base directly, falling back to a plan search if nothing matches. |
 | **Plan**      | A recipe: a triggering event, an optional context condition, and a body of steps.   |
 | **Intention** | A plan the agent has committed to and is currently executing (on the intention stack). |
 | **Action**    | A leaf step in a plan body: either a built-in (`.log`, `.send`, …) or a user-defined Rust method. |
@@ -229,7 +229,7 @@ A plan has three parts:
   | ----------- | -------------------------------------------------- |
   | `+!g`       | achievement goal `g` is **added**                  |
   | `-!g`       | achievement goal `g` is **dropped/failed**         |
-  | `+?g`       | test goal `g` is added                             |
+  | `+?g`       | test goal `g` is added and no matching belief was found directly |
   | `+b`        | belief `b` is **added**                            |
   | `-b`        | belief `b` is **removed**                          |
 
@@ -262,7 +262,7 @@ A plan body is a `;`-separated sequence of steps. Each step is one of:
 | `+belief`       | Add a belief (may trigger `+belief` plans)                              |
 | `-belief`       | Remove a belief (may trigger `-belief` plans)                           |
 | `!goal`         | Post a **subgoal**: pursue `goal` before continuing                    |
-| `?goal`         | Test goal: query the belief base                                       |
+| `?goal`         | Test goal: query the belief base directly; if nothing matches, falls back to a `+?goal` event/plan search |
 | `.builtin(...)` | Invoke a **built-in action** (leading dot): see [§7.8](#78-built-in-actions) |
 | `action(...)`   | Invoke a **user-defined action** (no leading dot): see [§7.9](#79-user-defined-actions) |
 

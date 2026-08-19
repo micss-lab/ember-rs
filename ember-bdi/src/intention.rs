@@ -6,7 +6,7 @@ use crate::bindings::{Bindings, OwnedBindings};
 use crate::context::Context;
 use crate::knowledge::base::KnowledgeBase;
 use crate::plan::action::{Execute, ExecuteResult, PendingAction};
-use crate::plan::{Formula, Plan, Trigger, TriggeringEvent};
+use crate::plan::{Formula, GoalKind, Plan, Trigger, TriggeringEvent};
 
 use self::result::*;
 
@@ -160,14 +160,42 @@ where
                     }
                 }
             }
-            Formula::Goal { kind, goal } => context.emit_event(
-                TriggeringEvent {
-                    trigger: Trigger::Addition,
-                    event: goal,
-                    goal: Some(kind),
-                },
-                Some(self.intention_id),
-            ),
+            Formula::Goal { kind, goal } => match kind {
+                GoalKind::Achieve => context.emit_event(
+                    TriggeringEvent {
+                        trigger: Trigger::Addition,
+                        event: goal,
+                        goal: Some(kind),
+                    },
+                    Some(self.intention_id),
+                ),
+                GoalKind::Query => {
+                    use crate::knowledge::query::IntoQuery;
+                    use crate::plan::QueryFormula;
+
+                    // Jason-style two-tier query: check the belief base first, fall back to an event.
+                    let query = QueryFormula::Literal(goal.clone());
+                    match (&query)
+                        .into_query(&*knowledge)
+                        .next_bindings(Some(&self.bindings.as_bindings()))
+                    {
+                        Some(bindings) => {
+                            self.bindings =
+                                Bindings::merge_views([&self.bindings.as_bindings(), &bindings])
+                                    .expect("merging bindings from query goal into frame failed")
+                                    .into()
+                        }
+                        None => context.emit_event(
+                            TriggeringEvent {
+                                trigger: Trigger::Addition,
+                                event: goal,
+                                goal: Some(kind),
+                            },
+                            Some(self.intention_id),
+                        ),
+                    }
+                }
+            },
             Formula::Unify { lhs, rhs } => {
                 use crate::knowledge::query::formula::eval::evaluate_relational;
                 use crate::plan::{RelationalOperator, RelationalQueryFormula};
@@ -244,6 +272,7 @@ mod tests {
     use alloc::vec;
 
     use crate::bindings::Bindings;
+    use crate::event::EventSource;
     use crate::plan::{Action, ArithmeticExpression, ArithmeticOperator, Formula, Trigger};
     use crate::variable::Variable;
 
@@ -575,5 +604,122 @@ mod tests {
 
         let result = intention.step(&mut context, &mut knowledge, &mut ());
         assert!(matches!(result, Err(StepError::UnifyEvalError(_))));
+    }
+
+    #[test]
+    fn query_goal_resolves_synchronously_against_a_matching_belief_without_emitting_an_event() {
+        let mut intention: Intention<()> = Intention::new(0);
+        // SAFETY: The environment on the context remains untouched,
+        let mut context = unsafe { new_context_without_environment() };
+        let mut knowledge = KnowledgeBase::default();
+        assert_belief(&mut knowledge, "ready", Vec::with_capacity(0));
+
+        let trigger = trigger("event", vec![], None);
+        let plan = plan(
+            trigger.clone(),
+            None,
+            vec![Formula::Goal {
+                kind: GoalKind::Query,
+                goal: literal("ready", Vec::with_capacity(0)),
+            }],
+        );
+
+        intention.push(&plan, Bindings::empty(), trigger);
+
+        let result = intention.step(&mut context, &mut knowledge, &mut ());
+        assert!(matches!(result, Ok(StepOk::Done)));
+        assert!(context.events.is_empty());
+    }
+
+    #[test]
+    fn query_goal_binds_variables_from_the_matching_belief_for_later_use_in_the_body() {
+        let mut intention: Intention<CaptureAction> = Intention::new(0);
+        // SAFETY: The environment on the context remains untouched,
+        let mut context = unsafe { new_context_without_environment() };
+        let mut knowledge = KnowledgeBase::default();
+        let mut state = Vec::new();
+        assert_belief(&mut knowledge, "battery_level", vec![number(87.0)]);
+
+        let x = variable();
+        let trigger = trigger("event", vec![], None);
+        let plan = plan(
+            trigger.clone(),
+            None,
+            vec![
+                Formula::Goal {
+                    kind: GoalKind::Query,
+                    goal: literal("battery_level", vec![variable_term(&x)]),
+                },
+                Formula::Action(Action::User(CaptureAction(x))),
+            ],
+        );
+
+        intention.push(&plan, Bindings::empty(), trigger);
+
+        // step 1: resolves the query goal in place, no event emitted, X bound into the frame.
+        let result = intention.step(&mut context, &mut knowledge, &mut state);
+        assert!(matches!(result, Ok(StepOk::Pending)));
+        assert!(context.events.is_empty());
+
+        // step 2: the capture action reads X back out through the same frame's bindings.
+        let result = intention.step(&mut context, &mut knowledge, &mut state);
+        assert!(matches!(result, Ok(StepOk::Done)));
+        assert_eq!(state, vec![87.0]);
+    }
+
+    #[test]
+    fn query_goal_falls_back_to_emitting_a_goal_event_when_no_belief_matches() {
+        let mut intention: Intention<()> = Intention::new(0);
+        // SAFETY: The environment on the context remains untouched,
+        let mut context = unsafe { new_context_without_environment() };
+        let mut knowledge = KnowledgeBase::default();
+
+        let trigger = trigger("event", vec![], None);
+        let plan = plan(
+            trigger.clone(),
+            None,
+            vec![Formula::Goal {
+                kind: GoalKind::Query,
+                goal: literal("missing", Vec::with_capacity(0)),
+            }],
+        );
+
+        intention.push(&plan, Bindings::empty(), trigger);
+
+        let result = intention.step(&mut context, &mut knowledge, &mut ());
+        assert!(matches!(result, Ok(StepOk::Done)));
+
+        assert_eq!(context.events.len(), 1);
+        let (source, event) = &context.events[0];
+        assert!(matches!(source, EventSource::Internal(0)));
+        assert_eq!(event.trigger, Trigger::Addition);
+        assert_eq!(event.goal, Some(GoalKind::Query));
+        assert_eq!(event.event, literal("missing", Vec::with_capacity(0)));
+    }
+
+    #[test]
+    fn achieve_goal_still_always_emits_an_event_even_when_a_matching_belief_exists() {
+        let mut intention: Intention<()> = Intention::new(0);
+        // SAFETY: The environment on the context remains untouched,
+        let mut context = unsafe { new_context_without_environment() };
+        let mut knowledge = KnowledgeBase::default();
+        assert_belief(&mut knowledge, "goal1", Vec::with_capacity(0));
+
+        let trigger = trigger("event", vec![], None);
+        let plan = plan(
+            trigger.clone(),
+            None,
+            vec![Formula::Goal {
+                kind: GoalKind::Achieve,
+                goal: literal("goal1", Vec::with_capacity(0)),
+            }],
+        );
+
+        intention.push(&plan, Bindings::empty(), trigger);
+
+        let result = intention.step(&mut context, &mut knowledge, &mut ());
+        assert!(matches!(result, Ok(StepOk::Done)));
+        assert_eq!(context.events.len(), 1);
+        assert_eq!(context.events[0].1.goal, Some(GoalKind::Achieve));
     }
 }
