@@ -170,6 +170,10 @@ pub(crate) enum BodyFormula {
         trigger: BodyFormulaGoalTrigger,
         literal: Literal,
     },
+    Unify {
+        lhs: RelationalTerm,
+        rhs: RelationalTerm,
+    },
     Action(Spanned<Action>),
 }
 
@@ -350,6 +354,13 @@ impl AstVisitor {
                             goal: #literal,
                         }
                     },
+                }
+            }
+            BodyFormula::Unify { lhs, rhs } => {
+                let lhs = self.visit_relational_term(lhs).into_token_stream();
+                let rhs = self.visit_relational_term(rhs).into_token_stream();
+                quote! {
+                    ::ember::agent::bdi::plan::Formula::Unify { lhs: #lhs, rhs: #rhs }
                 }
             }
             BodyFormula::Action(action) => {

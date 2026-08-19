@@ -1,3 +1,4 @@
+use crate::knowledge::query::formula::eval::EvaluationError;
 use crate::resolve::ResolveFailure;
 
 pub(crate) type Result = ::core::result::Result<StepOk, StepError>;
@@ -22,6 +23,8 @@ impl StepOk {
 pub(crate) enum StepError {
     ResolveFailure(ResolveFailure),
     ResolveIncomplete,
+    UnifyEvalError(EvaluationError),
+    UnifyFailed,
 }
 
 impl core::fmt::Display for StepError {
@@ -34,6 +37,8 @@ impl core::fmt::Display for StepError {
             match self {
                 ResolveFailure(failure) => failure.to_string(),
                 ResolveIncomplete => "resolve incomplete".to_string(),
+                UnifyEvalError(error) => error.to_string(),
+                UnifyFailed => "unification failed".to_string(),
             }
         )
     }

@@ -168,6 +168,25 @@ where
                 },
                 Some(self.intention_id),
             ),
+            Formula::Unify { lhs, rhs } => {
+                use crate::knowledge::query::formula::eval::evaluate_relational;
+                use crate::plan::{RelationalOperator, RelationalQueryFormula};
+
+                let formula = RelationalQueryFormula {
+                    operator: RelationalOperator::Unify,
+                    operands: (lhs, rhs),
+                };
+                match evaluate_relational(&formula, &self.bindings.as_bindings()) {
+                    Ok(Some(bindings)) => {
+                        self.bindings =
+                            Bindings::merge_views([&self.bindings.as_bindings(), &bindings])
+                                .expect("merging bindings from unify into frame failed")
+                                .into()
+                    }
+                    Ok(None) => return Err(StepError::UnifyFailed),
+                    Err(error) => return Err(StepError::UnifyEvalError(error)),
+                }
+            }
             Formula::Action(action) => {
                 use crate::plan::action::Execute;
 
@@ -221,10 +240,12 @@ where
 
 #[cfg(test)]
 mod tests {
+    use alloc::boxed::Box;
     use alloc::vec;
 
     use crate::bindings::Bindings;
-    use crate::plan::{Action, Formula, Trigger};
+    use crate::plan::{Action, ArithmeticExpression, ArithmeticOperator, Formula, Trigger};
+    use crate::variable::Variable;
 
     use crate::testing::*;
 
@@ -393,5 +414,166 @@ mod tests {
                 .is_some(),
             "belief should already be queryable right after the step that added it"
         );
+    }
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct CaptureAction(Variable);
+
+    impl crate::plan::action::Execute for CaptureAction {
+        type State = Vec<f32>;
+        type UserAction = CaptureAction;
+
+        fn execute<'b, B>(
+            self,
+            bindings: &B,
+            _context: &mut Context<Self::UserAction>,
+            _knowledge: &KnowledgeBase,
+            state: &mut Self::State,
+        ) -> crate::plan::action::ExecuteResult<'b, Self>
+        where
+            B: crate::bindings::BindingLookup + 'b,
+        {
+            let value = bindings
+                .lookup_as_type::<f32>(&self.0)
+                .expect("variable should be bound")
+                .expect("bound term should be a number");
+            state.push(value);
+            crate::plan::action::ExecuteResult::Done(None)
+        }
+    }
+
+    #[test]
+    fn unify_evaluates_ground_arithmetic_and_binds_the_result() {
+        let mut intention: Intention<CaptureAction> = Intention::new(0);
+        // SAFETY: The environment on the context remains untouched,
+        let mut context = unsafe { new_context_without_environment() };
+        let mut knowledge = KnowledgeBase::default();
+        let mut state = Vec::new();
+
+        let x = variable();
+        let trigger = trigger("event", vec![], None);
+        let plan = plan(
+            trigger.clone(),
+            None,
+            vec![
+                Formula::Unify {
+                    lhs: ArithmeticExpression::Term(variable_term(&x)),
+                    rhs: ArithmeticExpression::Operation {
+                        operator: ArithmeticOperator::Sum,
+                        operands: Box::new([
+                            ArithmeticExpression::Term(number(2.0)),
+                            ArithmeticExpression::Term(number(3.0)),
+                        ]),
+                    },
+                },
+                Formula::Action(Action::User(CaptureAction(x))),
+            ],
+        );
+
+        intention.push(&plan, Bindings::empty(), trigger);
+
+        // step 1: unifies X with the evaluated sum, binding it into the frame.
+        let result = intention.step(&mut context, &mut knowledge, &mut state);
+        assert!(matches!(result, Ok(StepOk::Pending)));
+
+        // step 2: the capture action reads X back out through the same frame's bindings.
+        let result = intention.step(&mut context, &mut knowledge, &mut state);
+        assert!(matches!(result, Ok(StepOk::Done)));
+        assert_eq!(state, vec![5.0]);
+    }
+
+    #[test]
+    fn unify_falls_back_to_structural_unification_for_non_arithmetic_terms() {
+        let mut intention: Intention<CaptureAction> = Intention::new(0);
+        // SAFETY: The environment on the context remains untouched,
+        let mut context = unsafe { new_context_without_environment() };
+        let mut knowledge = KnowledgeBase::default();
+        let mut state = Vec::new();
+
+        let x = variable();
+        let trigger = trigger("event", vec![], None);
+        let plan = plan(
+            trigger.clone(),
+            None,
+            vec![
+                Formula::Unify {
+                    lhs: ArithmeticExpression::Term(variable_term(&x)),
+                    rhs: ArithmeticExpression::Term(number(42.0)),
+                },
+                Formula::Action(Action::User(CaptureAction(x))),
+            ],
+        );
+
+        intention.push(&plan, Bindings::empty(), trigger);
+        intention
+            .step(&mut context, &mut knowledge, &mut state)
+            .ok();
+        intention
+            .step(&mut context, &mut knowledge, &mut state)
+            .ok();
+
+        assert_eq!(state, vec![42.0]);
+    }
+
+    #[test]
+    fn unify_fails_the_step_when_both_sides_are_ground_and_mismatched() {
+        let mut intention: Intention<()> = Intention::new(0);
+        // SAFETY: The environment on the context remains untouched,
+        let mut context = unsafe { new_context_without_environment() };
+        let mut knowledge = KnowledgeBase::default();
+
+        let trigger = trigger("event", vec![], None);
+        let plan = plan(
+            trigger.clone(),
+            None,
+            vec![Formula::Unify {
+                lhs: ArithmeticExpression::Term(number(2.0)),
+                rhs: ArithmeticExpression::Term(number(3.0)),
+            }],
+        );
+
+        intention.push(&plan, Bindings::empty(), trigger);
+
+        let result = intention.step(&mut context, &mut knowledge, &mut ());
+        assert!(matches!(result, Err(StepError::UnifyFailed)));
+    }
+
+    #[test]
+    fn unify_errors_the_step_when_a_compound_expression_is_only_partially_ground() {
+        let mut intention: Intention<()> = Intention::new(0);
+        // SAFETY: The environment on the context remains untouched,
+        let mut context = unsafe { new_context_without_environment() };
+        let mut knowledge = KnowledgeBase::default();
+
+        // Y is bound, Z is free: `(Y+1) + Z` can't fully evaluate, and unlike Jason,
+        // ember-bdi has no term shape to unify against the unevaluated expression instead
+        // (see plan section 6), so the whole step errors rather than silently succeeding.
+        let (y, z) = (variable(), variable());
+        let trigger = trigger("event", vec![], None);
+        let plan = plan(
+            trigger.clone(),
+            None,
+            vec![Formula::Unify {
+                lhs: ArithmeticExpression::Term(number(0.0)),
+                rhs: ArithmeticExpression::Operation {
+                    operator: ArithmeticOperator::Sum,
+                    operands: Box::new([
+                        ArithmeticExpression::Operation {
+                            operator: ArithmeticOperator::Sum,
+                            operands: Box::new([
+                                ArithmeticExpression::Term(variable_term(&y)),
+                                ArithmeticExpression::Term(number(1.0)),
+                            ]),
+                        },
+                        ArithmeticExpression::Term(variable_term(&z)),
+                    ]),
+                },
+            }],
+        );
+
+        intention.push(&plan, bindings(vec![(y, number(2.0).as_view())]), trigger);
+
+        let result = intention.step(&mut context, &mut knowledge, &mut ());
+        assert!(matches!(result, Err(StepError::UnifyEvalError(_))));
     }
 }

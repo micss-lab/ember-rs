@@ -1,0 +1,5 @@
+error: expected one of "*", "+", "-", ".", "/", ";", atom
+ --> tests/macros/compile-fail/bdi_agent_unify_nested_relational.rs:5:28
+  |
+5 |     +!check(X, Y) <- X = Y < 3; .log("info", "done").
+  |                            ^

@@ -90,6 +90,10 @@ pub enum Formula<A> {
         kind: GoalKind,
         goal: Literal,
     },
+    Unify {
+        lhs: ArithmeticExpression,
+        rhs: ArithmeticExpression,
+    },
     Action(Action<A>),
 }
 
@@ -114,6 +118,7 @@ impl<A> Formula<A> {
                 kind,
                 goal: goal.resolve(bindings)?,
             },
+            unify @ Formula::Unify { .. } => unify,
             action @ Formula::Action(_) => action,
         })
     }

@@ -213,7 +213,8 @@ peg::parser! {
                     node: BodyFormula::Action(Spanned { span, node: Action::Builtin(action) }),
                 }
             }
-            / span:span() !"." formula:atomic_formula() {
+            / span:span() lhs:relational_term() "=" rhs:relational_term() { Spanned { node: BodyFormula::Unify { lhs, rhs }, span } }
+            / span:span() formula:atomic_formula() {
                 Spanned {
                     span,
                     node: BodyFormula::Action(Spanned { span: formula.span, node: Action::User(formula) }),
@@ -295,7 +296,7 @@ peg::parser! {
                 .ok_or("variable")
         }
 
-        rule ATOM() -> Atom = a:$("."? TOKEN_IDENT()) {?
+        rule ATOM() -> Atom = a:$(TOKEN_IDENT()) {?
             let a = a.to_string();
             a.starts_with(|c: char| !(c.is_uppercase() || c == '_'))
                 .then_some(Atom(a))
