@@ -25,18 +25,9 @@ pub fn run(color: bool) -> Result<()> {
     for target in Target::ALL {
         let features = features::qualified_features_for(target)?.join(",");
 
-        let mut args: Vec<&str> = vec![
-            "clippy",
-            "--workspace",
-            "--target",
-            target.triple(),
-            message_format,
-        ];
-        if let Some(exclude) = target.workspace_exclude() {
-            args.push("--exclude");
-            args.push(exclude);
-        }
-        args.extend_from_slice(target.extra_args());
+        let mut args: Vec<&str> = vec!["clippy"];
+        args.extend(target.check_like_args());
+        args.push(message_format);
         if !features.is_empty() {
             args.push("--features");
             args.push(&features);

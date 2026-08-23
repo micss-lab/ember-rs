@@ -39,6 +39,28 @@ impl Target {
         }
     }
 
+    /// `--workspace --target <triple>` plus the flags every check-like cargo
+    /// invocation (`check`, `lsp`'s per-target clippy) needs to check
+    /// exactly the same code on this target: `--exclude` for a package this
+    /// target can't build, and `--all-targets` on `Local` only. Only the
+    /// local target can check `#[cfg(test)]` code: it's the only one with a
+    /// real `std`, which the `#[test]` harness needs. ESP32 is a
+    /// freestanding `-none-elf` target built with `-Zbuild-std=core,alloc`
+    /// only; `std` (and therefore `test`) cannot be built for it at all
+    /// (its global allocator needs OS-level realloc/alloc_zeroed).
+    pub fn check_like_args(self) -> Vec<&'static str> {
+        let mut args = vec!["--workspace", "--target", self.triple()];
+        if let Some(exclude) = self.workspace_exclude() {
+            args.push("--exclude");
+            args.push(exclude);
+        }
+        if self == Target::Local {
+            args.push("--all-targets");
+        }
+        args.extend_from_slice(self.extra_args());
+        args
+    }
+
     /// For `xtask hack` on this target: an extra feature to fold into
     /// `krate`'s feature-powerset, grouped 1:1 with an existing feature of
     /// that powerset via `cargo hack --group-features` (so combos get both
