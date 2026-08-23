@@ -112,7 +112,12 @@ impl<K, V> IntoIterator for SmallMap<K, V> {
 
 impl<K: PartialEq, V> FromIterator<(K, V)> for SmallMap<K, V> {
     fn from_iter<I: IntoIterator<Item = (K, V)>>(iter: I) -> Self {
-        let mut map = Self::default();
+        let iter = iter.into_iter();
+        // Reserve for the iterator's known lower bound up front, rather than growing the
+        // backing `Vec` one `insert` at a time: for the common case of collecting an
+        // already-exact-sized iterator (a `Vec`/`SmallMap` `into_iter()`, a `.map()` over
+        // one), this is the map's exact final size and avoids every intermediate reallocation.
+        let mut map = Self(Vec::with_capacity(iter.size_hint().0));
         for (k, v) in iter {
             map.insert(k, v);
         }
