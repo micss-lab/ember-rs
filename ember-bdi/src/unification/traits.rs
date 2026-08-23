@@ -2,7 +2,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 
 use crate::bindings::Bindings;
-use crate::literal::Literal;
+use crate::literal::{Literal, LiteralView};
 use crate::term::view::{StructureView, TermView};
 use crate::term::{Structure, Term};
 use crate::unification::error::UnificationError;
@@ -90,14 +90,14 @@ impl<'a> UnifyView<'a> for TermView<'a> {
                 this.collect_constraints(other)
             }
 
-            (TermView::Literal { negated: n1, .. }, TermView::Literal { negated: n2, .. })
-                if n1 != n2 =>
-            {
-                Err(UnificationError::NegationMismatch)
-            }
-            (TermView::Literal { structure: s1, .. }, TermView::Literal { structure: s2, .. }) => {
-                s1.collect_constraints(s2)
-            }
+            (
+                TermView::Literal(LiteralView { negated: n1, .. }),
+                TermView::Literal(LiteralView { negated: n2, .. }),
+            ) if n1 != n2 => Err(UnificationError::NegationMismatch),
+            (
+                TermView::Literal(LiteralView { structure: s1, .. }),
+                TermView::Literal(LiteralView { structure: s2, .. }),
+            ) => s1.collect_constraints(s2),
             (TermView::Number(n1), TermView::Number(n2)) => (n1 == n2)
                 .then(alloc::vec::Vec::new)
                 .ok_or(UnificationError::NumberMismatch),
@@ -131,14 +131,13 @@ impl<'v> Unify<TermView<'v>> for Term {
             (Term::Variable(v), other) => v.collect_constraints(other),
             (other, TermView::Variable(v)) => v.collect_constraints(other),
 
-            (Term::Literal(Literal { negated: n1, .. }), TermView::Literal { negated: n2, .. })
-                if *n1 != n2 =>
-            {
-                Err(UnificationError::NegationMismatch)
-            }
+            (
+                Term::Literal(Literal { negated: n1, .. }),
+                TermView::Literal(LiteralView { negated: n2, .. }),
+            ) if *n1 != n2 => Err(UnificationError::NegationMismatch),
             (
                 Term::Literal(Literal { structure: s1, .. }),
-                TermView::Literal { structure: s2, .. },
+                TermView::Literal(LiteralView { structure: s2, .. }),
             ) => s1.collect_constraints(s2),
 
             (Term::Number(n1), TermView::Number(n2)) => (*n1 == n2)

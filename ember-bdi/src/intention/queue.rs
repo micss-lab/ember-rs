@@ -134,7 +134,7 @@ impl<A: Clone, Sched> IntentionQueue<A, Sched> {
 
 impl<A, S, Sched> IntentionQueue<A, Sched>
 where
-    A: Execute<State = S, UserAction = A>,
+    A: Execute<State = S, UserAction = A> + Clone,
 {
     pub(crate) fn step(
         &mut self,

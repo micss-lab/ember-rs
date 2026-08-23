@@ -16,6 +16,12 @@ impl<K: PartialEq, V> SmallMap<K, V> {
         Self::default()
     }
 
+    /// Creates a new map with no reserved capacity guaranteeing no allocation will be
+    /// performed.
+    pub fn empty() -> Self {
+        Self(Vec::with_capacity(0))
+    }
+
     pub fn get(&self, key: &K) -> Option<&V> {
         self.0.iter().find(|(k, _)| k == key).map(|(_, v)| v)
     }
@@ -51,8 +57,16 @@ impl<K: PartialEq, V> SmallMap<K, V> {
         self.0.iter().map(|(_, v)| v)
     }
 
+    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut V> {
+        self.0.iter_mut().map(|(_, v)| v)
+    }
+
     pub fn iter(&self) -> impl Iterator<Item = (&K, &V)> {
         self.0.iter().map(|(k, v)| (k, v))
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (&mut K, &mut V)> {
+        self.0.iter_mut().map(|(k, v)| (k, v))
     }
 
     pub fn retain<F: FnMut(&K, &mut V) -> bool>(&mut self, mut f: F) {

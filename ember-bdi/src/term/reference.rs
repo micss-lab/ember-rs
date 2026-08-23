@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use bstr::BStr;
 use ember_util::cmp::TotalCmpF32;
 
-use crate::literal::Literal;
+use crate::literal::{Literal, LiteralView};
 use crate::variable::Variable;
 
 use super::owned::{Atom, Structure, Term};
@@ -109,21 +109,29 @@ impl<'a> From<TermView<'a>> for TermRef<'a> {
                     .collect::<Vec<_>>()
                     .into_boxed_slice(),
             ),
-            TermView::Literal {
-                negated,
-                structure: StructureView { functor, arguments },
-            } => Self::Literal {
-                negated,
-                functor,
-                arguments: arguments
-                    .map(|args| {
-                        args.into_iter()
-                            .map(Into::into)
-                            .collect::<Vec<_>>()
-                            .into_boxed_slice()
-                    })
-                    .unwrap_or_default(),
-            },
+            TermView::Literal(literal) => literal.into(),
+        }
+    }
+}
+
+impl<'a> From<LiteralView<'a>> for TermRef<'a> {
+    fn from(
+        LiteralView {
+            negated,
+            structure: StructureView { functor, arguments },
+        }: LiteralView<'a>,
+    ) -> Self {
+        Self::Literal {
+            negated,
+            functor,
+            arguments: arguments
+                .map(|args| {
+                    args.into_iter()
+                        .map(Into::into)
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice()
+                })
+                .unwrap_or_default(),
         }
     }
 }

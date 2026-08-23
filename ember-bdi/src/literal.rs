@@ -2,6 +2,7 @@ use ember_collections::SmallSet;
 
 pub use ember_bdi_macros::IntoLiteral;
 
+use crate::term::view::StructureView;
 use crate::term::{Atom, Structure};
 use crate::variable::VariableId;
 
@@ -42,6 +43,47 @@ impl core::fmt::Display for Literal {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct LiteralView<'a> {
+    pub negated: bool,
+    pub structure: StructureView<'a>,
+}
+
+impl<'a> From<&'a Literal> for LiteralView<'a> {
+    fn from(literal: &'a Literal) -> Self {
+        let Literal {
+            negated,
+            ref structure,
+        } = *literal;
+        LiteralView {
+            negated,
+            structure: structure.into(),
+        }
+    }
+}
+
+impl<'a> From<&'a Structure> for LiteralView<'a> {
+    fn from(structure: &'a Structure) -> Self {
+        LiteralView {
+            negated: false,
+            structure: structure.into(),
+        }
+    }
+}
+
+impl LiteralView<'_> {
+    pub(crate) fn to_owned(&self) -> Literal {
+        let Self {
+            negated,
+            ref structure,
+        } = *self;
+        Literal {
+            negated,
+            structure: structure.to_owned(),
+        }
+    }
+}
+
 pub trait IntoLiteral: Sized {
     fn into_literal(self) -> Literal;
 }
@@ -49,5 +91,11 @@ pub trait IntoLiteral: Sized {
 impl IntoLiteral for Literal {
     fn into_literal(self) -> Literal {
         self
+    }
+}
+
+impl IntoLiteral for LiteralView<'_> {
+    fn into_literal(self) -> Literal {
+        self.to_owned()
     }
 }

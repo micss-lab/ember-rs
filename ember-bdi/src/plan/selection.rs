@@ -121,6 +121,7 @@ impl<'p, 'e, A> ApplicablePlanSelection<'_, 'p, 'e, A> {
 #[cfg(test)]
 mod tests {
     use alloc::boxed::Box;
+    use alloc::rc::Rc;
     use alloc::vec;
 
     use crate::knowledge::base::KnowledgeBase;
@@ -148,7 +149,7 @@ mod tests {
                     arguments: None,
                 },
             })),
-            body: Box::new([]),
+            body: Rc::new([]),
         };
         store.add(plan);
 
@@ -194,14 +195,14 @@ mod tests {
                     arguments: None,
                 },
             })),
-            body: Box::new([]),
+            body: Rc::new([]),
         });
 
         // Plan 2: +!goal : true (Should succeed)
         store.add(Plan {
             trigger: trigger("goal", vec![], Some(GoalKind::Achieve)),
             context: None,
-            body: Box::new([]),
+            body: Rc::new([]),
         });
 
         let event = trigger("goal", vec![], Some(GoalKind::Achieve));
@@ -225,7 +226,7 @@ mod tests {
         store.add(Plan {
             trigger: trigger("test", vec![number(1.0)], Some(GoalKind::Achieve)),
             context: None,
-            body: Box::new([]),
+            body: Rc::new([]),
         });
 
         // Event for test(2)
@@ -249,7 +250,7 @@ mod tests {
         store.add(Plan {
             trigger: trigger("greet", vec![variable_term(&x)], Some(GoalKind::Achieve)),
             context: None,
-            body: Box::new([]),
+            body: Rc::new([]),
         });
 
         // Event: !greet("Alice")
@@ -302,7 +303,7 @@ mod tests {
                     arguments: Some(Box::new([variable_term(&x), string("red")])),
                 },
             })),
-            body: Box::new([]),
+            body: Rc::new([]),
         });
 
         // Event: !check("circle")
@@ -330,7 +331,7 @@ mod tests {
                 "color",
                 vec![variable_term(&x), variable_term(&y)],
             )),
-            body: Box::new([]),
+            body: Rc::new([]),
         });
 
         let event = trigger("check", vec![string("apple")], Some(GoalKind::Achieve));
@@ -361,7 +362,7 @@ mod tests {
                 "linked",
                 vec![variable_term(&plan_var), Term::Variable(variable())],
             )),
-            body: Box::new([]),
+            body: Rc::new([]),
         });
 
         let event = trigger(
@@ -388,12 +389,12 @@ mod tests {
         store.add(Plan {
             trigger: trigger("fix", vec![variable_term(&x)], Some(GoalKind::Achieve)),
             context: Some(literal_formula("is_tool", vec![variable_term(&x)])), // Fails
-            body: Box::new([]),
+            body: Rc::new([]),
         });
         store.add(Plan {
             trigger: trigger("fix", vec![variable_term(&x)], Some(GoalKind::Achieve)),
             context: Some(literal_formula("is_broken", vec![variable_term(&x)])), // Succeeds
-            body: Box::new([]),
+            body: Rc::new([]),
         });
 
         let event = trigger("fix", vec![string("bolt")], Some(GoalKind::Achieve));
@@ -422,7 +423,7 @@ mod tests {
                 "blocked",
                 vec![variable_term(&dir)],
             )))),
-            body: Box::new([]),
+            body: Rc::new([]),
         });
 
         let event_north = trigger("move", vec![string("north")], Some(GoalKind::Achieve));

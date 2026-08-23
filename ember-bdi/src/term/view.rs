@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use bstr::BStr;
 use ember_util::cmp::TotalCmpF32;
 
-use crate::literal::Literal;
+use crate::literal::{Literal, LiteralView};
 use crate::variable::Variable;
 
 use super::{Atom, Structure, Term};
@@ -17,10 +17,7 @@ pub enum TermView<'a> {
     String(Cow<'a, BStr>),
     Variable(&'a Variable),
     List(Box<[TermView<'a>]>),
-    Literal {
-        negated: bool,
-        structure: StructureView<'a>,
-    },
+    Literal(LiteralView<'a>),
 }
 
 impl Clone for TermView<'_> {
@@ -31,10 +28,7 @@ impl Clone for TermView<'_> {
             Self::String(s) => Self::String(s.clone()),
             Self::Variable(v) => Self::Variable(v),
             Self::List(items) => Self::List(items.clone()),
-            Self::Literal { negated, structure } => Self::Literal {
-                negated: *negated,
-                structure: structure.clone(),
-            },
+            Self::Literal(literal) => Self::Literal(literal.clone()),
         }
     }
 }
@@ -49,11 +43,8 @@ impl<'a> From<&'a Term> for TermView<'a> {
 }
 
 impl<'a> From<&'a Literal> for TermView<'a> {
-    fn from(Literal { negated, structure }: &'a Literal) -> Self {
-        TermView::Literal {
-            negated: *negated,
-            structure: structure.into(),
-        }
+    fn from(literal: &'a Literal) -> Self {
+        TermView::Literal(literal.into())
     }
 }
 
@@ -83,13 +74,7 @@ impl TermView<'_> {
                     .collect::<Vec<_>>()
                     .into_boxed_slice(),
             ),
-            TermView::Literal {
-                negated,
-                ref structure,
-            } => Term::Literal(Literal {
-                negated,
-                structure: structure.to_owned(),
-            }),
+            TermView::Literal(ref literal) => Term::Literal(literal.to_owned()),
         }
     }
 }
@@ -131,10 +116,7 @@ impl<'a> From<&'a Structure> for StructureView<'a> {
 
 impl<'a> From<&'a Structure> for TermView<'a> {
     fn from(structure: &'a Structure) -> Self {
-        Self::Literal {
-            negated: false,
-            structure: structure.into(),
-        }
+        Self::Literal(structure.into())
     }
 }
 

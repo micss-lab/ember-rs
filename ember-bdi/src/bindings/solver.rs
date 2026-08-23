@@ -3,7 +3,7 @@ use alloc::vec::Vec;
 use ember_collections::SmallMap;
 
 use crate::bindings::{AliasMap, Bindings, StructureView, TermView};
-use crate::literal::Literal;
+use crate::literal::{Literal, LiteralView};
 use crate::term::Term;
 use crate::unification::constraint::BindingConstraint;
 use crate::unification::error::{Result, UnificationError};
@@ -217,13 +217,13 @@ impl<'a> EquivalenceClasses<'a> {
                         }
                         None => None,
                     };
-                    Ok(TermView::Literal {
+                    Ok(TermView::Literal(LiteralView {
                         negated: *n,
                         structure: StructureView {
                             functor: &s.functor,
                             arguments: args,
                         },
-                    })
+                    }))
                 }
                 Term::List(items) => {
                     let mut resolved_items = Vec::with_capacity(items.len());
@@ -233,7 +233,7 @@ impl<'a> EquivalenceClasses<'a> {
                     Ok(TermView::List(resolved_items.into_boxed_slice()))
                 }
             },
-            TermView::Literal { negated, structure } => {
+            TermView::Literal(LiteralView { negated, structure }) => {
                 let args = match structure.arguments {
                     Some(args) => {
                         let mut resolved_args = Vec::with_capacity(args.len());
@@ -244,13 +244,13 @@ impl<'a> EquivalenceClasses<'a> {
                     }
                     None => None,
                 };
-                Ok(TermView::Literal {
+                Ok(TermView::Literal(LiteralView {
                     negated,
                     structure: StructureView {
                         functor: structure.functor,
                         arguments: args,
                     },
-                })
+                }))
             }
             TermView::Number(_) => Ok(term.clone()),
             TermView::String(_) => Ok(term.clone()),

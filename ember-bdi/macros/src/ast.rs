@@ -320,7 +320,7 @@ impl AstVisitor {
             .map(|f| self.visit_body_formula(f).into_token_stream());
 
         quote! {
-            ::alloc::boxed::Box::new([
+            ::alloc::rc::Rc::new([
                 #(#formulae),*
             ])
         }

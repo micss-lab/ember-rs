@@ -3,6 +3,9 @@ use alloc::vec::Vec;
 
 use crate::bindings::BindingLookup;
 use crate::literal::Literal;
+use crate::literal::LiteralView;
+use crate::plan::Formula;
+use crate::plan::FormulaView;
 use crate::term::FromTermError;
 use crate::term::Structure;
 use crate::term::Term;
@@ -49,33 +52,25 @@ pub trait Resolve: Sized {
 }
 
 impl Resolve for Literal {
-    type View<'a> = TermView<'a>;
+    type View<'a> = LiteralView<'a>;
 
     /// Resolve the literal using existing bindings as much as possible verifying that the
     /// created binding is valid in the place it used.
     fn resolve(self, bindings: &impl BindingLookup) -> Result<Self, ResolveFailure> {
-        Ok(match self.resolve_as_view(bindings)? {
-            TermView::Literal { negated, structure } => Self {
-                negated,
-                structure: structure.to_owned(),
-            },
-
-            _ => return Err(ResolveFailure::IncorrectKind),
-        })
+        Ok(self.resolve_as_view(bindings)?.to_owned())
     }
 
-    fn resolve_as_view<'b>(
-        &'b self,
-        bindings: &'b impl BindingLookup,
-    ) -> Result<TermView<'b>, ResolveFailure> {
-        Ok(match *self {
-            Literal {
-                negated,
-                ref structure,
-            } => TermView::Literal {
-                negated,
-                structure: structure.resolve_as_view(bindings)?,
-            },
+    fn resolve_as_view<'a>(
+        &'a self,
+        bindings: &'a impl BindingLookup,
+    ) -> Result<Self::View<'a>, ResolveFailure> {
+        let Literal {
+            negated,
+            ref structure,
+        } = *self;
+        Ok(LiteralView {
+            negated,
+            structure: structure.resolve_as_view(bindings)?,
         })
     }
 }
@@ -101,7 +96,7 @@ impl Resolve for Term {
                     .collect::<Result<Vec<_>, _>>()?
                     .into_boxed_slice(),
             ),
-            Term::Literal(ref literal) => literal.resolve_as_view(bindings)?,
+            Term::Literal(ref literal) => TermView::Literal(literal.resolve_as_view(bindings)?),
         })
     }
 }
@@ -113,10 +108,10 @@ impl Resolve for Structure {
         Ok(self.resolve_as_view(bindings)?.to_owned())
     }
 
-    fn resolve_as_view<'b>(
-        &'b self,
-        bindings: &'b impl BindingLookup,
-    ) -> Result<StructureView<'b>, ResolveFailure> {
+    fn resolve_as_view<'a>(
+        &'a self,
+        bindings: &'a impl BindingLookup,
+    ) -> Result<Self::View<'a>, ResolveFailure> {
         Ok(StructureView {
             functor: &self.functor,
             arguments: match self.arguments.as_ref() {
@@ -128,6 +123,40 @@ impl Resolve for Structure {
                 ),
                 None => None,
             },
+        })
+    }
+}
+
+impl<A> Resolve for Formula<A> {
+    type View<'a>
+        = FormulaView<'a, A>
+    where
+        Self: 'a;
+
+    fn resolve(self, bindings: &impl BindingLookup) -> Result<Self, ResolveFailure> {
+        Ok(self.resolve_as_view(bindings)?.to_owned())
+    }
+
+    fn resolve_as_view<'a>(
+        &'a self,
+        bindings: &'a impl BindingLookup,
+    ) -> Result<Self::View<'a>, ResolveFailure> {
+        Ok(match *self {
+            Formula::Belief {
+                trigger,
+                ref belief,
+                silent,
+            } => FormulaView::Belief {
+                trigger,
+                belief: belief.resolve_as_view(bindings)?,
+                silent,
+            },
+            Formula::Goal { kind, ref goal } => FormulaView::Goal {
+                kind,
+                goal: goal.resolve_as_view(bindings)?,
+            },
+            ref unify @ Formula::Unify { .. } => FormulaView::Formula(unify),
+            ref action @ Formula::Action(_) => FormulaView::Formula(action),
         })
     }
 }
@@ -189,14 +218,11 @@ mod tests {
             .expect("literal should resolve");
 
         // Verify structure views are mapped out cleanly
-        if let TermView::Literal { structure, .. } = resolved_view {
-            let args = structure.arguments.expect("Should contain arguments");
-            assert_eq!(args.len(), 2);
-            assert_eq!(args[0], TermView::Number(10.0.into()));
-            assert_eq!(args[1], TermView::Variable(&x));
-        } else {
-            panic!("Expected a TermView::Literal");
-        }
+        let LiteralView { structure, .. } = resolved_view;
+        let args = structure.arguments.expect("Should contain arguments");
+        assert_eq!(args.len(), 2);
+        assert_eq!(args[0], TermView::Number(10.0.into()));
+        assert_eq!(args[1], TermView::Variable(&x));
     }
 
     #[test]

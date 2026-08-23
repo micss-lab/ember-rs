@@ -8,7 +8,7 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
 
-    use crate::literal::Literal;
+    use crate::literal::{Literal, LiteralView};
     use crate::term::view::{StructureView, TermView};
     use crate::term::{Atom, Structure, Term};
     use crate::unification::error::UnificationError;
@@ -180,13 +180,13 @@ mod tests {
 
         let x_binding = result.get_view(&x).expect("X should be bound");
         let (g, n) = (Atom("g".into()), number(1.0));
-        let expected_x = TermView::Literal {
+        let expected_x = TermView::Literal(LiteralView {
             negated: false,
             structure: StructureView {
                 functor: &g,
                 arguments: Some(Box::new([n.as_view()])),
             },
-        };
+        });
         assert_eq!(x_binding, &expected_x);
     }
 
@@ -393,13 +393,13 @@ mod tests {
 
         let yt = variable_term(&y);
 
-        let term_g_y = TermView::Literal {
+        let term_g_y = TermView::Literal(LiteralView {
             negated: false,
             structure: StructureView {
                 functor: &Atom("g".into()),
                 arguments: Some(Box::new([TermView::Term(&yt)])),
             },
-        };
+        });
         let existing = x
             .unify(term_g_y.clone(), None)
             .expect("Initial binding failed");
@@ -415,13 +415,13 @@ mod tests {
 
         let n = number(10.0);
 
-        let expected_x = TermView::Literal {
+        let expected_x = TermView::Literal(LiteralView {
             negated: false,
             structure: StructureView {
                 functor: &Atom("g".into()),
                 arguments: Some(alloc::boxed::Box::new([n.as_view()])),
             },
-        };
+        });
 
         let x_res = final_bindings
             .get_view(&x)

@@ -18,6 +18,12 @@ impl<T: PartialEq> SmallSet<T> {
         Self::default()
     }
 
+    /// Creates a new set with no reserved capacity guaranteeing no allocation will be
+    /// performed.
+    pub fn empty() -> Self {
+        Self(Vec::with_capacity(0))
+    }
+
     pub fn contains(&self, value: &T) -> bool {
         self.0.contains(value)
     }

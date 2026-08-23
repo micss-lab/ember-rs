@@ -111,12 +111,12 @@ pub fn pure_context() -> PureContext {
 pub fn plan<A>(
     trigger: TriggeringEvent,
     context: Option<QueryFormula>,
-    body: Vec<Formula<A>>,
+    body: impl IntoIterator<Item = Formula<A>>,
 ) -> Plan<A> {
     Plan {
         trigger,
         context,
-        body: body.into_boxed_slice(),
+        body: body.into_iter().collect(),
     }
 }
 

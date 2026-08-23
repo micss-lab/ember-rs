@@ -2,6 +2,7 @@
 #![cfg_attr(target_os = "none", no_main)]
 
 use alloc::boxed::Box;
+use alloc::rc::Rc;
 use alloc::string::{String, ToString};
 use alloc::vec;
 
@@ -231,7 +232,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
             ),
             QueryFormula::literal(false, "have", Some([Term::String("coffee_beans".into())])),
         ])),
-        body: Box::new([
+        body: Rc::new([
             Formula::Action(Action::Builtin(BuiltinAction::Impure(ImpureAction::Log(
                 log::Level::Info,
                 [Term::String(
@@ -268,7 +269,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
             },
         },
         context: None, // This is the default, less specific plan.
-        body: Box::new([
+        body: Rc::new([
             Formula::Goal {
                 kind: GoalKind::Achieve,
                 goal: Literal {
@@ -325,7 +326,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
             "at",
             Some([Term::String("agent".into()), Term::Variable(v_dest.clone())]),
         )),
-        body: Box::new([Formula::Action(Action::Builtin(BuiltinAction::Impure(
+        body: Rc::new([Formula::Action(Action::Builtin(BuiltinAction::Impure(
             ImpureAction::Log(
                 log::Level::Info,
                 [
@@ -356,7 +357,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
             "at",
             Some([Term::String("agent".into()), Term::Variable(v_from.clone())]),
         )),
-        body: Box::new([
+        body: Rc::new([
             Formula::Action(Action::User(AgentAction::Move {
                 from: v_from.clone(),
                 to: v_dest.clone(),
@@ -413,7 +414,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
             "have",
             Some([Term::String("coffee_beans".into())]),
         )),
-        body: Box::new([Formula::Action(Action::Builtin(BuiltinAction::Impure(
+        body: Rc::new([Formula::Action(Action::Builtin(BuiltinAction::Impure(
             ImpureAction::Log(
                 log::Level::Info,
                 [Term::String(
@@ -439,7 +440,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
             },
         },
         context: None,
-        body: Box::new([
+        body: Rc::new([
             Formula::Action(Action::User(AgentAction::Buy("coffee_beans".into()))),
             Formula::Belief {
                 trigger: Trigger::Addition,
@@ -468,7 +469,7 @@ fn define_plans() -> PlanLibrary<AgentAction> {
             },
         },
         context: None,
-        body: Box::new([Formula::Action(Action::Builtin(BuiltinAction::Impure(
+        body: Rc::new([Formula::Action(Action::Builtin(BuiltinAction::Impure(
             ImpureAction::StopPlatform,
         )))]),
     });

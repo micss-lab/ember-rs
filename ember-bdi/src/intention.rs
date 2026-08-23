@@ -1,3 +1,4 @@
+use alloc::rc::Rc;
 use alloc::vec::Vec;
 
 use derive_where::derive_where;
@@ -6,7 +7,7 @@ use crate::bindings::{Bindings, OwnedBindings};
 use crate::context::Context;
 use crate::knowledge::base::KnowledgeBase;
 use crate::plan::action::{Execute, ExecuteResult, PendingAction};
-use crate::plan::{Formula, GoalKind, Plan, Trigger, TriggeringEvent};
+use crate::plan::{Formula, FormulaView, Plan, TriggeringEvent};
 
 use self::result::*;
 
@@ -25,7 +26,7 @@ pub struct Intention<A> {
 
 impl<A, S> Intention<A>
 where
-    A: Execute<State = S, UserAction = A>,
+    A: Execute<State = S, UserAction = A> + Clone,
 {
     pub(crate) fn step(
         &mut self,
@@ -72,7 +73,7 @@ impl<A> Intention<A> {
     }
 }
 
-impl<A: Clone> Intention<A> {
+impl<A> Intention<A> {
     pub(crate) fn push(
         &mut self,
         plan: &'_ Plan<A>,
@@ -93,11 +94,13 @@ struct Frame<A> {
     /// Bindings that this frame is created with and that have been resolved during the
     /// execution of this frame.
     bindings: OwnedBindings,
-    /// Remaining parts of the plan body to execute.
-    remaining: Vec<Formula<A>>,
+    /// Index into the plan body being executed.
+    cursor: usize,
+    /// Complete plan body to execute.
+    body: Rc<[Formula<A>]>,
 }
 
-impl<A: Clone> Frame<A> {
+impl<A> Frame<A> {
     fn new(
         plan: &'_ Plan<A>,
         bindings: Bindings<'_>,
@@ -108,14 +111,15 @@ impl<A: Clone> Frame<A> {
             intention_id,
             event,
             bindings: bindings.into(),
-            remaining: plan.body.iter().rev().cloned().collect(),
+            cursor: 0,
+            body: plan.body.clone(),
         }
     }
 }
 
 impl<A, S> Frame<A>
 where
-    A: Execute<State = S, UserAction = A>,
+    A: Execute<State = S, UserAction = A> + Clone,
 {
     fn step(
         &mut self,
@@ -123,127 +127,112 @@ where
         knowledge: &mut KnowledgeBase,
         state: &mut S,
     ) -> Result {
-        let Some(formula) = self.remaining.pop() else {
+        use crate::resolve::Resolve;
+
+        let Some(formula) = self.body.get(self.cursor) else {
             return StepOk::done();
         };
+        self.cursor += 1;
 
-        let formula = formula.resolve_possible(&self.bindings)?;
+        let formula = formula.resolve_as_view(&self.bindings)?;
 
         // Prevent tail recursion optimization if the last frame dispatched an action to the agent.
         let mut blocked_on_pending_action = false;
 
         match formula {
-            Formula::Belief {
-                trigger,
-                belief,
-                silent,
-            } => {
-                let event = if !belief.is_ground() {
-                    return Err(StepError::ResolveIncomplete);
-                } else {
-                    belief
-                };
-                match trigger {
-                    Trigger::Addition => {
-                        if silent {
-                            knowledge.assert_no_event(event);
-                        } else {
-                            knowledge.assert(event, context, Some(self.intention_id));
-                        }
-                    }
-                    Trigger::Deletion => {
-                        if silent {
-                            knowledge.remove_no_event(event);
-                        } else {
-                            knowledge.remove(event, context, Some(self.intention_id));
-                        }
-                    }
-                }
-            }
-            Formula::Goal { kind, goal } => match kind {
-                GoalKind::Achieve => context.emit_event(
-                    TriggeringEvent {
-                        trigger: Trigger::Addition,
-                        event: goal,
-                        goal: Some(kind),
-                    },
-                    Some(self.intention_id),
-                ),
-                GoalKind::Query => {
-                    use crate::knowledge::query::IntoQuery;
-                    use crate::plan::QueryFormula;
+            FormulaView::Formula(formula) => match formula {
+                Formula::Belief {
+                    trigger,
+                    belief,
+                    silent,
+                } => formula_step::handle_belief_formula(
+                    *trigger,
+                    belief.clone(),
+                    *silent,
+                    self.intention_id,
+                    context,
+                    knowledge,
+                )?,
+                Formula::Goal { kind, goal } => formula_step::handle_goal_formula(
+                    *kind,
+                    goal.clone(),
+                    self.intention_id,
+                    &mut self.bindings,
+                    context,
+                    knowledge,
+                )?,
+                Formula::Unify { lhs, rhs } => {
+                    use crate::knowledge::query::formula::eval::evaluate_relational;
+                    use crate::plan::{RelationalOperator, RelationalQueryFormula};
 
-                    // Jason-style two-tier query: check the belief base first, fall back to an event.
-                    let query = QueryFormula::Literal(goal.clone());
-                    match (&query)
-                        .into_query(&*knowledge, &context.pure)
-                        .next_bindings(Some(&self.bindings.as_bindings()))
-                    {
-                        Some(bindings) => {
+                    let formula = RelationalQueryFormula {
+                        operator: RelationalOperator::Unify,
+                        operands: (lhs.clone(), rhs.clone()),
+                    };
+                    match evaluate_relational(&formula, &self.bindings.as_bindings()) {
+                        Ok(Some(bindings)) => {
                             self.bindings =
                                 Bindings::merge_views([&self.bindings.as_bindings(), &bindings])
-                                    .expect("merging bindings from query goal into frame failed")
+                                    .expect("merging bindings from unify into frame failed")
                                     .into()
                         }
-                        None => context.emit_event(
-                            TriggeringEvent {
-                                trigger: Trigger::Addition,
-                                event: goal,
-                                goal: Some(kind),
-                            },
-                            Some(self.intention_id),
-                        ),
+                        Ok(None) => return Err(StepError::UnifyFailed),
+                        Err(error) => return Err(StepError::UnifyEvalError(error)),
+                    }
+                }
+                Formula::Action(action) => {
+                    use crate::plan::action::Execute;
+
+                    // TODO: Make use of resolve to resolve actions as well.
+                    match action
+                        .clone()
+                        .execute(&self.bindings, &mut *context, knowledge, state)
+                    {
+                        ExecuteResult::Pending(pending) => {
+                            let intention = pending
+                                .should_block_intention()
+                                .then_some(self.intention_id);
+                            blocked_on_pending_action = intention.is_some();
+                            context.dispatch_action(
+                                PendingAction::new(pending, self.bindings.clone()),
+                                intention,
+                            )
+                        }
+                        ExecuteResult::Done(Some(bindings)) => {
+                            self.bindings =
+                                Bindings::merge_views([&self.bindings.as_bindings(), &bindings])
+                                    .expect("merging bindings from action into frame failed")
+                                    .into()
+                        }
+                        ExecuteResult::Done(None) => (),
                     }
                 }
             },
-            Formula::Unify { lhs, rhs } => {
-                use crate::knowledge::query::formula::eval::evaluate_relational;
-                use crate::plan::{RelationalOperator, RelationalQueryFormula};
-
-                let formula = RelationalQueryFormula {
-                    operator: RelationalOperator::Unify,
-                    operands: (lhs, rhs),
-                };
-                match evaluate_relational(&formula, &self.bindings.as_bindings()) {
-                    Ok(Some(bindings)) => {
-                        self.bindings =
-                            Bindings::merge_views([&self.bindings.as_bindings(), &bindings])
-                                .expect("merging bindings from unify into frame failed")
-                                .into()
-                    }
-                    Ok(None) => return Err(StepError::UnifyFailed),
-                    Err(error) => return Err(StepError::UnifyEvalError(error)),
-                }
-            }
-            Formula::Action(action) => {
-                use crate::plan::action::Execute;
-
-                // TODO: Make use of resolve to resolve actions as well.
-                match action.execute(&self.bindings, &mut *context, knowledge, state) {
-                    ExecuteResult::Pending(pending) => {
-                        let intention = pending
-                            .should_block_intention()
-                            .then_some(self.intention_id);
-                        blocked_on_pending_action = intention.is_some();
-                        context.dispatch_action(
-                            PendingAction::new(pending, self.bindings.clone()),
-                            intention,
-                        )
-                    }
-                    ExecuteResult::Done(Some(bindings)) => {
-                        self.bindings =
-                            Bindings::merge_views([&self.bindings.as_bindings(), &bindings])
-                                .expect("merging bindings from action into frame failed")
-                                .into()
-                    }
-                    ExecuteResult::Done(None) => (),
-                }
-            }
+            FormulaView::Belief {
+                trigger,
+                belief,
+                silent,
+            } => formula_step::handle_belief_formula(
+                trigger,
+                belief.to_owned(),
+                silent,
+                self.intention_id,
+                context,
+                knowledge,
+            )?,
+            FormulaView::Goal { kind, goal } => formula_step::handle_goal_formula(
+                kind,
+                goal.to_owned(),
+                self.intention_id,
+                &mut self.bindings,
+                context,
+                knowledge,
+            )?,
         }
 
         // Pop the frame immediately such that it does not leak when the plan is infinitely tail
         // recursive. For example, heartbeat plans.
-        if self.remaining.is_empty() && !blocked_on_pending_action {
+        if self.cursor == self.body.len() && !blocked_on_pending_action {
             return StepOk::done();
         }
 
@@ -266,6 +255,95 @@ where
     }
 }
 
+mod formula_step {
+    use crate::bindings::{BindingLookup, Bindings, OwnedBindings};
+    use crate::context::Context;
+    use crate::knowledge::base::KnowledgeBase;
+    use crate::literal::Literal;
+    use crate::plan::{GoalKind, Trigger, TriggeringEvent};
+
+    use super::IntentionId;
+    use super::result::StepError;
+
+    pub(super) fn handle_belief_formula<A>(
+        trigger: Trigger,
+        belief: Literal,
+        silent: bool,
+        intention_id: IntentionId,
+        context: &mut Context<'_, A>,
+        knowledge: &mut KnowledgeBase,
+    ) -> Result<(), StepError> {
+        let event = if !belief.is_ground() {
+            return Err(StepError::ResolveIncomplete);
+        } else {
+            belief
+        };
+        match trigger {
+            Trigger::Addition => {
+                if silent {
+                    knowledge.assert_no_event(event);
+                } else {
+                    knowledge.assert(event, context, Some(intention_id));
+                }
+            }
+            Trigger::Deletion => {
+                if silent {
+                    knowledge.remove_no_event(event);
+                } else {
+                    knowledge.remove(event, context, Some(intention_id));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    pub(super) fn handle_goal_formula<A>(
+        kind: GoalKind,
+        goal: Literal,
+        intention_id: IntentionId,
+        bindings: &mut OwnedBindings,
+        context: &mut Context<'_, A>,
+        knowledge: &mut KnowledgeBase,
+    ) -> Result<(), StepError> {
+        match kind {
+            GoalKind::Achieve => context.emit_event(
+                TriggeringEvent {
+                    trigger: Trigger::Addition,
+                    event: goal,
+                    goal: Some(kind),
+                },
+                Some(intention_id),
+            ),
+            GoalKind::Query => {
+                use crate::knowledge::query::IntoQuery;
+                use crate::plan::QueryFormula;
+
+                // Jason-style two-tier query: check the belief base first, fall back to an event.
+                let query = QueryFormula::Literal(goal.clone());
+                match (&query)
+                    .into_query(&*knowledge, &context.pure)
+                    .next_bindings(Some(&bindings.as_bindings()))
+                {
+                    Some(b) => {
+                        *bindings = Bindings::merge_views([&b.as_bindings(), &b])
+                            .expect("merging bindings from query goal into frame failed")
+                            .into()
+                    }
+                    None => context.emit_event(
+                        TriggeringEvent {
+                            trigger: Trigger::Addition,
+                            event: goal,
+                            goal: Some(kind),
+                        },
+                        Some(intention_id),
+                    ),
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use alloc::boxed::Box;
@@ -273,7 +351,9 @@ mod tests {
 
     use crate::bindings::Bindings;
     use crate::event::EventSource;
-    use crate::plan::{Action, ArithmeticExpression, ArithmeticOperator, Formula, Trigger};
+    use crate::plan::{
+        Action, ArithmeticExpression, ArithmeticOperator, Formula, GoalKind, Trigger,
+    };
     use crate::variable::Variable;
 
     use crate::testing::*;

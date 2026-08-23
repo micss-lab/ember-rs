@@ -1,10 +1,8 @@
-use alloc::boxed::Box;
+use alloc::rc::Rc;
 
 use derive_where::derive_where;
 
-use crate::bindings::BindingLookup;
-use crate::literal::Literal;
-use crate::resolve::ResolveFailure;
+use crate::literal::{Literal, LiteralView};
 
 pub use crate::event::{GoalKind, Trigger, TriggeringEvent};
 pub use crate::knowledge::query::formula::*;
@@ -20,7 +18,12 @@ pub mod selector;
 pub struct Plan<A> {
     pub trigger: TriggeringEvent,
     pub context: Option<QueryFormula>,
-    pub body: Box<[Formula<A>]>,
+    /// # Why Rc?
+    ///
+    /// A plan body is cloned often to be stored in an intention's frame as a list of remaining
+    /// steps. Storing a pure reference is not possible as the lifetime would be
+    /// self-refferential inside a bdi agent. Hence an Rc is this best option.
+    pub body: Rc<[Formula<A>]>,
 }
 
 impl<A> PartialEq for Plan<A> {
@@ -97,29 +100,21 @@ pub enum Formula<A> {
     Action(Action<A>),
 }
 
-impl<A> Formula<A> {
-    pub(crate) fn resolve_possible<B: BindingLookup>(
-        self,
-        bindings: &B,
-    ) -> Result<Self, ResolveFailure> {
-        use crate::resolve::Resolve;
+pub enum FormulaView<'a, A> {
+    Formula(&'a Formula<A>),
+    Belief {
+        trigger: Trigger,
+        belief: LiteralView<'a>,
+        silent: bool,
+    },
+    Goal {
+        kind: GoalKind,
+        goal: LiteralView<'a>,
+    },
+}
 
-        Ok(match self {
-            Formula::Belief {
-                trigger,
-                belief,
-                silent,
-            } => Formula::Belief {
-                trigger,
-                belief: belief.resolve(bindings)?,
-                silent,
-            },
-            Formula::Goal { kind, goal } => Formula::Goal {
-                kind,
-                goal: goal.resolve(bindings)?,
-            },
-            unify @ Formula::Unify { .. } => unify,
-            action @ Formula::Action(_) => action,
-        })
+impl<A> FormulaView<'_, A> {
+    pub(crate) fn to_owned(&self) -> Formula<A> {
+        todo!()
     }
 }
