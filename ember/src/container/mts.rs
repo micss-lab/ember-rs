@@ -2,7 +2,6 @@ use core::marker::PhantomData;
 
 #[cfg(feature = "acc-custom")]
 use alloc::boxed::Box;
-use alloc::collections::BTreeSet;
 
 use ember_collections::SmallSet;
 #[cfg(feature = "acc-espnow")]
