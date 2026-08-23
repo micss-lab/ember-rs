@@ -8,6 +8,7 @@ ember-core = { workspace = true }
 ember-fipa = { workspace = true }
 ember-time = { workspace = true }
 ember-util = { workspace = true }
+ember-collections = { workspace = true }
 
 ember-acc = { workspace = true, optional = true }
 ember-bdi = { workspace = true, optional = true }

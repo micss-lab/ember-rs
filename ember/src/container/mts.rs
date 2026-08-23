@@ -4,6 +4,7 @@ use core::marker::PhantomData;
 use alloc::boxed::Box;
 use alloc::collections::BTreeSet;
 
+use ember_collections::SmallSet;
 #[cfg(feature = "acc-espnow")]
 use esp_radio::esp_now;
 
@@ -35,14 +36,15 @@ impl Mts<'_> {
         } else {
             for t in envelope.to.iter() {
                 // Resolve any possible proxies. Error on looping proxies.
-                let (mut resolved, mut visited) = (t.clone(), BTreeSet::new());
+                let mut visited = SmallSet::new();
+                let mut resolved = None;
 
                 if let Some(inbox) = loop {
-                    if !resolved.is_local() {
+                    if !t.is_local() {
                         break None;
                     }
 
-                    match adt.get_mut(resolved.local_name()) {
+                    match adt.get_mut(t.local_name()) {
                         Some(AgentReference::Local(LocalAgentReference { inbox })) => {
                             break Some(inbox);
                         }
@@ -51,7 +53,7 @@ impl Mts<'_> {
                                 log::error!("Proxy loop detected. Message cannot be sent.");
                                 return;
                             }
-                            resolved = proxy.clone();
+                            resolved.replace(proxy.clone());
                         }
                         None => {
                             log::error!(
@@ -69,7 +71,11 @@ impl Mts<'_> {
                     }
                 } else {
                     #[cfg(feature = "acc")]
-                    if self.channels.send(&resolved, message.clone()).is_ok() {
+                    if self
+                        .channels
+                        .send(resolved.as_ref().unwrap_or(t), message.clone())
+                        .is_ok()
+                    {
                         continue;
                     }
 
