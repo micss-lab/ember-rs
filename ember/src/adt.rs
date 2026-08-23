@@ -1,8 +1,8 @@
-use alloc::collections::btree_map::BTreeMap;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::ops::{Deref, DerefMut};
 
+use ember_collections::SmallMap;
 use ember_core::agent::aid::Aid;
 use ember_core::environment::MessageStore;
 use ember_core::message::Message;
@@ -19,10 +19,10 @@ pub(crate) struct LocalAgentReference {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct Adt(BTreeMap<String, AgentReference>);
+pub(crate) struct Adt(SmallMap<String, AgentReference>);
 
 impl Deref for Adt {
-    type Target = BTreeMap<String, AgentReference>;
+    type Target = SmallMap<String, AgentReference>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -34,7 +34,7 @@ impl Adt {
     where
         S: ToString,
     {
-        Self(BTreeMap::from_iter(existing.into_iter().map(|e| {
+        Self(SmallMap::from_iter(existing.into_iter().map(|e| {
             (
                 e.to_string(),
                 AgentReference::Local(LocalAgentReference::default()),

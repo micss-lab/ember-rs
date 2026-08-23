@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use core::borrow::Borrow;
 
 /// Linear-scan map backed by a `Vec<(K, V)>`. Cheaper than a `BTreeMap`
 /// for collections that never hold more than a handful of entries.
@@ -22,12 +23,31 @@ impl<K: PartialEq, V> SmallMap<K, V> {
         Self(Vec::with_capacity(0))
     }
 
-    pub fn get(&self, key: &K) -> Option<&V> {
-        self.0.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+    pub fn get<Q: PartialEq + ?Sized>(&self, key: &Q) -> Option<&V>
+    where
+        K: Borrow<Q>,
+    {
+        self.0
+            .iter()
+            .find(|(k, _)| k.borrow() == key)
+            .map(|(_, v)| v)
     }
 
-    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
-        self.0.iter_mut().find(|(k, _)| k == key).map(|(_, v)| v)
+    pub fn get_mut<Q: PartialEq + ?Sized>(&mut self, key: &Q) -> Option<&mut V>
+    where
+        K: Borrow<Q>,
+    {
+        self.0
+            .iter_mut()
+            .find(|(k, _)| k.borrow() == key)
+            .map(|(_, v)| v)
+    }
+
+    pub fn contains_key<Q: PartialEq + ?Sized>(&self, key: &Q) -> bool
+    where
+        K: Borrow<Q>,
+    {
+        self.get(key).is_some()
     }
 
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
@@ -40,13 +60,20 @@ impl<K: PartialEq, V> SmallMap<K, V> {
         }
     }
 
-    pub fn remove(&mut self, key: &K) -> Option<V> {
-        let index = self.0.iter().position(|(k, _)| k == key)?;
+    pub fn remove<Q: PartialEq + ?Sized>(&mut self, key: &Q) -> Option<V>
+    where
+        K: Borrow<Q>,
+    {
+        let index = self.0.iter().position(|(k, _)| k.borrow() == key)?;
         Some(self.0.swap_remove(index).1)
     }
 
     pub fn entry(&mut self, key: K) -> Entry<'_, K, V> {
         Entry { map: self, key }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
     }
 
     pub fn keys(&self) -> impl Iterator<Item = &K> {
@@ -231,5 +258,24 @@ mod tests {
         let mut pairs: Vec<_> = map.into_iter().collect();
         pairs.sort();
         assert_eq!(pairs, vec![(1, "a"), (2, "b")]);
+    }
+
+    #[test]
+    fn get_by_borrowed_key_matches_owned_key() {
+        let mut map: SmallMap<alloc::string::String, u32> = SmallMap::new();
+        map.insert("a".into(), 1);
+        assert_eq!(map.get("a"), Some(&1));
+        assert_eq!(map.get_mut("a"), Some(&mut 1));
+        assert!(map.contains_key("a"));
+        assert_eq!(map.remove("a"), Some(1));
+        assert!(!map.contains_key("a"));
+    }
+
+    #[test]
+    fn is_empty_reflects_entry_count() {
+        let mut map = SmallMap::new();
+        assert!(map.is_empty());
+        map.insert(1, "a");
+        assert!(!map.is_empty());
     }
 }

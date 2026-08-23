@@ -98,8 +98,6 @@ mod ams {
     fn register_agent(_ams: AmsAgentDescription, agent: AmsAgentDescription, adt: &mut Adt) {
         // TODO: Check that the ams for which the action is meant is this one.
 
-        use alloc::collections::btree_map::Entry;
-
         let aid: Aid = match agent.name.map(|n| n.parse()) {
             Some(Ok(aid)) => aid,
             Some(Err(e)) => {
@@ -116,16 +114,14 @@ mod ams {
         }
         let name = aid.local_name().to_string();
         log::trace!("Trying to registering agent `{name}`.");
-        match adt.entry(name.clone()) {
-            Entry::Vacant(entry) => {
-                entry.insert(AgentReference::Local(LocalAgentReference {
-                    inbox: Vec::new(),
-                }));
-                log::info!("Agent `{}` successfully registered.", name);
-            }
-            Entry::Occupied(_) => {
-                log::error!("Cannot register agent `{aid}` as it is already registered.");
-            }
+        if adt.contains_key(&name) {
+            log::error!("Cannot register agent `{aid}` as it is already registered.");
+        } else {
+            adt.insert(
+                name.clone(),
+                AgentReference::Local(LocalAgentReference { inbox: Vec::new() }),
+            );
+            log::info!("Agent `{}` successfully registered.", name);
         }
     }
 }

@@ -1,4 +1,4 @@
-use alloc::collections::BTreeMap;
+use ember_collections::SmallMap;
 
 use crate::bindings::Bindings;
 use crate::context::Context;
@@ -11,8 +11,8 @@ use super::{Intention, IntentionId};
 
 #[derive(Debug)]
 pub(crate) struct IntentionQueue<A, Sched = Random> {
-    intentions: BTreeMap<IntentionId, Intention<A>>,
-    blocked: BTreeMap<IntentionId, BlockReasons>,
+    intentions: SmallMap<IntentionId, Intention<A>>,
+    blocked: SmallMap<IntentionId, BlockReasons>,
     current_id: IntentionId,
     scheduler: Sched,
 }
@@ -20,8 +20,8 @@ pub(crate) struct IntentionQueue<A, Sched = Random> {
 impl<A, Sched: Default> Default for IntentionQueue<A, Sched> {
     fn default() -> Self {
         Self {
-            intentions: BTreeMap::default(),
-            blocked: BTreeMap::default(),
+            intentions: SmallMap::default(),
+            blocked: SmallMap::default(),
             current_id: 0,
             scheduler: Sched::default(),
         }
@@ -195,7 +195,7 @@ pub trait Scheduler<A> {
     fn select_intention(
         &mut self,
         candidates: impl IntoIterator<Item = IntentionId>,
-        intentions: &BTreeMap<IntentionId, Intention<A>>,
+        intentions: &SmallMap<IntentionId, Intention<A>>,
     ) -> Option<IntentionId>;
 }
 
@@ -207,7 +207,7 @@ impl<A> Scheduler<A> for Fifo {
     fn select_intention(
         &mut self,
         candidates: impl IntoIterator<Item = IntentionId>,
-        intentions: &BTreeMap<IntentionId, Intention<A>>,
+        intentions: &SmallMap<IntentionId, Intention<A>>,
     ) -> Option<IntentionId> {
         candidates.into_iter().find(|i| intentions.contains_key(i))
     }
@@ -246,7 +246,7 @@ impl<A> Scheduler<A> for Random {
     fn select_intention(
         &mut self,
         candidates: impl IntoIterator<Item = IntentionId>,
-        intentions: &BTreeMap<IntentionId, Intention<A>>,
+        intentions: &SmallMap<IntentionId, Intention<A>>,
     ) -> Option<IntentionId> {
         // Reservoir sampling (k = 1): picks one candidate uniformly at random in a single pass,
         // without needing to know the candidate count up front.
