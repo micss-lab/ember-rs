@@ -52,4 +52,9 @@ impl Knowledge {
     pub(super) fn atom_and_arity(&self) -> (Atom, usize) {
         self.belief.structure.atom_and_arity()
     }
+
+    pub(super) fn functor_and_arity(&self) -> (&Atom, usize) {
+        let structure = &self.belief.structure;
+        (&structure.functor, structure.arity())
+    }
 }

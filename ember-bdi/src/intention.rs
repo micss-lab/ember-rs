@@ -241,17 +241,17 @@ where
 
     fn take_filtered_bindings(&mut self) -> OwnedBindings {
         let vars = self.event.event.variables();
-        let mut map = alloc::collections::BTreeMap::new();
+        let mut filtered = Vec::new();
 
         if let Some(bindings) = &self.bindings.bindings {
             for v_id in vars {
                 if let Some(val) = bindings.get(&v_id) {
-                    map.insert(v_id, val.clone());
+                    filtered.push((v_id, val.clone()));
                 }
             }
         }
 
-        OwnedBindings::new(map, crate::bindings::AliasMap::empty())
+        OwnedBindings::new(filtered, crate::bindings::AliasMap::empty())
     }
 }
 

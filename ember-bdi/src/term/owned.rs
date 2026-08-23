@@ -91,10 +91,11 @@ impl Structure {
     }
 
     pub(crate) fn atom_and_arity(&self) -> (Atom, usize) {
-        (
-            self.functor.clone(),
-            self.arguments.as_ref().map(|args| args.len()).unwrap_or(0),
-        )
+        (self.functor.clone(), self.arity())
+    }
+
+    pub(crate) fn arity(&self) -> usize {
+        self.arguments.as_ref().map(|args| args.len()).unwrap_or(0)
     }
 }
 

@@ -270,8 +270,7 @@ impl<'a> GroundQuery<'a> {
                 literal: Literal { structure, .. },
                 ..
             } => bb
-                .collections
-                .get(&structure.atom_and_arity())
+                .collection(&structure.functor, structure.arity())
                 .map(|b| b.0.iter()),
             _ => None,
         };

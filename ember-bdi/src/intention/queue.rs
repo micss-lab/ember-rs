@@ -9,6 +9,9 @@ use crate::plan::{Plan, TriggeringEvent};
 use super::result::*;
 use super::{Intention, IntentionId};
 
+/// An agent's `max_intentions` budget keeps both maps to a handful of
+/// entries per tick, so a linear-scan map beats a `BTreeMap`'s per-insert
+/// node allocation.
 #[derive(Debug)]
 pub(crate) struct IntentionQueue<A, Sched = Random> {
     intentions: SmallMap<IntentionId, Intention<A>>,

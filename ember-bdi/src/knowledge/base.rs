@@ -83,7 +83,8 @@ impl KnowledgeBase {
     /// would result in an infinite loop.
     pub fn remove_no_event(&mut self, belief: impl Into<Knowledge>) -> bool {
         let belief = belief.into();
-        let Some(beliefs) = self.collections.get_mut(&belief.atom_and_arity()) else {
+        let (functor, arity) = belief.functor_and_arity();
+        let Some(beliefs) = self.collection_mut(functor, arity) else {
             return false;
         };
         beliefs.remove(&belief)
@@ -95,6 +96,23 @@ impl KnowledgeBase {
         pure_context: &'a PureContext,
     ) -> Query<'a> {
         query.into_query(self, pure_context)
+    }
+
+    /// Looks up the collection for `functor`/`arity` without cloning `functor` into an owned
+    /// key the way `Structure::atom_and_arity` would, since a lookup (unlike `entry`, which may
+    /// need to insert a new key) never needs to own one.
+    pub(super) fn collection(&self, functor: &Atom, arity: usize) -> Option<&KnowledgeCollection> {
+        self.collections
+            .iter()
+            .find(|((f, a), _)| f == functor && *a == arity)
+            .map(|(_, collection)| collection)
+    }
+
+    fn collection_mut(&mut self, functor: &Atom, arity: usize) -> Option<&mut KnowledgeCollection> {
+        self.collections
+            .iter_mut()
+            .find(|(k, _)| k.0 == *functor && k.1 == arity)
+            .map(|(_, collection)| collection)
     }
 }
 
