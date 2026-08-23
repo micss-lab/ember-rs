@@ -4,7 +4,7 @@ use crate::cargo::run_cargo;
 use crate::metadata;
 use crate::target::Target;
 
-pub fn run(target: Target, bin: &str, extra: &[String]) -> Result<()> {
+pub fn run(target: Target, bin: &str, debug: bool, extra: &[String]) -> Result<()> {
     // `cargo run` has no `--workspace`/`--exclude`, so without an explicit
     // `-p`, cargo has to consider the whole workspace's graph to disambiguate
     // the bin, including xtask's own std-only deps, which can't compile
@@ -14,6 +14,9 @@ pub fn run(target: Target, bin: &str, extra: &[String]) -> Result<()> {
 
     let mut args: Vec<&str> = vec!["run", "--target", target.triple()];
     args.extend_from_slice(target.extra_args());
+    if !debug {
+        args.push("--release");
+    }
     args.push("-p");
     args.push(&package);
     args.push("--bin");

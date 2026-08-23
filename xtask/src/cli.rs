@@ -21,6 +21,10 @@ enum Command {
         /// Build only this binary (e.g. an example under examples/src/bin).
         #[arg(long)]
         bin: Option<String>,
+        /// Use the `dev` profile (debug-assertions/overflow-checks on)
+        /// instead of the default `release`.
+        #[arg(long)]
+        debug: bool,
         /// Extra arguments forwarded verbatim to the underlying cargo invocation.
         #[arg(last = true)]
         args: Vec<String>,
@@ -33,6 +37,10 @@ enum Command {
         /// The binary to run (e.g. an example under examples/src/bin).
         #[arg(long)]
         bin: String,
+        /// Use the `dev` profile (debug-assertions/overflow-checks on)
+        /// instead of the default `release`.
+        #[arg(long)]
+        debug: bool,
         /// Extra arguments forwarded verbatim to the underlying cargo invocation.
         #[arg(last = true)]
         args: Vec<String>,
@@ -75,8 +83,18 @@ enum Command {
 impl Cli {
     pub fn run(self) -> Result<()> {
         match self.command {
-            Command::Build { target, bin, args } => commands::build::run(target, bin, &args),
-            Command::Run { target, bin, args } => commands::run::run(target, &bin, &args),
+            Command::Build {
+                target,
+                bin,
+                debug,
+                args,
+            } => commands::build::run(target, bin, debug, &args),
+            Command::Run {
+                target,
+                bin,
+                debug,
+                args,
+            } => commands::run::run(target, &bin, debug, &args),
             Command::Check { target } => commands::check::run(target),
             Command::Clippy { target, fix } => commands::clippy::run(target, fix),
             Command::Test => commands::test::run(),

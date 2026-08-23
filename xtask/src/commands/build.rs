@@ -4,7 +4,12 @@ use crate::cargo::run_cargo;
 use crate::metadata;
 use crate::target::Target;
 
-pub fn run(target: Option<Target>, bin: Option<String>, extra: &[String]) -> Result<()> {
+pub fn run(
+    target: Option<Target>,
+    bin: Option<String>,
+    debug: bool,
+    extra: &[String],
+) -> Result<()> {
     let targets: Vec<Target> = match target {
         Some(target) => vec![target],
         None => Target::ALL.to_vec(),
@@ -27,6 +32,9 @@ pub fn run(target: Option<Target>, bin: Option<String>, extra: &[String]) -> Res
 
         let mut args: Vec<&str> = vec!["build", "--target", target.triple()];
         args.extend_from_slice(target.extra_args());
+        if !debug {
+            args.push("--release");
+        }
 
         match (&package, &bin) {
             (Some(package), Some(bin)) => {

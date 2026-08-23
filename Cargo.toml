@@ -41,7 +41,7 @@ esp-println = "0.17.0"
 esp-radio = "0.18.0"
 esp-rtos = "0.3.0"
 
-[profile.release]
+[profile.dev]
 panic = "abort"
 debug-assertions = true
 overflow-checks = true
@@ -49,7 +49,7 @@ opt-level = 2
 debug = 2
 lto = false
 
-[profile.dev]
+[profile.release]
 opt-level = 3
 debug = false
 strip = "none"
