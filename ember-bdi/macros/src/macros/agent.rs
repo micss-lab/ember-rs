@@ -63,38 +63,38 @@ impl Parse for BdiAgentArgs {
     }
 }
 
-enum BeliefOrGoal {
+enum Statement {
     Belief(Belief),
     Goal(Goal),
+    Plan(Plan),
 }
 
 peg::parser! {
     pub grammar asl_parser() for FlatTokenStream {
-        rule belief_or_goal() -> Spanned<BeliefOrGoal>
-            = span:span() belief:belief() "." { Spanned { node: BeliefOrGoal::Belief(belief), span } }
-            / span:span() goal:goal() "." { Spanned { node: BeliefOrGoal::Goal(goal), span } }
-
         pub rule program() -> Program
-            = "{" beliefs_or_goals:belief_or_goal()* plans:plan()* "}" {
-            let (beliefs, goals) = {
-                let (mut beliefs, mut goals) = (Vec::new(), Vec::new());
-                beliefs_or_goals.into_iter().for_each(|bg| {
-                    let span = bg.span;
-                    match bg.node {
-                        BeliefOrGoal::Belief(belief) => beliefs.push(Spanned { node: belief, span }),
-                        BeliefOrGoal::Goal(goal) => goals.push(Spanned { node: goal, span }),
-                    }
-                });
-                (beliefs.into_boxed_slice(), goals.into_boxed_slice())
-            };
-            let plans = plans.into_boxed_slice();
+            = "{" statements:statement()* "}" {
+            let (mut beliefs, mut goals, mut plans) = (Vec::new(), Vec::new(), Vec::new());
+            statements.into_iter().for_each(|s| {
+                let span = s.span;
+                match s.node {
+                    Statement::Belief(belief) => beliefs.push(Spanned { node: belief, span }),
+                    Statement::Goal(goal) => goals.push(Spanned { node: goal, span }),
+                    Statement::Plan(plan) => plans.push(Spanned { node: plan, span }),
+                }
+            });
 
             Program {
-                beliefs,
-                goals,
-                plans,
+                beliefs: beliefs.into_boxed_slice(),
+                goals: goals.into_boxed_slice(),
+                plans: plans.into_boxed_slice(),
             }
         }
+
+        rule statement() -> Spanned<Statement>
+            = span:span() belief:belief() "." { Spanned { node: Statement::Belief(belief), span } }
+            / span:span() goal:goal() "." { Spanned { node: Statement::Goal(goal), span } }
+            / span:span() plan:plan() "." { Spanned { node: Statement::Plan(plan), span } }
+
 
         rule belief() -> Belief = lit:literal() belief_rule:( ":-" r:logical_expression() { r })? { Belief(lit, belief_rule) }
 
@@ -126,17 +126,14 @@ peg::parser! {
         rule list_term() -> Box<[Term]>
             = "[" items:term() ** "," "]" { items.into_boxed_slice() }
 
-        rule plan() -> Spanned<Plan>
-            = span:span() event:triggering_event() context:( ":" c:context() { c })? "<-" body:body() {
-            Spanned {
-                node: Plan {
+        rule plan() -> Plan
+            = event:triggering_event() context:( ":" c:context() { c })? "<-" body:body() {
+                Plan {
                     event,
                     context,
                     body,
-                },
-                span
+                }
             }
-        }
 
         rule triggering_event() -> TriggeringEvent
             = trigger:TRIGGER() goal:EVENT_GOAL()? event:literal() {
@@ -208,7 +205,7 @@ peg::parser! {
             / "(" expr:arithmetic_expression() ")" { ArithmeticFactor::Group(Box::new(expr)) }
 
         rule body() -> Body
-            = first:body_formula() last:(";" formula:body_formula() { formula })* "." {
+            = first:body_formula() last:(";" formula:body_formula() { formula })* {
             let mut formulae = Vec::from([first]);
             formulae.extend(last);
             Body(formulae.into_boxed_slice())
