@@ -9,9 +9,12 @@ help: the trait `IntoLiteral` is not implemented for `NotLiteral`
    |
  5 | struct NotLiteral;
    | ^^^^^^^^^^^^^^^^^
-help: the trait `IntoLiteral` is implemented for `ember::_crates::ember_bdi::literal::Literal`
+help: the following other types implement trait `IntoLiteral`
   --> src/literal.rs
    |
    | impl IntoLiteral for Literal {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ember::_crates::ember_bdi::literal::Literal`
+...
+   | impl IntoLiteral for LiteralView<'_> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `LiteralView<'_>`
    = note: this error originates in the derive macro `Percept` (in Nightly builds, run with -Z macro-backtrace for more info)

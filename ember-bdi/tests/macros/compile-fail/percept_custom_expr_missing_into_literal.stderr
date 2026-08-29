@@ -21,4 +21,7 @@ help: the following other types implement trait `IntoLiteral`
    |
    | impl IntoLiteral for Literal {
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ember::_crates::ember_bdi::literal::Literal`
+...
+   | impl IntoLiteral for LiteralView<'_> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `LiteralView<'_>`
    = note: this error originates in the derive macro `IntoLiteral` (in Nightly builds, run with -Z macro-backtrace for more info)
