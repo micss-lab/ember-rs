@@ -27,7 +27,13 @@ impl HttpChannel {
 }
 
 impl Acc for HttpChannel {
-    fn send(&mut self, address: &Aid, message: TransportMessage) -> Result<(), ()> {
+    fn send(
+        &mut self,
+        address: &Aid,
+        message: TransportMessage,
+        // TODO: Make use of these callbacks.
+        _callbacks: super::SendCallbacks,
+    ) -> Result<(), ()> {
         use rand::RngCore;
         let mut boundary = [0u8; 16];
         rand::rng().fill_bytes(&mut boundary);
@@ -63,7 +69,7 @@ impl Acc for HttpChannel {
         Ok(())
     }
 
-    fn receive(&mut self) -> Option<TransportMessage> {
+    fn receive(&mut self, _environment: &mut super::Environment) -> Option<TransportMessage> {
         use std::io::Read;
 
         let mut req = self.server.try_recv().expect("receiving message failed")?;

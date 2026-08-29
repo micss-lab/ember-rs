@@ -24,7 +24,12 @@ impl<'c> EspNowChannel<'c> {
 }
 
 impl<'c> Acc for EspNowChannel<'c> {
-    fn send(&mut self, address: &Aid, message: TransportMessage) -> Result<(), ()> {
+    fn send(
+        &mut self,
+        address: &Aid,
+        message: TransportMessage,
+        _callbacks: crate::SendCallbacks,
+    ) -> Result<(), ()> {
         let Some(sender) = self.sender.as_mut() else {
             log::error!("EspNow channel is not configured for sending messages.");
             return Err(());
@@ -58,7 +63,7 @@ impl<'c> Acc for EspNowChannel<'c> {
         Ok(())
     }
 
-    fn receive(&mut self) -> Option<TransportMessage> {
+    fn receive(&mut self, _environment: &mut crate::Environment) -> Option<TransportMessage> {
         let message = self.receiver.as_mut().and_then(|r| r.receive())?;
         postcard::from_bytes::<EspNowMessageDe>(message.data())
             .inspect_err(|_| {

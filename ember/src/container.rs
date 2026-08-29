@@ -3,17 +3,13 @@ use alloc::collections::VecDeque;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
-#[cfg(feature = "acc-espnow")]
-use esp_radio::esp_now;
-
 use ember_core::agent::Agent;
 use ember_core::agent::aid::Aid;
-use ember_core::environment::{Environment, MessageStore};
-use ember_core::message::Message;
+use ember_core::environment::{Environment, MessageStore, SendCallbacks};
+use ember_core::message::{Message, TransportMessage};
 
 use crate::adt::{Adt, AgentReference};
 
-use self::mts::Mts;
 use self::privileged::{ContainerView, PrivilegedAgents};
 
 mod mts;
@@ -22,12 +18,12 @@ mod privileged;
 pub struct Container<'a, 'c> {
     /// Agents managed by this container.
     agents: VecDeque<Box<dyn Agent + 'a>>,
-    /// Store of privileged agents able to modify the container directly.
-    privileged: PrivilegedAgents,
+    /// Store of privileged agents able to modify the container directly
+    privileged: PrivilegedAgents<'c>,
     /// Register of agents running on this platform.
     ladt: Adt,
-    /// Message transport service.
-    mts: Mts<'c>,
+    /// Intermediate store of messages to be delivered to agents.
+    pending_sends: Vec<(TransportMessage, SendCallbacks)>,
 }
 
 impl Container<'_, '_> {
@@ -48,13 +44,10 @@ impl Container<'_, '_> {
         // Iterate over all agents once, only rescheduling agents that are not removed.
         let mut amount = self.agents.len();
 
-        // Poll the message transport system.
-        self.mts.receive_messages(&mut self.ladt);
-
         // Poll privileged agents associated to this container.
         self.privileged.poll(&mut ContainerView {
             ladt: &mut self.ladt,
-            mts: &mut self.mts,
+            pending_sends: &mut self.pending_sends,
         });
 
         while let Some(mut agent) = self.agents.pop_front() {
@@ -66,8 +59,8 @@ impl Container<'_, '_> {
             let finished = agent.update(&mut context);
 
             // Handle all messages the agent wants to send.
-            for message in context.message_outbox.into_iter() {
-                self.mts.send_message(message, &mut self.ladt);
+            for entry in context.message_outbox.into_iter() {
+                self.pending_sends.push(entry);
             }
 
             self.return_unhandled_messages(agent.get_name(), context.message_inbox);
@@ -131,45 +124,14 @@ impl<'a> Container<'a, '_> {
     }
 }
 
+#[cfg(feature = "acc")]
 impl<'c> Container<'_, 'c> {
-    #[cfg(feature = "acc-http")]
-    pub fn enable_http(&mut self, port: u16) {
-        self.mts.enable_http(port);
+    pub fn set_channels(&mut self, channels: ember_acc::Channels<'c>) {
+        self.privileged.mts.with_channels(channels);
     }
 
-    #[cfg(feature = "acc-http")]
-    pub fn with_http(mut self, port: u16) -> Self {
-        self.enable_http(port);
-        self
-    }
-
-    #[cfg(feature = "acc-espnow")]
-    pub fn enable_espnow(
-        &mut self,
-        sender: Option<esp_now::EspNowSender<'c>>,
-        receiver: Option<esp_now::EspNowReceiver<'c>>,
-    ) {
-        self.mts.enable_espnow(sender, receiver);
-    }
-
-    #[cfg(feature = "acc-espnow")]
-    pub fn with_espnow(
-        mut self,
-        sender: Option<esp_now::EspNowSender<'c>>,
-        receiver: Option<esp_now::EspNowReceiver<'c>>,
-    ) -> Self {
-        self.enable_espnow(sender, receiver);
-        self
-    }
-
-    #[cfg(feature = "acc-custom")]
-    pub fn enable_custom_acc(&mut self, custom: Box<dyn ember_acc::Acc + 'c>) {
-        self.mts.enable_custom_acc(custom);
-    }
-
-    #[cfg(feature = "acc-custom")]
-    pub fn with_custom_acc(mut self, custom: Box<dyn ember_acc::Acc + 'c>) -> Self {
-        self.enable_custom_acc(custom);
+    pub fn with_channels(mut self, channels: ember_acc::Channels<'c>) -> Self {
+        self.set_channels(channels);
         self
     }
 }
@@ -182,7 +144,7 @@ impl Default for Container<'_, '_> {
             agents: VecDeque::default(),
             privileged,
             ladt,
-            mts: Mts::new(),
+            pending_sends: Vec::new(),
         }
     }
 }

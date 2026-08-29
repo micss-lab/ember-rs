@@ -1,43 +1,47 @@
 use alloc::borrow::Cow;
+use alloc::vec::Vec;
 
 use ember_core::agent::Agent;
-use ember_core::environment::Environment;
+use ember_core::environment::{Environment, SendCallbacks};
+use ember_core::message::TransportMessage;
 use ember_fipa::agent::ams::AmsAgent;
 
 use crate::adt::Adt;
 
-use super::Mts;
+use super::mts::Mts;
 
 /// Privileged agents able to modify the container/platform directly.
 pub(super) trait PrivilegedAgent: Agent {
     fn update_privileged(
         &mut self,
-        container: &mut ContainerView<'_, '_>,
+        container: &mut ContainerView<'_>,
         environment: &mut Environment,
     );
+
+    fn should_update(&self, _container: &ContainerView<'_>) -> bool {
+        true
+    }
 }
 
-pub(super) struct ContainerView<'a, 'c> {
+pub(super) struct ContainerView<'a> {
     pub(super) ladt: &'a mut Adt,
-    pub(super) mts: &'a mut Mts<'c>,
+    pub(super) pending_sends: &'a mut Vec<(TransportMessage, SendCallbacks)>,
 }
 
 #[derive(Default)]
-pub(super) struct PrivilegedAgents {
-    /// Ams agent managing this cotainers.
+pub(super) struct PrivilegedAgents<'c> {
     ams: AmsAgent,
+    pub(super) mts: Mts<'c>,
 }
 
-impl PrivilegedAgents {
+impl<'c> PrivilegedAgents<'c> {
     pub(super) fn agent_names(&self) -> impl IntoIterator<Item = Cow<'_, str>> + '_ {
-        core::iter::once(self.ams.get_name())
+        [self.ams.get_name(), self.mts.get_name()]
     }
 
-    pub(super) fn poll(&mut self, container: &mut ContainerView<'_, '_>) {
-        fn poll_agent(agent: &mut impl PrivilegedAgent, container: &mut ContainerView<'_, '_>) {
-            if !container.ladt.agent_has_message(agent.get_name()) {
-                // Assume that the agent does not have to be scheduled if there is no message for
-                // it available. This might be checked through the trait in the future.
+    pub(super) fn poll(&mut self, container: &mut ContainerView<'_>) {
+        fn poll_agent(agent: &mut impl PrivilegedAgent, container: &mut ContainerView<'_>) {
+            if !agent.should_update(container) {
                 return;
             }
 
@@ -50,8 +54,8 @@ impl PrivilegedAgents {
             agent.update_privileged(container, &mut environment);
 
             // Handle all messages the agent wants to send.
-            for message in environment.message_outbox.into_iter() {
-                container.mts.send_message(message, &mut *container.ladt);
+            for entry in environment.message_outbox.into_iter() {
+                container.pending_sends.push(entry);
             }
 
             container
@@ -60,6 +64,46 @@ impl PrivilegedAgents {
         }
 
         poll_agent(&mut self.ams, &mut *container);
+        poll_agent(&mut self.mts, &mut *container);
+    }
+}
+
+mod mts {
+    use ember_core::environment::Environment;
+
+    use crate::container::mts::Mts;
+
+    use super::{ContainerView, PrivilegedAgent};
+
+    impl PrivilegedAgent for Mts<'_> {
+        fn update_privileged(
+            &mut self,
+            container: &mut ContainerView<'_>,
+            environment: &mut Environment,
+        ) {
+            for (message, callbacks) in core::mem::take(container.pending_sends) {
+                self.route(message, callbacks, container.ladt);
+            }
+
+            #[cfg(feature = "acc")]
+            {
+                use ember_acc::{Acc, SendCallbacks};
+                while let Some(mut message) = self.channels.receive(environment) {
+                    let envelope = &mut message.envelopes.base;
+                    // TODO: Do this according to the fipa spec by pushing a new envelope.
+                    // Set the to parameter to the local address of the agent.
+                    envelope.to = core::mem::take(&mut envelope.to)
+                        .into_iter()
+                        .map(|t| t.to_local())
+                        .collect();
+
+                    // Deliver the message as if it was to the local agent. Not a
+                    // fresh outbound send, nothing to attach callbacks to.
+                    self.route(message, SendCallbacks::default(), container.ladt);
+                }
+            }
+            let _ = environment;
+        }
     }
 }
 
@@ -80,7 +124,7 @@ mod ams {
     impl PrivilegedAgent for AmsAgent {
         fn update_privileged(
             &mut self,
-            container: &mut ContainerView<'_, '_>,
+            container: &mut ContainerView<'_>,
             environment: &mut Environment,
         ) {
             // Should never stop running.
@@ -92,6 +136,10 @@ mod ams {
                     Register(r) => register_agent(r.ams, r.agent, container.ladt),
                 }
             }
+        }
+
+        fn should_update(&self, container: &ContainerView<'_>) -> bool {
+            container.ladt.agent_has_message(self.get_name())
         }
     }
 

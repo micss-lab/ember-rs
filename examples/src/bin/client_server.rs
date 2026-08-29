@@ -110,7 +110,7 @@ where
     fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         let metrics = self.0.next().expect("could not take measurement");
         log::debug!("Sending metrics.");
-        ctx.send_message(metrics.into())
+        ctx.send_message(metrics.into());
     }
 
     fn is_finished(&self) -> bool {

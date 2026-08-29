@@ -649,10 +649,13 @@ mod tests {
 
         fn sent_message<'ctx>(context: &'ctx Context<'ctx, ()>) -> &'ctx Message {
             let [
-                TransportMessage {
-                    payload: Payload::AclMessage(message),
-                    ..
-                },
+                (
+                    TransportMessage {
+                        payload: Payload::AclMessage(message),
+                        ..
+                    },
+                    _,
+                ),
             ] = context.message_outbox.as_slice()
             else {
                 panic!("expected exactly one parsed acl message in the outbox");

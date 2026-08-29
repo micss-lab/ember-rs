@@ -11,6 +11,8 @@ use core::marker::PhantomData;
 use ember_core::agent::aid::Aid;
 use ember_core::message::TransportMessage;
 
+pub use ember_core::environment::{Environment, SendCallbacks};
+
 #[cfg(feature = "espnow")]
 use self::espnow::*;
 #[cfg(feature = "http")]
@@ -43,9 +45,14 @@ pub mod util {
 }
 
 pub trait Acc {
-    fn send(&mut self, aid: &Aid, message: TransportMessage) -> Result<(), ()>;
+    fn send(
+        &mut self,
+        aid: &Aid,
+        message: TransportMessage,
+        callbacks: SendCallbacks,
+    ) -> Result<(), ()>;
 
-    fn receive(&mut self) -> Option<TransportMessage>;
+    fn receive(&mut self, environment: &mut Environment) -> Option<TransportMessage>;
 }
 
 #[derive(Default)]
@@ -99,32 +106,38 @@ impl<'c> Channels<'c> {
 }
 
 impl Acc for Channels<'_> {
-    fn send(&mut self, address: &Aid, message: TransportMessage) -> Result<(), ()> {
+    fn send(
+        &mut self,
+        address: &Aid,
+        message: TransportMessage,
+        callbacks: SendCallbacks,
+    ) -> Result<(), ()> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "http")] {
                 self.http
                     .as_mut()
-                    .map_or(Err(()), |http| http.send(address, message))
+                    .map_or(Err(()), |http| http.send(address, message, callbacks))
             } else if #[cfg(feature = "espnow")] {
-                self.espnow.as_mut().map_or(Err(()), |espnow| espnow.send(address, message))
+                self.espnow.as_mut().map_or(Err(()), |espnow| espnow.send(address, message, callbacks))
             } else if #[cfg(feature = "custom")] {
-                self.custom.as_mut().map_or(Err(()), |custom| custom.send(address, message))
+                self.custom.as_mut().map_or(Err(()), |custom| custom.send(address, message, callbacks))
             } else {
-                let _ = (address, message);
+                let _ = (address, message, callbacks);
                 Ok(())
             }
         }
     }
 
-    fn receive(&mut self) -> Option<TransportMessage> {
+    fn receive(&mut self, environment: &mut Environment) -> Option<TransportMessage> {
         cfg_if::cfg_if! {
             if #[cfg(feature = "http")] {
-                self.http.as_mut()?.receive()
+                self.http.as_mut()?.receive(environment)
             } else if #[cfg(feature = "espnow")] {
-                self.espnow.as_mut()?.receive()
+                self.espnow.as_mut()?.receive(environment)
             } else if #[cfg(feature = "custom")] {
-                self.custom.as_mut()?.receive()
+                self.custom.as_mut()?.receive(environment)
             } else {
+                let _ = environment;
                 None
             }
         }

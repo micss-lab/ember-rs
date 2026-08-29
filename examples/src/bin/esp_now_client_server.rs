@@ -111,7 +111,7 @@ where
     fn action(&mut self, ctx: &mut Context<Self::Event>, _: &mut Self::AgentState) {
         let metrics = self.0.next().expect("could not take measurement");
         log::debug!("Sending metrics.");
-        ctx.send_message(metrics.into())
+        ctx.send_message(metrics.into());
     }
 
     fn is_finished(&self) -> bool {
@@ -141,15 +141,21 @@ fn example() {
 
     log::info!("Initialized wifi");
 
+    use ember::_crates::acc::Channels;
+
+    let mut client_channels = Channels::new();
+    client_channels.enable_espnow(Some(sender), None);
     let mut client_container = Container::default()
-        .with_espnow(Some(sender), None)
+        .with_channels(client_channels)
         .with_agent(
             ReactiveAgent::new("client", ())
                 .with_behaviour(ReadMetrics(VALUES.into_iter().cycle())),
         );
 
+    let mut server_channels = Channels::new();
+    server_channels.enable_espnow(None, Some(receiver));
     let mut server_container = Container::default()
-        .with_espnow(None, Some(receiver))
+        .with_channels(server_channels)
         .with_agent(ReactiveAgent::new("server", ()).with_behaviour(MetricsReceiver));
 
     loop {

@@ -1,35 +1,51 @@
+use alloc::borrow::Cow;
 use core::marker::PhantomData;
-
-#[cfg(feature = "acc-custom")]
-use alloc::boxed::Box;
-
 use ember_collections::SmallSet;
-#[cfg(feature = "acc-espnow")]
-use esp_radio::esp_now;
 
 #[cfg(feature = "acc")]
-use ember_acc::{Acc, Channels};
-use ember_core::message::{Payload, TransportMessage};
+use ember_acc::Channels;
+
+use ember_core::agent::Agent;
+use ember_core::environment::{Environment, SendCallbacks};
+use ember_core::message::Payload;
+use ember_core::message::TransportMessage;
 
 use crate::adt::{Adt, AgentReference, LocalAgentReference};
 
+/// Message transport service. Delivers messages to agents, manages external message channels and
+/// resolves proxied message destinations.
+#[derive(Default)]
 pub(super) struct Mts<'c> {
     #[cfg(feature = "acc")]
-    channels: Channels<'c>,
+    pub(super) channels: Channels<'c>,
     _lifetime: PhantomData<&'c ()>,
 }
 
-impl Mts<'_> {
-    pub(super) fn new() -> Self {
-        Mts {
-            #[cfg(feature = "acc")]
-            channels: Channels::new(),
-            _lifetime: PhantomData,
-        }
+impl Agent for Mts<'_> {
+    fn get_name(&self) -> Cow<'_, str> {
+        Cow::Borrowed("mts")
     }
 
-    pub(super) fn send_message(&mut self, message: TransportMessage, adt: &mut Adt) {
+    fn update(&mut self, _environment: &mut Environment) -> bool {
+        // All behaviour of the mts lives at the priviledged level.
+        unreachable!("this function should never be called.")
+    }
+}
+
+impl Mts<'_> {
+    pub(super) fn route(
+        &mut self,
+        message: TransportMessage,
+        callbacks: SendCallbacks,
+        adt: &mut Adt,
+    ) {
         let envelope = &message.envelopes.base;
+        // A message can be sent to multiple receivers at once, though callbacks cannot cloned. We'd
+        // have to get rid of the `Box<dyn>` around callbacks to avoid this.
+        #[cfg(feature = "acc")]
+        let mut callbacks = Some(callbacks);
+        #[cfg(not(feature = "acc"))]
+        let _ = callbacks;
         if envelope.to.is_empty() {
             log::error!("Cannot send a message with no receivers");
         } else {
@@ -72,6 +88,7 @@ impl Mts<'_> {
                 drop(visited);
 
                 if is_local {
+                    // TODO: Also make use of the callbacks.
                     let local_name = resolved.to_local();
                     let Some(AgentReference::Local(LocalAgentReference { inbox })) =
                         adt.get_mut(local_name.local_name())
@@ -86,8 +103,19 @@ impl Mts<'_> {
                     }
                 } else {
                     #[cfg(feature = "acc")]
-                    if self.channels.send(resolved, message.clone()).is_ok() {
-                        continue;
+                    {
+                        use ember_acc::Acc;
+                        if self
+                            .channels
+                            .send(
+                                resolved,
+                                message.clone(),
+                                callbacks.take().unwrap_or_default(),
+                            )
+                            .is_ok()
+                        {
+                            continue;
+                        }
                     }
 
                     if resolved != t {
@@ -101,43 +129,12 @@ impl Mts<'_> {
             }
         }
     }
-
-    pub(super) fn receive_messages(&mut self, adt: &mut Adt) {
-        #[cfg(feature = "acc")]
-        while let Some(mut message) = self.channels.receive() {
-            let envelope = &mut message.envelopes.base;
-            // TODO: Do this according to the fipa spec by pushing a new envelope.
-            // Set the to parameter to the local address of the agent.
-            envelope.to = core::mem::take(&mut envelope.to)
-                .into_iter()
-                .map(|t| t.to_local())
-                .collect();
-
-            // Send the message as if it was to the local agent.
-            self.send_message(message, &mut *adt);
-        }
-        let _ = adt;
-    }
 }
 
 #[cfg(feature = "acc")]
 impl<'c> Mts<'c> {
-    #[cfg(feature = "acc-http")]
-    pub(super) fn enable_http(&mut self, port: u16) {
-        self.channels.enable_http(port);
-    }
-
-    #[cfg(feature = "acc-espnow")]
-    pub(super) fn enable_espnow(
-        &mut self,
-        sender: Option<esp_now::EspNowSender<'c>>,
-        receiver: Option<esp_now::EspNowReceiver<'c>>,
-    ) {
-        self.channels.enable_espnow(sender, receiver);
-    }
-
-    #[cfg(feature = "acc-custom")]
-    pub(super) fn enable_custom_acc(&mut self, custom: Box<dyn Acc + 'c>) {
-        self.channels.enable_custom(custom);
+    pub(super) fn with_channels(&mut self, channels: Channels<'c>) -> &mut Self {
+        self.channels = channels;
+        self
     }
 }
