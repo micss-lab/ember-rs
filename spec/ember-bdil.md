@@ -70,16 +70,21 @@ Variables begin with an uppercase letter or `_`. A variable in a literal is a pl
 ### 1.5 Performative Mapping (v0.1.0)
 
 Every FIPA performative is accepted; none is a protocol error. The BDI event generated on receipt is
-always a belief **addition**, and the performative is preserved by wrapping the content literal with
-it as a leading argument:
+a belief **addition** for every performative except `request`, and the performative is preserved by
+wrapping the content literal with it as a leading argument:
 
 | FIPA Performative | Trigger | Goal Kind | BDI Event |
 |---|---|---|---|
-| any | Addition | — | `+message(performative, literal)` |
+| `request` | Addition | Achieve | `!literal` |
+| any other | Addition | - | `+message(performative, literal)` |
 
 `performative` is the FIPA performative's wire string (e.g. `"inform"`, `"not-understood"`,
 `"disconfirm"`); `literal` is the content expression, unchanged. Plans distinguish the performative
 that was used by matching on this first argument, e.g. `+message("inform", X)`.
+
+`request` is reserved for `ember-bdi`'s own send-callback mechanism, an agent's reliable-channel
+implementation notifying itself of a delivery outcome. The `.send(...)` grammar only emits
+`inform`/`disconfirm`, so no `.asl` source can produce a `request` message.
 
 ---
 

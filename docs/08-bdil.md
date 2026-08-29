@@ -10,13 +10,17 @@ authoritative for anyone implementing an interoperable encoder/decoder.
 
 The language carries **one belief** per message: a single *content expression* that is a literal. The
 FIPA **performative** is preserved alongside the belief rather than interpreted by the framework: on
-receipt, every performative is accepted and the belief is always added, wrapped as
+receipt, every performative is accepted and the belief is added, wrapped as
 `message(performative, literal)` so plans can react differently depending on the performative used.
 This keeps the payload tiny: important on links like ESP-NOW.
 
+`request` is reserved for `ember-bdi`'s own send-callback mechanism. The `.send` built-in only ever
+emits `inform`/`disconfirm`, so ordinary ASL can't produce it.
+
 | FIPA Performative | Effect on receiver                              |
 | ------------------ | ------------------------------------------------ |
-| any                 | Add the belief `message(performative, literal)`  |
+| `request`           | Fire the achievement goal `!literal`             |
+| any other           | Add the belief `message(performative, literal)`  |
 
 From agent code you never build these frames by hand: you use the `.send` built-in action described
 in [BDI Agents §7.13](./07-bdi-agents.md#713-inter-agent-belief-sharing). This page is for

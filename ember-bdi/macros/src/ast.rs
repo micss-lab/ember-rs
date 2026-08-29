@@ -207,6 +207,16 @@ pub(crate) enum Action {
     User(Spanned<AtomicFormula>),
 }
 
+/// Which `.send(...)` outcome a callback fires on, see `BuiltinAction::Send::callbacks`.
+#[derive(Debug, Clone, Copy)]
+#[allow(clippy::enum_variant_names)]
+pub(crate) enum CallbackKind {
+    OnSuccess,
+    OnRetry,
+    OnFailure,
+    OnComplete,
+}
+
 #[derive(Debug, Clone)]
 pub enum BuiltinAction {
     Log(String, Box<[Term]>),
@@ -215,6 +225,8 @@ pub enum BuiltinAction {
         aid: AidOrVariable,
         trigger: Trigger,
         literal: Literal,
+        /// `[on_failure(retry(N)), ...]`, fired by the runtime `SendCallbacks` hook, not called directly.
+        callbacks: Box<[(CallbackKind, Literal)]>,
     },
     Wait {
         interval_millis: u64,
@@ -729,6 +741,7 @@ impl AstVisitor {
                 aid,
                 trigger,
                 literal,
+                callbacks,
             } => {
                 let aid = match aid {
                     AidOrVariable::Aid {
@@ -761,12 +774,31 @@ impl AstVisitor {
                     },
                 };
                 let literal_ts = self.visit_literal(literal).into_token_stream();
+                let callbacks_ts = callbacks.iter().map(|(kind, goal)| {
+                    let kind_ts = match kind {
+                        CallbackKind::OnSuccess => quote! {
+                            ::ember::agent::bdi::plan::action::CallbackKind::OnSuccess
+                        },
+                        CallbackKind::OnRetry => quote! {
+                            ::ember::agent::bdi::plan::action::CallbackKind::OnRetry
+                        },
+                        CallbackKind::OnFailure => quote! {
+                            ::ember::agent::bdi::plan::action::CallbackKind::OnFailure
+                        },
+                        CallbackKind::OnComplete => quote! {
+                            ::ember::agent::bdi::plan::action::CallbackKind::OnComplete
+                        },
+                    };
+                    let goal_ts = self.visit_literal(goal).into_token_stream();
+                    quote! { (#kind_ts, #goal_ts) }
+                });
                 quote! {
                     ::ember::agent::bdi::plan::action::BuiltinAction::Impure(
                         ::ember::agent::bdi::plan::action::ImpureAction::SendLiteral(
                             #aid,
                             #trigger_ts,
                             #literal_ts,
+                            ::alloc::boxed::Box::new([#(#callbacks_ts),*]),
                         )
                     )
                 }

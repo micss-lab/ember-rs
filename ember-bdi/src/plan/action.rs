@@ -10,6 +10,7 @@ use ember_time::{Duration, Instant};
 use ember_util::cmp::TotalCmpF32;
 
 use ember_core::agent::Aid;
+use ember_core::environment::Environment;
 use ember_core::message::content::ember_bdil::BdilContent;
 use ember_core::message::{Content, Message, Performative, Receiver};
 
@@ -231,6 +232,25 @@ impl PureAction {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CallbackKind {
+    OnSuccess,
+    OnRetry,
+    OnFailure,
+    OnComplete,
+}
+
+/// Creates a request message sent back to the agent.
+fn fire_goal(goal: Literal, my_aid: Aid, environment: &mut Environment) {
+    environment.send_message(Message {
+        performative: Performative::Request,
+        receiver: Some(Receiver::Single(my_aid)),
+        ontology: None,
+        other: None,
+        content: Some(Content::Bdil(BdilContent::Literal(goal.into()))),
+    });
+}
+
 /// Built-in actions that touch the environment, send a message, or otherwise have an effect
 /// beyond producing bindings. Body-only.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -240,7 +260,12 @@ pub enum ImpureAction {
     /// Terminate the execution of the platform the agent is running on.
     StopPlatform,
     /// Send a belief update to another agent.
-    SendLiteral(VariableOrReceiver, Trigger, Literal),
+    SendLiteral(
+        VariableOrReceiver,
+        Trigger,
+        Literal,
+        Box<[(CallbackKind, Literal)]>,
+    ),
     /// Halt the execution of an agents intention until the interval is finished. Construct this
     /// variant with the `[wait](WaitState::wait)` member function.
     Wait(WaitState),
@@ -278,7 +303,7 @@ impl ImpureAction {
                 context.stop_platform();
                 ExecuteResult::Done(None)
             }
-            SendLiteral(receiver, trigger, literal) => {
+            SendLiteral(receiver, trigger, literal, callbacks) => {
                 let literal = match literal.resolve(bindings) {
                     Ok(lit) => lit,
                     Err(_) => {
@@ -301,13 +326,35 @@ impl ImpureAction {
                         return ExecuteResult::Done(None);
                     }
                 };
-                context.send_message(Message {
+                let my_aid = Aid::local(context.pure.agent_name.as_ref().clone().into_owned());
+                let mut builder = context.send_message(Message {
                     performative,
                     receiver: Some(receiver),
                     ontology: None,
                     other: None,
                     content: Some(Content::Bdil(BdilContent::Literal(literal.into()))),
                 });
+                for (kind, goal) in Vec::from(callbacks) {
+                    let goal = match goal.resolve(bindings) {
+                        Ok(goal) => goal,
+                        Err(_) => {
+                            log::error!("failed to resolve .send callback goal");
+                            continue;
+                        }
+                    };
+                    let my_aid = my_aid.clone();
+                    builder = match kind {
+                        CallbackKind::OnSuccess => builder
+                            .on_success(move |environment| fire_goal(goal, my_aid, environment)),
+                        CallbackKind::OnFailure => builder
+                            .on_failure(move |environment| fire_goal(goal, my_aid, environment)),
+                        CallbackKind::OnComplete => builder
+                            .on_complete(move |environment| fire_goal(goal, my_aid, environment)),
+                        CallbackKind::OnRetry => builder.on_retry(move |_attempt, environment| {
+                            fire_goal(goal.clone(), my_aid.clone(), environment)
+                        }),
+                    };
+                }
                 ExecuteResult::Done(None)
             }
             Wait(state) => state.poll().map(Wait),
@@ -675,6 +722,7 @@ mod tests {
                 VariableOrReceiver::Variable(receiver_var),
                 Trigger::Addition,
                 literal("ack", vec![]),
+                Box::new([]),
             ));
 
             let result = action.execute(&bindings, &mut context, &knowledge);
@@ -698,6 +746,7 @@ mod tests {
                 VariableOrReceiver::Receiver(Receiver::Single(Aid::local("receiver-agent"))),
                 Trigger::Deletion,
                 literal("ack", vec![]),
+                Box::new([]),
             ));
 
             action.execute(&bindings, &mut context, &knowledge);
@@ -720,6 +769,7 @@ mod tests {
                 VariableOrReceiver::Receiver(Receiver::Single(Aid::local("receiver-agent"))),
                 Trigger::Addition,
                 literal("location", vec![variable_term(&var)]),
+                Box::new([]),
             ));
 
             action.execute(&bindings, &mut context, &knowledge);
@@ -741,12 +791,72 @@ mod tests {
                 VariableOrReceiver::Variable(variable()),
                 Trigger::Addition,
                 literal("ack", vec![]),
+                Box::new([]),
             ));
 
             let result = action.execute(&bindings, &mut context, &knowledge);
 
             assert!(matches!(result, ExecuteResult::Done(None)));
             assert!(context.message_outbox.is_empty());
+        }
+
+        #[test]
+        fn callback_fires_a_request_message_carrying_the_resolved_goal() {
+            let mut context: Context<()> = new_context_with_environment();
+            let knowledge = KnowledgeBase::default();
+            let var = variable();
+            let target_value = string("n1");
+            let bindings = bindings(vec![(var.clone(), target_value.as_view())]);
+
+            let action = BuiltinAction::Impure(ImpureAction::SendLiteral(
+                VariableOrReceiver::Receiver(Receiver::Single(Aid::local("receiver-agent"))),
+                Trigger::Addition,
+                literal("ack", vec![]),
+                Box::new([(
+                    CallbackKind::OnFailure,
+                    literal("retry", vec![variable_term(&var)]),
+                )]),
+            ));
+
+            action.execute(&bindings, &mut context, &knowledge);
+
+            let [(_, callbacks)] = context.message_outbox.as_mut_slice() else {
+                panic!("expected exactly one outbox entry");
+            };
+            assert!(callbacks.on_success.is_none());
+            assert!(callbacks.on_retry.is_none());
+            assert!(callbacks.on_complete.is_none());
+            let on_failure = callbacks
+                .on_failure
+                .take()
+                .expect("on_failure callback should be attached");
+
+            on_failure(&mut context);
+
+            let [_, (fired, _)] = context.message_outbox.as_slice() else {
+                panic!("expected the callback to push a second outbox entry");
+            };
+            let TransportMessage {
+                payload: Payload::AclMessage(message),
+                ..
+            } = fired
+            else {
+                panic!("expected a parsed acl message");
+            };
+            assert_eq!(message.performative, Performative::Request);
+            assert_eq!(
+                message.receiver,
+                Some(Receiver::Single(Aid::local("test-agent")))
+            );
+            let Some(Content::Bdil(BdilContent::Literal(goal))) = &message.content else {
+                panic!("expected a bdil literal content");
+            };
+            let goal = Literal::from(goal.clone());
+            assert_eq!(goal.structure.functor.0, "retry");
+            assert_eq!(
+                goal.structure.arguments.as_deref(),
+                Some([string("n1")].as_slice())
+            );
         }
     }
 

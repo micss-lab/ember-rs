@@ -246,9 +246,23 @@ peg::parser! {
             = "stop_platform" ("(" ")")? { BuiltinAction::StopPlatform }
 
         rule action_send() -> BuiltinAction
-            = "send" "(" aid:aid_or_variable() "," trigger:PERFORMATIVE() "," literal:literal() ")" {
-            BuiltinAction::Send { aid, trigger, literal }
+            = "send" "(" aid:aid_or_variable() "," trigger:PERFORMATIVE() "," literal:literal()
+              callbacks:("," c:send_callbacks() { c })? ")" {
+            BuiltinAction::Send { aid, trigger, literal, callbacks: callbacks.unwrap_or_default() }
         }
+
+        rule send_callbacks() -> Box<[(CallbackKind, Literal)]>
+            = "[" items:send_callback() ** "," "]" { items.into_boxed_slice() }
+
+        rule send_callback() -> (CallbackKind, Literal)
+            = kind:callback_kind() "(" goal:literal() ")" { (kind, goal) }
+
+        rule callback_kind() -> CallbackKind
+            = "on_success" { CallbackKind::OnSuccess }
+            / "on_retry" { CallbackKind::OnRetry }
+            / "on_failure" { CallbackKind::OnFailure }
+            / "on_complete" { CallbackKind::OnComplete }
+            / expected!("a send callback kind (`on_success`, `on_retry`, `on_failure`, `on_complete`)")
 
         rule action_wait() -> BuiltinAction
             = "wait" "(" interval_millis:MILLIS() ")" { BuiltinAction::Wait { interval_millis } }

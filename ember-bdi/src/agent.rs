@@ -209,18 +209,30 @@ where
     fn handle_message(&mut self, performative: Performative, content: BdilContent) {
         match content {
             BdilContent::Literal(l) => {
-                let literal = {
-                    let literal = Literal::from(l);
-                    Literal {
-                        negated: false,
-                        structure: Structure {
-                            functor: "message".into(),
-                            arguments: Some(Box::new([
-                                Term::String(performative.as_str().into()),
-                                Term::Literal(literal),
-                            ])),
+                let literal = Literal::from(l);
+
+                // "request" perfative runs the literal as an achievement goal directly.
+                if performative == Performative::Request {
+                    self.handle_event(
+                        TriggeringEvent {
+                            trigger: Trigger::Addition,
+                            event: literal,
+                            goal: Some(GoalKind::Achieve),
                         },
-                    }
+                        EventSource::External,
+                    );
+                    return;
+                }
+
+                let literal = Literal {
+                    negated: false,
+                    structure: Structure {
+                        functor: "message".into(),
+                        arguments: Some(Box::new([
+                            Term::String(performative.as_str().into()),
+                            Term::Literal(literal),
+                        ])),
+                    },
                 };
 
                 self.handle_event(
@@ -890,6 +902,41 @@ mod tests {
         state.sort();
         assert_eq!(state, vec!["pong", "pong", "pong"]);
         assert!(agent.intentions.is_empty());
+    }
+
+    #[test]
+    fn test_request_performative_fires_the_goal_directly_with_no_catch_plan() {
+        // A Request-performative message is only ever built directly in Rust, never by ASL `.send(...)`.
+        let mut lib = PlanLibrary::default();
+        lib.add(plan(
+            trigger("do_thing", vec![], Some(GoalKind::Achieve)),
+            None,
+            vec![Formula::Action(Action::User(TestAction::Log("fired")))],
+        ));
+        // No `+message(...)` plan here on purpose, catches a regression to the usual wrap.
+
+        let mut agent = BdiAgent::<Vec<&'static str>, TestAction, ()>::new(
+            "request-agent",
+            Vec::new(),
+            None,
+            lib,
+            vec![],
+        );
+
+        let message = Message {
+            performative: Performative::Request,
+            receiver: None,
+            ontology: None,
+            other: None,
+            content: Some(Content::Bdil(BdilContent::Literal(
+                literal("do_thing", vec![]).into(),
+            ))),
+        };
+        let mut environment = Environment::new(VecDeque::from([message]));
+
+        agent.tick(&mut environment);
+
+        assert_eq!(agent.state, vec!["fired"]);
     }
 
     #[test]
