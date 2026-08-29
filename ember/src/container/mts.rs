@@ -36,32 +36,48 @@ impl Mts<'_> {
             for t in envelope.to.iter() {
                 // Resolve any possible proxies. Error on looping proxies.
                 let mut visited = SmallSet::new();
-                let mut resolved = None;
+                let mut resolved = t;
 
-                if let Some(inbox) = loop {
-                    if !t.is_local() {
-                        break None;
+                let is_local = loop {
+                    if !resolved.is_local() {
+                        break false;
                     }
 
-                    match adt.get_mut(t.local_name()) {
-                        Some(AgentReference::Local(LocalAgentReference { inbox })) => {
-                            break Some(inbox);
+                    match adt.get(resolved.local_name()) {
+                        Some(AgentReference::Local(_)) => {
+                            break true;
                         }
                         Some(AgentReference::Proxy(proxy)) => {
                             if !visited.insert(proxy.clone()) {
                                 log::error!("Proxy loop detected. Message cannot be sent.");
                                 return;
                             }
-                            resolved.replace(proxy.clone());
+                            resolved = proxy;
                         }
                         None => {
-                            log::error!(
-                                "Failed to send message to agent `{t}`: local agent not registered with the ams"
-                            );
+                            if resolved != t {
+                                log::error!(
+                                    "Failed to send message to agent `{t}` resolved to `{resolved}`: local agent not registered with the ams"
+                                );
+                            } else {
+                                log::error!(
+                                    "Failed to send message to agent `{t}`: local agent not registered with the ams"
+                                );
+                            }
                             return;
                         }
                     }
-                } {
+                };
+
+                drop(visited);
+
+                if is_local {
+                    let local_name = resolved.to_local();
+                    let Some(AgentReference::Local(LocalAgentReference { inbox })) =
+                        adt.get_mut(local_name.local_name())
+                    else {
+                        unreachable!("agent is confirmed to be local and to have an inbox above");
+                    };
                     if let Payload::AclMessage(message) = message.payload.clone() {
                         inbox.push(message);
                     } else {
@@ -70,15 +86,17 @@ impl Mts<'_> {
                     }
                 } else {
                     #[cfg(feature = "acc")]
-                    if self
-                        .channels
-                        .send(resolved.as_ref().unwrap_or(t), message.clone())
-                        .is_ok()
-                    {
+                    if self.channels.send(resolved, message.clone()).is_ok() {
                         continue;
                     }
 
-                    log::error!("Failed to send message to agent `{t}`.");
+                    if resolved != t {
+                        log::error!(
+                            "Failed to send message to agent `{t}`, resolved to `{resolved}`."
+                        );
+                    } else {
+                        log::error!("Failed to send message to agent `{t}`.");
+                    }
                 }
             }
         }

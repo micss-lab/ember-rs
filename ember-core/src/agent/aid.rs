@@ -40,8 +40,8 @@ impl Aid {
         matches!(self.name.1, AgentPlatform::Local)
     }
 
-    pub fn to_local(self) -> Self {
-        Self::local(self.name.0)
+    pub fn to_local(&self) -> Self {
+        Self::local(self.name.0.clone())
     }
 
     pub fn platform(&self) -> &AgentPlatform {
