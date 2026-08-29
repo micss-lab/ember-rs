@@ -49,23 +49,20 @@ opt-level = 2
 debug = 2
 lto = false
 
+# DIAGNOSTICS: Keep checks on for now
+
 [profile.release]
 opt-level = 3
 debug = false
 strip = "none"
-debug-assertions = false
-overflow-checks = false
+debug-assertions = true
+overflow-checks = true
 lto = false
 panic = "abort"
 incremental = false
 codegen-units = 16
 rpath = false
 
-[profile.bindings]
-inherits = "release"
-opt-level = "z"
-lto = true
+# codegen-units = 16 splits xtensa-lx-rt's naked asm across LLVM codegen units and breaks its LBEG/LEND/LCOUNT special register operands on the Xtensa backend, so it gets its own codegen-units = 1 below.
+[profile.release.package.xtensa-lx-rt]
 codegen-units = 1
-panic = "abort"
-strip = true         # or "symbols" / true with newer Cargo
-debug = false

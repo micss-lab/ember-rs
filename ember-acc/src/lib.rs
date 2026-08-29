@@ -23,6 +23,9 @@ mod espnow;
 #[cfg(feature = "http")]
 mod http;
 
+#[cfg(feature = "espnow")]
+pub use self::espnow::ReliableEspNowChannel;
+
 #[cfg(any(feature = "serde-espnow", feature = "serde-http"))]
 pub mod serde;
 
@@ -112,34 +115,36 @@ impl Acc for Channels<'_> {
         message: TransportMessage,
         callbacks: SendCallbacks,
     ) -> Result<(), ()> {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "http")] {
-                self.http
-                    .as_mut()
-                    .map_or(Err(()), |http| http.send(address, message, callbacks))
-            } else if #[cfg(feature = "espnow")] {
-                self.espnow.as_mut().map_or(Err(()), |espnow| espnow.send(address, message, callbacks))
-            } else if #[cfg(feature = "custom")] {
-                self.custom.as_mut().map_or(Err(()), |custom| custom.send(address, message, callbacks))
-            } else {
-                let _ = (address, message, callbacks);
-                Ok(())
-            }
+        #[cfg(feature = "custom")]
+        if let Some(custom) = self.custom.as_mut() {
+            return custom.send(address, message, callbacks);
         }
+        #[cfg(feature = "espnow")]
+        if let Some(espnow) = self.espnow.as_mut() {
+            return espnow.send(address, message, callbacks);
+        }
+        #[cfg(feature = "http")]
+        if let Some(http) = self.http.as_mut() {
+            return http.send(address, message, callbacks);
+        }
+        let _ = (address, message, callbacks);
+        Err(())
     }
 
     fn receive(&mut self, environment: &mut Environment) -> Option<TransportMessage> {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "http")] {
-                self.http.as_mut()?.receive(environment)
-            } else if #[cfg(feature = "espnow")] {
-                self.espnow.as_mut()?.receive(environment)
-            } else if #[cfg(feature = "custom")] {
-                self.custom.as_mut()?.receive(environment)
-            } else {
-                let _ = environment;
-                None
-            }
+        #[cfg(feature = "custom")]
+        if let Some(custom) = self.custom.as_mut() {
+            return custom.receive(environment);
         }
+        #[cfg(feature = "espnow")]
+        if let Some(espnow) = self.espnow.as_mut() {
+            return espnow.receive(environment);
+        }
+        #[cfg(feature = "http")]
+        if let Some(http) = self.http.as_mut() {
+            return http.receive(environment);
+        }
+        let _ = environment;
+        None
     }
 }
