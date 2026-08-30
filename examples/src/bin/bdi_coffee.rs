@@ -100,21 +100,21 @@ impl Execute for AgentAction {
 
     fn execute<'b, B>(
         self,
-        bindings: &B,
+        bindings: B,
         _context: &mut ember::agent::bdi::context::Context<Self::UserAction>,
         _knowledge: &ember::agent::bdi::knowledge::base::KnowledgeBase,
         _state: &mut Self::State,
     ) -> ember::agent::bdi::plan::action::ExecuteResult<'b, Self>
     where
-        B: BindingLookup + 'b,
+        B: BindingLookup,
     {
         match self {
             AgentAction::Move { from, to } => {
                 let from = bindings
-                    .lookup_view(&from)
+                    .lookup(&from)
                     .expect("failed to lookup from in bindings");
                 let to = bindings
-                    .lookup_view(&to)
+                    .lookup(&to)
                     .expect("failed to lookup to in bindings");
 
                 info!("[ACTION] 🏃 Moving from {from:?} to {to:?}");

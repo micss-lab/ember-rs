@@ -182,6 +182,28 @@ impl BindingLookup for OwnedBindings {
     }
 }
 
+impl<B: BindingLookup + ?Sized> BindingLookup for &B {
+    fn lookup_view<'a>(&'a self, variable: &Variable) -> Option<TermView<'a>> {
+        (**self).lookup_view(variable)
+    }
+
+    fn as_bindings(&self) -> Bindings<'_> {
+        (**self).as_bindings()
+    }
+}
+
+impl<B: BindingLookup> BindingLookup for Option<B> {
+    fn lookup_view<'a>(&'a self, variable: &Variable) -> Option<TermView<'a>> {
+        self.as_ref()?.lookup_view(variable)
+    }
+
+    fn as_bindings(&self) -> Bindings<'_> {
+        self.as_ref()
+            .map(BindingLookup::as_bindings)
+            .unwrap_or_else(Bindings::empty)
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub(crate) struct AliasMap(Vec<(VariableId, VariableId)>);
 

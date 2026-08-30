@@ -1,20 +1,20 @@
 error[E0277]: the trait bound `NotLiteral: IntoLiteral` is not satisfied
  --> tests/macros/compile-fail/percept_missing_into_literal.rs:4:10
   |
- 4 | #[derive(Percept)]
-   |          ^^^^^^^ unsatisfied trait bound
-   |
+  4 | #[derive(Percept)]
+    |          ^^^^^^^ unsatisfied trait bound
+    |
 help: the trait `IntoLiteral` is not implemented for `NotLiteral`
-  --> tests/macros/compile-fail/percept_missing_into_literal.rs:5:1
-   |
- 5 | struct NotLiteral;
-   | ^^^^^^^^^^^^^^^^^
+   --> tests/macros/compile-fail/percept_missing_into_literal.rs:5:1
+    |
+  5 | struct NotLiteral;
+    | ^^^^^^^^^^^^^^^^^
 help: the following other types implement trait `IntoLiteral`
-  --> src/literal.rs
-   |
-   | impl IntoLiteral for Literal {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ember::_crates::ember_bdi::literal::Literal`
+   --> src/literal.rs
+    |
+    | impl IntoLiteral for Literal {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ember::_crates::ember_bdi::literal::Literal`
 ...
-   | impl IntoLiteral for LiteralView<'_> {
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `LiteralView<'_>`
-   = note: this error originates in the derive macro `Percept` (in Nightly builds, run with -Z macro-backtrace for more info)
+    | impl IntoLiteral for LiteralView<'_> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `LiteralView<'_>`
+    = note: this error originates in the derive macro `Percept` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -498,13 +498,13 @@ mod tests {
 
         fn execute<'b, B>(
             self,
-            _bindings: &B,
+            _bindings: B,
             _context: &mut Context<Self::UserAction>,
             _knowledge: &KnowledgeBase,
             state: &mut Self::State,
         ) -> ExecuteResult<'b, Self>
         where
-            B: BindingLookup + 'b,
+            B: BindingLookup,
         {
             match self {
                 TestAction::Wait(remaining) => {
@@ -761,13 +761,13 @@ mod tests {
 
         fn execute<'b, B>(
             self,
-            bindings: &B,
+            bindings: B,
             _context: &mut Context<Self::UserAction>,
             _knowledge: &KnowledgeBase,
             state: &mut Self::State,
         ) -> ExecuteResult<'b, Self>
         where
-            B: BindingLookup + 'b,
+            B: BindingLookup,
         {
             let seen = bindings
                 .lookup_as_type::<alloc::string::String>(&self.0)

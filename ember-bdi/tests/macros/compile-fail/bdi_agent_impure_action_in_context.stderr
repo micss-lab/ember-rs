@@ -1,4 +1,4 @@
-error: expected one of "me", "now", a pure action usable in a context (`.now`, `.me`)
+error: expected one of "append", "me", "member", "now", a pure action usable in a context (`.now`, `.me`, `.append`, `.member`)
  --> tests/macros/compile-fail/bdi_agent_impure_action_in_context.rs:5:15
   |
 5 |     +!brew : .wait(1000) <- .log("info", "done").

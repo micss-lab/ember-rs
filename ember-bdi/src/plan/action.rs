@@ -1,8 +1,8 @@
-use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
+use bstr::BString;
 use derive_where::derive_where;
 use log::{Level, log};
 
@@ -39,13 +39,13 @@ pub trait Execute: Sized {
     /// is to be ran again.
     fn execute<'b, B>(
         self,
-        bindings: &B,
+        bindings: B,
         context: &mut Context<Self::UserAction>,
         knowledge: &KnowledgeBase,
         state: &mut Self::State,
     ) -> ExecuteResult<'b, Self>
     where
-        B: BindingLookup + 'b;
+        B: BindingLookup;
 
     /// Should the intention this action is fired by wait for the action to complete before
     /// continuing.
@@ -85,13 +85,13 @@ where
 
     fn execute<'b, B>(
         self,
-        bindings: &B,
+        bindings: B,
         context: &mut Context<Self::UserAction>,
         knowledge: &KnowledgeBase,
         state: &mut Self::State,
     ) -> ExecuteResult<'b, Self>
     where
-        B: BindingLookup + 'b,
+        B: BindingLookup,
     {
         match self {
             Action::Builtin(action) => action
@@ -137,7 +137,8 @@ where
 
         match action.execute(&bindings, context, knowledge, state) {
             ExecuteResult::Pending(action) => ExecuteResult::Pending(Self { action, bindings }),
-            ExecuteResult::Done(bindings) => ExecuteResult::Done(bindings),
+            ExecuteResult::Done(None) => ExecuteResult::Done(None),
+            ExecuteResult::Done(Some(bindings)) => ExecuteResult::Done(Some(bindings)),
         }
     }
 }
@@ -170,16 +171,16 @@ impl BuiltinAction {
 
     pub(crate) fn execute<'b, B, A>(
         self,
-        bindings: &B,
+        bindings: B,
         context: &mut Context<A>,
         knowledge: &KnowledgeBase,
     ) -> ExecuteResult<'b, Self>
     where
-        B: BindingLookup + 'b,
+        B: BindingLookup,
     {
         match self {
             BuiltinAction::Pure(action) => {
-                ExecuteResult::Done(Some(action.evaluate(&context.pure)))
+                ExecuteResult::Done(action.evaluate(bindings, &context.pure))
             }
             BuiltinAction::Impure(action) => action
                 .execute(bindings, context, knowledge)
@@ -205,11 +206,19 @@ pub enum PureAction {
     // TODO: Use unification instead of just binding allowing this action to be used as a check,
     // not only a fetch.
     Me(Variable),
+    /// Binds `List` with `Item` appended to the given variable.
+    Append(Term, Term, Variable),
+    /// Whether `Item` structurally equals some element of `List`.
+    Member(Term, Term),
 }
 
 impl PureAction {
-    pub(crate) fn evaluate<'b>(&self, pure_context: &PureContext) -> Bindings<'b> {
-        match self {
+    pub(crate) fn evaluate(
+        &self,
+        bindings: impl BindingLookup,
+        pure_context: &PureContext,
+    ) -> Option<Bindings<'static>> {
+        Some(match self {
             PureAction::Now(variable) => {
                 let millis = ember_time::now().duration_since_epoch().to_millis();
                 Bindings::new(
@@ -224,11 +233,47 @@ impl PureAction {
                 let aid =
                     Aid::local(pure_context.agent_name.as_ref().clone().into_owned()).to_string();
                 Bindings::new(
-                    [(variable.id, Some(TermView::String(Cow::Owned(aid.into()))))],
+                    [(
+                        variable.id,
+                        Some(TermView::String(BString::from(aid).into())),
+                    )],
                     AliasMap::empty(),
                 )
             }
-        }
+            PureAction::Append(list, item, variable) => {
+                let items = match list.resolve_as_view(&bindings) {
+                    Ok(TermView::List(items)) => items,
+                    _ => {
+                        // TODO: Like in prolog, solve this using lazy evaluation.
+                        log::error!(".append: first argument did not resolve to a list");
+                        return None;
+                    }
+                };
+                let Ok(item) = item.resolve_as_view(&bindings) else {
+                    log::error!(".append: failed to resolve item argument");
+                    return None;
+                };
+                let items = items
+                    .iter()
+                    .chain(core::iter::once(&item))
+                    .map(TermView::to_owned_view)
+                    .collect();
+                let view = TermView::List(items);
+                Bindings::new([(variable.id, Some(view))], AliasMap::empty())
+            }
+            PureAction::Member(item, list) => {
+                let item = item.resolve_as_view(&bindings).ok()?;
+                let TermView::List(items) = list.resolve_as_view(&bindings).ok()? else {
+                    // TODO: Like in prolog, solve this using lazy evaluation.
+                    log::error!(".member: first argument did not resolve to a list");
+                    return None;
+                };
+                if !items.contains(&item) {
+                    return None;
+                }
+                Bindings::empty()
+            }
+        })
     }
 }
 
@@ -279,19 +324,19 @@ pub enum ImpureAction {
 impl ImpureAction {
     fn execute<'b, B, A>(
         self,
-        bindings: &B,
+        bindings: B,
         context: &mut Context<A>,
         knowledge: &KnowledgeBase,
     ) -> ExecuteResult<'b, Self>
     where
-        B: BindingLookup + 'b,
+        B: BindingLookup,
     {
         use ImpureAction::*;
         match self {
             Log(level, terms) => {
                 match terms
                     .into_iter()
-                    .map(|t| t.resolve(bindings).map(|t| t.to_string()))
+                    .map(|t| t.resolve(&bindings).map(|t| t.to_string()))
                     .collect::<Result<Vec<_>, _>>()
                 {
                     Ok(terms) => log!(level, "{terms:?}"),
@@ -304,7 +349,7 @@ impl ImpureAction {
                 ExecuteResult::Done(None)
             }
             SendLiteral(receiver, trigger, literal, callbacks) => {
-                let literal = match literal.resolve(bindings) {
+                let literal = match literal.resolve(&bindings) {
                     Ok(lit) => lit,
                     Err(_) => {
                         log::error!("failed to resolve literal to send");
@@ -315,7 +360,7 @@ impl ImpureAction {
                     Trigger::Addition => Performative::Inform,
                     Trigger::Deletion => Performative::NotUnderstood,
                 };
-                let receiver = match receiver.resolve(bindings) {
+                let receiver = match receiver.resolve(&bindings) {
                     Ok(VariableOrReceiver::Receiver(r)) => r,
                     Ok(_) => {
                         log::error!("failed to resolve .send arguments");
@@ -335,7 +380,7 @@ impl ImpureAction {
                     content: Some(Content::Bdil(BdilContent::Literal(literal.into()))),
                 });
                 for (kind, goal) in Vec::from(callbacks) {
-                    let goal = match goal.resolve(bindings) {
+                    let goal = match goal.resolve(&bindings) {
                         Ok(goal) => goal,
                         Err(_) => {
                             log::error!("failed to resolve .send callback goal");
@@ -396,9 +441,9 @@ pub struct AtState {
 }
 
 impl AtState {
-    fn poll<'b, B, A>(self, bindings: &B, context: &mut Context<A>) -> ExecuteResult<'b, Self>
+    fn poll<'b, B, A>(self, bindings: B, context: &mut Context<A>) -> ExecuteResult<'b, Self>
     where
-        B: BindingLookup + 'b,
+        B: BindingLookup,
     {
         let Self { start, delay, goal } = self;
 
@@ -475,8 +520,8 @@ impl Resolve for VariableOrReceiver {
     where
         Self: 'a;
 
-    fn resolve(self, bindings: &impl BindingLookup) -> Result<Self, ResolveFailure> {
-        self.resolve_as_view(bindings)
+    fn resolve(self, bindings: impl BindingLookup) -> Result<Self, ResolveFailure> {
+        self.resolve_as_view(&bindings)
     }
 
     fn resolve_as_view<'a>(
@@ -505,8 +550,8 @@ mod tests {
     use crate::term::conversion::{ConversionError, FromTermError};
     use crate::term::view::TermView;
     use crate::testing::{
-        bindings, new_context_with_environment, new_context_without_environment, string, variable,
-        variable_term,
+        bindings, list, new_context_with_environment, new_context_without_environment, string,
+        variable, variable_term,
     };
 
     use super::*;
@@ -625,6 +670,50 @@ mod tests {
             result.get_view(&var).map(TermView::to_owned),
             Some(string("test-agent@local"))
         );
+    }
+
+    #[test]
+    fn test_append_binds_a_new_list_with_the_item_appended() {
+        // SAFETY: `.append` never touches the environment.
+        let mut context: Context<()> = unsafe { new_context_without_environment() };
+        let bindings = bindings(vec![]);
+        let knowledge = KnowledgeBase::default();
+        let var = variable();
+
+        let action = BuiltinAction::Pure(PureAction::Append(
+            list(vec![string("a"), string("b")]),
+            string("c"),
+            var.clone(),
+        ));
+
+        let ExecuteResult::Done(Some(result)) = action.execute(&bindings, &mut context, &knowledge)
+        else {
+            panic!(".append must complete immediately with bindings");
+        };
+
+        assert_eq!(
+            result.get_view(&var).map(TermView::to_owned),
+            Some(list(vec![string("a"), string("b"), string("c")]))
+        );
+    }
+
+    #[test]
+    fn test_append_fails_when_the_first_argument_is_not_a_list() {
+        // SAFETY: `.append` never touches the environment.
+        let mut context: Context<()> = unsafe { new_context_without_environment() };
+        let bindings = bindings(vec![]);
+        let knowledge = KnowledgeBase::default();
+        let var = variable();
+
+        let action = BuiltinAction::Pure(PureAction::Append(
+            string("not-a-list"),
+            string("c"),
+            var.clone(),
+        ));
+
+        let result = action.execute(&bindings, &mut context, &knowledge);
+
+        assert!(matches!(result, ExecuteResult::Done(None)));
     }
 
     #[test]

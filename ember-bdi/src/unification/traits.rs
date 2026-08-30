@@ -103,13 +103,13 @@ impl<'a> UnifyView<'a> for TermView<'a> {
                 .ok_or(UnificationError::NumberMismatch),
 
             (TermView::Variable(v), other) | (other, TermView::Variable(v)) => {
-                v.collect_constraints(other)
+                Ok(vec![BindingConstraint::new(v.id, other)])
             }
 
             (TermView::List(l1), TermView::List(l2)) if l1.len() == l2.len() => {
                 let mut constraints = Vec::new();
-                for (a1, a2) in l1.into_iter().zip(l2) {
-                    constraints.extend(a1.collect_constraints(a2)?);
+                for (a1, a2) in l1.iter().zip(l2.iter()) {
+                    constraints.extend(a1.clone().collect_constraints(a2.clone())?);
                 }
                 Ok(constraints)
             }
@@ -129,7 +129,7 @@ impl<'v> Unify<TermView<'v>> for Term {
             (_, TermView::Term(other)) => self.collect_constraints(other),
 
             (Term::Variable(v), other) => v.collect_constraints(other),
-            (other, TermView::Variable(v)) => v.collect_constraints(other),
+            (other, TermView::Variable(v)) => Ok(vec![BindingConstraint::new(v.id, other)]),
 
             (
                 Term::Literal(Literal { negated: n1, .. }),
@@ -146,8 +146,8 @@ impl<'v> Unify<TermView<'v>> for Term {
 
             (Term::List(l1), TermView::List(l2)) if l1.len() == l2.len() => {
                 let mut constraints = Vec::new();
-                for (a1, a2) in l1.iter().zip(l2) {
-                    constraints.extend(a1.collect_constraints(a2)?);
+                for (a1, a2) in l1.iter().zip(l2.iter()) {
+                    constraints.extend(a1.collect_constraints(a2.clone())?);
                 }
                 Ok(constraints)
             }
@@ -211,7 +211,7 @@ impl<'v> Unify<StructureView<'v>> for Structure {
     where
         StructureView<'v>: 'a,
     {
-        if &self.functor != other.functor {
+        if self.functor != *other.functor {
             return Err(UnificationError::FunctorMismatch);
         }
 

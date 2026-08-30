@@ -22,13 +22,13 @@ impl Execute for () {
 
     fn execute<'b, B>(
         self,
-        _bindings: &B,
+        _bindings: B,
         _context: &mut Context<Self::UserAction>,
         _knowledge: &KnowledgeBase,
         _state: &mut Self::State,
     ) -> ExecuteResult<'b, Self>
     where
-        B: BindingLookup + 'b,
+        B: BindingLookup,
     {
         ExecuteResult::Done(None)
     }

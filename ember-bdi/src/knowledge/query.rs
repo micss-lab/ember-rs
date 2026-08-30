@@ -433,7 +433,7 @@ impl<'a> QueryOperand<'a> {
                     None
                 } else {
                     *evaluated = true;
-                    let fresh = action.evaluate(pure_context);
+                    let fresh = action.evaluate(existing_bindings, pure_context)?;
                     match existing_bindings {
                         Some(existing) => Bindings::merge_views([existing, &fresh]).ok(),
                         None => Some(fresh),
@@ -554,8 +554,7 @@ pub(crate) mod formula {
         },
         Literal(Literal),
         Relational(RelationalQueryFormula),
-        /// A pure built-in action (`.now`, `.me`), the only kind of built-in action allowed in a
-        /// plan's context guard.
+        /// A pure built-in action (`.now`, `.me`, `.member`), the only kind allowed in a context guard.
         Action(PureAction),
     }
 
@@ -816,8 +815,8 @@ mod tests {
     use crate::knowledge::belief::Knowledge;
     use crate::literal::Literal;
     use crate::plan::{
-        ArithmeticExpression, ArithmeticOperator, CompareOperator, LogicalOperator, QueryFormula,
-        RelationalOperator, RelationalQueryFormula,
+        ArithmeticExpression, ArithmeticOperator, CompareOperator, LogicalOperator, PureAction,
+        QueryFormula, RelationalOperator, RelationalQueryFormula,
     };
     use crate::term::view::TermView;
     use crate::term::{Atom, Structure, Term};
@@ -915,6 +914,10 @@ mod tests {
         })
     }
 
+    fn member(item: Term, list: Term) -> QueryFormula {
+        QueryFormula::Action(PureAction::Member(item, list))
+    }
+
     // --- Tests ---
 
     #[test]
@@ -979,6 +982,64 @@ mod tests {
                 .next_bindings(None)
                 .is_none()
         );
+    }
+
+    #[test]
+    fn member_succeeds_when_item_is_in_the_list() {
+        let pure_context = pure_context();
+        let bb = KnowledgeBase::default();
+
+        let formula = member(
+            string("b"),
+            list(vec![string("a"), string("b"), string("c")]),
+        );
+
+        assert!(
+            (&formula)
+                .into_query(&bb, &pure_context)
+                .next_bindings(None)
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn member_fails_when_item_is_not_in_the_list() {
+        let pure_context = pure_context();
+        let bb = KnowledgeBase::default();
+
+        let formula = member(
+            string("z"),
+            list(vec![string("a"), string("b"), string("c")]),
+        );
+
+        assert!(
+            (&formula)
+                .into_query(&bb, &pure_context)
+                .next_bindings(None)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn not_member_excludes_visited_candidates_like_via_unvisited() {
+        let pure_context = pure_context();
+        let mut bb = KnowledgeBase::default();
+        bb.assert_no_event(belief("via", vec![string("n1")]));
+        bb.assert_no_event(belief("via", vec![string("n2")]));
+
+        let via = variable();
+        // via(Via) & not .member(Via, [n1])
+        let formula = and(vec![
+            literal("via", vec![variable_term(&via)]),
+            not(member(variable_term(&via), list(vec![string("n1")]))),
+        ]);
+
+        let mut query = (&formula).into_query(&bb, &pure_context);
+        let bindings = query
+            .next_bindings(None)
+            .expect("n2 is not yet visited and should still match");
+        assert_eq!(bindings.get_view(&via), Some(&string("n2").as_view()));
+        assert!(query.next_bindings(None).is_none());
     }
 
     #[test]

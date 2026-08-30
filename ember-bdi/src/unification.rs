@@ -4,7 +4,7 @@ pub mod traits;
 
 #[cfg(test)]
 mod tests {
-    use alloc::boxed::Box;
+    use alloc::rc::Rc;
     use alloc::vec;
     use alloc::vec::Vec;
 
@@ -183,8 +183,8 @@ mod tests {
         let expected_x = TermView::Literal(LiteralView {
             negated: false,
             structure: StructureView {
-                functor: &g,
-                arguments: Some(Box::new([n.as_view()])),
+                functor: Rc::new(g),
+                arguments: Some(Rc::new([n.as_view()])),
             },
         });
         assert_eq!(x_binding, &expected_x);
@@ -396,8 +396,8 @@ mod tests {
         let term_g_y = TermView::Literal(LiteralView {
             negated: false,
             structure: StructureView {
-                functor: &Atom("g".into()),
-                arguments: Some(Box::new([TermView::Term(&yt)])),
+                functor: Rc::new(Atom("g".into())),
+                arguments: Some(Rc::new([TermView::Term(&yt)])),
             },
         });
         let existing = x
@@ -418,8 +418,8 @@ mod tests {
         let expected_x = TermView::Literal(LiteralView {
             negated: false,
             structure: StructureView {
-                functor: &Atom("g".into()),
-                arguments: Some(alloc::boxed::Box::new([n.as_view()])),
+                functor: Rc::new(Atom("g".into())),
+                arguments: Some(Rc::new([n.as_view()])),
             },
         });
 

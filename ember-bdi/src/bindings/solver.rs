@@ -1,3 +1,4 @@
+use alloc::rc::Rc;
 use alloc::vec::Vec;
 
 use ember_collections::SmallMap;
@@ -213,14 +214,14 @@ impl<'a> EquivalenceClasses<'a> {
                                 resolved_args
                                     .push(self.resolve_term(TermView::Term(arg), visiting)?);
                             }
-                            Some(resolved_args.into_boxed_slice())
+                            Some(resolved_args.into())
                         }
                         None => None,
                     };
                     Ok(TermView::Literal(LiteralView {
                         negated: *n,
                         structure: StructureView {
-                            functor: &s.functor,
+                            functor: Rc::new(s.functor.clone()),
                             arguments: args,
                         },
                     }))
@@ -230,17 +231,17 @@ impl<'a> EquivalenceClasses<'a> {
                     for item in items.iter() {
                         resolved_items.push(self.resolve_term(TermView::Term(item), visiting)?);
                     }
-                    Ok(TermView::List(resolved_items.into_boxed_slice()))
+                    Ok(TermView::List(resolved_items.into()))
                 }
             },
             TermView::Literal(LiteralView { negated, structure }) => {
-                let args = match structure.arguments {
+                let args = match &structure.arguments {
                     Some(args) => {
                         let mut resolved_args = Vec::with_capacity(args.len());
-                        for arg in args {
-                            resolved_args.push(self.resolve_term(arg, visiting)?);
+                        for arg in args.iter() {
+                            resolved_args.push(self.resolve_term(arg.clone(), visiting)?);
                         }
-                        Some(resolved_args.into_boxed_slice())
+                        Some(resolved_args.into())
                     }
                     None => None,
                 };
@@ -257,10 +258,10 @@ impl<'a> EquivalenceClasses<'a> {
 
             TermView::List(items) => {
                 let mut resolved_items = Vec::with_capacity(items.len());
-                for item in items {
-                    resolved_items.push(self.resolve_term(item, visiting)?);
+                for item in items.iter() {
+                    resolved_items.push(self.resolve_term(item.clone(), visiting)?);
                 }
-                Ok(TermView::List(resolved_items.into_boxed_slice()))
+                Ok(TermView::List(resolved_items.into()))
             }
 
             TermView::Variable(v) => {

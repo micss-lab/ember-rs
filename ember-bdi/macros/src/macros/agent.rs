@@ -157,7 +157,7 @@ peg::parser! {
         rule simple_logical_expression() -> SimpleLogicalExpression
             = "not" expr:simple_logical_expression() { SimpleLogicalExpression::Not(Box::new(expr)) }
             / "(" expr:logical_expression() ")" { SimpleLogicalExpression::Group(Box::new(expr)) }
-            / "." action:pure_builtin_action() { SimpleLogicalExpression::Action(action) }
+            / "." action:pure_builtin_action_in_context() { SimpleLogicalExpression::Action(action) }
             / lit:literal() { SimpleLogicalExpression::Literal(lit) }
             / expr:relational_expression() { SimpleLogicalExpression::Rel(expr) }
 
@@ -168,7 +168,12 @@ peg::parser! {
         rule pure_builtin_action() -> PureAction
             = "now" "(" variable:VARIABLE() ")" { PureAction::Now(variable) }
             / "me" "(" variable:VARIABLE() ")" { PureAction::Me(variable) }
-            / expected!("a pure action usable in a context (`.now`, `.me`)")
+            / "append" "(" list:term() "," item:term() "," variable:VARIABLE() ")" { PureAction::Append(list, item, variable) }
+            / "member" "(" item:term() "," list:term() ")" { PureAction::Member(item, list) }
+
+        rule pure_builtin_action_in_context() -> PureAction
+            = pure_builtin_action()
+            / expected!("a pure action usable in a context (`.now`, `.me`, `.append`, `.member`)")
 
         rule relational_expression() -> RelationalExpression
             = lhs:relational_term() operator:RELATIONAL_OPERATOR() rhs:relational_term() {
@@ -229,26 +234,28 @@ peg::parser! {
             }
 
         rule builtin_action() -> BuiltinAction
+            = pure:pure_builtin_action() { BuiltinAction::Pure(pure) }
+            / impure:impure_builtin_action() { BuiltinAction::Impure(impure) }
+            / expected!("a valid system action (e.g. `.log`, `.wait`, `.at`, `.now`, `.me`, `.append`, etc.)")
+
+        rule impure_builtin_action() -> ImpureAction
             = action_log()
             / action_stop_platform()
             / action_send()
             / action_wait()
             / action_forall()
             / action_at()
-            / action_now()
-            / action_me()
-            / expected!("a valid system action (e.g. `.log`, `.wait`, `.at`, `.now`, `.me`, etc.)")
 
-        rule action_log() -> BuiltinAction
-            = "log" "(" level:STRING() terms:("," t:term() { t })* ")" { BuiltinAction::Log(level, terms.into_boxed_slice()) }
+        rule action_log() -> ImpureAction
+            = "log" "(" level:STRING() terms:("," t:term() { t })* ")" { ImpureAction::Log(level, terms.into_boxed_slice()) }
 
-        rule action_stop_platform() -> BuiltinAction
-            = "stop_platform" ("(" ")")? { BuiltinAction::StopPlatform }
+        rule action_stop_platform() -> ImpureAction
+            = "stop_platform" ("(" ")")? { ImpureAction::StopPlatform }
 
-        rule action_send() -> BuiltinAction
+        rule action_send() -> ImpureAction
             = "send" "(" aid:aid_or_variable() "," trigger:PERFORMATIVE() "," literal:literal()
               callbacks:("," c:send_callbacks() { c })? ")" {
-            BuiltinAction::Send { aid, trigger, literal, callbacks: callbacks.unwrap_or_default() }
+            ImpureAction::Send { aid, trigger, literal, callbacks: callbacks.unwrap_or_default() }
         }
 
         rule send_callbacks() -> Box<[(CallbackKind, Literal)]>
@@ -264,21 +271,14 @@ peg::parser! {
             / "on_complete" { CallbackKind::OnComplete }
             / expected!("a send callback kind (`on_success`, `on_retry`, `on_failure`, `on_complete`)")
 
-        rule action_wait() -> BuiltinAction
-            = "wait" "(" interval_millis:MILLIS() ")" { BuiltinAction::Wait { interval_millis } }
+        rule action_wait() -> ImpureAction
+            = "wait" "(" interval_millis:MILLIS() ")" { ImpureAction::Wait { interval_millis } }
 
-        rule action_forall() -> BuiltinAction
-            = "forall" "(" query:logical_expression() "," goal:literal() ")" { BuiltinAction::Forall { query, goal } }
+        rule action_forall() -> ImpureAction
+            = "forall" "(" query:logical_expression() "," goal:literal() ")" { ImpureAction::Forall { query, goal } }
 
-        rule action_at() -> BuiltinAction
-            = "at" "(" delay_millis:MILLIS() "," goal:literal() ")" { BuiltinAction::At { delay_millis, goal } }
-
-        rule action_now() -> BuiltinAction
-            = "now" "(" variable:VARIABLE() ")" { BuiltinAction::Now(variable) }
-
-        rule action_me() -> BuiltinAction
-            = "me" "(" variable:VARIABLE() ")" { BuiltinAction::Me(variable) }
-
+        rule action_at() -> ImpureAction
+            = "at" "(" delay_millis:MILLIS() "," goal:literal() ")" { ImpureAction::At { delay_millis, goal } }
 
         rule aid_or_variable() -> AidOrVariable
             = s:STRING() {?

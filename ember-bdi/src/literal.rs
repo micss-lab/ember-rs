@@ -82,6 +82,17 @@ impl LiteralView<'_> {
             structure: structure.to_owned(),
         }
     }
+
+    pub(crate) fn to_owned_view(&self) -> LiteralView<'static> {
+        let Self {
+            negated,
+            ref structure,
+        } = *self;
+        LiteralView {
+            negated,
+            structure: structure.to_owned_view(),
+        }
+    }
 }
 
 pub trait IntoLiteral: Sized {

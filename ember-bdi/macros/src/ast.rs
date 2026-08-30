@@ -97,20 +97,20 @@ pub(crate) enum LogicalExpression {
 pub(crate) enum SimpleLogicalExpression {
     Literal(Literal),
     Rel(RelationalExpression),
-    /// A pure built-in action (`.now`, `.me`) used in a context guard.
+    /// A pure built-in action (`.now`, `.me`, `.append`, `.member`) used in a context guard.
     Action(PureAction),
     Not(Box<SimpleLogicalExpression>),
     Group(Box<LogicalExpression>),
 }
 
-/// The built-in actions with no side effects, the only ones allowed in a context guard. A
-/// dedicated type rather than a `BuiltinAction` leaf: `BuiltinAction::Forall` embeds a
-/// `LogicalExpression` by value, which would make `SimpleLogicalExpression` recursively sized
-/// if it held a full `BuiltinAction` instead.
 #[derive(Debug, Clone)]
 pub(crate) enum PureAction {
     Now(Variable),
     Me(Variable),
+    /// Binds `List` with `Item` appended to the given variable.
+    Append(Term, Term, Variable),
+    /// Whether `Item` structurally equals some element of `List`.
+    Member(Term, Term),
 }
 
 #[derive(Debug, Clone)]
@@ -219,6 +219,12 @@ pub(crate) enum CallbackKind {
 
 #[derive(Debug, Clone)]
 pub enum BuiltinAction {
+    Pure(PureAction),
+    Impure(ImpureAction),
+}
+
+#[derive(Debug, Clone)]
+pub enum ImpureAction {
     Log(String, Box<[Term]>),
     StopPlatform,
     Send {
@@ -239,8 +245,6 @@ pub enum BuiltinAction {
         delay_millis: u64,
         goal: Literal,
     },
-    Now(Variable),
-    Me(Variable),
 }
 
 #[derive(Debug, Clone)]
@@ -717,27 +721,87 @@ impl AstVisitor {
 
     fn visit_builtin_action(&mut self, action: &BuiltinAction) -> impl ToTokens {
         match action {
-            BuiltinAction::Log(level, terms) => {
+            BuiltinAction::Pure(action) => {
+                let action = self.visit_pure_action(action);
+                quote! {
+                    ::ember::agent::bdi::plan::action::BuiltinAction::Pure(#action)
+                }
+            }
+            // `WaitState`/`AtState` have private fields, so the runtime only lets us build these
+            // through `BuiltinAction::wait`/`::at`, which already return the wrapped
+            // `Impure(...)` value - unlike every other `ImpureAction` variant.
+            BuiltinAction::Impure(ImpureAction::Wait { interval_millis }) => quote! {
+                ::ember::agent::bdi::plan::action::BuiltinAction::wait(::core::time::Duration::from_millis(#interval_millis))
+            },
+            BuiltinAction::Impure(ImpureAction::At { delay_millis, goal }) => {
+                let goal = self.visit_literal(goal).into_token_stream();
+                quote! {
+                    ::ember::agent::bdi::plan::action::BuiltinAction::at(
+                        ::core::time::Duration::from_millis(#delay_millis),
+                        #goal,
+                    )
+                }
+            }
+            BuiltinAction::Impure(action) => {
+                let action = self.visit_impure_action(action);
+                quote! {
+                    ::ember::agent::bdi::plan::action::BuiltinAction::Impure(#action)
+                }
+            }
+        }
+    }
+
+    fn visit_pure_action(&mut self, action: &PureAction) -> impl ToTokens {
+        match action {
+            PureAction::Now(variable) => {
+                let variable = self.visit_variable(variable).into_token_stream();
+                quote! {
+                    ::ember::agent::bdi::plan::action::PureAction::Now(#variable)
+                }
+            }
+            PureAction::Me(variable) => {
+                let variable = self.visit_variable(variable).into_token_stream();
+                quote! {
+                    ::ember::agent::bdi::plan::action::PureAction::Me(#variable)
+                }
+            }
+            PureAction::Append(list, item, variable) => {
+                let list = self.visit_term(list).into_token_stream();
+                let item = self.visit_term(item).into_token_stream();
+                let variable = self.visit_variable(variable).into_token_stream();
+                quote! {
+                    ::ember::agent::bdi::plan::action::PureAction::Append(#list, #item, #variable)
+                }
+            }
+            PureAction::Member(item, list) => {
+                let item = self.visit_term(item).into_token_stream();
+                let list = self.visit_term(list).into_token_stream();
+                quote! {
+                    ::ember::agent::bdi::plan::action::PureAction::Member(#item, #list)
+                }
+            }
+        }
+    }
+
+    fn visit_impure_action(&mut self, action: &ImpureAction) -> impl ToTokens {
+        match action {
+            ImpureAction::Log(level, terms) => {
                 let terms = terms
                     .into_iter()
                     .map(|t| self.visit_term(t).to_token_stream());
                 quote! {
-                    ::ember::agent::bdi::plan::action::BuiltinAction::Impure(
-                        ::ember::agent::bdi::plan::action::ImpureAction::Log(
-                            #level.parse().expect("failed to parse log level"),
-                            ::alloc::boxed::Box::new([#(#terms),*])
-                        )
+                    ::ember::agent::bdi::plan::action::ImpureAction::Log(
+                        #level.parse().expect("failed to parse log level"),
+                        ::alloc::boxed::Box::new([#(#terms),*])
                     )
                 }
             }
-            BuiltinAction::StopPlatform => {
+            ImpureAction::StopPlatform => {
                 quote! {
-                    ::ember::agent::bdi::plan::action::BuiltinAction::Impure(
-                        ::ember::agent::bdi::plan::action::ImpureAction::StopPlatform
-                    )
+                    ::ember::agent::bdi::plan::action::ImpureAction::StopPlatform
                 }
             }
-            BuiltinAction::Send {
+            ImpureAction::Send {
                 aid,
                 trigger,
                 literal,
@@ -793,74 +857,26 @@ impl AstVisitor {
                     quote! { (#kind_ts, #goal_ts) }
                 });
                 quote! {
-                    ::ember::agent::bdi::plan::action::BuiltinAction::Impure(
-                        ::ember::agent::bdi::plan::action::ImpureAction::SendLiteral(
-                            #aid,
-                            #trigger_ts,
-                            #literal_ts,
-                            ::alloc::boxed::Box::new([#(#callbacks_ts),*]),
-                        )
+                    ::ember::agent::bdi::plan::action::ImpureAction::SendLiteral(
+                        #aid,
+                        #trigger_ts,
+                        #literal_ts,
+                        ::alloc::boxed::Box::new([#(#callbacks_ts),*]),
                     )
                 }
             }
-            BuiltinAction::Wait { interval_millis } => {
-                quote! {
-                    ::ember::agent::bdi::plan::action::BuiltinAction::wait(::core::time::Duration::from_millis(#interval_millis))
-                }
-            }
-            BuiltinAction::Forall { query, goal } => {
+            ImpureAction::Forall { query, goal } => {
                 let query = self.visit_logical_expression(query).into_token_stream();
                 let goal = self.visit_literal(goal).into_token_stream();
                 quote! {
-                    ::ember::agent::bdi::plan::action::BuiltinAction::Impure(
-                        ::ember::agent::bdi::plan::action::ImpureAction::Forall {
-                            query: #query,
-                            goal: #goal,
-                        }
-                    )
+                    ::ember::agent::bdi::plan::action::ImpureAction::Forall {
+                        query: #query,
+                        goal: #goal,
+                    }
                 }
             }
-            BuiltinAction::At { delay_millis, goal } => {
-                let goal = self.visit_literal(goal).into_token_stream();
-                quote! {
-                    ::ember::agent::bdi::plan::action::BuiltinAction::at(
-                        ::core::time::Duration::from_millis(#delay_millis),
-                        #goal,
-                    )
-                }
-            }
-            BuiltinAction::Now(variable) => {
-                let variable = self.visit_variable(variable).into_token_stream();
-                quote! {
-                    ::ember::agent::bdi::plan::action::BuiltinAction::Pure(
-                        ::ember::agent::bdi::plan::action::PureAction::Now(#variable)
-                    )
-                }
-            }
-            BuiltinAction::Me(variable) => {
-                let variable = self.visit_variable(variable).into_token_stream();
-                quote! {
-                    ::ember::agent::bdi::plan::action::BuiltinAction::Pure(
-                        ::ember::agent::bdi::plan::action::PureAction::Me(#variable)
-                    )
-                }
-            }
-        }
-    }
-
-    fn visit_pure_action(&mut self, action: &PureAction) -> impl ToTokens {
-        match action {
-            PureAction::Now(variable) => {
-                let variable = self.visit_variable(variable).into_token_stream();
-                quote! {
-                    ::ember::agent::bdi::plan::action::PureAction::Now(#variable)
-                }
-            }
-            PureAction::Me(variable) => {
-                let variable = self.visit_variable(variable).into_token_stream();
-                quote! {
-                    ::ember::agent::bdi::plan::action::PureAction::Me(#variable)
-                }
+            ImpureAction::Wait { .. } | ImpureAction::At { .. } => {
+                unreachable!("handled directly in visit_builtin_action")
             }
         }
     }

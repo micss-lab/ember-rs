@@ -404,13 +404,13 @@ mod tests {
 
         fn execute<'b, B>(
             self,
-            _bindings: &B,
+            _bindings: B,
             _context: &mut Context<Self::UserAction>,
             _knowledge: &KnowledgeBase,
             state: &mut Self::State,
         ) -> crate::plan::action::ExecuteResult<'b, Self>
         where
-            B: crate::bindings::BindingLookup + 'b,
+            B: crate::bindings::BindingLookup,
         {
             state.push(self.0);
             crate::plan::action::ExecuteResult::Done(None)
@@ -534,13 +534,13 @@ mod tests {
 
         fn execute<'b, B>(
             self,
-            bindings: &B,
+            bindings: B,
             _context: &mut Context<Self::UserAction>,
             _knowledge: &KnowledgeBase,
             state: &mut Self::State,
         ) -> crate::plan::action::ExecuteResult<'b, Self>
         where
-            B: crate::bindings::BindingLookup + 'b,
+            B: crate::bindings::BindingLookup,
         {
             let value = bindings
                 .lookup_as_type::<f32>(&self.0)

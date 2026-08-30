@@ -1,3 +1,4 @@
+use alloc::rc::Rc;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
@@ -43,7 +44,7 @@ pub trait Resolve: Sized {
         // https://github.com/rust-lang/rust/issues/87479.
         Self: 'a;
 
-    fn resolve(self, bindings: &impl BindingLookup) -> Result<Self, ResolveFailure>;
+    fn resolve(self, bindings: impl BindingLookup) -> Result<Self, ResolveFailure>;
 
     fn resolve_as_view<'a>(
         &'a self,
@@ -56,8 +57,8 @@ impl Resolve for Literal {
 
     /// Resolve the literal using existing bindings as much as possible verifying that the
     /// created binding is valid in the place it used.
-    fn resolve(self, bindings: &impl BindingLookup) -> Result<Self, ResolveFailure> {
-        Ok(self.resolve_as_view(bindings)?.to_owned())
+    fn resolve(self, bindings: impl BindingLookup) -> Result<Self, ResolveFailure> {
+        Ok(self.resolve_as_view(&bindings)?.to_owned())
     }
 
     fn resolve_as_view<'a>(
@@ -78,8 +79,8 @@ impl Resolve for Literal {
 impl Resolve for Term {
     type View<'a> = TermView<'a>;
 
-    fn resolve(self, bindings: &impl BindingLookup) -> Result<Self, ResolveFailure> {
-        Ok(self.resolve_as_view(bindings)?.to_owned())
+    fn resolve(self, bindings: impl BindingLookup) -> Result<Self, ResolveFailure> {
+        Ok(self.resolve_as_view(&bindings)?.to_owned())
     }
 
     fn resolve_as_view<'a>(
@@ -88,13 +89,15 @@ impl Resolve for Term {
     ) -> Result<TermView<'a>, ResolveFailure> {
         Ok(match *self {
             Term::Number(_) | Term::String(_) => TermView::Term(self),
-            Term::Variable(ref v) => bindings.lookup_view(v).unwrap_or(TermView::Variable(v)),
+            Term::Variable(ref v) => bindings
+                .lookup_view(v)
+                .unwrap_or_else(|| TermView::Variable(v.clone())),
             Term::List(ref items) => TermView::List(
                 items
                     .iter()
                     .map(|t| t.resolve_as_view(bindings))
                     .collect::<Result<Vec<_>, _>>()?
-                    .into_boxed_slice(),
+                    .into(),
             ),
             Term::Literal(ref literal) => TermView::Literal(literal.resolve_as_view(bindings)?),
         })
@@ -104,8 +107,8 @@ impl Resolve for Term {
 impl Resolve for Structure {
     type View<'a> = StructureView<'a>;
 
-    fn resolve(self, bindings: &impl BindingLookup) -> Result<Self, ResolveFailure> {
-        Ok(self.resolve_as_view(bindings)?.to_owned())
+    fn resolve(self, bindings: impl BindingLookup) -> Result<Self, ResolveFailure> {
+        Ok(self.resolve_as_view(&bindings)?.to_owned())
     }
 
     fn resolve_as_view<'a>(
@@ -113,13 +116,13 @@ impl Resolve for Structure {
         bindings: &'a impl BindingLookup,
     ) -> Result<Self::View<'a>, ResolveFailure> {
         Ok(StructureView {
-            functor: &self.functor,
+            functor: Rc::new(self.functor.clone()),
             arguments: match self.arguments.as_ref() {
                 Some(args) => Some(
                     args.into_iter()
                         .map(|a| a.resolve_as_view(bindings))
                         .collect::<Result<Vec<_>, _>>()?
-                        .into_boxed_slice(),
+                        .into(),
                 ),
                 None => None,
             },
@@ -133,8 +136,8 @@ impl<A> Resolve for Formula<A> {
     where
         Self: 'a;
 
-    fn resolve(self, bindings: &impl BindingLookup) -> Result<Self, ResolveFailure> {
-        Ok(self.resolve_as_view(bindings)?.to_owned())
+    fn resolve(self, bindings: impl BindingLookup) -> Result<Self, ResolveFailure> {
+        Ok(self.resolve_as_view(&bindings)?.to_owned())
     }
 
     fn resolve_as_view<'a>(
@@ -208,7 +211,7 @@ mod tests {
         let (x, y) = (variable(), variable());
         let bindings = bindings(vec![
             (x.clone(), TermView::Number(10.0.into())),
-            (y.clone(), TermView::Variable(&x)), // Chained view referencing X
+            (y.clone(), TermView::Variable(x.clone())), // Chained view referencing X
         ]);
 
         // p(X, Y)
@@ -222,7 +225,7 @@ mod tests {
         let args = structure.arguments.expect("Should contain arguments");
         assert_eq!(args.len(), 2);
         assert_eq!(args[0], TermView::Number(10.0.into()));
-        assert_eq!(args[1], TermView::Variable(&x));
+        assert_eq!(args[1], TermView::Variable(x.clone()));
     }
 
     #[test]
