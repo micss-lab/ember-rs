@@ -139,7 +139,7 @@ mod tests {
             Literal {
                 negated: false,
                 functor: Functor("reading".into()),
-                arguments: Some(Box::new([Term::Int(42), Term::Float(3.14f32.into())])),
+                arguments: Some(Box::new([Term::Int(42), Term::Float(3.16f32.into())])),
             }
             .into(),
         );
