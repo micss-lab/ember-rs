@@ -230,7 +230,7 @@ pub enum ImpureAction {
     Send {
         aid: AidOrVariable,
         trigger: Trigger,
-        literal: Literal,
+        literal: LiteralOrVariable,
         /// `[on_failure(retry(N)), ...]`, fired by the runtime `SendCallbacks` hook, not called directly.
         callbacks: Box<[(CallbackKind, Literal)]>,
     },
@@ -239,7 +239,7 @@ pub enum ImpureAction {
     },
     Forall {
         query: LogicalExpression,
-        goal: Literal,
+        goal: LiteralOrVariable,
     },
     At {
         delay_millis: u64,
@@ -253,6 +253,12 @@ pub enum AidOrVariable {
         aid_name: String,
         aid_platform: Option<String>,
     },
+    Variable(Variable),
+}
+
+#[derive(Debug, Clone)]
+pub enum LiteralOrVariable {
+    Literal(Literal),
     Variable(Variable),
 }
 
@@ -729,7 +735,7 @@ impl AstVisitor {
             }
             // `WaitState`/`AtState` have private fields, so the runtime only lets us build these
             // through `BuiltinAction::wait`/`::at`, which already return the wrapped
-            // `Impure(...)` value - unlike every other `ImpureAction` variant.
+            // `Impure(...)` value, unlike every other `ImpureAction` variant.
             BuiltinAction::Impure(ImpureAction::Wait { interval_millis }) => quote! {
                 ::ember::agent::bdi::plan::action::BuiltinAction::wait(::core::time::Duration::from_millis(#interval_millis))
             },
@@ -807,28 +813,7 @@ impl AstVisitor {
                 literal,
                 callbacks,
             } => {
-                let aid = match aid {
-                    AidOrVariable::Aid {
-                        aid_name,
-                        aid_platform,
-                    } => {
-                        let aid = match aid_platform {
-                            None => quote! { ::ember::agent::Aid::local(#aid_name) },
-                            Some(p) => quote! { ::ember::agent::Aid::general(#aid_name, #p) },
-                        };
-                        quote! {
-                            ::ember::agent::bdi::plan::action::VariableOrReceiver::Receiver(
-                                ::ember::message::Receiver::from(#aid)
-                            )
-                        }
-                    }
-                    AidOrVariable::Variable(v) => {
-                        let variable = self.visit_variable(v).into_token_stream();
-                        quote! {
-                            ::ember::agent::bdi::plan::action::VariableOrReceiver::Variable(#variable)
-                        }
-                    }
-                };
+                let aid = self.visit_aid_or_variable(aid).into_token_stream();
                 let trigger_ts = match trigger {
                     Trigger::Addition => quote! {
                         ::ember::agent::bdi::event::Trigger::Addition
@@ -837,7 +822,7 @@ impl AstVisitor {
                         ::ember::agent::bdi::event::Trigger::Deletion
                     },
                 };
-                let literal_ts = self.visit_literal(literal).into_token_stream();
+                let literal_ts = self.visit_literal_or_variable(literal).into_token_stream();
                 let callbacks_ts = callbacks.iter().map(|(kind, goal)| {
                     let kind_ts = match kind {
                         CallbackKind::OnSuccess => quote! {
@@ -854,7 +839,12 @@ impl AstVisitor {
                         },
                     };
                     let goal_ts = self.visit_literal(goal).into_token_stream();
-                    quote! { (#kind_ts, #goal_ts) }
+                    quote! {
+                        (
+                            #kind_ts,
+                            ::ember::agent::bdi::term::owned::composite::VariableOrLiteral::Literal(#goal_ts),
+                        )
+                    }
                 });
                 quote! {
                     ::ember::agent::bdi::plan::action::ImpureAction::SendLiteral(
@@ -867,7 +857,7 @@ impl AstVisitor {
             }
             ImpureAction::Forall { query, goal } => {
                 let query = self.visit_logical_expression(query).into_token_stream();
-                let goal = self.visit_literal(goal).into_token_stream();
+                let goal = self.visit_literal_or_variable(goal).into_token_stream();
                 quote! {
                     ::ember::agent::bdi::plan::action::ImpureAction::Forall {
                         query: #query,
@@ -877,6 +867,48 @@ impl AstVisitor {
             }
             ImpureAction::Wait { .. } | ImpureAction::At { .. } => {
                 unreachable!("handled directly in visit_builtin_action")
+            }
+        }
+    }
+
+    fn visit_aid_or_variable(&mut self, aid: &AidOrVariable) -> impl ToTokens {
+        match aid {
+            AidOrVariable::Aid {
+                aid_name,
+                aid_platform,
+            } => {
+                let aid = match aid_platform {
+                    None => quote! { ::ember::agent::Aid::local(#aid_name) },
+                    Some(p) => quote! { ::ember::agent::Aid::general(#aid_name, #p) },
+                };
+                quote! {
+                    ::ember::agent::bdi::term::owned::composite::VariableOrReceiver::Receiver(
+                        ::ember::message::Receiver::from(#aid)
+                    )
+                }
+            }
+            AidOrVariable::Variable(v) => {
+                let variable = self.visit_variable(v);
+                quote! {
+                    ::ember::agent::bdi::term::owned::composite::VariableOrReceiver::Variable(#variable)
+                }
+            }
+        }
+    }
+
+    fn visit_literal_or_variable(&mut self, literal: &LiteralOrVariable) -> impl ToTokens {
+        match literal {
+            LiteralOrVariable::Literal(literal) => {
+                let literal = self.visit_literal(literal);
+                quote! {
+                    ::ember::agent::bdi::term::owned::composite::VariableOrLiteral::Literal(#literal)
+                }
+            }
+            LiteralOrVariable::Variable(v) => {
+                let variable = self.visit_variable(v);
+                quote! {
+                    ::ember::agent::bdi::term::owned::composite::VariableOrLiteral::Variable(#variable)
+                }
             }
         }
     }

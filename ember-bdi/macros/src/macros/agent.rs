@@ -253,7 +253,7 @@ peg::parser! {
             = "stop_platform" ("(" ")")? { ImpureAction::StopPlatform }
 
         rule action_send() -> ImpureAction
-            = "send" "(" aid:aid_or_variable() "," trigger:PERFORMATIVE() "," literal:literal()
+            = "send" "(" aid:aid_or_variable() "," trigger:PERFORMATIVE() "," literal:literal_or_variable()
               callbacks:("," c:send_callbacks() { c })? ")" {
             ImpureAction::Send { aid, trigger, literal, callbacks: callbacks.unwrap_or_default() }
         }
@@ -275,7 +275,7 @@ peg::parser! {
             = "wait" "(" interval_millis:MILLIS() ")" { ImpureAction::Wait { interval_millis } }
 
         rule action_forall() -> ImpureAction
-            = "forall" "(" query:logical_expression() "," goal:literal() ")" { ImpureAction::Forall { query, goal } }
+            = "forall" "(" query:logical_expression() "," goal:literal_or_variable() ")" { ImpureAction::Forall { query, goal } }
 
         rule action_at() -> ImpureAction
             = "at" "(" delay_millis:MILLIS() "," goal:literal() ")" { ImpureAction::At { delay_millis, goal } }
@@ -294,6 +294,10 @@ peg::parser! {
             Ok(AidOrVariable::Aid { aid_name: name.to_string(), aid_platform })
         }
             / var:VARIABLE() { AidOrVariable::Variable(var) }
+
+        rule literal_or_variable() -> LiteralOrVariable
+            = l:literal() { LiteralOrVariable::Literal(l) }
+            / v:VARIABLE() { LiteralOrVariable::Variable(v) }
 
         rule PERFORMATIVE() -> Trigger
             = s:STRING() {?

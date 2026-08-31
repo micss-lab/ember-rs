@@ -9,6 +9,8 @@ use ember_util::cmp::TotalCmpF32;
 use crate::literal::Literal;
 use crate::variable::{Variable, VariableId};
 
+pub mod composite;
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Term {
     // TODO: Support full arithmetic formulas here.

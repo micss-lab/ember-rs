@@ -476,6 +476,7 @@ mod tests {
     use crate::knowledge::query::IntoQuery;
 
     use crate::plan::{Action, BuiltinAction, Formula, ImpureAction};
+    use crate::term::owned::composite::VariableOrLiteral;
     use crate::testing::{
         assert_belief, literal, literal_formula, plan, string, trigger, variable, variable_term,
     };
@@ -686,7 +687,10 @@ mod tests {
                 Formula::Action(Action::Builtin(BuiltinAction::Impure(
                     ImpureAction::Forall {
                         query: literal_formula("item", vec![variable_term(&x)]),
-                        goal: literal("mark_processed", vec![variable_term(&x)]),
+                        goal: VariableOrLiteral::Literal(literal(
+                            "mark_processed",
+                            vec![variable_term(&x)],
+                        )),
                     },
                 ))),
                 Formula::Action(Action::User(TestAction::Log("after_forall"))),

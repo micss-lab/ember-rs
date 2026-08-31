@@ -21,8 +21,9 @@ use crate::knowledge::base::KnowledgeBase;
 use crate::knowledge::query::IntoQuery;
 use crate::literal::Literal;
 use crate::plan::{GoalKind, TriggeringEvent};
-use crate::resolve::{Resolve, ResolveFailure};
+use crate::resolve::Resolve;
 use crate::term::Term;
+use crate::term::owned::composite::{VariableOrLiteral, VariableOrReceiver};
 use crate::term::view::TermView;
 use crate::variable::Variable;
 
@@ -308,14 +309,17 @@ pub enum ImpureAction {
     SendLiteral(
         VariableOrReceiver,
         Trigger,
-        Literal,
-        Box<[(CallbackKind, Literal)]>,
+        VariableOrLiteral,
+        Box<[(CallbackKind, VariableOrLiteral)]>,
     ),
     /// Halt the execution of an agents intention until the interval is finished. Construct this
     /// variant with the `[wait](WaitState::wait)` member function.
     Wait(WaitState),
     /// Spawn a new intention for all possible bindings resulting from unification with the pattern.
-    Forall { query: QueryFormula, goal: Literal },
+    Forall {
+        query: QueryFormula,
+        goal: VariableOrLiteral,
+    },
     /// Raises an achievement-goal event once `delay` has elapsed. Construct this variant with
     /// the `[at](BuiltinAction::at)` member function.
     At(AtState),
@@ -349,13 +353,6 @@ impl ImpureAction {
                 ExecuteResult::Done(None)
             }
             SendLiteral(receiver, trigger, literal, callbacks) => {
-                let literal = match literal.resolve(&bindings) {
-                    Ok(lit) => lit,
-                    Err(_) => {
-                        log::error!("failed to resolve literal to send");
-                        return ExecuteResult::Done(None);
-                    }
-                };
                 let performative = match trigger {
                     Trigger::Addition => Performative::Inform,
                     Trigger::Deletion => Performative::NotUnderstood,
@@ -371,6 +368,14 @@ impl ImpureAction {
                         return ExecuteResult::Done(None);
                     }
                 };
+
+                let literal = match literal.resolve(&bindings) {
+                    Ok(VariableOrLiteral::Literal(l)) => l,
+                    _ => {
+                        log::error!(".send literal arg did not resolve to a literal");
+                        return ExecuteResult::Done(None);
+                    }
+                };
                 let my_aid = Aid::local(context.pure.agent_name.as_ref().clone().into_owned());
                 let mut builder = context.send_message(Message {
                     performative,
@@ -381,9 +386,9 @@ impl ImpureAction {
                 });
                 for (kind, goal) in Vec::from(callbacks) {
                     let goal = match goal.resolve(&bindings) {
-                        Ok(goal) => goal,
-                        Err(_) => {
-                            log::error!("failed to resolve .send callback goal");
+                        Ok(VariableOrLiteral::Literal(l)) => l,
+                        _ => {
+                            log::error!("failed to resolve .send callback goal to a literal");
                             continue;
                         }
                     };
@@ -409,10 +414,10 @@ impl ImpureAction {
                 let mut query = query.into_query(knowledge, &pure_context);
                 while let Some(bindings) = query.next_bindings(Some(&bindings.as_bindings())) {
                     let goal = match goal.clone().resolve(&bindings) {
-                        Ok(goal) => goal,
-                        Err(_) => {
+                        Ok(VariableOrLiteral::Literal(l)) => l,
+                        _ => {
                             log::error!(
-                                "failed to resolve goal in forall body with queried bindings"
+                                "failed to resolve goal in forall body with queried bindings to a literal"
                             );
                             continue;
                         }
@@ -504,37 +509,6 @@ impl WaitState {
         ExecuteResult::Pending(Self {
             start: Some(start),
             interval,
-        })
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum VariableOrReceiver {
-    Variable(Variable),
-    Receiver(Receiver),
-}
-
-impl Resolve for VariableOrReceiver {
-    type View<'a>
-        = Self
-    where
-        Self: 'a;
-
-    fn resolve(self, bindings: impl BindingLookup) -> Result<Self, ResolveFailure> {
-        self.resolve_as_view(&bindings)
-    }
-
-    fn resolve_as_view<'a>(
-        &'a self,
-        bindings: &'a impl BindingLookup,
-    ) -> Result<Self::View<'a>, ResolveFailure> {
-        Ok(match self {
-            VariableOrReceiver::Variable(v) => match bindings.lookup_as_type::<Aid>(v) {
-                Some(Ok(aid)) => VariableOrReceiver::Receiver(Receiver::Single(aid)),
-                Some(Err(e)) => return Err(ResolveFailure::ConversionFailed(e)),
-                None => VariableOrReceiver::Variable(v.clone()),
-            },
-            VariableOrReceiver::Receiver(_) => self.clone(),
         })
     }
 }
@@ -810,7 +784,7 @@ mod tests {
             let action = BuiltinAction::Impure(ImpureAction::SendLiteral(
                 VariableOrReceiver::Variable(receiver_var),
                 Trigger::Addition,
-                literal("ack", vec![]),
+                VariableOrLiteral::Literal(literal("ack", vec![])),
                 Box::new([]),
             ));
 
@@ -834,7 +808,7 @@ mod tests {
             let action = BuiltinAction::Impure(ImpureAction::SendLiteral(
                 VariableOrReceiver::Receiver(Receiver::Single(Aid::local("receiver-agent"))),
                 Trigger::Deletion,
-                literal("ack", vec![]),
+                VariableOrLiteral::Literal(literal("ack", vec![])),
                 Box::new([]),
             ));
 
@@ -857,7 +831,7 @@ mod tests {
             let action = BuiltinAction::Impure(ImpureAction::SendLiteral(
                 VariableOrReceiver::Receiver(Receiver::Single(Aid::local("receiver-agent"))),
                 Trigger::Addition,
-                literal("location", vec![variable_term(&var)]),
+                VariableOrLiteral::Literal(literal("location", vec![variable_term(&var)])),
                 Box::new([]),
             ));
 
@@ -879,7 +853,7 @@ mod tests {
             let action = BuiltinAction::Impure(ImpureAction::SendLiteral(
                 VariableOrReceiver::Variable(variable()),
                 Trigger::Addition,
-                literal("ack", vec![]),
+                VariableOrLiteral::Literal(literal("ack", vec![])),
                 Box::new([]),
             ));
 
@@ -900,10 +874,10 @@ mod tests {
             let action = BuiltinAction::Impure(ImpureAction::SendLiteral(
                 VariableOrReceiver::Receiver(Receiver::Single(Aid::local("receiver-agent"))),
                 Trigger::Addition,
-                literal("ack", vec![]),
+                VariableOrLiteral::Literal(literal("ack", vec![])),
                 Box::new([(
                     CallbackKind::OnFailure,
-                    literal("retry", vec![variable_term(&var)]),
+                    VariableOrLiteral::Literal(literal("retry", vec![variable_term(&var)])),
                 )]),
             ));
 
@@ -1062,7 +1036,7 @@ mod tests {
             let x = variable();
             let action = BuiltinAction::Impure(ImpureAction::Forall {
                 query: literal_formula("item", vec![variable_term(&x)]),
-                goal: literal("process", vec![variable_term(&x)]),
+                goal: VariableOrLiteral::Literal(literal("process", vec![variable_term(&x)])),
             });
 
             let result = action.execute(&bindings, &mut context, &knowledge);
@@ -1089,7 +1063,7 @@ mod tests {
             let x = variable();
             let action = BuiltinAction::Impure(ImpureAction::Forall {
                 query: literal_formula("item", vec![variable_term(&x)]),
-                goal: literal("process", vec![variable_term(&x)]),
+                goal: VariableOrLiteral::Literal(literal("process", vec![variable_term(&x)])),
             });
 
             let result = action.execute(&bindings, &mut context, &knowledge);
@@ -1135,7 +1109,10 @@ mod tests {
             let (x, y) = (variable(), variable());
             let action = BuiltinAction::Impure(ImpureAction::Forall {
                 query: literal_formula("pair", vec![variable_term(&x), variable_term(&y)]),
-                goal: literal("process", vec![variable_term(&x), variable_term(&y)]),
+                goal: VariableOrLiteral::Literal(literal(
+                    "process",
+                    vec![variable_term(&x), variable_term(&y)],
+                )),
             });
 
             let result = action.execute(&bindings, &mut context, &knowledge);
@@ -1169,7 +1146,10 @@ mod tests {
 
             let action = BuiltinAction::Impure(ImpureAction::Forall {
                 query: literal_formula("item", vec![variable_term(&x)]),
-                goal: literal("process", vec![variable_term(&x), variable_term(&room)]),
+                goal: VariableOrLiteral::Literal(literal(
+                    "process",
+                    vec![variable_term(&x), variable_term(&room)],
+                )),
             });
 
             let result = action.execute(&bindings, &mut context, &knowledge);
