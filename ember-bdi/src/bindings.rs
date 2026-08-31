@@ -52,13 +52,13 @@ impl<'a> Bindings<'a> {
         self.get_view(variable).cloned()
     }
 
-    /// Lookup the given variable as a reference to the stored view.
-    pub(crate) fn lookup(&self, variable: &Variable) -> Option<TermRef<'_>> {
+    /// Lookup the term bound to the given variable.
+    pub fn lookup(&self, variable: &Variable) -> Option<TermRef<'_>> {
         Some(self.get_view(variable)?.into())
     }
 
-    /// Loopup the term bound to the given variable and parse the term into the required type.
-    pub(crate) fn lookup_as_type<T>(&self, variable: &Variable) -> Option<Result<T, FromTermError>>
+    /// Lookup the term bound to the given variable and parse it into the required type.
+    pub fn lookup_as_type<T>(&self, variable: &Variable) -> Option<Result<T, FromTermError>>
     where
         T: for<'s> FromTerm<'s>,
     {

@@ -343,8 +343,9 @@ pub(crate) enum QueryOperand<'a> {
         /// if it has new solutions. Using `evaluated`, `None` can be returned after the first call.
         evaluated: bool,
     },
-    /// A pure built-in action (`.now`, `.me`) used as a leaf. Same single-shot shape as
-    /// `Relational`: it doesn't read the belief base, so there's nothing to backtrack into.
+    /// A pure built-in action (`.now`, `.me`, `.findall`, `.min`, `.max`) used as a leaf. Same
+    /// single-shot shape as `Relational`: it fully resolves in one call, so there's nothing to
+    /// backtrack into.
     Action {
         action: &'a PureAction,
         evaluated: bool,
@@ -434,8 +435,11 @@ impl<'a> QueryOperand<'a> {
                 } else {
                     *evaluated = true;
                     let empty_bindings: Bindings<'static> = Bindings::empty();
-                    let fresh = action
-                        .evaluate(existing_bindings.unwrap_or(&empty_bindings), pure_context)?;
+                    let fresh = action.evaluate(
+                        existing_bindings.unwrap_or(&empty_bindings),
+                        pure_context,
+                        knowledge_base,
+                    )?;
                     match existing_bindings {
                         Some(existing) => Bindings::merge_views([existing, &fresh]).ok(),
                         None => Some(fresh),
@@ -556,7 +560,8 @@ pub(crate) mod formula {
         },
         Literal(Literal),
         Relational(RelationalQueryFormula),
-        /// A pure built-in action (`.now`, `.me`, `.member`), the only kind allowed in a context guard.
+        /// A pure built-in action (`.now`, `.me`, `.member`, `.findall`, `.min`, `.max`), the
+        /// only kind allowed in a context guard.
         Action(PureAction),
     }
 
@@ -820,8 +825,10 @@ mod tests {
         ArithmeticExpression, ArithmeticOperator, CompareOperator, LogicalOperator, PureAction,
         QueryFormula, RelationalOperator, RelationalQueryFormula,
     };
+    use crate::term::owned::composite::VariableOrList;
     use crate::term::view::TermView;
     use crate::term::{Atom, Structure, Term};
+    use crate::variable::Variable;
 
     use crate::testing::*;
 
@@ -916,8 +923,20 @@ mod tests {
         })
     }
 
-    fn member(item: Term, list: Term) -> QueryFormula {
+    fn member(item: Term, list: VariableOrList) -> QueryFormula {
         QueryFormula::Action(PureAction::Member(item, list))
+    }
+
+    fn findall(template: Term, query: QueryFormula, variable: Variable) -> QueryFormula {
+        QueryFormula::Action(PureAction::Findall(template, Box::new(query), variable))
+    }
+
+    fn min(list: VariableOrList, minimal: Term) -> QueryFormula {
+        QueryFormula::Action(PureAction::Min(list, minimal))
+    }
+
+    fn max(list: VariableOrList, maximal: Term) -> QueryFormula {
+        QueryFormula::Action(PureAction::Max(list, maximal))
     }
 
     // --- Tests ---
@@ -993,7 +1012,7 @@ mod tests {
 
         let formula = member(
             string("b"),
-            list(vec![string("a"), string("b"), string("c")]),
+            variable_or_list(vec![string("a"), string("b"), string("c")]),
         );
 
         assert!(
@@ -1011,7 +1030,7 @@ mod tests {
 
         let formula = member(
             string("z"),
-            list(vec![string("a"), string("b"), string("c")]),
+            variable_or_list(vec![string("a"), string("b"), string("c")]),
         );
 
         assert!(
@@ -1033,7 +1052,10 @@ mod tests {
         // via(Via) & not .member(Via, [n1])
         let formula = and(vec![
             literal("via", vec![variable_term(&via)]),
-            not(member(variable_term(&via), list(vec![string("n1")]))),
+            not(member(
+                variable_term(&via),
+                variable_or_list(vec![string("n1")]),
+            )),
         ]);
 
         let mut query = (&formula).into_query(&bb, &pure_context);
@@ -1042,6 +1064,230 @@ mod tests {
             .expect("n2 is not yet visited and should still match");
         assert_eq!(bindings.get_view(&via), Some(&string("n2").as_view()));
         assert!(query.next_bindings(None).is_none());
+    }
+
+    #[test]
+    fn findall_builds_the_list_in_solution_order() {
+        let pure_context = pure_context();
+        let mut bb = KnowledgeBase::default();
+        bb.assert_no_event(belief("a", vec![number(30.0)]));
+        bb.assert_no_event(belief("a", vec![number(20.0)]));
+
+        let x = variable();
+        let out = variable();
+        let formula = findall(
+            variable_term(&x),
+            literal("a", vec![variable_term(&x)]),
+            out.clone(),
+        );
+
+        let mut query = (&formula).into_query(&bb, &pure_context);
+        let bindings = query.next_bindings(None).expect(".findall always succeeds");
+        assert_eq!(
+            bindings.get_view(&out).map(TermView::to_owned),
+            Some(list(vec![number(30.0), number(20.0)]))
+        );
+    }
+
+    #[test]
+    fn findall_with_no_solutions_binds_an_empty_list() {
+        let pure_context = pure_context();
+        let bb = KnowledgeBase::default();
+
+        let x = variable();
+        let out = variable();
+        let formula = findall(
+            variable_term(&x),
+            literal("a", vec![variable_term(&x)]),
+            out.clone(),
+        );
+
+        let mut query = (&formula).into_query(&bb, &pure_context);
+        let bindings = query
+            .next_bindings(None)
+            .expect(".findall succeeds even with zero solutions");
+        assert_eq!(
+            bindings.get_view(&out).map(TermView::to_owned),
+            Some(list(vec![]))
+        );
+    }
+
+    #[test]
+    fn min_and_max_bind_the_smallest_and_largest_element() {
+        let pure_context = pure_context();
+        let bb = KnowledgeBase::default();
+
+        let x = variable();
+        let min_formula = min(
+            variable_or_list(vec![number(3.0), number(1.0), number(2.0)]),
+            variable_term(&x),
+        );
+        let bindings = (&min_formula)
+            .into_query(&bb, &pure_context)
+            .next_bindings(None)
+            .expect(".min should succeed on a non-empty list");
+        assert_eq!(
+            bindings.get_view(&x).map(TermView::to_owned),
+            Some(number(1.0))
+        );
+
+        let y = variable();
+        let max_formula = max(
+            variable_or_list(vec![number(3.0), number(1.0), number(2.0)]),
+            variable_term(&y),
+        );
+        let bindings = (&max_formula)
+            .into_query(&bb, &pure_context)
+            .next_bindings(None)
+            .expect(".max should succeed on a non-empty list");
+        assert_eq!(
+            bindings.get_view(&y).map(TermView::to_owned),
+            Some(number(3.0))
+        );
+    }
+
+    #[test]
+    fn min_and_max_fail_on_an_empty_list() {
+        let pure_context = pure_context();
+        let bb = KnowledgeBase::default();
+
+        let x = variable();
+        assert!(
+            (&min(variable_or_list(vec![]), variable_term(&x)))
+                .into_query(&bb, &pure_context)
+                .next_bindings(None)
+                .is_none()
+        );
+        assert!(
+            (&max(variable_or_list(vec![]), variable_term(&x)))
+                .into_query(&bb, &pure_context)
+                .next_bindings(None)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn min_check_mode_matches_or_fails_against_the_found_minimum() {
+        let pure_context = pure_context();
+        let bb = KnowledgeBase::default();
+
+        let matching = min(
+            variable_or_list(vec![number(3.0), number(1.0)]),
+            number(1.0),
+        );
+        assert!(
+            (&matching)
+                .into_query(&bb, &pure_context)
+                .next_bindings(None)
+                .is_some()
+        );
+
+        let mismatching = min(
+            variable_or_list(vec![number(3.0), number(1.0)]),
+            number(2.0),
+        );
+        assert!(
+            (&mismatching)
+                .into_query(&bb, &pure_context)
+                .next_bindings(None)
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn findall_and_min_solve_an_argmin_inside_a_rule_body() {
+        let pure_context = pure_context();
+        let mut bb = KnowledgeBase::default();
+        bb.assert_no_event(belief("via_hops", vec![string("n1"), number(2.0)]));
+        bb.assert_no_event(belief("via_hops", vec![string("n2"), number(1.0)]));
+        bb.assert_no_event(belief("via_hops", vec![string("n3"), number(1.0)]));
+        bb.assert_no_event(belief(
+            "neighbor",
+            vec![string("n1"), string("x"), number(5.0)],
+        ));
+        bb.assert_no_event(belief(
+            "neighbor",
+            vec![string("n2"), string("x"), number(3.0)],
+        ));
+        bb.assert_no_event(belief(
+            "neighbor",
+            vec![string("n3"), string("x"), number(2.0)],
+        ));
+
+        let route = |hops: Term, id: Term, via: Term| {
+            Term::Literal(crate::testing::literal("route", vec![hops, id, via]))
+        };
+
+        let (via, hops, id) = (variable(), variable(), variable());
+        let (route_via, route_hops, route_id) = (variable(), variable(), variable());
+        let routes = variable();
+
+        // best_via(Via, Hops, Id) :-
+        //     .findall(route(Hops2, Id2, Via2), via_hops(Via2, Hops2) & neighbor(Via2, _, Id2), Routes)
+        //     & .min(Routes, route(Hops, Id, Via)).
+        bb.assert_no_event(rule(
+            "best_via",
+            vec![
+                variable_term(&via),
+                variable_term(&hops),
+                variable_term(&id),
+            ],
+            and(vec![
+                findall(
+                    route(
+                        variable_term(&route_hops),
+                        variable_term(&route_id),
+                        variable_term(&route_via),
+                    ),
+                    and(vec![
+                        literal(
+                            "via_hops",
+                            vec![variable_term(&route_via), variable_term(&route_hops)],
+                        ),
+                        literal(
+                            "neighbor",
+                            vec![
+                                variable_term(&route_via),
+                                variable_term(&variable()),
+                                variable_term(&route_id),
+                            ],
+                        ),
+                    ]),
+                    routes.clone(),
+                ),
+                min(
+                    VariableOrList::Variable(routes.clone()),
+                    route(
+                        variable_term(&hops),
+                        variable_term(&id),
+                        variable_term(&via),
+                    ),
+                ),
+            ]),
+        ));
+
+        let goal = literal(
+            "best_via",
+            vec![
+                variable_term(&via),
+                variable_term(&hops),
+                variable_term(&id),
+            ],
+        );
+        let bindings = (&goal)
+            .into_query(&bb, &pure_context)
+            .next_bindings(None)
+            .expect("best_via should find the lowest-hops, tie-broken-by-id route");
+
+        assert_eq!(bindings.get_view(&via), Some(&string("n3").as_view()));
+        assert_eq!(
+            bindings.get_view(&hops).map(TermView::to_owned),
+            Some(number(1.0))
+        );
+        assert_eq!(
+            bindings.get_view(&id).map(TermView::to_owned),
+            Some(number(2.0))
+        );
     }
 
     #[test]

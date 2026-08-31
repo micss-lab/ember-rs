@@ -10,7 +10,7 @@ use log::info;
 
 use ember::Container;
 use ember::agent::bdi::BdiAgent;
-use ember::agent::bdi::bindings::BindingLookup;
+use ember::agent::bdi::bindings::Bindings;
 use ember::agent::bdi::knowledge::base::KnowledgeBase;
 use ember::agent::bdi::knowledge::belief::Knowledge;
 use ember::agent::bdi::literal::{IntoLiteral, Literal};
@@ -98,16 +98,13 @@ impl Execute for AgentAction {
 
     type UserAction = Self;
 
-    fn execute<'b, B>(
+    fn execute<'b>(
         self,
-        bindings: B,
+        bindings: &Bindings<'b>,
         _context: &mut ember::agent::bdi::context::Context<Self::UserAction>,
         _knowledge: &ember::agent::bdi::knowledge::base::KnowledgeBase,
         _state: &mut Self::State,
-    ) -> ember::agent::bdi::plan::action::ExecuteResult<'b, Self>
-    where
-        B: BindingLookup,
-    {
+    ) -> ember::agent::bdi::plan::action::ExecuteResult<'b, Self> {
         match self {
             AgentAction::Move { from, to } => {
                 let from = bindings

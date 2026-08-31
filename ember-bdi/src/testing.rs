@@ -12,6 +12,7 @@ use crate::knowledge::base::KnowledgeBase;
 use crate::literal::Literal;
 use crate::plan::action::{Execute, ExecuteResult};
 use crate::plan::{Formula, GoalKind, Plan, QueryFormula, Trigger, TriggeringEvent};
+use crate::term::owned::composite::VariableOrList;
 use crate::term::view::TermView;
 use crate::term::{Atom, Structure, Term};
 use crate::variable::Variable;
@@ -49,6 +50,10 @@ pub fn number(num: f32) -> Term {
 
 pub fn list(items: Vec<Term>) -> Term {
     Term::List(items.into_boxed_slice())
+}
+
+pub fn variable_or_list(items: Vec<Term>) -> VariableOrList {
+    VariableOrList::List(items.into_boxed_slice())
 }
 pub fn trigger(functor: &str, args: Vec<Term>, goal: Option<GoalKind>) -> TriggeringEvent {
     TriggeringEvent {

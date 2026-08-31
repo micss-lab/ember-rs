@@ -23,8 +23,11 @@ use crate::literal::Literal;
 use crate::plan::{GoalKind, TriggeringEvent};
 use crate::resolve::Resolve;
 use crate::term::Term;
-use crate::term::owned::composite::{VariableOrLiteral, VariableOrReceiver};
+use crate::term::owned::composite::{
+    VariableOrList, VariableOrListView, VariableOrLiteral, VariableOrReceiver,
+};
 use crate::term::view::TermView;
+use crate::unification::traits::UnifyView;
 use crate::variable::Variable;
 
 use super::QueryFormula;
@@ -173,7 +176,7 @@ impl BuiltinAction {
     ) -> ExecuteResult<'b, Self> {
         match self {
             BuiltinAction::Pure(action) => {
-                ExecuteResult::Done(action.evaluate(bindings, &context.pure))
+                ExecuteResult::Done(action.evaluate(bindings, &context.pure, knowledge))
             }
             BuiltinAction::Impure(action) => action
                 .execute(bindings, context, knowledge)
@@ -200,9 +203,15 @@ pub enum PureAction {
     // not only a fetch.
     Me(Variable),
     /// Binds `List` with `Item` appended to the given variable.
-    Append(Term, Term, Variable),
+    Append(VariableOrList, Term, Variable),
     /// Whether `Item` structurally equals some element of `List`.
-    Member(Term, Term),
+    Member(Term, VariableOrList),
+    /// Binds `List` to every instantiation of `Template` that satisfies `Query`.
+    Findall(Term, Box<QueryFormula>, Variable),
+    /// Checks `Minimal` against, or binds it to, the smallest element of `List`.
+    Min(VariableOrList, Term),
+    /// Checks `Maximal` against, or binds it to, the largest element of `List`.
+    Max(VariableOrList, Term),
 }
 
 impl PureAction {
@@ -210,6 +219,7 @@ impl PureAction {
         &self,
         bindings: &Bindings<'_>,
         pure_context: &PureContext,
+        knowledge: &KnowledgeBase,
     ) -> Option<Bindings<'static>> {
         Some(match self {
             PureAction::Now(variable) => {
@@ -235,7 +245,7 @@ impl PureAction {
             }
             PureAction::Append(list, item, variable) => {
                 let items = match list.resolve_as_view(bindings) {
-                    Ok(TermView::List(items)) => items,
+                    Ok(VariableOrListView::List(items)) => items,
                     _ => {
                         // TODO: Like in prolog, solve this using lazy evaluation.
                         log::error!(".append: first argument did not resolve to a list");
@@ -256,7 +266,7 @@ impl PureAction {
             }
             PureAction::Member(item, list) => {
                 let item = item.resolve_as_view(bindings).ok()?;
-                let TermView::List(items) = list.resolve_as_view(bindings).ok()? else {
+                let VariableOrListView::List(items) = list.resolve_as_view(bindings).ok()? else {
                     // TODO: Like in prolog, solve this using lazy evaluation.
                     log::error!(".member: first argument did not resolve to a list");
                     return None;
@@ -265,6 +275,45 @@ impl PureAction {
                     return None;
                 }
                 Bindings::empty()
+            }
+            PureAction::Findall(template, query, variable) => {
+                let mut query = query.into_query(knowledge, pure_context);
+                let mut items = Vec::new();
+                while let Some(solution) = query.next_bindings(Some(bindings)) {
+                    let Ok(view) = template.resolve_as_view(&solution) else {
+                        log::error!(
+                            ".findall: failed to resolve template against a query solution"
+                        );
+                        return None;
+                    };
+                    items.push(view.to_owned_view());
+                }
+                Bindings::new(
+                    [(variable.id, Some(TermView::List(items.into())))],
+                    AliasMap::empty(),
+                )
+            }
+            PureAction::Min(list, minimal) => {
+                let VariableOrListView::List(items) = list.resolve_as_view(bindings).ok()? else {
+                    log::error!(".min: first argument did not resolve to a list");
+                    return None;
+                };
+                let found = items.iter().min()?;
+                let resolved_minimal = minimal.resolve_as_view(bindings).ok()?;
+                let constraints = resolved_minimal.collect_constraints(found.clone()).ok()?;
+                let solved = Bindings::build_from_constraints(constraints, None).ok()?;
+                solved.into_owned()
+            }
+            PureAction::Max(list, maximal) => {
+                let VariableOrListView::List(items) = list.resolve_as_view(bindings).ok()? else {
+                    log::error!(".max: first argument did not resolve to a list");
+                    return None;
+                };
+                let found = items.iter().max()?;
+                let resolved_maximal = maximal.resolve_as_view(bindings).ok()?;
+                let constraints = resolved_maximal.collect_constraints(found.clone()).ok()?;
+                let solved = Bindings::build_from_constraints(constraints, None).ok()?;
+                solved.into_owned()
             }
         })
     }
@@ -515,7 +564,7 @@ mod tests {
     use crate::term::view::TermView;
     use crate::testing::{
         bindings, list, new_context_with_environment, new_context_without_environment, string,
-        variable, variable_term,
+        variable, variable_or_list, variable_term,
     };
 
     use super::*;
@@ -645,7 +694,7 @@ mod tests {
         let var = variable();
 
         let action = BuiltinAction::Pure(PureAction::Append(
-            list(vec![string("a"), string("b")]),
+            variable_or_list(vec![string("a"), string("b")]),
             string("c"),
             var.clone(),
         ));
@@ -662,15 +711,17 @@ mod tests {
     }
 
     #[test]
-    fn test_append_fails_when_the_first_argument_is_not_a_list() {
+    fn test_append_fails_when_the_list_variable_is_not_bound_to_a_list() {
         // SAFETY: `.append` never touches the environment.
         let mut context: Context<()> = unsafe { new_context_without_environment() };
-        let bindings = bindings(vec![]);
+        let list_var = variable();
+        let not_a_list = string("not-a-list");
+        let bindings = bindings(vec![(list_var.clone(), not_a_list.as_view())]);
         let knowledge = KnowledgeBase::default();
         let var = variable();
 
         let action = BuiltinAction::Pure(PureAction::Append(
-            string("not-a-list"),
+            VariableOrList::Variable(list_var),
             string("c"),
             var.clone(),
         ));
@@ -1155,6 +1206,133 @@ mod tests {
             expected.sort();
 
             assert_eq!(goals, expected);
+        }
+    }
+
+    mod findall {
+        use alloc::vec;
+
+        use crate::testing::{assert_belief, literal_formula, variable_term};
+
+        use super::*;
+
+        #[test]
+        fn binds_the_list_in_solution_order() {
+            let mut context: Context<()> = unsafe { new_context_without_environment() };
+            let mut knowledge = KnowledgeBase::default();
+            assert_belief(&mut knowledge, "item", vec![string("a")]);
+            assert_belief(&mut knowledge, "item", vec![string("b")]);
+            let bindings = bindings(vec![]);
+
+            let (x, out) = (variable(), variable());
+            let action = BuiltinAction::Pure(PureAction::Findall(
+                variable_term(&x),
+                Box::new(literal_formula("item", vec![variable_term(&x)])),
+                out.clone(),
+            ));
+
+            let ExecuteResult::Done(Some(result)) =
+                action.execute(&bindings, &mut context, &knowledge)
+            else {
+                panic!(".findall must complete immediately with bindings");
+            };
+
+            assert_eq!(
+                result.get_view(&out).map(TermView::to_owned),
+                Some(list(vec![string("a"), string("b")]))
+            );
+        }
+
+        #[test]
+        fn no_solutions_still_succeeds_binding_an_empty_list() {
+            let mut context: Context<()> = unsafe { new_context_without_environment() };
+            let knowledge = KnowledgeBase::default();
+            let bindings = bindings(vec![]);
+
+            let (x, out) = (variable(), variable());
+            let action = BuiltinAction::Pure(PureAction::Findall(
+                variable_term(&x),
+                Box::new(literal_formula("item", vec![variable_term(&x)])),
+                out.clone(),
+            ));
+
+            let ExecuteResult::Done(Some(result)) =
+                action.execute(&bindings, &mut context, &knowledge)
+            else {
+                panic!(
+                    ".findall must complete immediately with bindings, even with zero solutions"
+                );
+            };
+
+            assert_eq!(
+                result.get_view(&out).map(TermView::to_owned),
+                Some(list(vec![]))
+            );
+        }
+    }
+
+    mod min_max {
+        use crate::testing::{number, variable_or_list};
+
+        use super::*;
+
+        #[test]
+        fn min_and_max_bind_the_smallest_and_largest_element() {
+            let mut context: Context<()> = unsafe { new_context_without_environment() };
+            let knowledge = KnowledgeBase::default();
+            let bindings = bindings(vec![]);
+
+            let x = variable();
+            let action = BuiltinAction::Pure(PureAction::Min(
+                variable_or_list(vec![number(3.0), number(1.0), number(2.0)]),
+                variable_term(&x),
+            ));
+            let ExecuteResult::Done(Some(result)) =
+                action.execute(&bindings, &mut context, &knowledge)
+            else {
+                panic!(".min must complete immediately with bindings");
+            };
+            assert_eq!(
+                result.get_view(&x).map(TermView::to_owned),
+                Some(number(1.0))
+            );
+
+            let y = variable();
+            let action = BuiltinAction::Pure(PureAction::Max(
+                variable_or_list(vec![number(3.0), number(1.0), number(2.0)]),
+                variable_term(&y),
+            ));
+            let ExecuteResult::Done(Some(result)) =
+                action.execute(&bindings, &mut context, &knowledge)
+            else {
+                panic!(".max must complete immediately with bindings");
+            };
+            assert_eq!(
+                result.get_view(&y).map(TermView::to_owned),
+                Some(number(3.0))
+            );
+        }
+
+        #[test]
+        fn min_and_max_fail_on_an_empty_list() {
+            let mut context: Context<()> = unsafe { new_context_without_environment() };
+            let knowledge = KnowledgeBase::default();
+            let bindings = bindings(vec![]);
+            let x = variable();
+
+            let action =
+                BuiltinAction::Pure(PureAction::Min(variable_or_list(vec![]), variable_term(&x)));
+            assert!(matches!(
+                action.execute(&bindings, &mut context, &knowledge),
+                ExecuteResult::Done(None)
+            ));
+
+            let action =
+                BuiltinAction::Pure(PureAction::Max(variable_or_list(vec![]), variable_term(&x)));
+            assert!(matches!(
+                action.execute(&bindings, &mut context, &knowledge),
+                ExecuteResult::Done(None)
+            ));
         }
     }
 }

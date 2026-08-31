@@ -97,7 +97,8 @@ pub(crate) enum LogicalExpression {
 pub(crate) enum SimpleLogicalExpression {
     Literal(Literal),
     Rel(RelationalExpression),
-    /// A pure built-in action (`.now`, `.me`, `.append`, `.member`) used in a context guard.
+    /// A pure built-in action (`.now`, `.me`, `.append`, `.member`, `.findall`, `.min`, `.max`)
+    /// used in a context guard.
     Action(PureAction),
     Not(Box<SimpleLogicalExpression>),
     Group(Box<LogicalExpression>),
@@ -108,9 +109,15 @@ pub(crate) enum PureAction {
     Now(Variable),
     Me(Variable),
     /// Binds `List` with `Item` appended to the given variable.
-    Append(Term, Term, Variable),
+    Append(ListOrVariable, Term, Variable),
     /// Whether `Item` structurally equals some element of `List`.
-    Member(Term, Term),
+    Member(Term, ListOrVariable),
+    /// Binds `List` to every instantiation of `Template` that satisfies `Query`.
+    Findall(Term, Box<LogicalExpression>, Variable),
+    /// Checks `Minimal` against, or binds it to, the smallest element of `List`.
+    Min(ListOrVariable, Term),
+    /// Checks `Maximal` against, or binds it to, the largest element of `List`.
+    Max(ListOrVariable, Term),
 }
 
 #[derive(Debug, Clone)]
@@ -259,6 +266,12 @@ pub enum AidOrVariable {
 #[derive(Debug, Clone)]
 pub enum LiteralOrVariable {
     Literal(Literal),
+    Variable(Variable),
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum ListOrVariable {
+    List(Box<[Term]>),
     Variable(Variable),
 }
 
@@ -772,7 +785,7 @@ impl AstVisitor {
                 }
             }
             PureAction::Append(list, item, variable) => {
-                let list = self.visit_term(list).into_token_stream();
+                let list = self.visit_list_or_variable(list).into_token_stream();
                 let item = self.visit_term(item).into_token_stream();
                 let variable = self.visit_variable(variable).into_token_stream();
                 quote! {
@@ -781,9 +794,32 @@ impl AstVisitor {
             }
             PureAction::Member(item, list) => {
                 let item = self.visit_term(item).into_token_stream();
-                let list = self.visit_term(list).into_token_stream();
+                let list = self.visit_list_or_variable(list).into_token_stream();
                 quote! {
                     ::ember::agent::bdi::plan::action::PureAction::Member(#item, #list)
+                }
+            }
+            PureAction::Findall(template, query, variable) => {
+                let template = self.visit_term(template).into_token_stream();
+                let query = self.visit_logical_expression(query).into_token_stream();
+                let query = quote! { ::alloc::boxed::Box::new(#query) };
+                let variable = self.visit_variable(variable).into_token_stream();
+                quote! {
+                    ::ember::agent::bdi::plan::action::PureAction::Findall(#template, #query, #variable)
+                }
+            }
+            PureAction::Min(list, minimal) => {
+                let list = self.visit_list_or_variable(list).into_token_stream();
+                let minimal = self.visit_term(minimal).into_token_stream();
+                quote! {
+                    ::ember::agent::bdi::plan::action::PureAction::Min(#list, #minimal)
+                }
+            }
+            PureAction::Max(list, maximal) => {
+                let list = self.visit_list_or_variable(list).into_token_stream();
+                let maximal = self.visit_term(maximal).into_token_stream();
+                quote! {
+                    ::ember::agent::bdi::plan::action::PureAction::Max(#list, #maximal)
                 }
             }
         }
@@ -908,6 +944,28 @@ impl AstVisitor {
                 let variable = self.visit_variable(v);
                 quote! {
                     ::ember::agent::bdi::term::owned::composite::VariableOrLiteral::Variable(#variable)
+                }
+            }
+        }
+    }
+
+    fn visit_list_or_variable(&mut self, list: &ListOrVariable) -> impl ToTokens {
+        match list {
+            ListOrVariable::List(items) => {
+                let items = items
+                    .iter()
+                    .map(|t| self.visit_term(t).into_token_stream())
+                    .collect::<Vec<_>>();
+                quote! {
+                    ::ember::agent::bdi::term::owned::composite::VariableOrList::List(
+                        ::alloc::boxed::Box::new([#(#items),*])
+                    )
+                }
+            }
+            ListOrVariable::Variable(v) => {
+                let variable = self.visit_variable(v);
+                quote! {
+                    ::ember::agent::bdi::term::owned::composite::VariableOrList::Variable(#variable)
                 }
             }
         }

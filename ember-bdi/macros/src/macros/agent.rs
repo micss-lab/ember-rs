@@ -168,12 +168,19 @@ peg::parser! {
         rule pure_builtin_action() -> PureAction
             = "now" "(" variable:VARIABLE() ")" { PureAction::Now(variable) }
             / "me" "(" variable:VARIABLE() ")" { PureAction::Me(variable) }
-            / "append" "(" list:term() "," item:term() "," variable:VARIABLE() ")" { PureAction::Append(list, item, variable) }
-            / "member" "(" item:term() "," list:term() ")" { PureAction::Member(item, list) }
+            / "append" "(" list:list_or_variable() "," item:term() "," variable:VARIABLE() ")" { PureAction::Append(list, item, variable) }
+            / "member" "(" item:term() "," list:list_or_variable() ")" { PureAction::Member(item, list) }
+            / "findall" "(" template:term() "," query:logical_expression() "," variable:VARIABLE() ")" { PureAction::Findall(template, Box::new(query), variable) }
+            / "min" "(" list:list_or_variable() "," minimal:term() ")" { PureAction::Min(list, minimal) }
+            / "max" "(" list:list_or_variable() "," maximal:term() ")" { PureAction::Max(list, maximal) }
 
         rule pure_builtin_action_in_context() -> PureAction
             = pure_builtin_action()
-            / expected!("a pure action usable in a context (`.now`, `.me`, `.append`, `.member`)")
+            / expected!("a pure action usable in a context (`.now`, `.me`, `.append`, `.member`, `.findall`, `.min`, `.max`)")
+
+        rule list_or_variable() -> ListOrVariable
+            = items:list_term() { ListOrVariable::List(items) }
+            / var:VARIABLE() { ListOrVariable::Variable(var) }
 
         rule relational_expression() -> RelationalExpression
             = lhs:relational_term() operator:RELATIONAL_OPERATOR() rhs:relational_term() {
