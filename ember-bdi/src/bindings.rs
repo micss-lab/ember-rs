@@ -143,9 +143,7 @@ pub trait BindingLookup {
     fn lookup_view<'a>(&'a self, variable: &Variable) -> Option<TermView<'a>>;
 
     /// Lookup the term bound to the given variable.
-    fn lookup<'a>(&'a self, variable: &Variable) -> Option<TermRef<'a>> {
-        self.lookup_view(variable).map(Into::into)
-    }
+    fn lookup<'a>(&'a self, variable: &Variable) -> Option<TermRef<'a>>;
 
     /// Loopup the term bound to the give variable and parse the term into the required type.
     fn lookup_as_type<'a, T>(&'a self, variable: &Variable) -> Option<Result<T, FromTermError>>
@@ -163,6 +161,10 @@ impl BindingLookup for Bindings<'_> {
         self.get_view(variable).cloned()
     }
 
+    fn lookup<'a>(&'a self, variable: &Variable) -> Option<TermRef<'a>> {
+        Some(self.get_view(variable)?.into())
+    }
+
     fn as_bindings(&self) -> Bindings<'_> {
         self.clone()
     }
@@ -177,6 +179,10 @@ impl BindingLookup for OwnedBindings {
             .map(|t| t.as_view())
     }
 
+    fn lookup<'a>(&'a self, variable: &Variable) -> Option<TermRef<'a>> {
+        Some(self.bindings.as_ref()?.get(&variable.id)?.as_ref()?.into())
+    }
+
     fn as_bindings(&self) -> Bindings<'_> {
         self.as_bindings()
     }
@@ -187,6 +193,10 @@ impl<B: BindingLookup + ?Sized> BindingLookup for &B {
         (**self).lookup_view(variable)
     }
 
+    fn lookup<'a>(&'a self, variable: &Variable) -> Option<TermRef<'a>> {
+        (**self).lookup(variable)
+    }
+
     fn as_bindings(&self) -> Bindings<'_> {
         (**self).as_bindings()
     }
@@ -195,6 +205,10 @@ impl<B: BindingLookup + ?Sized> BindingLookup for &B {
 impl<B: BindingLookup> BindingLookup for Option<B> {
     fn lookup_view<'a>(&'a self, variable: &Variable) -> Option<TermView<'a>> {
         self.as_ref()?.lookup_view(variable)
+    }
+
+    fn lookup<'a>(&'a self, variable: &Variable) -> Option<TermRef<'a>> {
+        self.as_ref()?.lookup(variable)
     }
 
     fn as_bindings(&self) -> Bindings<'_> {

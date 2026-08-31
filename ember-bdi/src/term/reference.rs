@@ -1,5 +1,3 @@
-use alloc::borrow::{Cow, ToOwned};
-use alloc::boxed::Box;
 use alloc::rc::Rc;
 use alloc::vec::Vec;
 
@@ -15,13 +13,13 @@ use super::view::{StructureView, TermView, ViewString};
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TermRef<'a> {
     Number(TotalCmpF32),
-    String(Cow<'a, BStr>),
+    String(&'a BStr),
     Variable(Variable),
-    List(Box<[TermRef<'a>]>),
+    List(Rc<[TermRef<'a>]>),
     Literal {
         negated: bool,
-        functor: Rc<Atom>,
-        arguments: Box<[TermRef<'a>]>,
+        functor: &'a Atom,
+        arguments: Option<Rc<[TermRef<'a>]>>,
     },
 }
 
@@ -29,7 +27,7 @@ impl TermRef<'_> {
     pub fn to_owned(&self) -> Term {
         match self {
             Self::Number(n) => Term::Number(*n),
-            Self::String(s) => Term::String(s.clone().into_owned()),
+            Self::String(s) => Term::String((*s).into()),
             Self::Variable(v) => Term::Variable(v.clone()),
             Self::List(items) => Term::List(
                 items
@@ -46,13 +44,9 @@ impl TermRef<'_> {
                 negated: *negated,
                 structure: Structure {
                     functor: (**functor).clone(),
-                    arguments: (!arguments.is_empty()).then(|| {
-                        arguments
-                            .iter()
-                            .map(|t| t.to_owned())
-                            .collect::<Vec<_>>()
-                            .into_boxed_slice()
-                    }),
+                    arguments: arguments
+                        .as_ref()
+                        .map(|args| args.iter().map(|t| t.to_owned()).collect()),
                 },
             }),
         }
@@ -63,15 +57,9 @@ impl<'a> From<&'a Term> for TermRef<'a> {
     fn from(term: &'a Term) -> Self {
         match term {
             Term::Number(n) => Self::Number(*n),
-            Term::String(s) => Self::String(Cow::Borrowed(s.as_ref())),
+            Term::String(s) => Self::String(s.as_ref()),
             Term::Variable(v) => Self::Variable(v.clone()),
-            Term::List(items) => Self::List(
-                items
-                    .iter()
-                    .map(Into::into)
-                    .collect::<Vec<_>>()
-                    .into_boxed_slice(),
-            ),
+            Term::List(items) => Self::List(items.iter().map(Into::into).collect()),
             &Term::Literal(Literal {
                 negated,
                 structure:
@@ -81,61 +69,50 @@ impl<'a> From<&'a Term> for TermRef<'a> {
                     },
             }) => Self::Literal {
                 negated,
-                functor: Rc::new(functor.clone()),
+                functor,
                 arguments: arguments
                     .as_ref()
-                    .map(|args| {
-                        args.into_iter()
-                            .map(Into::into)
-                            .collect::<Vec<_>>()
-                            .into_boxed_slice()
-                    })
-                    .unwrap_or_default(),
+                    .map(|args| args.into_iter().map(Into::into).collect()),
             },
         }
     }
 }
 
-impl<'a> From<TermView<'a>> for TermRef<'a> {
-    fn from(term: TermView<'a>) -> Self {
-        match term {
-            TermView::Term(term) => Self::from(term),
+impl<'a> From<&'a TermView<'a>> for TermRef<'a> {
+    fn from(term: &'a TermView<'a>) -> Self {
+        match *term {
+            TermView::Term(term) => term.into(),
             TermView::Number(n) => Self::Number(n),
-            TermView::String(ViewString::Borrowed(s)) => Self::String(Cow::Borrowed(s)),
-            TermView::String(ViewString::Owned(s)) => Self::String(Cow::Owned((*s).to_owned())),
-            TermView::Variable(v) => Self::Variable(v),
-            TermView::List(items) => Self::List(
-                items
-                    .iter()
-                    .cloned()
-                    .map(Into::into)
-                    .collect::<Vec<_>>()
-                    .into_boxed_slice(),
-            ),
-            TermView::Literal(literal) => literal.into(),
+            TermView::String(ref s) => s.into(),
+            TermView::Variable(ref v) => Self::Variable(v.clone()),
+            TermView::List(ref l) => Self::List(l.iter().map(Into::into).collect()),
+            TermView::Literal(ref l) => l.into(),
         }
     }
 }
 
-impl<'a> From<LiteralView<'a>> for TermRef<'a> {
+impl<'a> From<&'a ViewString<'a>> for TermRef<'a> {
+    fn from(string: &'a ViewString<'a>) -> Self {
+        match string {
+            ViewString::Borrowed(s) => Self::String(s),
+            ViewString::Owned(s) => Self::String(s.as_ref()),
+        }
+    }
+}
+
+impl<'a> From<&'a LiteralView<'a>> for TermRef<'a> {
     fn from(
         LiteralView {
             negated,
             structure: StructureView { functor, arguments },
-        }: LiteralView<'a>,
+        }: &'a LiteralView<'a>,
     ) -> Self {
         Self::Literal {
-            negated,
-            functor,
+            negated: *negated,
+            functor: functor.as_ref(),
             arguments: arguments
-                .map(|args| {
-                    args.iter()
-                        .cloned()
-                        .map(Into::into)
-                        .collect::<Vec<_>>()
-                        .into_boxed_slice()
-                })
-                .unwrap_or_default(),
+                .as_ref()
+                .map(|args| args.iter().map(Into::into).collect()),
         }
     }
 }

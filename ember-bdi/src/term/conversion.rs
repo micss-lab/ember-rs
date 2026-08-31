@@ -80,12 +80,12 @@ impl FromTerm<'_> for f32 {
 impl FromTerm<'_> for BString {
     fn from_term(term: TermRef<'_>) -> Result<Self, FromTermError> {
         match term {
-            TermRef::String(s) => Ok(s.clone().into_owned()),
+            TermRef::String(s) => Ok(s.into()),
             TermRef::Literal {
                 functor,
                 arguments,
                 negated,
-            } if arguments.is_empty() && !negated => Ok(BString::from(functor.0.as_bytes())),
+            } if arguments.is_none() && !negated => Ok(BString::from(functor.0.as_bytes())),
             _ => Err(FromTermError::InvalidType(Some("string or atom"))),
         }
     }

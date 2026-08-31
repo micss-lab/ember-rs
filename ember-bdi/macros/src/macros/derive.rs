@@ -557,7 +557,10 @@ pub(crate) mod from_term {
                             functor: term_functor,
                             arguments,
                             ..
-                        } if term_functor.0 == #functor && arguments.len() == #arg_count => {
+                        } if term_functor.0 == #functor
+                            && arguments.as_deref().map_or(0, |a| a.len()) == #arg_count =>
+                        {
+                            let arguments = arguments.as_deref().unwrap_or(&[]);
                             Ok(Self {
                                 #(#args_extraction,)*
                             })
@@ -586,7 +589,10 @@ pub(crate) mod from_term {
                             functor: term_functor,
                             arguments,
                             ..
-                        } if term_functor.0 == #functor && arguments.len() == #arg_count => {
+                        } if term_functor.0 == #functor
+                            && arguments.as_deref().map_or(0, |a| a.len()) == #arg_count =>
+                        {
+                            let arguments = arguments.as_deref().unwrap_or(&[]);
                             Ok(Self (
                                 #(#args_extraction,)*
                             ))
@@ -606,7 +612,9 @@ pub(crate) mod from_term {
                             functor: term_functor,
                             arguments,
                             ..
-                        } if term_functor.0 == #functor && arguments.is_empty() => {
+                        } if term_functor.0 == #functor
+                            && arguments.as_deref().unwrap_or(&[]).is_empty() =>
+                        {
                             Ok(Self)
                         }
                         _ => Err(
@@ -638,7 +646,8 @@ pub(crate) mod from_term {
                     }
                 });
                 quote! {
-                    #expected_functor if arguments.len() == #arg_count => {
+                    #expected_functor if arguments.as_deref().map_or(0, |a| a.len()) == #arg_count => {
+                        let arguments = arguments.as_deref().unwrap_or(&[]);
                         Ok(Self::#v_name {
                             #(#args_extraction,)*
                         })
@@ -656,7 +665,8 @@ pub(crate) mod from_term {
                     }
                 });
                 quote! {
-                    #expected_functor if arguments.len() == #arg_count => {
+                    #expected_functor if arguments.as_deref().map_or(0, |a| a.len()) == #arg_count => {
+                        let arguments = arguments.as_deref().unwrap_or(&[]);
                         Ok(Self::#v_name (
                             #(#args_extraction,)*
                         ))
@@ -665,7 +675,7 @@ pub(crate) mod from_term {
             }
             Fields::Unit => {
                 quote! {
-                    #expected_functor if arguments.is_empty() => {
+                    #expected_functor if arguments.as_deref().unwrap_or(&[]).is_empty() => {
                         Ok(Self::#v_name)
                     }
                 }
