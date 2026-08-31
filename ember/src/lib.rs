@@ -40,6 +40,11 @@ pub mod agent {
     }
 }
 
+#[cfg(feature = "acc")]
+pub mod acc {
+    pub use ember_acc::{Acc, Channels};
+}
+
 pub use ember_core::message;
 
 pub use ember_core::environment;
