@@ -704,6 +704,35 @@ mod tests {
     }
 
     #[test]
+    fn query_goal_resolves_a_string_belief_when_the_frame_already_has_another_binding() {
+        // Regression: `Term`/`TermView` had no String-vs-String unify arm, so merging a query
+        // goal's result back into a frame that already held an unrelated string binding hit the
+        // `_ => TypeMismatch` catch-all as soon as the solver had to compare two string views
+        // against each other, not just against a number.
+        let mut intention: Intention<()> = Intention::new(0);
+        let mut context = unsafe { new_context_without_environment() };
+        let mut knowledge = KnowledgeBase::default();
+        assert_belief(&mut knowledge, "my_aid", vec![string("n0@local")]);
+
+        let x = variable();
+        let trigger = trigger("event", vec![], None);
+        let plan = plan(
+            trigger.clone(),
+            None,
+            vec![Formula::Goal {
+                kind: GoalKind::Query,
+                goal: literal("my_aid", vec![variable_term(&x)]),
+            }],
+        );
+
+        let n = variable();
+        intention.push(&plan, bindings(vec![(n, string("n1").as_view())]), trigger);
+
+        let result = intention.step(&mut context, &mut knowledge, &mut ());
+        assert!(matches!(result, Ok(StepOk::Done)));
+    }
+
+    #[test]
     fn query_goal_binds_variables_from_the_matching_belief_for_later_use_in_the_body() {
         let mut intention: Intention<CaptureAction> = Intention::new(0);
         // SAFETY: The environment on the context remains untouched,

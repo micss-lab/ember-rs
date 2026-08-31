@@ -1,6 +1,8 @@
 use alloc::vec;
 use alloc::vec::Vec;
 
+use bstr::ByteSlice;
+
 use crate::bindings::Bindings;
 use crate::literal::{Literal, LiteralView};
 use crate::term::view::{StructureView, TermView};
@@ -101,6 +103,9 @@ impl<'a> UnifyView<'a> for TermView<'a> {
             (TermView::Number(n1), TermView::Number(n2)) => (n1 == n2)
                 .then(alloc::vec::Vec::new)
                 .ok_or(UnificationError::NumberMismatch),
+            (TermView::String(a), TermView::String(b)) => (a == b)
+                .then(alloc::vec::Vec::new)
+                .ok_or(UnificationError::StringMismatch),
 
             (TermView::Variable(v), other) | (other, TermView::Variable(v)) => {
                 Ok(vec![BindingConstraint::new(v.id, other)])
@@ -143,6 +148,9 @@ impl<'v> Unify<TermView<'v>> for Term {
             (Term::Number(n1), TermView::Number(n2)) => (*n1 == n2)
                 .then(alloc::vec::Vec::new)
                 .ok_or(UnificationError::NumberMismatch),
+            (Term::String(a), TermView::String(b)) => (a.as_bstr() == b.as_bstr())
+                .then(alloc::vec::Vec::new)
+                .ok_or(UnificationError::StringMismatch),
 
             (Term::List(l1), TermView::List(l2)) if l1.len() == l2.len() => {
                 let mut constraints = Vec::new();
@@ -254,5 +262,43 @@ impl Unify<&Literal> for Literal {
         Self: 'a,
     {
         TermView::from(self).collect_constraints(TermView::from(other))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use bstr::BStr;
+
+    use crate::term::view::ViewString;
+
+    use super::*;
+
+    fn view_string(s: &str) -> TermView<'_> {
+        TermView::String(ViewString::from(BStr::new(s)))
+    }
+
+    // Regression: neither `TermView`-vs-`TermView` nor `Term`-vs-`TermView` unification had a
+    // String arm, so both fell through to the `_ => TypeMismatch` catch-all instead of comparing
+    // the strings - `Term`-vs-`&Term` string unification was already covered
+    // (`unification::tests::mismatch_constants`), which is why this went unnoticed.
+    #[test]
+    fn view_vs_view_strings_unify_when_equal_and_mismatch_otherwise() {
+        assert!(view_string("n0").unify(view_string("n0"), None).is_ok());
+        assert_eq!(
+            view_string("n0").unify(view_string("n1"), None).unwrap_err(),
+            UnificationError::StringMismatch
+        );
+    }
+
+    #[test]
+    fn term_vs_view_strings_unify_when_equal_and_mismatch_otherwise() {
+        let equal = Term::String("n0".into());
+        assert!(equal.unify(view_string("n0"), None).is_ok());
+
+        let different = Term::String("n0".into());
+        assert_eq!(
+            different.unify(view_string("n1"), None).unwrap_err(),
+            UnificationError::StringMismatch
+        );
     }
 }
