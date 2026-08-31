@@ -110,7 +110,7 @@ impl<A> Frame<A> {
         Self {
             intention_id,
             event,
-            bindings: bindings.into(),
+            bindings: bindings.into_owned(),
             cursor: 0,
             body: plan.body.clone(),
         }
@@ -169,12 +169,11 @@ where
                         operator: RelationalOperator::Unify,
                         operands: (lhs.clone(), rhs.clone()),
                     };
-                    match evaluate_relational(&formula, &self.bindings.as_bindings()) {
+                    match evaluate_relational(&formula, &self.bindings) {
                         Ok(Some(bindings)) => {
-                            self.bindings =
-                                Bindings::merge_views([&self.bindings.as_bindings(), &bindings])
-                                    .expect("merging bindings from unify into frame failed")
-                                    .into()
+                            self.bindings = Bindings::merge_views([&self.bindings, &bindings])
+                                .expect("merging bindings from unify into frame failed")
+                                .into_owned()
                         }
                         Ok(None) => return Err(StepError::UnifyFailed),
                         Err(error) => return Err(StepError::UnifyEvalError(error)),
@@ -199,10 +198,9 @@ where
                             )
                         }
                         ExecuteResult::Done(Some(bindings)) => {
-                            self.bindings =
-                                Bindings::merge_views([&self.bindings.as_bindings(), &bindings])
-                                    .expect("merging bindings from action into frame failed")
-                                    .into()
+                            self.bindings = Bindings::merge_views([&self.bindings, &bindings])
+                                .expect("merging bindings from action into frame failed")
+                                .into_owned()
                         }
                         ExecuteResult::Done(None) => (),
                     }
@@ -256,7 +254,7 @@ where
 }
 
 mod formula_step {
-    use crate::bindings::{BindingLookup, Bindings, OwnedBindings};
+    use crate::bindings::{Bindings, OwnedBindings};
     use crate::context::Context;
     use crate::knowledge::base::KnowledgeBase;
     use crate::literal::Literal;
@@ -322,12 +320,12 @@ mod formula_step {
                 let query = QueryFormula::Literal(goal.clone());
                 match (&query)
                     .into_query(&*knowledge, &context.pure)
-                    .next_bindings(Some(&bindings.as_bindings()))
+                    .next_bindings(Some(&*bindings))
                 {
                     Some(b) => {
-                        *bindings = Bindings::merge_views([&b.as_bindings(), &b])
+                        *bindings = Bindings::merge_views([&b, &b])
                             .expect("merging bindings from query goal into frame failed")
-                            .into()
+                            .into_owned()
                     }
                     None => context.emit_event(
                         TriggeringEvent {
@@ -402,16 +400,13 @@ mod tests {
         type State = Vec<&'static str>;
         type UserAction = LogAction;
 
-        fn execute<'b, B>(
+        fn execute<'b>(
             self,
-            _bindings: B,
+            _bindings: &Bindings<'b>,
             _context: &mut Context<Self::UserAction>,
             _knowledge: &KnowledgeBase,
             state: &mut Self::State,
-        ) -> crate::plan::action::ExecuteResult<'b, Self>
-        where
-            B: crate::bindings::BindingLookup,
-        {
+        ) -> crate::plan::action::ExecuteResult<'b, Self> {
             state.push(self.0);
             crate::plan::action::ExecuteResult::Done(None)
         }
@@ -532,16 +527,13 @@ mod tests {
         type State = Vec<f32>;
         type UserAction = CaptureAction;
 
-        fn execute<'b, B>(
+        fn execute<'b>(
             self,
-            bindings: B,
+            bindings: &Bindings<'b>,
             _context: &mut Context<Self::UserAction>,
             _knowledge: &KnowledgeBase,
             state: &mut Self::State,
-        ) -> crate::plan::action::ExecuteResult<'b, Self>
-        where
-            B: crate::bindings::BindingLookup,
-        {
+        ) -> crate::plan::action::ExecuteResult<'b, Self> {
             let value = bindings
                 .lookup_as_type::<f32>(&self.0)
                 .expect("variable should be bound")

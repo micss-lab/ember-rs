@@ -1,10 +1,7 @@
-use core::marker::PhantomData;
-
 use alloc::vec::Vec;
 
 use ember_collections::{SmallMap, SmallSet};
 
-use crate::term::Term;
 use crate::term::conversion::{FromTerm, FromTermError};
 use crate::term::reference::TermRef;
 use crate::term::view::{StructureView, TermView};
@@ -15,29 +12,26 @@ use crate::variable::{Variable, VariableId};
 pub(crate) mod solver;
 
 #[derive(Debug, Clone, Default)]
-pub struct Bindings<'a, T = TermView<'a>> {
-    pub(crate) bindings: Option<SmallMap<VariableId, Option<T>>>,
+pub struct Bindings<'a> {
+    pub(crate) bindings: Option<SmallMap<VariableId, Option<TermView<'a>>>>,
     pub(crate) aliases: AliasMap,
-    lifetime_: PhantomData<&'a ()>,
 }
 
-impl<'a, T> Bindings<'a, T> {
+impl<'a> Bindings<'a> {
     pub(crate) fn empty() -> Self {
         Self {
             bindings: None,
             aliases: AliasMap::empty(),
-            lifetime_: PhantomData,
         }
     }
 
     pub(crate) fn new(
-        bindings: impl IntoIterator<Item = (VariableId, Option<T>)>,
+        bindings: impl IntoIterator<Item = (VariableId, Option<TermView<'a>>)>,
         aliases: AliasMap,
     ) -> Self {
         Self {
             bindings: Some(bindings.into_iter().collect()),
             aliases,
-            lifetime_: PhantomData,
         }
     }
 
@@ -48,11 +42,27 @@ impl<'a, T> Bindings<'a, T> {
         }
         self.aliases.retain_variables(variables);
     }
-}
 
-impl<'a> Bindings<'a, TermView<'a>> {
     pub(crate) fn get_view(&self, variable: &Variable) -> Option<&TermView<'a>> {
         self.bindings.as_ref()?.get(&variable.id)?.as_ref()
+    }
+
+    /// Lookup the given variable as a view.
+    pub(crate) fn lookup_view(&self, variable: &Variable) -> Option<TermView<'a>> {
+        self.get_view(variable).cloned()
+    }
+
+    /// Lookup the given variable as a reference to the stored view.
+    pub(crate) fn lookup(&self, variable: &Variable) -> Option<TermRef<'_>> {
+        Some(self.get_view(variable)?.into())
+    }
+
+    /// Loopup the term bound to the given variable and parse the term into the required type.
+    pub(crate) fn lookup_as_type<T>(&self, variable: &Variable) -> Option<Result<T, FromTermError>>
+    where
+        T: for<'s> FromTerm<'s>,
+    {
+        self.lookup(variable).map(T::from_term)
     }
 
     /// Tries to build a unification map of the collected constraints using the existing
@@ -64,7 +74,7 @@ impl<'a> Bindings<'a, TermView<'a>> {
     /// partition this variable belongs to. If the partition already contains a value, try to
     /// unify the current value with the new one returning new constraints. Do this for each
     /// constraint in the queue.
-    pub(crate) fn build_from_constraints<'b>(
+    pub(crate) fn build_from_constraints(
         constraints: impl IntoIterator<Item = BindingConstraint<'a>>,
         existing_bindings: Option<&Bindings<'a>>,
     ) -> Result<Self, UnificationError> {
@@ -87,29 +97,7 @@ impl<'a> Bindings<'a, TermView<'a>> {
         }
         solver.solve()
     }
-}
 
-pub type OwnedBindings = Bindings<'static, Term>;
-
-impl From<Bindings<'_>> for OwnedBindings {
-    fn from(
-        Bindings {
-            bindings, aliases, ..
-        }: Bindings<'_>,
-    ) -> Self {
-        Self {
-            bindings: bindings.map(|b| {
-                b.into_iter()
-                    .map(|(k, v)| (k, v.map(|v| v.to_owned())))
-                    .collect()
-            }),
-            aliases,
-            lifetime_: PhantomData,
-        }
-    }
-}
-
-impl OwnedBindings {
     pub(crate) fn merge<const N: usize>(mut bindings: [Self; N]) -> Result<Self, UnificationError> {
         let mut solver = solver::ConstraintSolver::new(core::iter::empty());
         bindings.iter_mut().try_for_each(|b| {
@@ -117,106 +105,32 @@ impl OwnedBindings {
                 solver.register_constraints(
                     bindings
                         .iter()
-                        .filter_map(|(v, t)| t.as_ref().map(|t| (*v, t.as_view()))),
+                        .filter_map(|(v, t)| t.as_ref().map(|t| (*v, t.clone()))),
                 )?;
             }
 
             solver.register_aliases(core::mem::replace(&mut b.aliases.0, Vec::with_capacity(0)))
         })?;
-        Ok(solver.solve()?.into())
+        solver.solve()
     }
 
-    pub(crate) fn as_bindings(&self) -> Bindings<'_> {
+    /// Widens every bound view to `'static`, detaching the bindings from whatever they
+    /// currently borrow. Callers that need to persist bindings past the lifetime of what
+    /// produced them (e.g. a frame storing them across ticks) call this once, at the point of
+    /// storage - not something `Bindings` forces on every lookup.
+    pub(crate) fn into_owned(self) -> OwnedBindings {
         Bindings {
-            bindings: self.bindings.as_ref().map(|b| {
-                b.iter()
-                    .map(|(k, v)| (*k, v.as_ref().map(|v| v.as_view())))
+            bindings: self.bindings.map(|b| {
+                b.into_iter()
+                    .map(|(k, v)| (k, v.map(|v| v.to_owned_view())))
                     .collect()
             }),
-            aliases: self.aliases.clone(),
-            lifetime_: PhantomData,
+            aliases: self.aliases,
         }
     }
 }
 
-pub trait BindingLookup {
-    fn lookup_view<'a>(&'a self, variable: &Variable) -> Option<TermView<'a>>;
-
-    /// Lookup the term bound to the given variable.
-    fn lookup<'a>(&'a self, variable: &Variable) -> Option<TermRef<'a>>;
-
-    /// Loopup the term bound to the give variable and parse the term into the required type.
-    fn lookup_as_type<'a, T>(&'a self, variable: &Variable) -> Option<Result<T, FromTermError>>
-    where
-        T: FromTerm<'a>,
-    {
-        self.lookup(variable).map(T::from_term)
-    }
-
-    fn as_bindings(&self) -> Bindings<'_>;
-}
-
-impl BindingLookup for Bindings<'_> {
-    fn lookup_view<'a>(&'a self, variable: &Variable) -> Option<TermView<'a>> {
-        self.get_view(variable).cloned()
-    }
-
-    fn lookup<'a>(&'a self, variable: &Variable) -> Option<TermRef<'a>> {
-        Some(self.get_view(variable)?.into())
-    }
-
-    fn as_bindings(&self) -> Bindings<'_> {
-        self.clone()
-    }
-}
-
-impl BindingLookup for OwnedBindings {
-    fn lookup_view<'a>(&'a self, variable: &Variable) -> Option<TermView<'a>> {
-        self.bindings
-            .as_ref()?
-            .get(&variable.id)?
-            .as_ref()
-            .map(|t| t.as_view())
-    }
-
-    fn lookup<'a>(&'a self, variable: &Variable) -> Option<TermRef<'a>> {
-        Some(self.bindings.as_ref()?.get(&variable.id)?.as_ref()?.into())
-    }
-
-    fn as_bindings(&self) -> Bindings<'_> {
-        self.as_bindings()
-    }
-}
-
-impl<B: BindingLookup + ?Sized> BindingLookup for &B {
-    fn lookup_view<'a>(&'a self, variable: &Variable) -> Option<TermView<'a>> {
-        (**self).lookup_view(variable)
-    }
-
-    fn lookup<'a>(&'a self, variable: &Variable) -> Option<TermRef<'a>> {
-        (**self).lookup(variable)
-    }
-
-    fn as_bindings(&self) -> Bindings<'_> {
-        (**self).as_bindings()
-    }
-}
-
-impl<B: BindingLookup> BindingLookup for Option<B> {
-    fn lookup_view<'a>(&'a self, variable: &Variable) -> Option<TermView<'a>> {
-        self.as_ref()?.lookup_view(variable)
-    }
-
-    fn lookup<'a>(&'a self, variable: &Variable) -> Option<TermRef<'a>> {
-        self.as_ref()?.lookup(variable)
-    }
-
-    fn as_bindings(&self) -> Bindings<'_> {
-        self.as_ref()
-            .map(BindingLookup::as_bindings)
-            .unwrap_or_else(Bindings::empty)
-    }
-}
+pub type OwnedBindings = Bindings<'static>;
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct AliasMap(Vec<(VariableId, VariableId)>);

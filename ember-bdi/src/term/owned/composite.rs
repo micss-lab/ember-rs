@@ -1,7 +1,7 @@
 use ember_core::agent::Aid;
 use ember_core::message::Receiver;
 
-use crate::bindings::BindingLookup;
+use crate::bindings::Bindings;
 use crate::literal::Literal;
 use crate::resolve::{Resolve, ResolveFailure};
 use crate::term::reference::TermRef;
@@ -21,7 +21,7 @@ impl Resolve for VariableOrReceiver {
     where
         Self: 'a;
 
-    fn resolve(self, bindings: impl BindingLookup) -> Result<Self, ResolveFailure> {
+    fn resolve(self, bindings: &Bindings<'_>) -> Result<Self, ResolveFailure> {
         Ok(match &self {
             VariableOrReceiver::Variable(v) => match bindings.lookup_as_type::<Aid>(v) {
                 Some(Ok(aid)) => VariableOrReceiver::Receiver(Receiver::Single(aid)),
@@ -34,7 +34,7 @@ impl Resolve for VariableOrReceiver {
 
     fn resolve_as_view<'a>(
         &'a self,
-        bindings: &'a impl BindingLookup,
+        bindings: &Bindings<'a>,
     ) -> Result<Self::View<'a>, ResolveFailure> {
         self.clone().resolve(bindings)
     }
@@ -52,7 +52,7 @@ impl Resolve for VariableOrLiteral {
     where
         Self: 'a;
 
-    fn resolve(self, bindings: impl BindingLookup) -> Result<Self, ResolveFailure> {
+    fn resolve(self, bindings: &Bindings<'_>) -> Result<Self, ResolveFailure> {
         Ok(match self {
             VariableOrLiteral::Variable(v) => match bindings.lookup(&v) {
                 Some(TermRef::Literal {
@@ -77,7 +77,7 @@ impl Resolve for VariableOrLiteral {
 
     fn resolve_as_view<'a>(
         &'a self,
-        bindings: &'a impl BindingLookup,
+        bindings: &Bindings<'a>,
     ) -> Result<Self::View<'a>, ResolveFailure> {
         self.clone().resolve(bindings)
     }

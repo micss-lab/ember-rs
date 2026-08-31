@@ -43,16 +43,13 @@ pub(crate) fn expand(mut input: ItemImpl) -> syn::Result<TokenStream> {
             type State = #self_ty;
             type UserAction = Self;
 
-            fn execute<'b, B>(
+            fn execute<'b>(
                 self,
-                bindings: B,
+                bindings: &::ember::agent::bdi::bindings::Bindings<'b>,
                 context: &mut ::ember::agent::bdi::context::Context<Self::UserAction>,
                 knowledge: &::ember::agent::bdi::knowledge::base::KnowledgeBase,
                 state: &mut Self::State,
-            ) -> ::ember::agent::bdi::plan::action::ExecuteResult<'b, Self>
-            where
-                B: ::ember::agent::bdi::bindings::BindingLookup,
-            {
+            ) -> ::ember::agent::bdi::plan::action::ExecuteResult<'b, Self> {
                 match self {
                     #(#match_arms)*
                 }
@@ -196,7 +193,7 @@ fn extract_action_params(inputs: &syn::punctuated::Punctuated<FnArg, Token![,]>)
                         format!("Failed to convert argument '{clean_ident}' to expected type");
 
                     params.execute_resolutions.push(quote! {
-                        let #clean_ident = match ::ember::agent::bdi::resolve::Resolve::resolve_as_view(&#clean_ident, &bindings) {
+                        let #clean_ident = match ::ember::agent::bdi::resolve::Resolve::resolve_as_view(&#clean_ident, bindings) {
                             Ok(val) => val,
                             Err(e) => {
                                 ::log::error!("{}: {:?}", #err_msg_res, e);

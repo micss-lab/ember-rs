@@ -433,7 +433,9 @@ impl<'a> QueryOperand<'a> {
                     None
                 } else {
                     *evaluated = true;
-                    let fresh = action.evaluate(existing_bindings, pure_context)?;
+                    let empty_bindings: Bindings<'static> = Bindings::empty();
+                    let fresh = action
+                        .evaluate(existing_bindings.unwrap_or(&empty_bindings), pure_context)?;
                     match existing_bindings {
                         Some(existing) => Bindings::merge_views([existing, &fresh]).ok(),
                         None => Some(fresh),

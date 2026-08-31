@@ -14,7 +14,7 @@ use ember_core::environment::Environment;
 use ember_core::message::content::ember_bdil::BdilContent;
 use ember_core::message::{Content, Message, Performative, Receiver};
 
-use crate::bindings::{AliasMap, BindingLookup, Bindings, OwnedBindings};
+use crate::bindings::{AliasMap, Bindings, OwnedBindings};
 use crate::context::{Context, PureContext};
 use crate::event::Trigger;
 use crate::knowledge::base::KnowledgeBase;
@@ -38,15 +38,13 @@ pub trait Execute: Sized {
 
     /// Executes the action returning `None` if it has finshed and a new action state if the action
     /// is to be ran again.
-    fn execute<'b, B>(
+    fn execute<'b>(
         self,
-        bindings: B,
+        bindings: &Bindings<'b>,
         context: &mut Context<Self::UserAction>,
         knowledge: &KnowledgeBase,
         state: &mut Self::State,
-    ) -> ExecuteResult<'b, Self>
-    where
-        B: BindingLookup;
+    ) -> ExecuteResult<'b, Self>;
 
     /// Should the intention this action is fired by wait for the action to complete before
     /// continuing.
@@ -84,16 +82,13 @@ where
 
     type UserAction = A;
 
-    fn execute<'b, B>(
+    fn execute<'b>(
         self,
-        bindings: B,
+        bindings: &Bindings<'b>,
         context: &mut Context<Self::UserAction>,
         knowledge: &KnowledgeBase,
         state: &mut Self::State,
-    ) -> ExecuteResult<'b, Self>
-    where
-        B: BindingLookup,
-    {
+    ) -> ExecuteResult<'b, Self> {
         match self {
             Action::Builtin(action) => action
                 .execute(bindings, context, knowledge)
@@ -170,15 +165,12 @@ impl BuiltinAction {
         }))
     }
 
-    pub(crate) fn execute<'b, B, A>(
+    pub(crate) fn execute<'b, A>(
         self,
-        bindings: B,
+        bindings: &Bindings<'b>,
         context: &mut Context<A>,
         knowledge: &KnowledgeBase,
-    ) -> ExecuteResult<'b, Self>
-    where
-        B: BindingLookup,
-    {
+    ) -> ExecuteResult<'b, Self> {
         match self {
             BuiltinAction::Pure(action) => {
                 ExecuteResult::Done(action.evaluate(bindings, &context.pure))
@@ -216,7 +208,7 @@ pub enum PureAction {
 impl PureAction {
     pub(crate) fn evaluate(
         &self,
-        bindings: impl BindingLookup,
+        bindings: &Bindings<'_>,
         pure_context: &PureContext,
     ) -> Option<Bindings<'static>> {
         Some(match self {
@@ -242,7 +234,7 @@ impl PureAction {
                 )
             }
             PureAction::Append(list, item, variable) => {
-                let items = match list.resolve_as_view(&bindings) {
+                let items = match list.resolve_as_view(bindings) {
                     Ok(TermView::List(items)) => items,
                     _ => {
                         // TODO: Like in prolog, solve this using lazy evaluation.
@@ -250,7 +242,7 @@ impl PureAction {
                         return None;
                     }
                 };
-                let Ok(item) = item.resolve_as_view(&bindings) else {
+                let Ok(item) = item.resolve_as_view(bindings) else {
                     log::error!(".append: failed to resolve item argument");
                     return None;
                 };
@@ -263,8 +255,8 @@ impl PureAction {
                 Bindings::new([(variable.id, Some(view))], AliasMap::empty())
             }
             PureAction::Member(item, list) => {
-                let item = item.resolve_as_view(&bindings).ok()?;
-                let TermView::List(items) = list.resolve_as_view(&bindings).ok()? else {
+                let item = item.resolve_as_view(bindings).ok()?;
+                let TermView::List(items) = list.resolve_as_view(bindings).ok()? else {
                     // TODO: Like in prolog, solve this using lazy evaluation.
                     log::error!(".member: first argument did not resolve to a list");
                     return None;
@@ -326,21 +318,18 @@ pub enum ImpureAction {
 }
 
 impl ImpureAction {
-    fn execute<'b, B, A>(
+    fn execute<'b, A>(
         self,
-        bindings: B,
+        bindings: &Bindings<'b>,
         context: &mut Context<A>,
         knowledge: &KnowledgeBase,
-    ) -> ExecuteResult<'b, Self>
-    where
-        B: BindingLookup,
-    {
+    ) -> ExecuteResult<'b, Self> {
         use ImpureAction::*;
         match self {
             Log(level, terms) => {
                 match terms
                     .into_iter()
-                    .map(|t| t.resolve(&bindings).map(|t| t.to_string()))
+                    .map(|t| t.resolve(bindings).map(|t| t.to_string()))
                     .collect::<Result<Vec<_>, _>>()
                 {
                     Ok(terms) => log!(level, "{terms:?}"),
@@ -357,7 +346,7 @@ impl ImpureAction {
                     Trigger::Addition => Performative::Inform,
                     Trigger::Deletion => Performative::NotUnderstood,
                 };
-                let receiver = match receiver.resolve(&bindings) {
+                let receiver = match receiver.resolve(bindings) {
                     Ok(VariableOrReceiver::Receiver(r)) => r,
                     Ok(_) => {
                         log::error!("failed to resolve .send arguments");
@@ -369,7 +358,7 @@ impl ImpureAction {
                     }
                 };
 
-                let literal = match literal.resolve(&bindings) {
+                let literal = match literal.resolve(bindings) {
                     Ok(VariableOrLiteral::Literal(l)) => l,
                     _ => {
                         log::error!(".send literal arg did not resolve to a literal");
@@ -385,7 +374,7 @@ impl ImpureAction {
                     content: Some(Content::Bdil(BdilContent::Literal(literal.into()))),
                 });
                 for (kind, goal) in Vec::from(callbacks) {
-                    let goal = match goal.resolve(&bindings) {
+                    let goal = match goal.resolve(bindings) {
                         Ok(VariableOrLiteral::Literal(l)) => l,
                         _ => {
                             log::error!("failed to resolve .send callback goal to a literal");
@@ -412,7 +401,7 @@ impl ImpureAction {
             Forall { query, goal } => {
                 let pure_context = context.pure.clone();
                 let mut query = query.into_query(knowledge, &pure_context);
-                while let Some(bindings) = query.next_bindings(Some(&bindings.as_bindings())) {
+                while let Some(bindings) = query.next_bindings(Some(bindings)) {
                     let goal = match goal.clone().resolve(&bindings) {
                         Ok(VariableOrLiteral::Literal(l)) => l,
                         _ => {
@@ -446,10 +435,11 @@ pub struct AtState {
 }
 
 impl AtState {
-    fn poll<'b, B, A>(self, bindings: B, context: &mut Context<A>) -> ExecuteResult<'b, Self>
-    where
-        B: BindingLookup,
-    {
+    fn poll<'b, A>(
+        self,
+        bindings: &Bindings<'b>,
+        context: &mut Context<A>,
+    ) -> ExecuteResult<'b, Self> {
         let Self { start, delay, goal } = self;
 
         let Some(start) = start else {

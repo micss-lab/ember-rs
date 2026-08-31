@@ -472,7 +472,7 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
 
-    use crate::bindings::BindingLookup;
+    use crate::bindings::Bindings;
     use crate::knowledge::query::IntoQuery;
 
     use crate::plan::{Action, BuiltinAction, Formula, ImpureAction};
@@ -497,16 +497,13 @@ mod tests {
         type State = Vec<&'static str>;
         type UserAction = TestAction;
 
-        fn execute<'b, B>(
+        fn execute<'b>(
             self,
-            _bindings: B,
+            _bindings: &Bindings<'b>,
             _context: &mut Context<Self::UserAction>,
             _knowledge: &KnowledgeBase,
             state: &mut Self::State,
-        ) -> ExecuteResult<'b, Self>
-        where
-            B: BindingLookup,
-        {
+        ) -> ExecuteResult<'b, Self> {
             match self {
                 TestAction::Wait(remaining) => {
                     state.push("poll");
@@ -763,16 +760,13 @@ mod tests {
         type State = Vec<alloc::string::String>;
         type UserAction = RecordArg;
 
-        fn execute<'b, B>(
+        fn execute<'b>(
             self,
-            bindings: B,
+            bindings: &Bindings<'b>,
             _context: &mut Context<Self::UserAction>,
             _knowledge: &KnowledgeBase,
             state: &mut Self::State,
-        ) -> ExecuteResult<'b, Self>
-        where
-            B: BindingLookup,
-        {
+        ) -> ExecuteResult<'b, Self> {
             let seen = bindings
                 .lookup_as_type::<alloc::string::String>(&self.0)
                 .and_then(Result::ok)

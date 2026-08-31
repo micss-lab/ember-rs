@@ -2,7 +2,7 @@ use alloc::rc::Rc;
 use alloc::string::ToString;
 use alloc::vec::Vec;
 
-use crate::bindings::BindingLookup;
+use crate::bindings::Bindings;
 use crate::literal::Literal;
 use crate::literal::LiteralView;
 use crate::plan::Formula;
@@ -44,11 +44,11 @@ pub trait Resolve: Sized {
         // https://github.com/rust-lang/rust/issues/87479.
         Self: 'a;
 
-    fn resolve(self, bindings: impl BindingLookup) -> Result<Self, ResolveFailure>;
+    fn resolve(self, bindings: &Bindings<'_>) -> Result<Self, ResolveFailure>;
 
     fn resolve_as_view<'a>(
         &'a self,
-        bindings: &'a impl BindingLookup,
+        bindings: &Bindings<'a>,
     ) -> Result<Self::View<'a>, ResolveFailure>;
 }
 
@@ -57,13 +57,13 @@ impl Resolve for Literal {
 
     /// Resolve the literal using existing bindings as much as possible verifying that the
     /// created binding is valid in the place it used.
-    fn resolve(self, bindings: impl BindingLookup) -> Result<Self, ResolveFailure> {
-        Ok(self.resolve_as_view(&bindings)?.to_owned())
+    fn resolve(self, bindings: &Bindings<'_>) -> Result<Self, ResolveFailure> {
+        Ok(self.resolve_as_view(bindings)?.to_owned())
     }
 
     fn resolve_as_view<'a>(
         &'a self,
-        bindings: &'a impl BindingLookup,
+        bindings: &Bindings<'a>,
     ) -> Result<Self::View<'a>, ResolveFailure> {
         let Literal {
             negated,
@@ -79,13 +79,13 @@ impl Resolve for Literal {
 impl Resolve for Term {
     type View<'a> = TermView<'a>;
 
-    fn resolve(self, bindings: impl BindingLookup) -> Result<Self, ResolveFailure> {
-        Ok(self.resolve_as_view(&bindings)?.to_owned())
+    fn resolve(self, bindings: &Bindings<'_>) -> Result<Self, ResolveFailure> {
+        Ok(self.resolve_as_view(bindings)?.to_owned())
     }
 
     fn resolve_as_view<'a>(
         &'a self,
-        bindings: &'a impl BindingLookup,
+        bindings: &Bindings<'a>,
     ) -> Result<TermView<'a>, ResolveFailure> {
         Ok(match *self {
             Term::Number(_) | Term::String(_) => TermView::Term(self),
@@ -107,13 +107,13 @@ impl Resolve for Term {
 impl Resolve for Structure {
     type View<'a> = StructureView<'a>;
 
-    fn resolve(self, bindings: impl BindingLookup) -> Result<Self, ResolveFailure> {
-        Ok(self.resolve_as_view(&bindings)?.to_owned())
+    fn resolve(self, bindings: &Bindings<'_>) -> Result<Self, ResolveFailure> {
+        Ok(self.resolve_as_view(bindings)?.to_owned())
     }
 
     fn resolve_as_view<'a>(
         &'a self,
-        bindings: &'a impl BindingLookup,
+        bindings: &Bindings<'a>,
     ) -> Result<Self::View<'a>, ResolveFailure> {
         Ok(StructureView {
             functor: Rc::new(self.functor.clone()),
@@ -136,13 +136,13 @@ impl<A> Resolve for Formula<A> {
     where
         Self: 'a;
 
-    fn resolve(self, bindings: impl BindingLookup) -> Result<Self, ResolveFailure> {
-        Ok(self.resolve_as_view(&bindings)?.to_owned())
+    fn resolve(self, bindings: &Bindings<'_>) -> Result<Self, ResolveFailure> {
+        Ok(self.resolve_as_view(bindings)?.to_owned())
     }
 
     fn resolve_as_view<'a>(
         &'a self,
-        bindings: &'a impl BindingLookup,
+        bindings: &Bindings<'a>,
     ) -> Result<Self::View<'a>, ResolveFailure> {
         Ok(match *self {
             Formula::Belief {

@@ -6,7 +6,7 @@ use alloc::vec::Vec;
 
 use ember_core::environment::Environment;
 
-use crate::bindings::{BindingLookup, Bindings};
+use crate::bindings::Bindings;
 use crate::context::{Context, PureContext};
 use crate::knowledge::base::KnowledgeBase;
 use crate::literal::Literal;
@@ -20,16 +20,13 @@ impl Execute for () {
     type State = ();
     type UserAction = ();
 
-    fn execute<'b, B>(
+    fn execute<'b>(
         self,
-        _bindings: B,
+        _bindings: &Bindings<'b>,
         _context: &mut Context<Self::UserAction>,
         _knowledge: &KnowledgeBase,
         _state: &mut Self::State,
-    ) -> ExecuteResult<'b, Self>
-    where
-        B: BindingLookup,
-    {
+    ) -> ExecuteResult<'b, Self> {
         ExecuteResult::Done(None)
     }
 }
