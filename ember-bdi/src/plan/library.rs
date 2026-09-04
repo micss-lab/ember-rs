@@ -1,4 +1,6 @@
+use alloc::rc::Rc;
 use alloc::vec::Vec;
+use core::ops::Deref;
 
 use ember_collections::SmallMap;
 
@@ -8,25 +10,23 @@ use crate::knowledge::base::KnowledgeBase;
 use crate::term::Atom;
 
 use super::selection::PlanSelection;
-use super::selector::{FirstApplicable, PlanSelector};
+use super::selector::PlanSelector;
 use super::{GoalKind, Plan, Trigger, TriggeringEvent};
 
 #[derive(Debug)]
-pub struct PlanLibrary<A, PSel = FirstApplicable> {
+pub struct PlanLibrary<A> {
     pub(super) plans: SmallMap<PlanKey, Vec<Plan<A>>>,
-    selector: PSel,
 }
 
-impl<A, PSel: Default> Default for PlanLibrary<A, PSel> {
+impl<A> Default for PlanLibrary<A> {
     fn default() -> Self {
         Self {
             plans: SmallMap::default(),
-            selector: PSel::default(),
         }
     }
 }
 
-impl<A: Ord, PSel> PlanLibrary<A, PSel> {
+impl<A: Ord> PlanLibrary<A> {
     pub fn add(&mut self, plan: Plan<A>) {
         self.plans
             .entry((&plan.trigger).into())
@@ -35,31 +35,51 @@ impl<A: Ord, PSel> PlanLibrary<A, PSel> {
     }
 }
 
-impl<A, PSel> PlanLibrary<A, PSel> {
-    /// Configures how a plan is chosen among those applicable to an event. Replaces the default
-    /// (`FirstApplicable`). Changes the selector's type, so it returns a differently-typed
-    /// library.
-    pub fn with_plan_selector<NewPSel>(self, selector: NewPSel) -> PlanLibrary<A, NewPSel> {
-        PlanLibrary {
-            plans: self.plans,
-            selector,
-        }
-    }
-
+impl<A> PlanLibrary<A> {
     pub fn select<'p, 'b, 'e>(
-        &'p mut self,
+        &'p self,
         event: &'e TriggeringEvent,
+        selector: &mut dyn PlanSelector<A>,
         knowledge: &'b KnowledgeBase,
         pure_context: &'b PureContext,
     ) -> Option<(&'p Plan<A>, Bindings<'b>)>
     where
         'p: 'b,
         'e: 'b,
-        PSel: PlanSelector<A>,
     {
         let selection = PlanSelection::select_from_library(event, &self.plans);
-        self.selector
-            .select_plan(selection, knowledge, pure_context)
+        selector.select_plan(selection, knowledge, pure_context)
+    }
+}
+
+/// Cheaply-cloneable `Rc` handle to a `PlanLibrary`, shared across every
+/// `BdiAgent` built from the same `#[bdi_agent]`-generated type.
+#[derive(Debug)]
+pub struct SharedPlanLibrary<A>(Rc<PlanLibrary<A>>);
+
+impl<A> Clone for SharedPlanLibrary<A> {
+    fn clone(&self) -> Self {
+        Self(Rc::clone(&self.0))
+    }
+}
+
+impl<A> SharedPlanLibrary<A> {
+    pub fn new(library: PlanLibrary<A>) -> Self {
+        Self(Rc::new(library))
+    }
+}
+
+impl<A> Deref for SharedPlanLibrary<A> {
+    type Target = PlanLibrary<A>;
+
+    fn deref(&self) -> &PlanLibrary<A> {
+        &self.0
+    }
+}
+
+impl<A> From<SharedPlanLibrary<A>> for Rc<PlanLibrary<A>> {
+    fn from(shared: SharedPlanLibrary<A>) -> Self {
+        shared.0
     }
 }
 

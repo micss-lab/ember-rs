@@ -406,6 +406,7 @@ pub(crate) fn expand(args: BdiAgentArgs, input: DeriveInput) -> TokenStream {
     };
 
     let agent_ident = &input.ident;
+    let agent_builder_ident = format_ident!("{}Builder", agent_ident);
     let percept_type = args.percept_type.unwrap_or_else(|| {
         // Unit type.
         Type::Tuple(TypeTuple {
@@ -423,21 +424,98 @@ pub(crate) fn expand(args: BdiAgentArgs, input: DeriveInput) -> TokenStream {
 
     let impl_ = quote! {
         impl #agent_ident {
+            pub fn agent_builder(self) -> #agent_builder_ident {
+                #agent_builder_ident::new(self)
+            }
+
             pub fn into_agent(self) -> ::ember::agent::bdi::BdiAgent<'static, #agent_ident, #agent_action, #percept_type> {
-                self.into_agent_named(#agent_name)
+                self.agent_builder().into_agent()
             }
 
             pub fn into_agent_named(
                 self,
-                name: impl ::core::convert::Into<::alloc::borrow::Cow<'static, str>>
+                name: impl ::core::convert::Into<::alloc::borrow::Cow<'static, str>>,
             ) -> ::ember::agent::bdi::BdiAgent<'static, #agent_ident, #agent_action, #percept_type> {
+                self.agent_builder().name(name).into_agent()
+            }
+        }
+
+        pub struct #agent_builder_ident {
+            agent: #agent_ident,
+            name: ::core::option::Option<::alloc::borrow::Cow<'static, str>>,
+            plan_library: ::core::option::Option<::alloc::rc::Rc<::ember::agent::bdi::plan::library::PlanLibrary<#agent_action>>>,
+        }
+
+        impl #agent_builder_ident {
+            pub fn new(agent: #agent_ident) -> Self {
+                Self {
+                    agent,
+                    name: ::core::option::Option::None,
+                    plan_library: ::core::option::Option::None,
+                }
+            }
+
+            pub fn name(
+                self,
+                name: impl ::core::convert::Into<::alloc::borrow::Cow<'static, str>>,
+            ) -> Self {
+                Self {
+                    agent: self.agent,
+                    name: ::core::option::Option::Some(name.into()),
+                    plan_library: self.plan_library,
+                }
+            }
+
+            pub fn plan_library(
+                self,
+                library: impl ::core::convert::Into<::alloc::rc::Rc<::ember::agent::bdi::plan::library::PlanLibrary<#agent_action>>>
+            ) -> Self {
+                Self {
+                    agent: self.agent,
+                    name: self.name,
+                    plan_library: ::core::option::Option::Some(library.into())
+                }
+            }
+
+            pub fn into_agent(self) -> ::ember::agent::bdi::BdiAgent<'static, #agent_ident, #agent_action, #percept_type> {
+                fn shared_plan_library() -> ::ember::agent::bdi::plan::library::SharedPlanLibrary<#agent_action> {
+                    struct AssumeSingleThreaded(
+                        ::core::cell::RefCell<
+                            ::core::option::Option<
+                                ::ember::agent::bdi::plan::library::SharedPlanLibrary<#agent_action>
+                            >
+                        >
+                    );
+
+                    // SAFETY: only ever accessed from `into_agent`, which always runs
+                    // synchronously before the container starts polling.
+                    unsafe impl ::core::marker::Sync for AssumeSingleThreaded {}
+
+                    static SHARED: AssumeSingleThreaded = AssumeSingleThreaded(
+                        ::core::cell::RefCell::new(::core::option::Option::None)
+                    );
+
+                    ::ember::_crates::critical_section::with(|_| {
+                        SHARED.0
+                            .borrow_mut()
+                            .get_or_insert_with(|| {
+                                ::ember::agent::bdi::plan::library::SharedPlanLibrary::new(#plan_library)
+                            })
+                            .clone()
+                    })
+                }
+
+                let name = self.name.unwrap_or_else(
+                    || ::alloc::borrow::Cow::Borrowed(#agent_name)
+                );
+
                 let beliefbase = #beliefbase;
                 let initial_goals = #initial_goals;
-                let plan_library = #plan_library;
+                let plan_library = self.plan_library.unwrap_or_else(|| shared_plan_library().into());
 
                 ::ember::agent::bdi::BdiAgent::new(
                     name,
-                    self,
+                    self.agent,
                     Some(beliefbase),
                     plan_library,
                     initial_goals,

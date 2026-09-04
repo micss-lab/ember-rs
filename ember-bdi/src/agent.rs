@@ -1,13 +1,14 @@
 use alloc::borrow::Cow;
 use alloc::boxed::Box;
 use alloc::collections::VecDeque;
-
 use alloc::rc::Rc;
+
+use ember_fipa::agent::{ExecutionState, FipaAgent};
+
 use ember_core::agent::Agent;
 use ember_core::environment::Environment;
 use ember_core::message::content::ember_bdil::BdilContent;
 use ember_core::message::{Content, Message, MessageFilter, Performative};
-use ember_fipa::agent::{ExecutionState, FipaAgent};
 
 use crate::context::{Context, PureContext};
 use crate::event::EventSource;
@@ -37,7 +38,8 @@ pub struct BdiAgent<
     name: PureContext,
     state: State,
     beliefs: KnowledgeBase,
-    plans: PlanLibrary<Action, PSel>,
+    plans: Rc<PlanLibrary<Action>>,
+    plan_selector: PSel,
     intentions: IntentionQueue<Action, Sched>,
     pending_actions: VecDeque<(Option<IntentionId>, PendingAction<Action>)>,
     event_queue: EventQueue<Sel>,
@@ -52,20 +54,21 @@ where
     Action: Clone,
     Sched: Default,
     Sel: Default,
-    PSel: PlanSelector<Action>,
+    PSel: PlanSelector<Action> + Default,
 {
     pub fn new(
         name: impl Into<Cow<'static, str>>,
         state: State,
         beliefs: Option<KnowledgeBase>,
-        plans: PlanLibrary<Action, PSel>,
+        plans: impl Into<Rc<PlanLibrary<Action>>>,
         initial_goals: impl IntoIterator<Item = Literal>,
     ) -> Self {
         let mut this = Self {
             name: PureContext::new(Rc::new(name.into())),
             state,
             beliefs: beliefs.unwrap_or_default(),
-            plans,
+            plans: plans.into(),
+            plan_selector: PSel::default(),
             intentions: IntentionQueue::default(),
             pending_actions: VecDeque::new(),
             event_queue: EventQueue::default(),
@@ -127,6 +130,7 @@ impl<'s, State, Action, Percept, Sched, Sel, PSel>
             state: self.state,
             beliefs: self.beliefs,
             plans: self.plans,
+            plan_selector: self.plan_selector,
             intentions: self.intentions.with_scheduler(scheduler),
             pending_actions: self.pending_actions,
             event_queue: self.event_queue,
@@ -145,6 +149,7 @@ impl<'s, State, Action, Percept, Sched, Sel, PSel>
             state: self.state,
             beliefs: self.beliefs,
             plans: self.plans,
+            plan_selector: self.plan_selector,
             intentions: self.intentions,
             pending_actions: self.pending_actions,
             event_queue: self.event_queue.with_event_selector(selector),
@@ -162,7 +167,8 @@ impl<'s, State, Action, Percept, Sched, Sel, PSel>
             name: self.name,
             state: self.state,
             beliefs: self.beliefs,
-            plans: self.plans.with_plan_selector(selector),
+            plans: self.plans,
+            plan_selector: selector,
             intentions: self.intentions,
             pending_actions: self.pending_actions,
             event_queue: self.event_queue,
@@ -194,7 +200,10 @@ where
             };
         }
 
-        let Some((plan, bindings)) = self.plans.select(&event, &self.beliefs, &self.name) else {
+        let Some((plan, bindings)) =
+            self.plans
+                .select(&event, &mut self.plan_selector, &self.beliefs, &self.name)
+        else {
             return;
         };
 
@@ -1010,22 +1019,15 @@ mod tests {
                 Formula::Action(Action::User(TestAction::Log("marker"))),
             ],
         ));
-        let lib = lib.with_plan_selector(RejectShortBody);
 
-        let mut agent = BdiAgent::<
-            Vec<&'static str>,
-            TestAction,
-            (),
-            Random,
-            FirstEvent,
-            RejectShortBody,
-        >::new(
+        let mut agent = BdiAgent::<Vec<&'static str>, TestAction, (), Random, FirstEvent>::new(
             "selector-agent",
             Vec::new(),
             None,
             lib,
             vec![literal("start", vec![])],
-        );
+        )
+        .with_plan_selector(RejectShortBody);
 
         let mut environment = new_environment();
         for _ in 0..10 {

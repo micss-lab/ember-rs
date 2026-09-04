@@ -10,6 +10,8 @@ ember-time = { workspace = true }
 ember-util = { workspace = true }
 ember-collections = { workspace = true }
 
+critical-section = { workspace = true }
+
 ember-acc = { workspace = true, optional = true }
 ember-bdi = { workspace = true, optional = true }
 ember-reactive = { workspace = true, optional = true }

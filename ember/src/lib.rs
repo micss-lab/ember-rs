@@ -15,6 +15,8 @@ pub mod _crates {
     pub use ember_fipa as fipa;
     #[cfg(feature = "agent-reactive")]
     pub use ember_reactive as reactive;
+
+    pub use critical_section;
 }
 
 pub mod agent {
