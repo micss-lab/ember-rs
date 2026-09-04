@@ -38,14 +38,12 @@ impl Mts<'_> {
         message: TransportMessage,
         callbacks: SendCallbacks,
         adt: &mut Adt,
+        environment: &mut Environment,
     ) {
         let envelope = &message.envelopes.base;
         // A message can be sent to multiple receivers at once, though callbacks cannot cloned. We'd
         // have to get rid of the `Box<dyn>` around callbacks to avoid this.
-        #[cfg(feature = "acc")]
         let mut callbacks = Some(callbacks);
-        #[cfg(not(feature = "acc"))]
-        let _ = callbacks;
         if envelope.to.is_empty() {
             log::error!("Cannot send a message with no receivers");
         } else {
@@ -80,6 +78,15 @@ impl Mts<'_> {
                                     "Failed to send message to agent `{t}`: local agent not registered with the ams"
                                 );
                             }
+
+                            if let Some(mut cbs) = callbacks.take() {
+                                if let Some(on_failure) = cbs.on_failure.take() {
+                                    on_failure(environment);
+                                }
+                                if let Some(on_complete) = cbs.on_complete.take() {
+                                    on_complete(environment);
+                                }
+                            }
                             return;
                         }
                     }
@@ -97,6 +104,14 @@ impl Mts<'_> {
                     };
                     if let Payload::AclMessage(message) = message.payload.clone() {
                         inbox.push(message);
+                        if let Some(mut cbs) = callbacks.take() {
+                            if let Some(on_success) = cbs.on_success.take() {
+                                on_success(environment);
+                            }
+                            if let Some(on_complete) = cbs.on_complete.take() {
+                                on_complete(environment);
+                            }
+                        }
                     } else {
                         // TODO: Solve this.
                         log::warn!("Cannot send message that is not a parsed acl message to agent");

@@ -82,7 +82,7 @@ mod mts {
             environment: &mut Environment,
         ) {
             for (message, callbacks) in core::mem::take(container.pending_sends) {
-                self.route(message, callbacks, container.ladt);
+                self.route(message, callbacks, container.ladt, environment);
             }
 
             #[cfg(feature = "acc")]
@@ -99,10 +99,9 @@ mod mts {
 
                     // Deliver the message as if it was to the local agent. Not a
                     // fresh outbound send, nothing to attach callbacks to.
-                    self.route(message, SendCallbacks::default(), container.ladt);
+                    self.route(message, SendCallbacks::default(), container.ladt, environment);
                 }
             }
-            let _ = environment;
         }
     }
 }
