@@ -1,4 +1,3 @@
-use alloc::borrow::Cow;
 use alloc::format;
 
 use alloc::string::ToString;
@@ -37,11 +36,7 @@ impl FipaAgent {
     /// Because this behaviour is component based and not through inheritance, it is up to the
     /// super agent to adhere to this state.
     #[must_use]
-    pub fn update(
-        &mut self,
-        environment: &mut Environment,
-        agent_name: &Cow<'static, str>,
-    ) -> ExecutionState {
+    pub fn update(&mut self, environment: &mut Environment, agent_name: &str) -> ExecutionState {
         use ExecutionState::*;
         match self.state {
             Initiated if !self.registered => {

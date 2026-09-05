@@ -153,6 +153,7 @@ impl TermView<'_> {
     }
 }
 
+#[cfg(test)]
 impl Term {
     pub(crate) fn as_view(&self) -> TermView<'_> {
         self.into()
