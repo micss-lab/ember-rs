@@ -4,6 +4,7 @@ use std::time::Duration;
 use std::vec::Vec;
 
 use bytes::{BufMut, Bytes, BytesMut};
+use ember_core::environment::Environment;
 use multipart::server::{Multipart, ReadEntry, ReadEntryResult};
 use serde::ser::SerializeStruct;
 use tiny_http::Server;
@@ -33,7 +34,8 @@ impl Acc for HttpChannel {
         message: TransportMessage,
         // TODO: Make use of these callbacks.
         _callbacks: super::SendCallbacks,
-    ) -> Result<(), ()> {
+        _environment: &mut Environment,
+    ) -> Result<(), super::SendError> {
         use rand::RngCore;
         let mut boundary = [0u8; 16];
         rand::rng().fill_bytes(&mut boundary);
@@ -56,11 +58,11 @@ impl Acc for HttpChannel {
             Err(ureq::Error::Timeout(ureq::Timeout::RecvResponse)) => {
                 // TODO: Handle this.
                 log::warn!("Remote acc did not respond");
-                return Err(());
+                return Err(super::SendError::Generic("".into()));
             }
             Err(e) => {
                 log::error!("failed to send message: {e}");
-                return Err(());
+                return Err(super::SendError::Generic("".into()));
             }
         };
 

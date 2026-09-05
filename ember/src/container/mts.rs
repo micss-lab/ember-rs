@@ -126,6 +126,7 @@ impl Mts<'_> {
                                 resolved,
                                 message.clone(),
                                 callbacks.take().unwrap_or_default(),
+                                &mut *environment,
                             )
                             .is_ok()
                         {

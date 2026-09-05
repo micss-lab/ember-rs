@@ -144,7 +144,7 @@ fn example() {
     use ember::_crates::acc::Channels;
 
     let mut client_channels = Channels::new();
-    client_channels.enable_espnow(Some(sender), None);
+    client_channels.enable_espnow(Some(sender), None, false);
     let mut client_container = Container::default()
         .with_channels(client_channels)
         .with_agent(
@@ -153,7 +153,7 @@ fn example() {
         );
 
     let mut server_channels = Channels::new();
-    server_channels.enable_espnow(None, Some(receiver));
+    server_channels.enable_espnow(None, Some(receiver), false);
     let mut server_container = Container::default()
         .with_channels(server_channels)
         .with_agent(ReactiveAgent::new("server", ()).with_behaviour(MetricsReceiver));

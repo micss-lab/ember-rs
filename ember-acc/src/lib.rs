@@ -18,16 +18,17 @@ use self::espnow::*;
 #[cfg(feature = "http")]
 use self::http::*;
 
+use self::error::SendError;
+
+pub mod error;
+
 #[cfg(feature = "espnow")]
 mod espnow;
 #[cfg(feature = "http")]
 mod http;
 
 #[cfg(feature = "espnow")]
-pub use self::espnow::ReliableEspNowChannel;
-
-#[cfg(any(feature = "serde-espnow", feature = "serde-http"))]
-pub mod serde;
+pub use self::espnow::EspNowChannel;
 
 #[cfg(feature = "espnow")]
 pub mod util {
@@ -38,7 +39,7 @@ pub mod util {
     pub fn aid_to_mac(aid: &Aid) -> [u8; 6] {
         use ember_core::agent::aid::AgentPlatform::*;
         let mac = match aid.platform() {
-            Local => panic!("espnow channel does not support sending messages to localhost"),
+            Local => panic!("channels do not support sending messages to the local platform"),
             Public(p) => p
                 .parse::<MacAddr6>()
                 .expect("failed to parse destination platform as mac address"),
@@ -53,7 +54,8 @@ pub trait Acc {
         aid: &Aid,
         message: TransportMessage,
         callbacks: SendCallbacks,
-    ) -> Result<(), ()>;
+        environment: &mut Environment,
+    ) -> Result<(), SendError>;
 
     fn receive(&mut self, environment: &mut Environment) -> Option<TransportMessage>;
 }
@@ -91,12 +93,21 @@ impl<'c> Channels<'c> {
         &mut self,
         sender: Option<EspNowSender<'c>>,
         receiver: Option<EspNowReceiver<'c>>,
+        reliable: bool,
     ) {
         if self.espnow.is_some() {
             log::warn!("EspNow already enabled. Nothing changed.");
             return;
         }
-        self.espnow = Some(EspNowChannel::new(sender, receiver));
+        self.espnow = Some(EspNowChannel::new(sender, receiver, reliable));
+    }
+
+    /// Turns espnow's reliability tracking on or off, if espnow is enabled.
+    #[cfg(feature = "espnow")]
+    pub fn set_espnow_reliable(&mut self, reliable: bool, environment: &mut Environment) {
+        if let Some(espnow) = self.espnow.as_mut() {
+            espnow.set_reliable(reliable, environment);
+        }
     }
 
     #[cfg(feature = "custom")]
@@ -114,21 +125,24 @@ impl Acc for Channels<'_> {
         address: &Aid,
         message: TransportMessage,
         callbacks: SendCallbacks,
-    ) -> Result<(), ()> {
+        environment: &mut Environment,
+    ) -> Result<(), SendError> {
         #[cfg(feature = "custom")]
         if let Some(custom) = self.custom.as_mut() {
-            return custom.send(address, message, callbacks);
+            return custom.send(address, message, callbacks, environment);
         }
         #[cfg(feature = "espnow")]
         if let Some(espnow) = self.espnow.as_mut() {
-            return espnow.send(address, message, callbacks);
+            return espnow.send(address, message, callbacks, environment);
         }
         #[cfg(feature = "http")]
         if let Some(http) = self.http.as_mut() {
-            return http.send(address, message, callbacks);
+            return http.send(address, message, callbacks, environment);
         }
-        let _ = (address, message, callbacks);
-        Err(())
+        let _ = (address, message, callbacks, environment);
+        Err(SendError::Generic(
+            "no channel to send message registered".into(),
+        ))
     }
 
     fn receive(&mut self, environment: &mut Environment) -> Option<TransportMessage> {
